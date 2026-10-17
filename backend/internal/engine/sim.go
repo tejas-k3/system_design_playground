@@ -90,6 +90,8 @@ type node struct {
 	slow            float64
 	slowUntil       float64
 	cut             bool     // partitioned: calls to it get no answer
+	promoted        bool     // replica that took over as the primary after a failover
+	successor       *node    // database: the replica that replaced it
 	held            []func() // calls waiting out a partition, delivered when it heals
 	out, in         []*edge
 

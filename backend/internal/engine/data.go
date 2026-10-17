@@ -42,7 +42,25 @@ func (s *Sim) primaryEdge(n *node) *edge {
 		if e.removed {
 			continue
 		}
-		if e.to.kind == KDatabase || (e.to.kind == KShardRouter && hasChild(e.to, KDatabase)) {
+		if e.to.kind == KDatabase {
+			if t := e.to.successor; t != nil && t.promoted && !t.removed { // a replica took over: writes go there now
+				if pe := s.edgeTo(n, t); pe != nil {
+					return pe
+				}
+				continue // this server cannot reach the new primary
+			}
+			return e
+		}
+		if e.to.kind == KShardRouter && hasChild(e.to, KDatabase) {
+			return e
+		}
+	}
+	return nil
+}
+
+func (s *Sim) edgeTo(n, to *node) *edge {
+	for _, e := range n.out {
+		if !e.removed && e.to == to {
 			return e
 		}
 	}
@@ -350,7 +368,7 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		case write:
 			res.Ver = s.commit(n, c)
 		case c.wl == wlGeo || c.wl == wlLeader:
-		case n.kind == KReplica:
+		case n.kind == KReplica && !n.promoted:
 			res.Ver = s.verAt(c.key, s.now-n.f("replicationLagMs"))
 		default:
 			res.Ver = s.itemVer(c.key)

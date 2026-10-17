@@ -111,3 +111,22 @@ func (s *Sim) pruneCommitted() {
 		s.commitHd = 0
 	}
 }
+
+// truncateVersions forgets every item version written after cutoff (they never reached the replica that took
+// over) and returns how many writes that removed.
+func (s *Sim) truncateVersions(cutoff float64) int {
+	lost := 0
+	for key, v := range s.vers {
+		keep := len(v.t)
+		for keep > 0 && v.t[keep-1] > cutoff {
+			keep--
+		}
+		lost += len(v.t) - keep
+		if keep == 0 {
+			delete(s.vers, key) // an item that only ever existed in the lost window is simply gone
+			continue
+		}
+		v.v, v.t = v.v[:keep], v.t[:keep]
+	}
+	return lost
+}

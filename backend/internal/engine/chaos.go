@@ -10,6 +10,7 @@ type ChaosRecord struct {
 	Type   string  `json:"type"`
 	NodeID string  `json:"nodeId"`
 	Label  string  `json:"label"`
+	Lost   int     `json:"lost,omitempty"` // promotion: acknowledged writes that did not survive
 }
 
 func (s *Sim) fireChaos(ev ChaosEvent) {
@@ -78,6 +79,37 @@ func (s *Sim) partition(n *node, durationSec float64) {
 	})
 }
 
+// scheduleFailover promotes a replica once the failure has been noticed and the replica has taken over, unless
+// the primary came back first (a blip shorter than the detection time is not a failover).
+func (s *Sim) scheduleFailover(db *node) {
+	ep := db.epoch
+	s.after((db.f("detectSec")+db.f("promoteSec"))*1000, func() {
+		if db.down && db.epoch == ep {
+			s.promote(db)
+		}
+	})
+}
+
+// promote makes the first healthy replica the primary. Writes the old primary acknowledged less than the replica's
+// replication lag before it crashed never reached the replica, so they are gone: that is the price of asynchronous replication.
+func (s *Sim) promote(db *node) {
+	var r *node
+	for _, n := range s.order {
+		if n.kind == KReplica && !n.removed && !n.down && !n.promoted {
+			r = n
+			break
+		}
+	}
+	if r == nil {
+		return // nothing to promote: the database stays down
+	}
+	lost := s.truncateVersions(db.downAt - r.f("replicationLagMs"))
+	s.runLost += lost
+	r.promoted = true
+	db.successor = r
+	s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "promotion", NodeID: r.id, Label: r.label, Lost: lost})
+}
+
 // CrashNode takes a node down; if downSec > 0 it restarts automatically.
 func (s *Sim) CrashNode(id string, downSec float64) {
 	n := s.nodes[id]
@@ -91,6 +123,9 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	s.dropConns(n)
 	if n.kind == KRedis {
 		s.loseRedisData(n)
+	}
+	if n.kind == KDatabase && n.s("onFailure") == "promote" {
+		s.scheduleFailover(n)
 	}
 	if downSec > 0 {
 		ep := n.epoch

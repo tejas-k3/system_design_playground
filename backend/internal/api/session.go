@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -366,6 +367,8 @@ func (ss *session) afterAdvance(ctx context.Context) {
 			txt = "Chaos: " + c.Label + " crashed"
 		case "partition":
 			txt = "Chaos: " + c.Label + " was cut off from the network"
+		case "promotion":
+			txt = fmt.Sprintf("Failover: %s is the primary now; %d acknowledged writes were lost", c.Label, c.Lost)
 		}
 		ss.pending = append(ss.pending, notice{"warn", txt})
 	}

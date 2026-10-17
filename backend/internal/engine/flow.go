@@ -581,7 +581,7 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 		s.failAt(n, RNoRoute, cb)
 		return
 	case KReplica:
-		if c.cmd == cmdWrite {
+		if c.cmd == cmdWrite && !n.promoted {
 			s.failAt(n, RNoRoute, cb)
 			return
 		}
