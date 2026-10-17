@@ -199,6 +199,7 @@ func init() {
 					opt("stayDown", "Stay down until it restarts"), opt("promote", "Promote a replica")),
 				num("detectSec", "Failure detection", "Failover", 10, 1, 120, 1, "s", "How long until the failure is noticed.").showIf("onFailure", "promote"),
 				num("promoteSec", "Promotion time", "Failover", 20, 1, 300, 1, "s", "How long the replica takes to become the primary once the failure is noticed.").showIf("onFailure", "promote"),
+				flag("fencing", "Fence the old primary", "Failover", true, "Keep a recovered old primary out. Without it, the old primary comes back, clients return to it, and every write the new primary took in the meantime is lost.").showIf("onFailure", "promote"),
 				num("maxConnections", "Max connections", "Capacity", 500, 10, 5000, 10, "", "Hard limit on open connections from all servers; beyond it connections are refused."),
 				num("queueCap", "Queue size", "Capacity", 100, 0, 5000, 10, "", "Queries that may wait for a free slot."),
 				flag("spatialIndex", "Spatial index", "Features", false, "Makes nearby-location searches cheap."),
@@ -213,7 +214,9 @@ func init() {
 			Params: []ParamSpec{
 				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it can work on at once."),
 				num("readMs", "Read time", "Speed", 10, 1, 500, 1, "ms", "Time for one read."),
-				num("replicationLagMs", "Replication lag", "Freshness", 100, 0, 30000, 50, "ms", "How far behind the primary this copy runs. Writes newer than this are lost if it has to take over."),
+				sel("replication", "Replication", "Freshness", "async", "Asynchronous: the primary acknowledges first, so a failover loses the last few writes. Synchronous: it waits for this copy (slower writes, and writes stop if this copy is down) and nothing is lost.",
+					opt("async", "Asynchronous"), opt("sync", "Synchronous")),
+				num("replicationLagMs", "Replication lag", "Freshness", 100, 0, 30000, 50, "ms", "How far behind the primary this copy runs. Writes newer than this are lost if it has to take over.").showIf("replication", "async"),
 				num("writeMs", "Write time", "Speed", 30, 1, 1000, 1, "ms", "Time for one write, once this replica has been promoted to primary.").adv(),
 				num("maxConnections", "Max connections", "Capacity", 500, 10, 5000, 10, "", "Hard limit on open connections."),
 				num("queueCap", "Queue size", "Capacity", 100, 0, 5000, 10, "", "Queries that may wait."),

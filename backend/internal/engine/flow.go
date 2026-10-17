@@ -570,7 +570,11 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 		return
 	}
 	if n.down {
-		s.failAt(n, RNodeDown, cb)
+		reason := RNodeDown
+		if n.kind == KDatabase && n.s("onFailure") == "promote" && n.successor == nil {
+			reason = RNoPrimary // a replica is about to take over: say so instead of 'down'
+		}
+		s.failAt(n, reason, cb)
 		return
 	}
 	switch n.kind {
