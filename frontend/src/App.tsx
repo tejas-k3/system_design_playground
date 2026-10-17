@@ -12,10 +12,12 @@ import { Toolbar } from './ui/Toolbar'
 import { Welcome } from './ui/Welcome'
 import { togglePlay } from './sim/bridge'
 import { parseHash } from './model/links'
+import { openDesign } from './sim/designs'
 import { loadScenario } from './sim/loadScenario'
 import { useStore } from './state/store'
 
 export function App() {
+  const registryReady = useStore((s) => !!s.reg)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target
@@ -30,17 +32,21 @@ export function App() {
   }, [])
 
   // deep links: /#challenge=<id> and /#design=<id>, on load and when the hash changes in an open tab
+  // (the registry must be ready before a design can be validated, hence the dependency)
   useEffect(() => {
     const open = () => {
       const link = parseHash(location.hash)
       if (link?.kind === 'challenge') loadScenario(link.id)
+      if (link?.kind === 'design') {
+        history.replaceState(null, '', location.pathname + location.search) // a reload must not re-apply the link
+        openDesign(link.id)
+      }
     }
     open()
     window.addEventListener('hashchange', open)
     return () => window.removeEventListener('hashchange', open)
-  }, [])
+  }, [registryReady])
 
-  const registryReady = useStore((s) => !!s.reg)
   return (
     <div className="app">
       <Toolbar />

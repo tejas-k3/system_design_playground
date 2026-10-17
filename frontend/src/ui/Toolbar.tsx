@@ -1,4 +1,5 @@
 import { reset, step, togglePlay } from '../sim/bridge'
+import { shareCurrentDesign } from '../sim/designs'
 import { useStore } from '../state/store'
 
 export function Toolbar() {
@@ -77,6 +78,9 @@ export function Toolbar() {
 
       <div className="spacer" />
       <span className="pill" title="Estimated hourly cost of this design">${cost.toFixed(2)}/hr</span>
+      <button onClick={shareCurrentDesign} title="Copy a link to this design" aria-label="Share a link to this design">
+        <Icon d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v13" />
+      </button>
       <button className="wide" onClick={() => setUi({ picker: true })}>
         Challenges
       </button>
