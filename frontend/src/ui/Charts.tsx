@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SeriesPoint } from '../api/types'
 import { palettes } from '../draw/theme'
-import { pct, successRate } from '../model/goals'
+import { failedAfter, pct, successRate } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { useStore } from '../state/store'
 import { Errors } from './Inspector'
@@ -131,6 +131,7 @@ export function Charts() {
           <Tile label="Success" value={rate === null ? '—' : pct(rate)} bad={total > 20 && (rate ?? 1) < 0.95} />
           <Tile label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
           <Tile label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
+          <Tile label="Failed after" value={failedAfter(run)} />
           <Tile label="In flight" value={String(inFlight)} />
         </span>
       </div>

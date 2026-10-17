@@ -165,6 +165,7 @@ export interface RunStats {
   p50: number
   p95: number
   p99: number
+  failP50: number // median time to failure; p50/p95/p99 count successes only
   mean: number
   errors: Record<string, number>
   conflicts: number
