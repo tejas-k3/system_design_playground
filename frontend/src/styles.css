@@ -94,9 +94,9 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .charts-body > .center { grid-column: 1 / -1; align-self: center; }
 
 .scenario { flex: none; width: 320px; overflow: auto; background: var(--panel); border-right: 1px solid var(--line); z-index: 3; }
-.scenario > header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; } .scenario.closed { width: 52px; } .scenario.closed h2, .scenario.closed .badge, .scenario.closed .x { display: none; }
+.scenario > header { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 8px 10px; } .scenario > header h2 { white-space: nowrap; } .scenario > header .x { margin-left: auto; } .scenario.closed { width: 52px; } .scenario.closed h2, .scenario.closed .badge, .scenario.closed .x { display: none; }
 .scenario-body { padding: 0 12px 12px; } .scenario-body p { margin: 4px 0 8px; }
-.badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--panel2); } .badge.easy { color: var(--ok); } .badge.medium { color: var(--warn); } .badge.hard { color: var(--bad); } .badge.cfg { color: var(--accent); }
+.badge { white-space: nowrap; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--panel2); } .badge.easy { color: var(--ok); } .badge.medium { color: var(--warn); } .badge.hard { color: var(--bad); } .badge.cfg { color: var(--accent); }
 .goals { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; }
 .goals li { display: grid; grid-template-columns: 18px 1fr auto auto; gap: 8px; align-items: baseline; font-size: 13px; } .goals em { color: var(--muted); font-style: normal; } .goals b { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
 .goals .pass .mark, .goals .pass b { color: var(--ok); } .goals .fail .mark, .goals .fail b { color: var(--bad); } .goals .pending { color: var(--muted); }
@@ -122,6 +122,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
   .inspector { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
   .inspector-tab { top: 8px; }
 }
+@media (max-width: 1100px) { .brand-name { display: none; } } /* keep the toolbar on one row at tablet widths */
 @media (max-width: 980px) { /* keep in step with NARROW_PX in model/responsive.ts */
   .toolbar { gap: 6px; padding: 6px 8px; } .brand-name, .clock { display: none; } .spacer { display: none; }
   .toolbar .group { flex: none; } /* wrap a whole group to the next row rather than squeezing it */

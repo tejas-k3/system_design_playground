@@ -12,6 +12,7 @@ export function Toolbar() {
   const setSim = useStore((s) => s.setSim)
   const now = useStore((s) => s.stats.global.now)
   const cost = useStore((s) => s.cost)
+  const nodeCount = useStore((s) => s.diagram.nodes.length)
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const canUndo = useStore((s) => s.past.length > 0)
@@ -78,7 +79,7 @@ export function Toolbar() {
       </div>
 
       <div className="spacer" />
-      <span className="pill" title="Estimated hourly cost of this design">{fmtCost(cost)}</span>
+      {nodeCount > 0 && <span className="pill" title="Estimated hourly cost of this design">{fmtCost(cost)}</span>}
       <button onClick={shareCurrentDesign} title="Copy a link to this design" aria-label="Share a link to this design">
         <Icon d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v13" />
       </button>
