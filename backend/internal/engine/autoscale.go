@@ -107,11 +107,13 @@ func (s *Sim) autoscale(n *node) {
 		add := desired - total
 		a.pending += add
 		for k := 0; k < add; k++ {
+			s.logEvent("scaleUp", n, 0)
 			s.after(n.f("scaleUpDelaySec")*1000, func() {
 				a.pending--
 				if s.autoscaled(n) && !n.removed && a.instances < hi {
 					a.instances++
 					a.ops++
+					s.logEvent("serverUp", n, 0)
 					a.hist = nil   // load measured on the old fleet size says little about the new one
 					s.startNext(n) // queued work can start on the new threads
 				}
@@ -126,6 +128,7 @@ func (s *Sim) autoscale(n *node) {
 		if s.now-a.belowSince >= n.f("scaleDownDelaySec")*1000 && a.instances > lo {
 			a.instances--
 			a.ops++
+			s.logEvent("scaleDown", n, 0)
 			a.hist = nil
 			a.belowSince = s.now
 		}

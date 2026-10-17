@@ -43,6 +43,7 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 		return
 	}
 	factor := math.Max(1, ev.Factor)
+	s.logEvent("slow", t, 0)
 	t.slow = factor
 	t.slowUntil = s.now + ev.DurationSec*1000
 	until := t.slowUntil
@@ -61,6 +62,7 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 	s.at(until, func() {
 		if s.now >= t.slowUntil && t.slowUntil == until {
 			t.slow = 1
+			s.logEvent("slowEnd", t, 0)
 		}
 	})
 }
@@ -69,8 +71,10 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 // timeouts, unlike a crash that refuses at once) until it heals, when the waiting calls are delivered.
 func (s *Sim) partition(n *node, durationSec float64) {
 	n.cut = true
+	s.logEvent("partition", n, 0)
 	s.after(durationSec*1000, func() {
 		n.cut = false
+		s.logEvent("heal", n, 0)
 		held := n.held
 		n.held = nil
 		for _, deliver := range held {
@@ -83,6 +87,11 @@ func (s *Sim) partition(n *node, durationSec float64) {
 // the primary came back first (a blip shorter than the detection time is not a failover).
 func (s *Sim) scheduleFailover(db *node) {
 	ep := db.epoch
+	s.after(db.f("detectSec")*1000, func() {
+		if db.down && db.epoch == ep {
+			s.logEvent("failoverDetected", db, 0)
+		}
+	})
 	s.after((db.f("detectSec")+db.f("promoteSec"))*1000, func() {
 		if db.down && db.epoch == ep {
 			s.promote(db)
@@ -108,6 +117,7 @@ func (s *Sim) promote(db *node) {
 	r.promoted = true
 	db.successor = r
 	s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "promotion", NodeID: r.id, Label: r.label, Lost: lost})
+	s.logEvent("promotion", r, lost)
 }
 
 // CrashNode takes a node down; if downSec > 0 it restarts automatically.
@@ -117,6 +127,7 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 		return
 	}
 	n.down, n.downAt = true, s.now
+	s.logEvent("crash", n, 0)
 	n.epoch++
 	s.failQueued(n, RNodeDown)
 	s.closePools(n)
@@ -145,6 +156,7 @@ func (s *Sim) RestartNode(id string) {
 	}
 	n.down = false
 	n.slow = 1
+	s.logEvent("restart", n, 0)
 	if n.kind == KDatabase && n.successor != nil && n.successor.promoted && !n.b("fencing") {
 		s.rejoinUnfenced(n)
 	}
@@ -192,4 +204,5 @@ func (s *Sim) rejoinUnfenced(db *node) {
 	r.promoted, r.sincePromotion = false, 0
 	db.successor = nil
 	s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "splitbrain", NodeID: db.id, Label: db.label, Lost: lost})
+	s.logEvent("splitbrain", db, lost)
 }

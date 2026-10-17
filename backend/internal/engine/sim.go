@@ -211,6 +211,7 @@ type Sim struct {
 	bi        int
 	series    []SeriesPoint
 	chaosLog  []ChaosRecord
+	events    []Event // everything worth a marker on the charts (capped)
 
 	born       []Particle
 	bornOn     bool
@@ -409,4 +410,12 @@ func (s *Sim) backlog() int { return s.jobEnqueued - s.jobCompleted - s.jobLost 
 func (s *Sim) service(n *node, mean float64) float64 {
 	mode, _ := n.p["variability"].(string)
 	return s.rng.ServiceDist(mean, mode)
+}
+
+// logEvent records something that happened to node n at the current time (see Event).
+func (s *Sim) logEvent(typ string, n *node, lost int) {
+	s.events = append(s.events, Event{T: s.now / 1000, Type: typ, NodeID: n.id, Label: n.label, Lost: lost})
+	if len(s.events) > maxEvents {
+		s.events = append([]Event(nil), s.events[len(s.events)-maxEvents:]...)
+	}
 }
