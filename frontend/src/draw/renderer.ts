@@ -4,7 +4,7 @@ import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
 import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from '../model/rates'
-import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, noteRect, nodeRect, HANDLE_R } from './geometry'
+import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
 
@@ -138,9 +138,21 @@ function drawParticles(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<stri
     const y = g.a.y + (g.b.y - g.a.y) * k + Math.cos(ang) * off
     ctx.globalAlpha = 1 - Math.pow(Math.abs(t - 0.5) * 2, 3) * 0.6
     ctx.fillStyle = pt.fail ? sc.palette.bad : pt.back ? sc.palette.ok : sc.palette.accent
-    ctx.beginPath()
-    ctx.arc(x, y, pt.fail ? 4 : 3.2, 0, Math.PI * 2)
-    ctx.fill()
+    if (particleShape(pt) === 'cross') {
+      ctx.strokeStyle = sc.palette.bad
+      ctx.lineWidth = 2.2
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(x - 3.6, y - 3.6)
+      ctx.lineTo(x + 3.6, y + 3.6)
+      ctx.moveTo(x + 3.6, y - 3.6)
+      ctx.lineTo(x - 3.6, y + 3.6)
+      ctx.stroke()
+    } else {
+      ctx.beginPath()
+      ctx.arc(x, y, 3.2, 0, Math.PI * 2)
+      ctx.fill()
+    }
   }
   ctx.globalAlpha = 1
 }
@@ -251,6 +263,7 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
     ctx.fillStyle = 'rgba(0,0,0,0)'
     ctx.strokeStyle = p.bad
     ctx.lineWidth = 2
+    ctx.setLineDash([7, 4]) // dashed as well as red: trouble is not signalled by colour alone
     ctx.beginPath()
     ctx.roundRect(r.x - 2, r.y - 2, r.w + 4, r.h + 4, 12)
     ctx.stroke()
@@ -306,6 +319,17 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
     ctx.beginPath()
     ctx.roundRect(bx, by, utilBarWidth(ns.util, bw), 5, 3)
     ctx.fill()
+    // ticks where the colour changes (60% and 85%), so the level can be read from the length alone
+    ctx.strokeStyle = p.ink
+    ctx.globalAlpha = 0.45
+    ctx.lineWidth = 1
+    for (const mark of [0.6, 0.85]) {
+      ctx.beginPath()
+      ctx.moveTo(bx + bw * mark, by - 2)
+      ctx.lineTo(bx + bw * mark, by + 7)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
   }
   // chips sit just above the node, right-aligned, so they never cover its title
   let cx = r.x + r.w - 4

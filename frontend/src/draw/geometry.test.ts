@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Diagram } from '../api/types'
 import type { Reg } from '../model/diagram'
-import { HANDLE_R, fitFontSize, handlePos, handleRadius, hitTest, legibleSize, nodeRect } from './geometry'
+import { HANDLE_R, particleShape, fitFontSize, handlePos, handleRadius, hitTest, legibleSize, nodeRect } from './geometry'
 
 const reg = { spec: () => ({ width: 160, height: 72 }) } as unknown as Reg
 const diagram = { nodes: [{ id: 'a', kind: 'appServer', x: 0, y: 0, label: 'a', params: {} }], edges: [], notes: [] } as unknown as Diagram
@@ -54,5 +54,14 @@ describe('fitFontSize', () => {
   })
   it('stops at the minimum, where the caller truncates', () => {
     expect(fitFontSize(measure, 'A very long component name indeed', 98, 16, 12)).toBe(12)
+  })
+})
+
+describe('particleShape', () => {
+  it('draws a failed request as a cross and everything else as a dot, so failure never depends on colour alone', () => {
+    expect(particleShape({ fail: true, back: false })).toBe('cross')
+    expect(particleShape({ fail: true, back: true })).toBe('cross')
+    expect(particleShape({ fail: false, back: true })).toBe('dot')
+    expect(particleShape({ fail: false, back: false })).toBe('dot')
   })
 })
