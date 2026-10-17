@@ -3,6 +3,7 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
+import { clientRateLabel, fmtRate } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
@@ -69,12 +70,6 @@ export function createRough(canvas: HTMLCanvasElement): RoughCanvas {
 function roundedPath(r: Rect, rad: number): string {
   const { x, y, w, h } = r
   return `M ${x + rad} ${y} L ${x + w - rad} ${y} Q ${x + w} ${y} ${x + w} ${y + rad} L ${x + w} ${y + h - rad} Q ${x + w} ${y + h} ${x + w - rad} ${y + h} L ${x + rad} ${y + h} Q ${x} ${y + h} ${x} ${y + h - rad} L ${x} ${y + rad} Q ${x} ${y} ${x + rad} ${y} Z`
-}
-
-function fmtRate(v: number): string {
-  if (v >= 10000) return `${(v / 1000).toFixed(0)}k`
-  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`
-  return v >= 10 ? `${Math.round(v)}` : v.toFixed(1)
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, sc: Scene) {
@@ -164,12 +159,17 @@ function drawParticles(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<stri
   ctx.globalAlpha = 1
 }
 
+/** Requests per second leaving a node, from the live stats of its outgoing connections. */
+function sentRate(id: string, sc: Scene): number {
+  return sc.diagram.edges.reduce((sum, e) => (e.from === id ? sum + (sc.stats.edges[e.id]?.rps ?? 0) : sum), 0)
+}
+
 function nodeSubtitle(n: Node, sc: Scene): string {
   const spec = sc.reg.spec(n.kind)!
   const rp = sc.reg.resolve(n)
   switch (n.kind) {
     case 'client':
-      return `${rp.rps} rps${rp.pattern !== 'constant' ? ` → ${rp.peakRps}` : ''}`
+      return clientRateLabel(rp as { rps: number; pattern: string; peakRps: number }, sc.running, sentRate(n.id, sc))
     case 'appServer':
       return `${rp.threads} threads`
     case 'database':
