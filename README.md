@@ -50,8 +50,13 @@ Open **Challenges** for guided scenarios. Each has goals (success rate, latency,
 bookings, stale reads…), three hints, a prediction question, a reference solution you can reveal after
 the hints, and a debrief. Some are *configuration only*: the architecture is fixed.
 
-Shortcuts: `Space` play/pause · `V` select · `C` connect · `Delete` remove · `Ctrl/⌘ Z` undo ·
+Shortcuts: `Space` play/pause · `V` select · `C` connect · `Delete` remove · arrow keys move (Shift: far) · `Ctrl/⌘ Z` undo ·
 `Shift+Z` redo · `F` fit view · `+`/`-` zoom · double-click empty space for a note · `Esc` cancel.
+
+**Without a mouse or on a phone:** the first Tab stop on the canvas is a list of every component (Enter selects one);
+the inspector's "Sends requests to" section connects and disconnects components from a dropdown, so nothing
+requires dragging. On a touch screen, pinch to zoom and drag to pan; below 980 px wide the panels start closed
+and the inspector becomes a bottom sheet.
 
 ## What is simulated
 
