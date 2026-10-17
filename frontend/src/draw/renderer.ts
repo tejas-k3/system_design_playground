@@ -216,8 +216,10 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
   const down = !!ns?.down
   const failing = !!ns && ns.arr > 2 && ns.err / Math.max(ns.arr, 1) > 0.02
 
+  // the hand-drawn body is generated once at the origin and translated into place: caching it at its absolute position
+  // left a ghost behind whenever the component was moved
   const body = cached(`n:${n.id}:${r.w}:${r.h}:${p.card}`, () =>
-    rc.generator.path(roundedPath(r, 10), { roughness: 1.05, bowing: 0.8, seed: hash(n.id), fill: p.card, fillStyle: 'solid' }),
+    rc.generator.path(roundedPath({ x: 0, y: 0, w: r.w, h: r.h }, 10), { roughness: 1.05, bowing: 0.8, seed: hash(n.id), fill: p.card, fillStyle: 'solid' }),
   )
   if (failing && sc.running) {
     ctx.save()
@@ -231,7 +233,10 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
     ctx.stroke()
     ctx.restore()
   }
+  ctx.save()
+  ctx.translate(r.x, r.y)
   rc.draw({ ...body, options: { ...body.options, stroke: down ? p.bad : p.ink, strokeWidth: selected ? 2.4 : 1.7, fill: p.card } })
+  ctx.restore()
   if (selected) {
     ctx.save()
     ctx.setLineDash([5, 4])
