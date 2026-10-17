@@ -79,6 +79,8 @@ func (p ParamSpec) needs(kinds ...string) ParamSpec { p.NeedsEdgeTo = kinds; ret
 func (p ParamSpec) fixed() ParamSpec                { p.FixedInChallenge = true; return p }
 func (p ParamSpec) adv() ParamSpec                  { p.Advanced = true; return p }
 
+func pb(p Params, k string) bool { v, _ := p[k].(bool); return v }
+
 func pf(p Params, k string, def float64) float64 {
 	switch v := p[k].(type) {
 	case float64:
@@ -145,6 +147,12 @@ func init() {
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				num("cpuMs", "CPU time", "Capacity", 20, 1, 500, 1, "ms", "Compute per request, not counting time waiting on dependencies.").fixed(),
 				variability("Capacity"),
+				flag("autoscale", "Autoscale", "Scaling", false, "Add and remove whole servers (each with these threads) as load changes. New servers take time to boot, and every running server costs money.").adv(),
+				num("minInstances", "Min servers", "Scaling", 1, 1, 32, 1, "", "Never fewer than this many.").adv().showIf("autoscale", "true"),
+				num("maxInstances", "Max servers", "Scaling", 8, 1, 32, 1, "", "Never more than this many.").adv().showIf("autoscale", "true"),
+				num("targetUtilPct", "Target busy level", "Scaling", 60, 20, 95, 5, "%", "Add servers when threads are busier than this, over the last 30 s.").adv().showIf("autoscale", "true"),
+				num("scaleUpDelaySec", "Boot time", "Scaling", 30, 1, 300, 1, "s", "How long a new server takes before it can take requests.").adv().showIf("autoscale", "true"),
+				num("scaleDownDelaySec", "Scale-down wait", "Scaling", 120, 0, 900, 5, "s", "How long load must stay low before one server is removed (stops it flapping).").adv().showIf("autoscale", "true"),
 				num("queueCap", "Queue size", "Capacity", 50, 0, 2000, 10, "", "Requests that may wait for a thread. When full, new ones get a 503."),
 				sel("queueOrder", "Queue order", "Capacity", "fifo", "Who gets the next free thread. Under overload newest-first serves people still waiting.",
 					opt("fifo", "Oldest first"), opt("lifo", "Newest first")),
@@ -338,7 +346,12 @@ func NodeCost(n Node) float64 {
 	if s == nil {
 		return 0
 	}
-	return s.cost(Resolve(n.Kind, n.Params))
+	p := Resolve(n.Kind, n.Params)
+	c := s.cost(p)
+	if n.Kind == KAppServer && pb(p, "autoscale") { // a fleet costs at least its minimum number of servers
+		c *= math.Max(1, pf(p, "minInstances", 1))
+	}
+	return c
 }
 
 // DiagramCost sums node costs.

@@ -276,7 +276,7 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	resp := runResp{Stats: sim.Snapshot(), CostPerHour: engine.DiagramCost(d), Truncated: truncated}
+	resp := runResp{Stats: sim.Snapshot(), CostPerHour: sim.CostPerHour(), Truncated: truncated}
 	if sc != nil {
 		sc := engine.Evaluate(sc.Goals, d, sim.RunSnapshot(), resp.CostPerHour)
 		resp.Score = &sc

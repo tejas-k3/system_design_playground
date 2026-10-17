@@ -375,7 +375,7 @@ func (ss *session) afterAdvance(ctx context.Context) {
 	if ss.sc != nil && !ss.finished && ss.sim.Finished() {
 		ss.finished = true
 		ss.status = "paused"
-		score := engine.Evaluate(ss.sc.Goals, ss.diagram, ss.sim.RunSnapshot(), engine.DiagramCost(ss.diagram))
+		score := engine.Evaluate(ss.sc.Goals, ss.diagram, ss.sim.RunSnapshot(), ss.sim.CostPerHour())
 		ss.send(ctx, resultMsg{Type: "result", ScenarioID: ss.sc.ID, Score: score})
 	}
 }

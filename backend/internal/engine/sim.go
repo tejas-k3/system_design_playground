@@ -91,6 +91,7 @@ type node struct {
 	slowUntil       float64
 	cut             bool     // partitioned: calls to it get no answer
 	promoted        bool     // replica that took over as the primary after a failover
+	as              scaler   // app server autoscaling state
 	successor       *node    // database: the replica that replaced it
 	held            []func() // calls waiting out a partition, delivered when it heals
 	out, in         []*edge
@@ -325,6 +326,7 @@ func (s *Sim) tick() {
 			continue
 		}
 		s.markBusy(n)
+		s.autoscale(n)
 		capN := float64(s.capacity(n))
 		switch {
 		case n.kind == KQueue:
