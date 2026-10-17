@@ -10,6 +10,14 @@ export interface GoalRow {
 const pct = (f: number) => `${(Math.floor(f * 1000) / 10).toFixed(1)}%`
 const ms = (v: number) => (v >= 10000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`)
 
+/** What the extra stars need, in words ('' when a challenge has no star targets). */
+export function starTargets(g: Goals): string {
+  const parts: string[] = []
+  if (g.starCostPerHour !== undefined) parts.push(`2 need cost ≤ $${g.starCostPerHour.toFixed(2)}/hr`)
+  if (g.starP95Ms !== undefined) parts.push(`${parts.length ? '3 also' : '3'} need p95 ≤ ${ms(g.starP95Ms)}`)
+  return parts.length ? `Stars: ${parts.join(', ')}.` : ''
+}
+
 /** Live read-out of how a run is tracking against the goals (the server gives the final verdict). */
 export function goalRows(g: Goals, stats: Stats, cost: number, started: boolean): GoalRow[] {
   const r = stats.global.run
