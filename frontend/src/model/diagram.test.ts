@@ -1,29 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Reg, defaultLatency, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
-import type { Registry } from '../api/types'
+import { reg } from '../test/fixtures'
+import { defaultLatency, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
 
-const registry: Registry = {
-  latency: { min: 1, max: 200 },
-  nodes: [
-    {
-      kind: 'client', name: 'Users', description: '', lesson: '', accent: '#000', width: 160, height: 72,
-      canConnectTo: ['appServer'],
-      params: [{ key: 'rps', label: 'rps', group: 'g', type: 'number', default: 50, min: 1, max: 5000 }],
-    },
-    {
-      kind: 'appServer', name: 'App Server', description: '', lesson: '', accent: '#000', width: 160, height: 72,
-      canConnectTo: ['database'],
-      params: [
-        { key: 'threads', label: 't', group: 'g', type: 'number', default: 8, min: 1, max: 64 },
-        { key: 'order', label: 'o', group: 'g', type: 'select', default: 'fifo', options: [{ value: 'fifo', label: '' }, { value: 'lifo', label: '' }] },
-        { key: 'dbPool', label: 'p', group: 'g', type: 'number', default: 20, min: 1, max: 200, needsEdgeTo: ['database'] },
-        { key: 'cb', label: 'c', group: 'g', type: 'boolean', default: false },
-      ],
-    },
-    { kind: 'database', name: 'Database', description: '', lesson: '', accent: '#000', width: 160, height: 72, canConnectTo: null, params: [] },
-  ],
-}
-const reg = new Reg(registry)
+
 
 describe('sanitizeDiagram', () => {
   it('rejects non-objects', () => {
