@@ -41,9 +41,22 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 		s.partition(t, ev.DurationSec)
 		return
 	}
-	t.slow = math.Max(1, ev.Factor)
+	factor := math.Max(1, ev.Factor)
+	t.slow = factor
 	t.slowUntil = s.now + ev.DurationSec*1000
 	until := t.slowUntil
+	// intermittent: slow for PulseSec, normal for PulseSec, ... (the last step to normal is the end below)
+	for at, on := s.now+ev.PulseSec*1000, false; ev.PulseSec > 0 && at < until; at, on = at+ev.PulseSec*1000, !on {
+		slow := factor
+		if !on {
+			slow = 1
+		}
+		s.at(at, func() {
+			if t.slowUntil == until && s.now < until {
+				t.slow = slow
+			}
+		})
+	}
 	s.at(until, func() {
 		if s.now >= t.slowUntil && t.slowUntil == until {
 			t.slow = 1
