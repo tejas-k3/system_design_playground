@@ -25,6 +25,10 @@ export class Reg {
   params(kind: string): ParamSpec[] {
     return this.byKind.get(kind)?.params ?? []
   }
+  /** Human label of a select setting's value, e.g. 'roundRobin' -> 'Round robin'. */
+  optionLabel(kind: string, key: string, value: unknown): string | undefined {
+    return this.params(kind).find((p) => p.key === key)?.options?.find((o) => o.value === value)?.label
+  }
   defaults(kind: string): Params {
     const out: Params = {}
     for (const p of this.params(kind)) out[p.key] = p.default

@@ -4,7 +4,7 @@ import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
 import { clientRateLabel, edgeLabel, smoothRate, utilBarWidth } from '../model/rates'
-import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, handleRadius, legibleSize, noteRect, nodeRect, HANDLE_R } from './geometry'
+import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
 
@@ -193,6 +193,8 @@ function nodeSubtitle(n: Node, sc: Scene): string {
   switch (n.kind) {
     case 'client':
       return clientRateLabel(rp as { rps: number; pattern: string; peakRps: number }, sc.running, sentRate(n.id, sc), sc.traffic?.[n.id])
+    case 'loadBalancer':
+      return sc.reg.optionLabel(n.kind, 'algorithm', rp.algorithm) ?? spec.name
     case 'appServer':
       return `${rp.threads} threads`
     case 'database':
@@ -281,9 +283,10 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = p.ink
   const zoom = sc.viewport.zoom
-  ctx.font = `bold ${legibleSize(16, zoom, 11)}px ${FONT}`
-  let label = n.label
   const maxW = r.w - 62
+  const titleSize = fitFontSize((t, size) => { ctx.font = `bold ${size}px ${FONT}`; return ctx.measureText(t).width }, n.label, maxW, legibleSize(16, zoom, 11), 12)
+  ctx.font = `bold ${titleSize}px ${FONT}`
+  let label = n.label
   while (label.length > 3 && ctx.measureText(label).width > maxW) label = label.slice(0, -2)
   if (label !== n.label) label += '…'
   ctx.fillText(label, r.x + 52, r.y + 28)

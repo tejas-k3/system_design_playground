@@ -131,7 +131,7 @@ export function Charts() {
           <Tile label="Success" value={rate === null ? '—' : pct(rate)} bad={total > 20 && (rate ?? 1) < 0.95} />
           <Tile label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
           <Tile label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
-          <Tile label="Failed after" value={failedAfter(run)} />
+          <Tile label="Failures took" value={failedAfter(run)} hint="Median time a failed request took, from the user's first attempt. p50 and p95 count successes only." />
           <Tile label="In flight" value={String(inFlight)} />
         </span>
       </div>
@@ -157,9 +157,9 @@ export function Charts() {
   )
 }
 
-function Tile({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+function Tile({ label, value, bad, hint }: { label: string; value: string; bad?: boolean; hint?: string }) {
   return (
-    <span className={`tile ${bad ? 'bad' : ''}`}>
+    <span className={`tile ${bad ? 'bad' : ''}`} title={hint}>
       <small>{label}</small>
       <b>{value}</b>
     </span>

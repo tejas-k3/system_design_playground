@@ -125,3 +125,14 @@ describe('nothingToRun', () => {
     expect(nothingToRun(dia([node('u', 'client'), node('a', 'appServer')], [{ from: 'u', to: 'a' }]))).toBeNull()
   })
 })
+
+describe('optionLabel', () => {
+  it('names the chosen option of a select setting', () => {
+    expect(reg.optionLabel('appServer', 'order', 'lifo')).toBe('Newest first')
+  })
+  it('returns undefined for anything it cannot name', () => {
+    expect(reg.optionLabel('appServer', 'order', 'nope')).toBeUndefined()
+    expect(reg.optionLabel('appServer', 'threads', 8)).toBeUndefined()
+    expect(reg.optionLabel('ghost', 'order', 'lifo')).toBeUndefined()
+  })
+})

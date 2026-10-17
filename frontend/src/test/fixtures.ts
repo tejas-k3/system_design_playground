@@ -22,7 +22,7 @@ export const registry: Registry = {
       canConnectTo: ['database'],
       params: [
         { key: 'threads', label: 't', group: 'g', type: 'number', default: 8, min: 1, max: 64 },
-        { key: 'order', label: 'o', group: 'g', type: 'select', default: 'fifo', options: [{ value: 'fifo', label: '' }, { value: 'lifo', label: '' }] },
+        { key: 'order', label: 'o', group: 'g', type: 'select', default: 'fifo', options: [{ value: 'fifo', label: 'Oldest first' }, { value: 'lifo', label: 'Newest first' }] },
         { key: 'dbPool', label: 'p', group: 'g', type: 'number', default: 20, min: 1, max: 200, needsEdgeTo: ['database'] },
         { key: 'cb', label: 'c', group: 'g', type: 'boolean', default: false },
       ],
