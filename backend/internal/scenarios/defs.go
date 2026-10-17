@@ -455,4 +455,30 @@ func init() {
 		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is freshness, which is why caching suits content that changes slowly.",
 	})
 
+	// 16 ─ Medium, config only ─────────────────────────────────────────────────────────
+	lopsided := func(algorithm string) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 300.0, "readPct": 90.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, P{"algorithm": algorithm}).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "lb").servers(4, cols[2], rowTop, 80, nil).done()
+	}
+	register(&Scenario{
+		ID: "one-slow-server", Title: "One slow server", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Round robin keeps feeding a server that has become eight times slower.",
+		Story:   "One of four servers starts running eight times slower (a noisy neighbour, a bad disk). The load balancer still hands it a quarter of the traffic, and users feel it. The architecture is fixed.",
+		Diagram: lopsided("roundRobin"), Solution: lopsided("leastConn"),
+		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "app2", AtSec: 2, Factor: 8, DurationSec: 200}},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(400)},
+		DurationSec: 50, WarmupSec: 6, Speed: 1,
+		Hints: [3]string{
+			"Round robin treats every server as equal. Is that still true?",
+			"The balancer can send new work to whichever server has the fewest requests in flight, or stop using a server that misbehaves.",
+			"Switch the load balancer to least connections, or turn on outlier ejection.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Why does a least-connections balancer help when one server is slow?", Options: []string{"A slow server accumulates open requests, so it is picked less often", "It makes the slow server faster", "It restarts the slow server"}, Answer: 0,
+			Explain: "Requests pile up on the slow server, so its in-flight count is high and new requests go elsewhere."}},
+		Debrief: "Balancing is not about equal shares, it is about equal outcomes. Least connections adapts to slowness automatically; ejecting outliers goes further and rests a sick server entirely.",
+	})
+
 }

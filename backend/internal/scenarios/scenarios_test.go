@@ -109,6 +109,13 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("failed: %+v", res.Checks)
 		}
 	})
+	t.Run("one-slow-server is also fixed by ejecting the outlier", func(t *testing.T) {
+		sc := Get("one-slow-server")
+		d := withParam(sc.Diagram, "lb", "outlierEjection", true)
+		if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("outlier ejection failed: %+v", res.Checks)
+		}
+	})
 	t.Run("results are stable across seeds for the reference solutions", func(t *testing.T) {
 		for _, sc := range All() {
 			for _, seed := range []uint32{1, 2, 3} {
