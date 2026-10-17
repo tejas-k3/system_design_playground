@@ -3,6 +3,7 @@ import type { SeriesPoint } from '../api/types'
 import { palettes } from '../draw/theme'
 import { useStore } from '../state/store'
 import { Errors } from './Inspector'
+import { Traces } from './Traces'
 
 interface Line {
   label: string
@@ -96,6 +97,7 @@ const compact = (v: number) => (v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : v >= 
 
 export function Charts() {
   const [open, setOpen] = useState(true)
+  const [tab, setTab] = useState<'metrics' | 'traces'>('metrics')
   const series = useStore((s) => s.stats.series)
   const run = useStore((s) => s.stats.global.run)
   const inFlight = useStore((s) => s.stats.global.inFlight)
@@ -116,7 +118,11 @@ export function Charts() {
   return (
     <section className={`charts ${open ? '' : 'closed'}`} aria-label="Run metrics">
       <div className="charts-head">
-        <button className="link" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? '▾' : '▸'} Metrics</button>
+        <button className="link" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? 'Collapse metrics' : 'Expand metrics'}>{open ? '▾' : '▸'}</button>
+        <div className="seg" role="tablist" aria-label="Metrics view">
+          <button role="tab" aria-selected={tab === 'metrics'} className={tab === 'metrics' ? 'on' : ''} onClick={() => { setTab('metrics'); setOpen(true) }}>Metrics</button>
+          <button role="tab" aria-selected={tab === 'traces'} className={tab === 'traces' ? 'on' : ''} onClick={() => { setTab('traces'); setOpen(true) }}>Request traces</button>
+        </div>
         <span className="tiles">
           <Tile label="Requests" value={run.resolved.toLocaleString()} />
           <Tile label="Success" value={total ? `${(Math.floor((run.ok / total) * 1000) / 10).toFixed(1)}%` : '—'} bad={total > 20 && run.ok / total < 0.95} />
@@ -125,7 +131,8 @@ export function Charts() {
           <Tile label="In flight" value={String(inFlight)} />
         </span>
       </div>
-      {open && (
+      {open && tab === 'traces' && <Traces />}
+      {open && tab === 'metrics' && (
         <div className="charts-body">
           {status === 'stopped' && series.length === 0 ? (
             <p className="muted center">Press Play to start sending traffic.</p>
