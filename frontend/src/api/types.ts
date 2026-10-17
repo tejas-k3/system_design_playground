@@ -205,9 +205,43 @@ export interface Notice {
   text: string
 }
 
+/** One visit of a request to a node. Times are ms since the request was created. */
+export interface Span {
+  node: string
+  label: string
+  kind: string
+  depth: number
+  attempt: number
+  at: number // arrived
+  start: number // began being served (after any queueing)
+  end: number // answered
+  ok: boolean
+  reason?: string
+  open?: boolean // still running when the trace was read
+  late?: boolean // began after the request had already resolved
+}
+
+export interface Trace {
+  id: number
+  client: string
+  write: boolean
+  key: number
+  ok: boolean
+  reason?: string
+  latencyMs: number
+  attempts: number
+  spans: Span[]
+}
+
+export interface TraceSet {
+  failed: Trace[]
+  ok: Trace[]
+}
+
 export type ServerMsg =
   | { type: 'frame'; status: SimStatus; speed: number; stats?: Stats; particles?: Particle[]; notices?: Notice[] }
   | { type: 'result'; scenarioId: string; score: Score }
+  | ({ type: 'traces' } & TraceSet)
   | { type: 'error'; message: string }
 
 export type ClientMsg =
@@ -215,4 +249,5 @@ export type ClientMsg =
   | { type: 'diagram'; diagram: Diagram }
   | { type: 'play' | 'pause' | 'step' | 'reset' }
   | { type: 'speed'; speed: number }
+  | { type: 'traces' }
   | { type: 'crash' | 'restart'; nodeId: string }

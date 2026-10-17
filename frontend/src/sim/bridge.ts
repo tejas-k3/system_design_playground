@@ -24,6 +24,9 @@ function onMessage(m: ServerMsg) {
       pushParticles(m.particles)
       m.notices?.forEach((n) => st.toast(n.text, n.level === 'warn' ? 'warn' : n.level, 4000))
       break
+    case 'traces':
+      st.setTraces({ failed: m.failed ?? [], ok: m.ok ?? [] })
+      break
     case 'result':
       if (st.scenario?.def.id === m.scenarioId) st.setResult(m.score)
       break
@@ -95,6 +98,9 @@ export function play(): void {
     sock.send({ type: 'play' })
   })
 }
+
+/** Ask the server for the latest request traces; the answer lands in the store. */
+export const requestTraces = () => socket?.open && socket.send({ type: 'traces' })
 
 export const pause = () => withSocket((sock) => sock.send({ type: 'pause' }))
 

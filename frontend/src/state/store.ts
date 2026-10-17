@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Diagram, Edge, Node, Note, Prediction, Scenario, Score, SimStatus, Stats } from '../api/types'
+import type { Diagram, Edge, Node, Note, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
 
 export type Tool = 'select' | 'connect'
@@ -39,6 +39,7 @@ export interface State {
   progress: Record<string, number>
   sim: { status: SimStatus; speed: number; seed: number }
   stats: Stats
+  traces: TraceSet | null // latest request traces from the server; null before the first answer
   cost: number
   scenario: ScenarioState | null
   sandbox: Diagram | null // sandbox saved while a scenario is open
@@ -77,6 +78,7 @@ export interface State {
   setUi(p: Partial<State['ui']>): void
   setSim(p: Partial<State['sim']>): void
   setStats(s: Stats): void
+  setTraces(t: TraceSet | null): void
   setCost(c: number): void
   setConnection(c: Connection): void
   toast(text: string, kind?: Toast['kind'], ms?: number): void
@@ -124,6 +126,7 @@ export const useStore = create<State>()((set, get) => {
     progress: {},
     sim: { status: 'stopped', speed: 1, seed: 42 },
     stats: emptyStats(),
+    traces: null,
     cost: 0,
     scenario: null,
     sandbox: null,
@@ -140,6 +143,7 @@ export const useStore = create<State>()((set, get) => {
     clearRun: () =>
       set((s) => ({
         stats: emptyStats(),
+        traces: null,
         scenario: s.scenario ? { ...s.scenario, result: null } : null,
         ui: { ...s.ui, result: false },
       })),
@@ -260,6 +264,7 @@ export const useStore = create<State>()((set, get) => {
     setUi: (p) => set((s) => ({ ui: { ...s.ui, ...p } })),
     setSim: (p) => set((s) => ({ sim: { ...s.sim, ...p } })),
     setStats: (stats) => set({ stats: { ...stats, series: stats.series ?? [], nodes: stats.nodes ?? {}, edges: stats.edges ?? {} } }),
+    setTraces: (traces) => set({ traces }),
     setCost: (cost) => set({ cost }),
     setConnection: (connection) => set({ connection }),
 
@@ -279,6 +284,7 @@ export const useStore = create<State>()((set, get) => {
         future: [],
         selection: [],
         stats: emptyStats(),
+        traces: null,
         scenario: { def, hintLevel: 0, result: null, predictions: {}, solved: false },
         sim: { ...s.sim, status: 'stopped', speed: def.speed || 1 },
         ui: { ...s.ui, picker: false, welcome: false, result: false },
@@ -293,6 +299,7 @@ export const useStore = create<State>()((set, get) => {
         future: [],
         selection: [],
         stats: emptyStats(),
+        traces: null,
         scenario: null,
         sim: { ...s.sim, status: 'stopped' },
         ui: { ...s.ui, welcome: !(s.sandbox?.nodes.length), result: false },
