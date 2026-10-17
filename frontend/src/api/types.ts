@@ -118,6 +118,15 @@ export interface Scenario extends ScenarioSummary {
   debrief: string
 }
 
+/** Something that happened during the run, for markers on the charts (times in seconds, like the series). */
+export interface SimEvent {
+  t: number
+  type: string
+  nodeId: string
+  label: string
+  lost?: number
+}
+
 export interface NodeStats {
   id: string
   arr: number
@@ -184,6 +193,7 @@ export interface Stats {
   nodes: Record<string, NodeStats>
   edges: Record<string, EdgeStats>
   series: SeriesPoint[]
+  events: SimEvent[]
 }
 
 export interface Check {

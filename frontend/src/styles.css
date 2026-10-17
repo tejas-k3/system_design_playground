@@ -185,3 +185,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .skip { position: absolute; left: 8px; top: -48px; z-index: 50; padding: 8px 14px; background: var(--accent); color: var(--accent-ink); border-radius: 8px; text-decoration: none; }
 .skip:focus { top: 8px; }
 #canvas-area:focus { outline: none; }
+
+/* tooltip for a chart event marker */
+.chart { position: relative; }
+.chart-tip { position: absolute; top: 22px; transform: translateX(-50%); max-width: 240px; padding: 4px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); font-size: 12px; pointer-events: none; z-index: 5; }

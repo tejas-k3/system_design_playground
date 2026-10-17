@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SeriesPoint } from '../api/types'
+import type { SeriesPoint, SimEvent } from '../api/types'
 import { palettes } from '../draw/theme'
 import { describeChart } from '../model/announce'
+import { type EventMark, eventLabel, eventMarks } from '../model/events'
 import { failedAfter, pct, successRate } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { useStore } from '../state/store'
@@ -15,8 +16,10 @@ interface Line {
   value: (p: SeriesPoint) => number
 }
 
-function Chart({ title, unit, lines, series, theme, fixedMax, fmt }: { title: string; unit: string; lines: Line[]; series: SeriesPoint[]; theme: 'light' | 'dark'; fixedMax?: number; fmt?: (v: number) => string }) {
+function Chart({ title, unit, lines, series, events, theme, fixedMax, fmt }: { title: string; unit: string; lines: Line[]; series: SeriesPoint[]; events: SimEvent[]; theme: 'light' | 'dark'; fixedMax?: number; fmt?: (v: number) => string }) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const marks = useRef<EventMark[]>([])
+  const [tip, setTip] = useState<{ x: number; text: string } | null>(null)
   useEffect(() => {
     const cv = ref.current
     if (!cv) return
@@ -77,7 +80,38 @@ function Chart({ title, unit, lines, series, theme, fixedMax, fmt }: { title: st
       ctx.stroke()
     }
     ctx.setLineDash([])
-  }, [series, lines, theme, fixedMax, fmt])
+    // event markers: a dashed line with a lettered flag (the letter, not the colour, says what it is)
+    marks.current = eventMarks(events, { t0, t1, left, width: pw })
+    ctx.font = 'bold 10px system-ui, sans-serif'
+    for (const m of marks.current) {
+      ctx.strokeStyle = p.ink
+      ctx.globalAlpha = 0.5
+      ctx.setLineDash([3, 3])
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(m.x, top + 12)
+      ctx.lineTo(m.x, top + ph)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.globalAlpha = 1
+      ctx.fillStyle = p.card
+      ctx.strokeStyle = p.ink
+      ctx.beginPath()
+      ctx.roundRect(m.x - 7, top, 14, 12, 3)
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = p.ink
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(m.count > 1 ? '…' : m.glyph, m.x, top + 6.5)
+    }
+  }, [series, events, lines, theme, fixedMax, fmt])
+  const hover = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - r.left
+    const near = marks.current.find((m) => Math.abs(m.x - x) <= 8)
+    setTip(near ? { x: near.x, text: near.labels.join(' · ') } : null)
+  }
   return (
     <figure className="chart">
       <figcaption>
@@ -88,7 +122,8 @@ function Chart({ title, unit, lines, series, theme, fixedMax, fmt }: { title: st
           ))}
         </span>
       </figcaption>
-      <canvas ref={ref} role="img" aria-label={describeChart(title, unit, series.length ? lines.map((l) => ({ label: l.label, value: l.value(series[series.length - 1]) })) : [])} />
+      <canvas ref={ref} onMouseMove={hover} onMouseLeave={() => setTip(null)} role="img" aria-label={describeChart(title, unit, series.length ? lines.map((l) => ({ label: l.label, value: l.value(series[series.length - 1]) })) : [])} />
+      {tip && <div className="chart-tip" style={{ left: Math.min(tip.x, 9999) }} role="presentation">{tip.text}</div>}
     </figure>
   )
 }
@@ -105,6 +140,7 @@ export function Charts() {
   const [open, setOpen] = useState(!isNarrow())
   const [tab, setTab] = useState<'metrics' | 'traces'>('metrics')
   const series = useStore((s) => s.stats.series)
+  const events = useStore((s) => s.stats.events)
   const run = useStore((s) => s.stats.global.run)
   const inFlight = useStore((s) => s.stats.global.inFlight)
   const theme = useStore((s) => s.theme)
@@ -146,9 +182,10 @@ export function Charts() {
             <p className="muted center">Press Play to start sending traffic.</p>
           ) : (
             <>
-              <Chart title="Throughput" unit="req/s" lines={okLines} series={series} theme={theme} />
-              <Chart title="Latency" unit="ms" lines={latLines} series={series} theme={theme} />
-              <Chart title="Success" unit="%" lines={succLines} series={series} theme={theme} fixedMax={100} fmt={(v) => `${Math.round(v)}`} />
+              <ul className="sr-only" aria-label="Events during the run">{events.map((e, i) => <li key={i}>{`${e.t.toFixed(1)} seconds: ${eventLabel(e)}`}</li>)}</ul>
+              <Chart title="Throughput" unit="req/s" lines={okLines} series={series} events={events} theme={theme} />
+              <Chart title="Latency" unit="ms" lines={latLines} series={series} events={events} theme={theme} />
+              <Chart title="Success" unit="%" lines={succLines} series={series} events={events} theme={theme} fixedMax={100} fmt={(v) => `${Math.round(v)}`} />
               <div className="chart errors-box">
                 <h3>Why requests failed</h3>
                 {Object.keys(run.errors).length ? <Errors errors={run.errors} total={run.failed} /> : <p className="muted small">No failures so far.</p>}

@@ -23,7 +23,7 @@ export interface Toast {
 }
 export type Connection = 'connecting' | 'open' | 'closed'
 
-export const emptyStats = (): Stats => ({ global: { now: 0, inFlight: 0, cost: 0, avgCost: 0, run: emptyRun() }, nodes: {}, edges: {}, series: [] })
+export const emptyStats = (): Stats => ({ global: { now: 0, inFlight: 0, cost: 0, avgCost: 0, run: emptyRun() }, nodes: {}, edges: {}, series: [], events: [] })
 function emptyRun() {
   return { resolved: 0, pending: 0, ok: 0, failed: 0, p50: 0, p95: 0, p99: 0, failP50: 0, mean: 0, errors: {}, conflicts: 0, freshReads: 0, staleReads: 0, duplicates: 0, lostWrites: 0 }
 }
@@ -270,7 +270,7 @@ export const useStore = create<State>()((set, get) => {
     },
     setUi: (p) => set((s) => ({ ui: { ...s.ui, ...p } })),
     setSim: (p) => set((s) => ({ sim: { ...s.sim, ...p } })),
-    setStats: (stats) => set({ stats: { ...stats, series: stats.series ?? [], nodes: stats.nodes ?? {}, edges: stats.edges ?? {} } }),
+    setStats: (stats) => set({ stats: { ...stats, series: stats.series ?? [], events: stats.events ?? [], nodes: stats.nodes ?? {}, edges: stats.edges ?? {} } }),
     setTraces: (traces) => set({ traces }),
     setCost: (cost) => set({ cost }),
     setConnection: (connection) => set({ connection }),
