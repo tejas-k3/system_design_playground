@@ -29,7 +29,8 @@ Or as a single binary serving the built UI:
 make run              # builds both, then http://localhost:8090
 ```
 
-Other targets: `make test`, `make lint` (gofmt + staticcheck), `make bench`, `make build`. Use `PORT=9000 make dev` to change the port.
+Other targets: `make test`, `make lint` (gofmt + staticcheck), `make bench`, `make build`, `make docker-run`.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker, configuration, reverse proxy, metrics and capacity notes. Use `PORT=9000 make dev` to change the port.
 
 ## How to play
 
