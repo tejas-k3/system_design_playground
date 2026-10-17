@@ -25,6 +25,14 @@ export interface Note {
   text: string
   fontSize?: number
 }
+export interface Finding {
+  rule: string
+  severity: 'error' | 'warn' | 'info'
+  message: string
+  fix: string
+  nodes: string[]
+}
+
 export interface Diagram {
   nodes: Node[]
   edges: Edge[]

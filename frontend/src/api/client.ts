@@ -1,4 +1,4 @@
-import type { Diagram, Registry, Scenario, ScenarioSummary } from './types'
+import type { Diagram, Finding, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -28,7 +28,7 @@ export async function fetchDesign(id: string): Promise<Diagram> {
   return (await json<{ diagram: Diagram }>(await fetch(`/api/designs/${encodeURIComponent(id)}`))).diagram
 }
 
-export async function validate(diagram: Diagram): Promise<{ diagram: Diagram; adjusted: boolean; costPerHour: number }> {
+export async function validate(diagram: Diagram): Promise<{ diagram: Diagram; adjusted: boolean; costPerHour: number; findings: Finding[] }> {
   const res = await fetch('/api/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram }) })
   return json(res)
 }

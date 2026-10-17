@@ -7,6 +7,7 @@ import { fmtCost, pct, successRate } from '../model/goals'
 import { phaseChip } from '../model/phase'
 import { sparkPoints, sparkSummary } from '../model/spark'
 import { crashNode, requestNodeSeries, restartNode } from '../sim/bridge'
+import { ReviewPanel } from './ReviewPanel'
 import { useStore } from '../state/store'
 
 const whole = (v: number) => `${Math.round(v * 100)}%`
@@ -69,6 +70,7 @@ function Overview({ count }: { count: number }) {
           <Errors errors={run.errors} total={run.failed} />
         </>
       )}
+      <ReviewPanel />
       <p className="muted small">Select a component to edit its settings. Shift-click or drag a box to select several. Press Delete to remove.</p>
     </div>
   )
