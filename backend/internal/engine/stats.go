@@ -16,6 +16,7 @@ type NodeStats struct {
 	Size    int                `json:"size,omitempty"`
 	Reasons map[string]float64 `json:"reasons,omitempty"`
 	Down    bool               `json:"down,omitempty"`
+	Cut     bool               `json:"cut,omitempty"` // partitioned from the network
 	Slow    float64            `json:"slow,omitempty"`
 	Extra   map[string]float64 `json:"extra,omitempty"`
 }
@@ -102,7 +103,7 @@ func (s *Sim) Snapshot() Stats {
 		u /= ringSize
 		ns := NodeStats{
 			ID: n.id, Arr: float64(sum.arr) / span, Ok: float64(sum.ok) / span, Err: float64(sum.err) / span,
-			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down,
+			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut,
 		}
 		if c := s.capacity(n); c < 1<<20 {
 			ns.Cap = c

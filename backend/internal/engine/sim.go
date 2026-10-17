@@ -89,6 +89,8 @@ type node struct {
 	epoch           int
 	slow            float64
 	slowUntil       float64
+	cut             bool     // partitioned: calls to it get no answer
+	held            []func() // calls waiting out a partition, delivered when it heals
 	out, in         []*edge
 
 	busy     int

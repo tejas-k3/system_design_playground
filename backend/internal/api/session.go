@@ -361,8 +361,11 @@ func (ss *session) afterAdvance(ctx context.Context) {
 	for ; ss.chaosSeen < len(log); ss.chaosSeen++ {
 		c := log[ss.chaosSeen]
 		txt := "Chaos: " + c.Label + " got slower"
-		if c.Type == "crash" {
+		switch c.Type {
+		case "crash":
 			txt = "Chaos: " + c.Label + " crashed"
+		case "partition":
+			txt = "Chaos: " + c.Label + " was cut off from the network"
 		}
 		ss.pending = append(ss.pending, notice{"warn", txt})
 	}
