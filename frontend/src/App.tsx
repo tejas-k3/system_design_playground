@@ -28,10 +28,15 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // deep link: /#challenge=<id>
+  // deep link: /#challenge=<id>, on load and when the hash changes in an open tab
   useEffect(() => {
-    const m = /challenge=([a-z0-9-]+)/.exec(location.hash)
-    if (m) loadScenario(m[1])
+    const open = () => {
+      const m = /challenge=([a-z0-9-]+)/.exec(location.hash)
+      if (m) loadScenario(m[1])
+    }
+    open()
+    window.addEventListener('hashchange', open)
+    return () => window.removeEventListener('hashchange', open)
   }, [])
 
   const registryReady = useStore((s) => !!s.reg)
