@@ -1,0 +1,150 @@
+package engine
+
+import (
+	"math"
+	"strconv"
+)
+
+const (
+	MinLatencyMs = 1
+	MaxLatencyMs = 200
+)
+
+func finite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
+
+func clamp(v, lo, hi float64) float64 { return math.Min(hi, math.Max(lo, v)) }
+
+// SanitizeParams keeps only known keys with valid values, clamping numbers into range.
+// It reports whether anything had to be changed.
+func SanitizeParams(kind string, in Params) (Params, bool) {
+	out := Params{}
+	adjusted := false
+	spec := Spec(kind)
+	if spec == nil {
+		return out, in != nil
+	}
+	for k, raw := range in {
+		var ps *ParamSpec
+		for i := range spec.Params {
+			if spec.Params[i].Key == k {
+				ps = &spec.Params[i]
+			}
+		}
+		if ps == nil {
+			adjusted = true
+			continue
+		}
+		switch ps.Type {
+		case "number":
+			var f float64
+			ok := true
+			switch v := raw.(type) {
+			case float64:
+				f = v
+			case int:
+				f = float64(v)
+			case string:
+				p, err := strconv.ParseFloat(v, 64)
+				f, ok = p, err == nil
+			default:
+				ok = false
+			}
+			if !ok || !finite(f) {
+				adjusted = true
+				continue
+			}
+			c := clamp(f, ps.Min, ps.Max)
+			if c != f {
+				adjusted = true
+			}
+			out[k] = c
+		case "select":
+			s, _ := raw.(string)
+			valid := false
+			for _, o := range ps.Options {
+				if o.Value == s {
+					valid = true
+				}
+			}
+			if !valid {
+				adjusted = true
+				continue
+			}
+			out[k] = s
+		case "boolean":
+			b, ok := raw.(bool)
+			if !ok {
+				adjusted = true
+				continue
+			}
+			out[k] = b
+		}
+	}
+	return out, adjusted
+}
+
+// Sanitize validates a diagram: unknown kinds, bad coordinates, duplicate ids and illegal
+// edges are dropped; parameters and latencies are clamped. The result is always safe to run.
+func Sanitize(in Diagram) (Diagram, bool) {
+	adjusted := false
+	seen := map[string]bool{}
+	claim := func(id string) bool {
+		if id == "" || seen[id] {
+			return false
+		}
+		seen[id] = true
+		return true
+	}
+	out := Diagram{Nodes: []Node{}, Edges: []Edge{}, Notes: []Note{}}
+	kinds := map[string]string{}
+	for _, n := range in.Nodes {
+		spec := Spec(n.Kind)
+		if spec == nil || !finite(n.X) || !finite(n.Y) || !claim(n.ID) {
+			adjusted = true
+			continue
+		}
+		p, adj := SanitizeParams(n.Kind, n.Params)
+		if adj {
+			adjusted = true
+		}
+		label := n.Label
+		if label == "" {
+			label = spec.Name
+		}
+		out.Nodes = append(out.Nodes, Node{ID: n.ID, Kind: n.Kind, X: n.X, Y: n.Y, Label: label, Params: p, Locked: n.Locked})
+		kinds[n.ID] = n.Kind
+	}
+	pairs := map[string]bool{}
+	for _, e := range in.Edges {
+		fk, ok1 := kinds[e.From]
+		tk, ok2 := kinds[e.To]
+		key := e.From + "\n" + e.To
+		if !ok1 || !ok2 || e.From == e.To || !CanConnect(fk, tk) || pairs[key] || !claim(e.ID) {
+			adjusted = true
+			continue
+		}
+		pairs[key] = true
+		lat := e.LatencyMs
+		if !finite(lat) || lat == 0 {
+			lat = DefaultLatency(fk, tk)
+			adjusted = true
+		}
+		if c := clamp(lat, MinLatencyMs, MaxLatencyMs); c != lat {
+			lat = c
+			adjusted = true
+		}
+		out.Edges = append(out.Edges, Edge{ID: e.ID, From: e.From, To: e.To, LatencyMs: lat})
+	}
+	for _, n := range in.Notes {
+		if !finite(n.X) || !finite(n.Y) || !claim(n.ID) {
+			adjusted = true
+			continue
+		}
+		fs := n.FontSize
+		if !finite(fs) || fs <= 0 {
+			fs = 0
+		}
+		out.Notes = append(out.Notes, Note{ID: n.ID, X: n.X, Y: n.Y, Text: n.Text, FontSize: fs})
+	}
+	return out, adjusted
+}
