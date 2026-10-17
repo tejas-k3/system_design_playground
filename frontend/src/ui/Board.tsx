@@ -5,6 +5,7 @@ import { palettes } from '../draw/theme'
 import { drainParticles } from '../sim/particles'
 import { useStore } from '../state/store'
 import { NoteEditor, type NoteEdit } from './board/NoteEditor'
+import { type PinchState, pinchOf, pinchStep } from './board/pinch'
 import { useBoardShortcuts } from './board/useBoardShortcuts'
 import { useCanvasSize } from './board/useCanvasSize'
 import { useFitView } from './board/useFitView'
@@ -26,6 +27,8 @@ export function Board() {
   const pointer = useRef<Pt>({ x: 0, y: 0 })
   const connectTo = useRef<{ target: string | null; pending: string | null }>({ target: null, pending: null })
   const marquee = useRef<Rect | null>(null)
+  const touches = useRef(new Map<number, Pt>()) // active pointers in screen space, for pinch
+  const pinch = useRef<PinchState | null>(null)
   const particles = useRef<ActiveParticle[]>([])
   const raf = useRef(0)
   const [noteEdit, setNoteEdit] = useState<NoteEdit | null>(null)
@@ -122,6 +125,16 @@ export function Board() {
     canvas.current!.setPointerCapture(e.pointerId)
     const sp = local(e)
     pointer.current = sp
+    touches.current.set(e.pointerId, sp)
+    if (touches.current.size === 2) {
+      // a second finger turns whatever was happening into a pinch: drop any drag or connection
+      if (mode.current.k === 'drag') st.endGesture()
+      mode.current = { k: 'idle' }
+      connectTo.current = { target: null, pending: null }
+      const [a, b] = [...touches.current.values()]
+      pinch.current = pinchOf(a, b)
+      return
+    }
     const w = world(sp)
     if (e.button === 1 || e.button === 2) {
       mode.current = { k: 'pan', sx: sp.x, sy: sp.y, moved: false }
@@ -175,6 +188,17 @@ export function Board() {
     if (!st.reg) return
     const sp = local(e)
     pointer.current = sp
+    if (touches.current.has(e.pointerId)) touches.current.set(e.pointerId, sp)
+    if (pinch.current && touches.current.size === 2) {
+      const [a, b] = [...touches.current.values()]
+      const next = pinchOf(a, b)
+      const { dx, dy, factor } = pinchStep(pinch.current, next)
+      const v = st.viewport
+      st.setViewport({ scrollX: v.scrollX + dx, scrollY: v.scrollY + dy })
+      if (factor !== 1) st.zoomAt(factor, next.mid.x, next.mid.y)
+      pinch.current = next
+      return
+    }
     const w = world(sp)
     const m = mode.current
     switch (m.k) {
@@ -233,6 +257,14 @@ export function Board() {
     const st = useStore.getState()
     const m = mode.current
     canvas.current?.releasePointerCapture(e.pointerId)
+    touches.current.delete(e.pointerId)
+    if (pinch.current) {
+      // the pinch ends when a finger lifts; the remaining finger must not start dragging or panning
+      if (touches.current.size < 2) pinch.current = null
+      mode.current = { k: 'idle' }
+      setCursor('default')
+      return
+    }
     if (m.k === 'drag') st.endGesture()
     if (m.k === 'pan' && !m.moved) st.setSelection([])
     if (m.k === 'connect') {
