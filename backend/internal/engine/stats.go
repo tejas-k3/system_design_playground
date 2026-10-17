@@ -41,23 +41,30 @@ type JobStats struct {
 }
 
 // RunStats are totals over the counted part of the run.
+// LatencyBucket is one bar of the latency distribution: successes with latency up to LeMs (the last bucket has LeMs 1e9 = "and above").
+type LatencyBucket struct {
+	LeMs  float64 `json:"leMs"`
+	Count int     `json:"count"`
+}
+
 type RunStats struct {
-	Resolved   int            `json:"resolved"`
-	Pending    int            `json:"pending"`
-	OK         int            `json:"ok"`
-	Failed     int            `json:"failed"`
-	P50        float64        `json:"p50"`
-	P95        float64        `json:"p95"`
-	P99        float64        `json:"p99"`
-	FailP50    float64        `json:"failP50"` // median time to failure; the latencies above count successes only
-	Mean       float64        `json:"mean"`
-	Errors     map[string]int `json:"errors"`
-	Conflicts  int            `json:"conflicts"`
-	Fresh      int            `json:"freshReads"`
-	Stale      int            `json:"staleReads"`
-	Dups       int            `json:"duplicates"`
-	LostWrites int            `json:"lostWrites"`
-	Jobs       *JobStats      `json:"jobs,omitempty"`
+	Resolved       int             `json:"resolved"`
+	Pending        int             `json:"pending"`
+	OK             int             `json:"ok"`
+	Failed         int             `json:"failed"`
+	P50            float64         `json:"p50"`
+	P95            float64         `json:"p95"`
+	P99            float64         `json:"p99"`
+	LatencyBuckets []LatencyBucket `json:"latencyBuckets"` // distribution of successful requests
+	FailP50        float64         `json:"failP50"`        // median time to failure; the latencies above count successes only
+	Mean           float64         `json:"mean"`
+	Errors         map[string]int  `json:"errors"`
+	Conflicts      int             `json:"conflicts"`
+	Fresh          int             `json:"freshReads"`
+	Stale          int             `json:"staleReads"`
+	Dups           int             `json:"duplicates"`
+	LostWrites     int             `json:"lostWrites"`
+	Jobs           *JobStats       `json:"jobs,omitempty"`
 }
 
 // Event is one thing that happened to the system, for placing on the charts: crashes and restarts, slow-downs and
@@ -184,7 +191,16 @@ func (s *Sim) Snapshot() Stats {
 		}
 		st.Edges[e.id] = es
 	}
-	run := RunStats{
+	buckets := s.hist.Buckets(LatencyBounds)
+	lb := make([]LatencyBucket, len(buckets))
+	for i, c := range buckets {
+		le := 1e9
+		if i < len(LatencyBounds) {
+			le = LatencyBounds[i]
+		}
+		lb[i] = LatencyBucket{LeMs: le, Count: c}
+	}
+	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
 		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, LostWrites: s.runLost,
