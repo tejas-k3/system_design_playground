@@ -94,7 +94,7 @@ export function Board() {
   useEffect(() => wake(), [wake])
 
   const size = useCanvasSize(wrap, canvas, () => wakeRef.current())
-  const fitView = useFitView(size)
+  const fitView = useFitView(wrap)
 
   // ---- pointer handling -------------------------------------------------------------
 
