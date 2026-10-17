@@ -132,6 +132,7 @@ export interface NodeStats {
   reasons?: Record<string, number>
   down?: boolean
   cut?: boolean // partitioned from the network
+  primary?: boolean // a replica that took over as the primary
   slow?: number
   extra?: Record<string, number>
 }
