@@ -25,6 +25,7 @@ const t0 = Date.now()
 for (const st of JSON.parse(stepsJson)) {
   if (st.goto) { await send('Page.navigate', { url: st.goto }); await sleep(st.wait ?? 2000); continue }
   if (st.click) { const ok = await ev(`(()=>{const q=${JSON.stringify(st.click)};let el=document.querySelector(q.startsWith('css:')?q.slice(4):'__none__');if(!el)el=[...document.querySelectorAll('button,a,[role=tab]')].find(b=>b.textContent.trim().startsWith(q));if(!el)return false;el.click();return true})()`); console.log('click', st.click, ok) }
+  if (st.vision) await send('Emulation.setEmulatedVisionDeficiency', { type: st.vision })
   if (st.type) await send('Input.insertText', { text: st.type })
   if (st.key) { const code = { Enter: 13, Tab: 9, Escape: 27, a: 65 }[st.key] ?? 0; for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: st.key, code: st.key, windowsVirtualKeyCode: code, modifiers: st.mod ?? 0 }) }
   if (st.eval) { const v = await ev(st.eval); if (st.log) console.log(st.log, JSON.stringify(v)) }
