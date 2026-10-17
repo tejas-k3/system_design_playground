@@ -3,7 +3,7 @@ import { type ActiveParticle, PARTICLE_MS, createRough, measureText, render } fr
 import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld } from '../draw/geometry'
 import { palettes } from '../draw/theme'
 import { openOutputs } from '../model/diagram'
-import { drainParticles } from '../sim/particles'
+import { drainParticles, spawnTimes } from '../sim/particles'
 import { useStore } from '../state/store'
 import { NodeOutline } from './board/NodeOutline'
 import { NoteEditor, type NoteEdit } from './board/NoteEditor'
@@ -36,6 +36,7 @@ export function Board() {
   const canvas = useRef<HTMLCanvasElement>(null)
   const mode = useRef<Mode>({ k: 'idle' })
   const hover = useRef<string | null>(null)
+  const lastBurst = useRef(0)
   const pointer = useRef<Pt>({ x: 0, y: 0 })
   const connectTo = useRef<{ target: string | null; pending: string | null }>({ target: null, pending: null })
   const marquee = useRef<Rect | null>(null)
@@ -55,7 +56,12 @@ export function Board() {
     const rc = createRough(cv)
     const now = performance.now()
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
-    for (const p of drainParticles()) if (!reduced) particles.current.push({ edge: p.e, back: !!p.b, fail: !!p.f, t0: now })
+    const burst = drainParticles()
+    if (burst.length > 0) {
+      const t0s = spawnTimes(burst.length, now, now - lastBurst.current)
+      lastBurst.current = now
+      if (!reduced) burst.forEach((p, i) => particles.current.push({ edge: p.e, back: !!p.b, fail: !!p.f, t0: t0s[i] }))
+    }
     if (particles.current.length > 700) particles.current = particles.current.slice(-700)
     particles.current = particles.current.filter((p) => now - p.t0 < PARTICLE_MS)
 

@@ -29,3 +29,9 @@ export function edgeLabel(latencyMs: number, rps: number, detailed: boolean, run
 export function utilBarWidth(util: number, full: number): number {
   return util <= 0 ? 0 : Math.max(4, full * Math.min(1, util))
 }
+
+/** Eases a displayed number toward its latest value (time constant about 300 ms) so a rate label glides instead of flickering. */
+export function smoothRate(shown: number | undefined, target: number, dtMs: number): number {
+  if (shown === undefined) return target
+  return shown + (target - shown) * (1 - Math.exp(-dtMs / 300))
+}
