@@ -4,6 +4,11 @@ import { useStore } from '../../state/store'
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
 
+/** Arrow key to direction; each press moves the selection by a small step, or a large one with Shift. */
+const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+const STEP = 10
+const BIG_STEP = 50
+
 interface Actions {
   /** Fit the whole design in view. */
   fit: () => void
@@ -34,6 +39,12 @@ export function useBoardShortcuts({ fit, zoomBy, cancel }: Actions): void {
       } else if (e.key === 'Escape') {
         cancel()
         st.setSelection([])
+      } else if (!mod && ARROWS[e.key] && st.selection.length > 0) {
+        e.preventDefault()
+        const [dx, dy] = ARROWS[e.key]
+        const step = e.shiftKey ? BIG_STEP : STEP
+        st.beginGesture() // a held key is one undo step, ended on key up
+        st.moveNodes(st.selection, dx * step, dy * step)
       } else if (mod) {
         return
       } else if (key === 'v') st.setTool('select')
@@ -42,7 +53,14 @@ export function useBoardShortcuts({ fit, zoomBy, cancel }: Actions): void {
       else if (e.key === '+' || e.key === '=') zoomBy(1.2)
       else if (e.key === '-') zoomBy(1 / 1.2)
     }
+    const up = (e: KeyboardEvent) => {
+      if (ARROWS[e.key]) useStore.getState().endGesture()
+    }
     window.addEventListener('keydown', down)
-    return () => window.removeEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
   }, [fit, zoomBy, cancel])
 }
