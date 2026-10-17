@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
 	"time"
 
@@ -197,18 +198,11 @@ func (ss *session) build() {
 func nearestSpeed(v float64) float64 {
 	best := validSpeeds[0]
 	for _, s := range validSpeeds {
-		if abs(s-v) < abs(best-v) {
+		if math.Abs(s-v) < math.Abs(best-v) {
 			best = s
 		}
 	}
 	return best
-}
-
-func abs(f float64) float64 {
-	if f < 0 {
-		return -f
-	}
-	return f
 }
 
 // handle applies one client message. It returns false when the connection should close.

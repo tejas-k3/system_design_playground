@@ -1,6 +1,10 @@
 package engine
 
-import "math"
+import (
+	"math"
+	"slices"
+	"sort"
+)
 
 // Result is the outcome of one call travelling back up the chain.
 type Result struct {
@@ -763,7 +767,7 @@ func (s *Sim) ejectOutliers(lb *node) {
 		if len(peers) == 0 {
 			continue
 		}
-		sortFloats(peers)
+		slices.Sort(peers)
 		med := peers[len(peers)/2]
 		if len(peers)%2 == 0 {
 			med = (peers[len(peers)/2-1] + peers[len(peers)/2]) / 2
@@ -772,27 +776,13 @@ func (s *Sim) ejectOutliers(lb *node) {
 			picks = append(picks, cand{e, mean[i] / med})
 		}
 	}
-	for i := 0; i < len(picks); i++ {
-		for j := i + 1; j < len(picks); j++ {
-			if picks[j].score > picks[i].score {
-				picks[i], picks[j] = picks[j], picks[i]
-			}
-		}
-	}
+	sort.Slice(picks, func(i, j int) bool { return picks[i].score > picks[j].score })
 	for _, p := range picks {
 		if ejected >= maxEject {
 			break
 		}
 		p.e.ejectTill = s.now + ejectMs
 		ejected++
-	}
-}
-
-func sortFloats(a []float64) {
-	for i := 1; i < len(a); i++ {
-		for j := i; j > 0 && a[j] < a[j-1]; j-- {
-			a[j], a[j-1] = a[j-1], a[j]
-		}
 	}
 }
 
