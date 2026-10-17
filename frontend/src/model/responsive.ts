@@ -7,7 +7,7 @@
  *    the inspector is a bottom sheet.
  */
 export const NARROW_PX = 980
-export const COMPACT_PX = 1600
+export const COMPACT_PX = 1360 // library 216 + challenge 320 + inspector 300 leaves >= 480 px of canvas from here up
 
 const width = (): number | null => (typeof window === 'undefined' ? null : window.innerWidth)
 

@@ -25,12 +25,14 @@ describe('layout tiers', () => {
     expect(NARROW_PX).toBeLessThan(COMPACT_PX)
   })
 
-  it('covers the laptop widths that used to squeeze the canvas', () => {
-    for (const w of [1024, 1280, 1366, 1440, 1536]) {
+  it('uses the overlay drawer only where a docked inspector would squeeze the canvas below ~480 px', () => {
+    for (const w of [1024, 1280]) {
       at(w)
       expect(isCompact()).toBe(true)
     }
-    at(1920)
-    expect(isCompact()).toBe(false)
+    for (const w of [1366, 1440, 1536, 1920]) {
+      at(w)
+      expect(isCompact()).toBe(false)
+    }
   })
 })
