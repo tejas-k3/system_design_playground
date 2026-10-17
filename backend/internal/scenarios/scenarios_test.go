@@ -179,3 +179,23 @@ func TestStarTargetsArePublished(t *testing.T) {
 		}
 	}
 }
+
+// The star bars must not sit on a knife edge: a learner who rebuilds the reference solution should get the
+// same stars whichever seed the run happens to use.
+func TestReferenceStarsDoNotDependOnTheSeed(t *testing.T) {
+	for _, sc := range All() {
+		sc := sc
+		t.Run(sc.ID, func(t *testing.T) {
+			first := -1
+			for seed := uint32(1); seed <= 8; seed++ {
+				s := engine.RunToEnd(sc.Solution, sc.Options(seed), sc.Goals)
+				if first < 0 {
+					first = s.Stars
+				}
+				if s.Stars != first {
+					t.Fatalf("seed %d earns %d stars, seed 1 earned %d (p95 %.0f ms, cost $%.2f/hr)", seed, s.Stars, first, s.Run.P95, s.CostPerHour)
+				}
+			}
+		})
+	}
+}
