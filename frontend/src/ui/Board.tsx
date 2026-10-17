@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { type ActiveParticle, PARTICLE_MS, createRough, measureText, render } from '../draw/renderer'
-import { type Pt, type Rect, boundsOf, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld } from '../draw/geometry'
+import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld } from '../draw/geometry'
 import { palettes } from '../draw/theme'
-import { MIN_ZOOM } from '../model/diagram'
 import { drainParticles } from '../sim/particles'
 import { useStore } from '../state/store'
 import { NoteEditor, type NoteEdit } from './board/NoteEditor'
 import { useBoardShortcuts } from './board/useBoardShortcuts'
+import { useCanvasSize } from './board/useCanvasSize'
+import { useFitView } from './board/useFitView'
 import { useWheelZoom } from './board/useWheelZoom'
 import { ZoomBadge } from './board/ZoomBadge'
 
@@ -27,7 +28,6 @@ export function Board() {
   const marquee = useRef<Rect | null>(null)
   const particles = useRef<ActiveParticle[]>([])
   const raf = useRef(0)
-  const size = useRef({ w: 0, h: 0, dpr: 1 })
   const [noteEdit, setNoteEdit] = useState<NoteEdit | null>(null)
   const [cursor, setCursor] = useState('default')
 
@@ -89,46 +89,8 @@ export function Board() {
   }, [])
   useEffect(() => wake(), [wake])
 
-  // size the canvas to its container
-  useLayoutEffect(() => {
-    const el = wrap.current
-    const cv = canvas.current
-    if (!el || !cv) return
-    const fit = () => {
-      const dpr = window.devicePixelRatio || 1
-      const r = el.getBoundingClientRect()
-      size.current = { w: r.width, h: r.height, dpr }
-      cv.width = Math.max(1, Math.round(r.width * dpr))
-      cv.height = Math.max(1, Math.round(r.height * dpr))
-      cv.style.width = `${r.width}px`
-      cv.style.height = `${r.height}px`
-      wakeRef.current()
-    }
-    fit()
-    const ro = new ResizeObserver(fit)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  const fitView = useCallback(() => {
-    const st = useStore.getState()
-    if (!st.reg) return
-    const b = boundsOf(st.diagram, st.reg, measureText)
-    const { w, h } = size.current
-    if (!b || !w) {
-      st.setViewport({ scrollX: 0, scrollY: 0, zoom: 1 })
-      return
-    }
-    const pad = 80
-    const zoom = Math.min(1.2, Math.max(MIN_ZOOM, Math.min((w - pad * 2) / b.w, (h - pad * 2) / b.h)))
-    st.setViewport({ zoom, scrollX: (w - b.w * zoom) / 2 - b.x * zoom, scrollY: (h - b.h * zoom) / 2 - b.y * zoom })
-  }, [])
-
-  const fitRequest = useStore((s) => s.fitRequest)
-  const scenarioId = useStore((s) => s.scenario?.def.id)
-  useEffect(() => {
-    fitView()
-  }, [fitRequest, scenarioId, fitView])
+  const size = useCanvasSize(wrap, canvas, () => wakeRef.current())
+  const fitView = useFitView(size)
 
   // ---- pointer handling -------------------------------------------------------------
 
