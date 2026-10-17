@@ -193,3 +193,6 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .distribution { display: flex; flex-direction: column; padding: 0 10px 10px; height: 168px; flex: none; }
 .distribution canvas { flex: 1; width: 100%; min-height: 0; }
 .distribution p { margin: 2px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.timelines .spark { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; margin: 2px 0; }
+.timelines .spark canvas { width: 100%; height: 26px; background: var(--panel2); border-radius: 4px; }

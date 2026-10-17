@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Diagram, Edge, Node, Note, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
+import type { Diagram, Edge, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
 import { isCompact, isNarrow } from '../model/responsive'
 
@@ -40,6 +40,7 @@ export interface State {
   progress: Record<string, number>
   sim: { status: SimStatus; speed: number; seed: number }
   stats: Stats
+  nodeSeries: { nodeId: string; points: NodePoint[] } | null // latest per-second history of the selected component
   traces: TraceSet | null // latest request traces from the server; null before the first answer
   cost: number | null // null until the server has priced the current diagram
   scenario: ScenarioState | null
@@ -80,6 +81,7 @@ export interface State {
   setUi(p: Partial<State['ui']>): void
   setSim(p: Partial<State['sim']>): void
   setStats(s: Stats): void
+  setNodeSeries(s: { nodeId: string; points: NodePoint[] } | null): void
   setTraces(t: TraceSet | null): void
   setCost(c: number): void
   setConnection(c: Connection): void
@@ -128,6 +130,7 @@ export const useStore = create<State>()((set, get) => {
     progress: {},
     sim: { status: 'stopped', speed: 1, seed: 42 },
     stats: emptyStats(),
+    nodeSeries: null,
     traces: null,
     cost: null,
     scenario: null,
@@ -272,6 +275,7 @@ export const useStore = create<State>()((set, get) => {
     setSim: (p) => set((s) => ({ sim: { ...s.sim, ...p } })),
     setStats: (stats) => set({ stats: { ...stats, series: stats.series ?? [], events: stats.events ?? [], nodes: stats.nodes ?? {}, edges: stats.edges ?? {}, global: { ...stats.global, run: { ...stats.global.run, latencyBuckets: stats.global.run.latencyBuckets ?? [] } } } }),
     setTraces: (traces) => set({ traces }),
+    setNodeSeries: (nodeSeries) => set({ nodeSeries }),
     setCost: (cost) => set({ cost }),
     setConnection: (connection) => set({ connection }),
 

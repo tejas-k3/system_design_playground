@@ -262,10 +262,21 @@ export interface TraceSet {
   ok: Trace[]
 }
 
+/** One second of a component's history (for the timelines in the inspector). */
+export interface NodePoint {
+  t: number
+  util: number
+  qLen: number
+  arr: number
+  err: number
+  instances?: number
+}
+
 export type ServerMsg =
   | { type: 'frame'; status: SimStatus; speed: number; stats?: Stats; particles?: Particle[]; notices?: Notice[] }
   | { type: 'result'; scenarioId: string; score: Score }
   | ({ type: 'traces' } & TraceSet)
+  | { type: 'nodeSeries'; nodeId: string; points: NodePoint[] }
   | { type: 'error'; message: string }
 
 export type ClientMsg =
@@ -274,4 +285,5 @@ export type ClientMsg =
   | { type: 'play' | 'pause' | 'step' | 'reset' }
   | { type: 'speed'; speed: number }
   | { type: 'traces' }
+  | { type: 'nodeSeries'; nodeId: string }
   | { type: 'crash' | 'restart'; nodeId: string }
