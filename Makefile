@@ -4,7 +4,7 @@
 PORT ?= 8090
 export ADDR := :$(PORT)
 
-.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench docker-build docker-run
+.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench docker-build docker-run up down logs
 
 help:
 	@echo "make install   install frontend dependencies"
@@ -14,7 +14,9 @@ help:
 	@echo "make test      run backend and frontend tests"
 	@echo "make lint      gofmt check and staticcheck on the backend"
 	@echo "make bench     engine benchmark (30 simulated seconds of a 1k rps system)"
-	@echo "make docker-build / docker-run   build the image / run it on :$(PORT) with a persistent volume"
+	@echo "make up         build and run in the background on :$(PORT) (restarts automatically, keeps shared designs)"
+	@echo "make down | logs   stop and remove it | follow its logs"
+	@echo "make docker-build / docker-run   build the image / run it in the foreground"
 
 install:
 	cd frontend && npm install
@@ -57,3 +59,17 @@ docker-build:
 
 docker-run: docker-build
 	docker run --rm -p $(PORT):8090 -v sdp-data:/data $(IMAGE)
+
+CONTAINER ?= system-design-playground
+
+# run in the background, restarting after a reboot or crash, with shared designs kept in a named volume
+up: docker-build
+	-docker rm -f $(CONTAINER)
+	docker run -d --name $(CONTAINER) --restart unless-stopped -p $(PORT):8090 -v sdp-data:/data $(IMAGE)
+	@echo "Running at http://localhost:$(PORT)  (make logs to follow, make down to stop)"
+
+down:
+	docker rm -f $(CONTAINER)
+
+logs:
+	docker logs -f $(CONTAINER)
