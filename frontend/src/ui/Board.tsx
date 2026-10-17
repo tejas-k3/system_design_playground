@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { type ActiveParticle, PARTICLE_MS, createRough, measureText, render } from '../draw/renderer'
 import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld } from '../draw/geometry'
 import { palettes } from '../draw/theme'
+import { openOutputs } from '../model/diagram'
 import { drainParticles } from '../sim/particles'
 import { useStore } from '../state/store'
 import { NodeOutline } from './board/NodeOutline'
@@ -19,6 +20,16 @@ type Mode =
   | { k: 'drag'; last: Pt; ids: string[] }
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
   | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
+
+type State = ReturnType<typeof useStore.getState>
+
+/** Components whose connection handle is shown and grabbable: selected, hovered, or waiting to be wired up (not while running). */
+function handleSet(st: State, hover: string | null): Set<string> {
+  const ids = new Set<string>(st.selection.filter((id) => st.diagram.nodes.some((n) => n.id === id)))
+  if (hover && st.diagram.nodes.some((n) => n.id === hover)) ids.add(hover)
+  if (st.sim.status === 'stopped') for (const id of openOutputs(st.reg!, st.diagram)) ids.add(id)
+  return ids
+}
 
 export function Board() {
   const wrap = useRef<HTMLDivElement>(null)
@@ -64,6 +75,7 @@ export function Board() {
       palette: palettes[st.theme],
       selection: new Set(st.selection),
       hover: hover.current,
+      handles: handleSet(st, hover.current),
       connect: conn ? { from: conn, to: screenToWorld(pointer.current, st.viewport), target: connectTo.current.target } : null,
       validTargets: valid,
       marquee: marquee.current,
@@ -106,9 +118,7 @@ export function Board() {
 
   const hitAt = (w: Pt) => {
     const st = useStore.getState()
-    const handles = new Set<string>(st.selection.filter((id) => st.diagram.nodes.some((n) => n.id === id)))
-    if (hover.current && st.diagram.nodes.some((n) => n.id === hover.current)) handles.add(hover.current)
-    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handles)
+    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current))
   }
 
   const finishConnect = (from: string, to: string | null) => {

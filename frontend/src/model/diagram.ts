@@ -166,3 +166,10 @@ export function paramVisible(d: Diagram, node: Node, p: ParamSpec, resolved: Par
   if (p.needsEdgeTo && !hasEdgeTo(d, node.id, p.needsEdgeTo)) return false
   return true
 }
+
+/** Components that could send requests somewhere but have no outgoing connection yet (a database sends nothing, so it is never listed).
+ *  The canvas shows their connection handle without being asked: it is the next thing to do. */
+export function openOutputs(reg: Reg, d: Diagram): Set<string> {
+  const sending = new Set(d.edges.map((e) => e.from))
+  return new Set(d.nodes.filter((n) => !sending.has(n.id) && (reg.spec(n.kind)?.canConnectTo?.length ?? 0) > 0).map((n) => n.id))
+}
