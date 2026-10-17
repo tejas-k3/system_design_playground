@@ -4,7 +4,7 @@ import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
 import { clientRateLabel, edgeLabel, utilBarWidth } from '../model/rates'
-import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, handleRadius, noteRect, nodeRect, HANDLE_R } from './geometry'
+import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, handleRadius, legibleSize, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
 
@@ -190,17 +190,19 @@ function nodeSubtitle(n: Node, sc: Scene): string {
   }
 }
 
-function chip(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, bg: string, fg: string) {
-  ctx.font = `12px ${FONT}`
-  const w = ctx.measureText(text).width + 10
+/** A small status pill whose right edge is at x and whose bottom edge is at y (scale k keeps it legible when zoomed out). */
+function chip(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, bg: string, fg: string, k: number): number {
+  ctx.font = `${12 * k}px ${FONT}`
+  const w = ctx.measureText(text).width + 10 * k
   ctx.fillStyle = bg
   ctx.beginPath()
-  ctx.roundRect(x - w, y, w, 17, 8)
+  ctx.roundRect(x - w, y - 17 * k, w, 17 * k, 8 * k)
   ctx.fill()
   ctx.fillStyle = fg
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(text, x - w / 2, y + 9)
+  ctx.fillText(text, x - w / 2, y - 8.5 * k)
+  return w + 4 * k
 }
 
 function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: Node) {
@@ -251,14 +253,15 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = p.ink
-  ctx.font = `bold 16px ${FONT}`
+  const zoom = sc.viewport.zoom
+  ctx.font = `bold ${legibleSize(16, zoom, 11)}px ${FONT}`
   let label = n.label
   const maxW = r.w - 62
   while (label.length > 3 && ctx.measureText(label).width > maxW) label = label.slice(0, -2)
   if (label !== n.label) label += '…'
   ctx.fillText(label, r.x + 52, r.y + 28)
   ctx.fillStyle = p.muted
-  ctx.font = `13px ${FONT}`
+  ctx.font = `${legibleSize(13, zoom, 10)}px ${FONT}`
   ctx.fillText(nodeSubtitle(n, sc), r.x + 52, r.y + 46)
   // utilization bar
   if (ns && sc.running && n.kind !== 'client' && n.kind !== 'loadBalancer') {
@@ -274,22 +277,18 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
     ctx.roundRect(bx, by, utilBarWidth(ns.util, bw), 5, 3)
     ctx.fill()
   }
-  // chips
-  let cx = r.x + r.w - 6
-  const cy = r.y + 6
-  if (down) {
-    chip(ctx, 'DOWN', cx, cy, p.bad, '#fff')
-    cx -= 52
-  } else if (ns?.slow) {
-    chip(ctx, `${ns.slow}× slow`, cx, cy, p.warn, '#1f1f1f')
-    cx -= 64
-  }
+  // chips sit just above the node, right-aligned, so they never cover its title
+  let cx = r.x + r.w - 4
+  const cy = r.y - 4
+  const ck = legibleSize(12, zoom, 10) / 12
+  if (down) cx -= chip(ctx, 'DOWN', cx, cy, p.bad, '#fff', ck)
+  else if (ns?.slow) cx -= chip(ctx, `${ns.slow}× slow`, cx, cy, p.warn, '#1f1f1f', ck)
   if (ns && sc.running) {
     if (ns.qLen > 0) {
-      chip(ctx, `q ${ns.qLen}`, cx, cy, ns.qLen >= (ns.cap || 1e9) ? p.bad : p.grid, ns.qLen >= (ns.cap || 1e9) ? '#fff' : p.ink)
-      cx -= 46
+      const full = ns.qLen >= (ns.cap || 1e9)
+      cx -= chip(ctx, `q ${ns.qLen}`, cx, cy, full ? p.bad : p.grid, full ? '#fff' : p.ink, ck)
     }
-    if (ns.hitRate >= 0) chip(ctx, `hit ${Math.round(ns.hitRate * 100)}%`, cx, cy, p.grid, p.ink)
+    if (ns.hitRate >= 0) chip(ctx, `hit ${Math.round(ns.hitRate * 100)}%`, cx, cy, p.grid, p.ink, ck)
   }
   if (n.locked) {
     ctx.fillStyle = p.muted
