@@ -111,12 +111,12 @@ and the inspector becomes a bottom sheet.
 | App servers | Thread pool, bounded FIFO/LIFO queue, queue-wait timeout, call timeouts, circuit breaker, idempotency keys |
 | Connection pools | Per server per database; databases refuse connections beyond their limit |
 | Caches / CDN | LRU, LFU, FIFO, random eviction; TTL (with optional jitter); warm start; optional sharing of concurrent misses; read-through or cache-aside; invalidate / write-through |
-| Replication | Replica serves the version from `now − lag`; strong / bounded / eventual reads and a stale-read count |
+| Replication | Replica serves the version from `now − lag`; strong / bounded / eventual reads and a stale-read count; optional failover: promote a replica after a detection and promotion time, losing writes newer than its lag |
 | Load balancing | Round robin, least connections, random; health-check delay; outlier ejection |
 | Queues | Bounded queue + workers, retries, backlog and job-latency metrics |
 | Rate limiter | Token bucket |
 | Sharding / geo / leaderboard / booking | Shard routing by key; spatial index; Redis sorted-set style ops; row locks and Redis locks with TTL, double-booking detection |
-| Chaos | Crash (auto-restart) and slow-down events, scheduled or manual |
+| Chaos | Crash (auto-restart), slow-down (steady or pulsing) and network-partition events, scheduled or manual |
 
 Runs are **deterministic**: the same diagram and seed always produce the same result.
 
