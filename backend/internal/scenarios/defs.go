@@ -11,7 +11,7 @@ func init() {
 	register(&Scenario{
 		ID: "hello-world", Title: "Hello, database", Difficulty: "Tutorial",
 		Summary: "Your app answers every request, but remembers nothing.",
-		Story:   "Visitors are hitting your app server and getting answers, but nothing is stored anywhere. Connect the server to the database so it does real work, then press Play.",
+		Story:   "Visitors are hitting your app server and getting answers, but nothing is stored anywhere. Connect the server to the database (drag from the round handle on the server's right edge) so it does real work, then press Play.",
 		Diagram: (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 30.0}).
 			n("app", engine.KAppServer, cols[1], rowMid, nil).
