@@ -314,6 +314,7 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
   if (down) cx -= chip(ctx, 'DOWN', cx, cy, p.bad, '#fff', ck)
   else if (ns?.cut) cx -= chip(ctx, 'CUT OFF', cx, cy, p.bad, '#fff', ck)
   else if (ns?.slow) cx -= chip(ctx, `${ns.slow}× slow`, cx, cy, p.warn, '#1f1f1f', ck)
+  if (ns?.primary) cx -= chip(ctx, 'PRIMARY', cx, cy, p.ok, '#fff', ck)
   if (ns && sc.running) {
     if (ns.qLen > 0) {
       const full = ns.qLen >= (ns.cap || 1e9)
