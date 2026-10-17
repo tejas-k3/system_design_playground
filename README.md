@@ -16,6 +16,8 @@ simulation live.
 
 ## Quick start
 
+Requires Go 1.23+ and Node 20+.
+
 ```sh
 make install          # once: frontend dependencies
 make dev              # Go API on :8090 + Vite on :5173, open http://localhost:5173

@@ -1,5 +1,5 @@
 # System Design Playground: Go simulator + React UI
-# Requires Go >= 1.22 and Node >= 20.
+# Requires Go >= 1.23 and Node >= 20.
 
 PORT ?= 8090
 export ADDR := :$(PORT)
