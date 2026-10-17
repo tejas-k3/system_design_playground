@@ -484,6 +484,59 @@ func init() {
 		Debrief: "Autoscaling trades money for time. A low target busy level orders servers early and costs more; a high one is cheap and late. Boot time sets how far ahead you must look, and a wait before removing servers stops the fleet flapping. The very large fixed fleet works too, but costs all day what you only need at the peak.",
 	})
 
+	// 14d ─ Medium, config only: the database is cut off (a partition, not a crash) ─────────
+	cutOff := func(app engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 120.0, "readPct": 60.0, "keySpace": 2000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("cache", engine.KCache, cols[3], rowTop, P{"capacityItems": 2000.0}).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "lb").servers(2, cols[2], rowTop, 100, app, "cache").e("cache", "db").done()
+	}
+	register(&Scenario{
+		ID: "cut-off", Title: "Cut off", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The database does not crash. It just stops answering.",
+		Story:   "At 20 seconds the network around the database goes quiet for 25 seconds. Nothing is refused: requests to it simply never come back. Most reads are served from the cache, but your servers keep waiting on the database for everything else. Keep as many requests succeeding as you can. The architecture is fixed: fix it with configuration.",
+		Diagram: cutOff(P{"threads": 16.0}), Solution: cutOff(P{"threads": 16.0, "callTimeoutMs": 300.0, "circuitBreaker": true}),
+		Chaos:       []engine.ChaosEvent{{Type: "partition", NodeID: "db", AtSec: 20, DurationSec: 25}},
+		Goals:       engine.Goals{MinSuccessRate: 0.82, MaxP95Ms: f(1000)},
+		DurationSec: 80, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"A crashed database refuses connections at once. A cut-off one never answers. What does a server thread do while it waits?",
+			"Every waiting request holds a thread. Look at the app server's 'Call timeout': zero means wait forever.",
+			"Give calls to the database a timeout of a few hundred milliseconds so threads come back, and turn on the circuit breaker so servers stop trying while the database is unreachable.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A server calls a database that is cut off, and 'Call timeout' is 0 (wait forever). What happens to the server?", Options: []string{"Its threads fail fast and are reused", "Its threads all end up stuck waiting, so it stops answering even requests that never needed the database", "The load balancer notices and takes over"}, Answer: 1,
+			Explain: "Each waiting request holds a thread for good. Within a second or two none are left, and cache hits queue behind them."}},
+		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up threads until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a circuit breaker stops you spending a thread on every attempt.",
+	})
+
+	// 14e ─ Medium, config only: one server keeps stalling (a gray failure that pulses) ────
+	flaky := func(lb engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 150.0, "readPct": 100.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, lb).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "lb").servers(3, cols[2], rowTop, 100, P{"threads": 8.0}).done()
+	}
+	register(&Scenario{
+		ID: "flaky-neighbour", Title: "Flaky neighbour", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "One of three servers keeps stalling, then recovering, then stalling again.",
+		Story:   "From 15 seconds on, one of your three app servers alternates between normal and fifteen times slower every four seconds (a noisy neighbour, a garbage-collection storm). It never goes down, so the balancer keeps sending it a third of the traffic. Keep users happy. The architecture is fixed: fix it with configuration.",
+		Diagram: flaky(nil), Solution: flaky(P{"outlierEjection": true}),
+		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "app2", AtSec: 15, Factor: 15, DurationSec: 120, PulseSec: 4}},
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(500)},
+		DurationSec: 120, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"The slow server is not down, so health checks pass. What else tells you a server is bad?",
+			"Open the load balancer's settings and look at the health group.",
+			"Turn on 'Eject outliers' (servers much slower than their peers leave rotation for a while), or switch to least connections: a stalling server piles up unfinished requests, so it is given fewer new ones.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A server is slow half the time but never fails a health check. Which balancing rule protects users best?", Options: []string{"Round robin: everyone gets a fair share", "Dropping servers whose latency is far above their peers'", "Sending more traffic to the slow one so it catches up"}, Answer: 1,
+			Explain: "A slow server is worse than a dead one: a dead one is skipped, a slow one keeps being given work it cannot finish."}},
+		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because a sick server is the one with the most unfinished work.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
