@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchSolution } from '../api/client'
 import { goalRows } from '../model/goals'
+import { isNarrow } from '../model/responsive'
 import { reset } from '../sim/bridge'
 import { useStore } from '../state/store'
 
@@ -13,8 +14,8 @@ export function ScenarioPanel() {
   const answer = useStore((s) => s.answerPrediction)
   const showSolution = useStore((s) => s.showSolution)
   const exit = useStore((s) => s.exitScenario)
-  const [open, setOpen] = useState(true)
-  useEffect(() => setOpen(true), [sc?.def.id])
+  const [open, setOpen] = useState(!isNarrow()) // on a phone the story starts folded away so the board is visible
+  useEffect(() => setOpen(!isNarrow()), [sc?.def.id])
   if (!sc) return null
   const { def } = sc
   const rows = goalRows(def.goals, stats, cost, status !== 'stopped')

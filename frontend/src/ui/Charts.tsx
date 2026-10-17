@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SeriesPoint } from '../api/types'
 import { palettes } from '../draw/theme'
+import { isNarrow } from '../model/responsive'
 import { useStore } from '../state/store'
 import { Errors } from './Inspector'
 import { Traces } from './Traces'
@@ -96,7 +97,7 @@ function niceMax(v: number): number {
 const compact = (v: number) => (v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : v >= 10 ? `${Math.round(v)}` : `${+v.toFixed(1)}`)
 
 export function Charts() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(!isNarrow())
   const [tab, setTab] = useState<'metrics' | 'traces'>('metrics')
   const series = useStore((s) => s.stats.series)
   const run = useStore((s) => s.stats.global.run)

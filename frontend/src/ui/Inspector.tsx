@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
 import { paramVisible } from '../model/diagram'
+import { isNarrow } from '../model/responsive'
 import { crashNode, restartNode } from '../sim/bridge'
 import { useStore } from '../state/store'
 
@@ -13,6 +14,10 @@ export function Inspector() {
   const open = useStore((s) => s.ui.inspector)
   const setUi = useStore((s) => s.setUi)
   const reg = useStore((s) => s.reg)
+  // on a phone the inspector is a bottom sheet: bring it up when something gets selected
+  useEffect(() => {
+    if (isNarrow() && selection.length > 0) setUi({ inspector: true })
+  }, [selection, setUi])
   if (!reg) return null
   if (!open) {
     return (
