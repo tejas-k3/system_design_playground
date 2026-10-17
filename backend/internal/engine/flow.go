@@ -553,6 +553,10 @@ func (s *Sim) passBack(n *node, res Result, cb func(Result)) {
 // ---- arrival -----------------------------------------------------------------------
 
 func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
+	if n.cut {
+		n.held = append(n.held, func() { s.arrive(n, c, cb) })
+		return
+	}
 	if c.tr != nil {
 		cb = s.traceArrive(n, c, cb)
 	}

@@ -2,7 +2,7 @@ package engine
 
 import "math"
 
-// Chaos: scheduled and manual crashes and slow-downs.
+// Chaos: scheduled and manual crashes, slow-downs and network partitions.
 
 // ChaosRecord is a chaos event that fired.
 type ChaosRecord struct {
@@ -33,8 +33,12 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 		return
 	}
 	s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: ev.Type, NodeID: t.id, Label: t.label})
-	if ev.Type == "crash" {
+	switch ev.Type {
+	case "crash":
 		s.CrashNode(t.id, ev.DownSec)
+		return
+	case "partition":
+		s.partition(t, ev.DurationSec)
 		return
 	}
 	t.slow = math.Max(1, ev.Factor)
@@ -43,6 +47,20 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 	s.at(until, func() {
 		if s.now >= t.slowUntil && t.slowUntil == until {
 			t.slow = 1
+		}
+	})
+}
+
+// partition cuts a node off the network: calls to it get no answer (callers only escape through their own
+// timeouts, unlike a crash that refuses at once) until it heals, when the waiting calls are delivered.
+func (s *Sim) partition(n *node, durationSec float64) {
+	n.cut = true
+	s.after(durationSec*1000, func() {
+		n.cut = false
+		held := n.held
+		n.held = nil
+		for _, deliver := range held {
+			deliver()
 		}
 	})
 }

@@ -104,12 +104,12 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow
+	Type        string  `json:"type"` // crash | slow | partition
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`
 	Factor      float64 `json:"factor,omitempty"`
-	DurationSec float64 `json:"durationSec,omitempty"`
+	DurationSec float64 `json:"durationSec,omitempty"` // slow and partition
 }
 
 // TrafficPoint is (seconds, rps) on a piecewise-linear traffic curve.
