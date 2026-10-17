@@ -29,7 +29,7 @@ Or as a single binary serving the built UI:
 make run              # builds both, then http://localhost:8090
 ```
 
-Other targets: `make test`, `make bench`, `make build`. Use `PORT=9000 make dev` to change the port.
+Other targets: `make test`, `make lint` (gofmt + staticcheck), `make bench`, `make build`. Use `PORT=9000 make dev` to change the port.
 
 ## How to play
 
@@ -71,17 +71,19 @@ Runs are **deterministic**: the same diagram and seed always produce the same re
 backend/
   cmd/server/            HTTP server entry point (flags / env: ADDR, STATIC_DIR, ALLOWED_ORIGINS)
   internal/engine/       the simulator (no I/O, fully unit tested)
-    sim.go flow.go data.go   event loop, request flow, per-node behaviour
-    registry.go              node kinds, parameters, connection rules, cost
-    sanitize.go              validates untrusted diagrams
-    scoring.go stats.go      goals, stars and the snapshots the UI renders
+    sim.go                   core types, event loop, 100 ms tick
+    topology.go clients.go   building and live-editing the graph; traffic, retries
+    flow.go data.go          request flow, pools, queues; per-node behaviour
+    chaos.go versions.go     failure injection; item versions and staleness
+    registry.go sanitize.go  node kinds and parameters; validation of untrusted diagrams
+    scoring.go stats.go      goals and stars; the snapshots the UI renders
   internal/scenarios/    challenges as data (+ tests: start must fail, solution must pass)
   internal/api/          REST + WebSocket session
 frontend/src/
   api/ model/ state/     wire types, diagram helpers + sanitizer, zustand store, persistence
   sim/                   WebSocket client and the store ⇄ server bridge
   draw/                  canvas renderer (roughjs), geometry and hit-testing, icons
-  ui/                    Board, Library, Inspector, Charts, Scenario panels, modals
+  ui/                    Board, Toolbar, Library, Inspector, Charts, challenge panel, dialogs
 ```
 
 The engine is a priority-queue discrete-event simulation. Each request is a chain of callbacks across
