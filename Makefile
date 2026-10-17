@@ -64,7 +64,7 @@ CONTAINER ?= system-design-playground
 
 # run in the background, restarting after a reboot or crash, with shared designs kept in a named volume
 up: docker-build
-	-docker rm -f $(CONTAINER)
+	@docker rm -f $(CONTAINER) >/dev/null 2>&1 || true # replace any previous run quietly
 	docker run -d --name $(CONTAINER) --restart unless-stopped -p $(PORT):8090 -v sdp-data:/data $(IMAGE)
 	@echo "Running at http://localhost:$(PORT)  (make logs to follow, make down to stop)"
 
