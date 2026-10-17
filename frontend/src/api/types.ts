@@ -113,6 +113,7 @@ export interface Scenario extends ScenarioSummary {
   warmupSec: number
   speed: number
   hints: [string, string, string]
+  traffic?: Record<string, [number, number][]> // a client's rate over time, in seconds and rps, replacing its own setting
   predictions?: Prediction[]
   debrief: string
 }
