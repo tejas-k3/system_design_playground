@@ -13,6 +13,9 @@ const ms = (v: number) => (v >= 10000 ? `${(v / 1000).toFixed(1)} s` : `${Math.r
 /** Hourly cost as shown on screen; a dash until the server has priced the design. */
 export const fmtCost = (c: number | null): string => (c === null ? '—' : `$${c.toFixed(2)}/hr`)
 
+/** Median time a failed request took (the headline latencies count successes only). */
+export const failedAfter = (r: Stats['global']['run']): string => (r.failed > 0 ? ms(r.failP50) : '—')
+
 /** Share of finished requests that succeeded (null before any finish). The one success figure shown anywhere on screen;
  *  requests still in flight count once they resolve, and the final verdict agrees because nothing is pending by then. */
 export function successRate(r: Stats['global']['run']): number | null {

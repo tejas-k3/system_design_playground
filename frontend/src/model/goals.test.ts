@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Stats } from '../api/types'
 import { emptyStats } from '../state/store'
-import { fmtCost, goalRows, starTargets, successRate } from './goals'
+import { failedAfter, fmtCost, goalRows, starTargets, successRate } from './goals'
 
 const stats = (run: Partial<Stats['global']['run']>): Stats => ({ ...emptyStats(), global: { now: 5, inFlight: 0, cost: 0, run: { ...emptyStats().global.run, ...run } } })
 const row = (rows: ReturnType<typeof goalRows>, label: string) => rows.find((r) => r.label === label)!
@@ -68,5 +68,12 @@ describe('unknown cost', () => {
   it('is written as a dash, never as $0.00', () => {
     expect(fmtCost(null)).toBe('—')
     expect(fmtCost(0.5)).toBe('$0.50/hr')
+  })
+})
+
+describe('failedAfter', () => {
+  it('is the median time to failure, or a dash when nothing has failed', () => {
+    expect(failedAfter({ ...emptyStats().global.run, failed: 3, failP50: 812.4 })).toBe('812 ms')
+    expect(failedAfter({ ...emptyStats().global.run, failed: 0, failP50: 0 })).toBe('—')
   })
 })
