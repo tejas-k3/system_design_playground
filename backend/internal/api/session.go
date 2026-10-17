@@ -54,6 +54,12 @@ type resultMsg struct {
 	Score      engine.Score `json:"score"`
 }
 
+// tracesMsg answers a "traces" request with the recent failed and successful request traces.
+type tracesMsg struct {
+	Type string `json:"type"`
+	engine.TraceSet
+}
+
 type errMsg struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
@@ -202,6 +208,7 @@ func (ss *session) build() {
 	}
 	ss.sim = engine.New(ss.diagram, opts)
 	ss.sim.EnableParticles(true)
+	ss.sim.EnableTraces(true)
 	ss.finished = false
 	ss.chaosSeen = 0
 	ss.slowWarned = false
@@ -283,6 +290,12 @@ func (ss *session) handle(ctx context.Context, m clientMsg) bool {
 	case "speed":
 		ss.speed = nearestSpeed(m.Speed)
 		return ss.send(ctx, ss.frame(false))
+	case "traces":
+		set := engine.TraceSet{Failed: []engine.TraceOut{}, OK: []engine.TraceOut{}}
+		if ss.sim != nil {
+			set = ss.sim.Traces()
+		}
+		return ss.send(ctx, tracesMsg{Type: "traces", TraceSet: set})
 	case "crash":
 		if ss.sim != nil {
 			ss.sim.CrashNode(m.NodeID, 0)

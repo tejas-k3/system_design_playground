@@ -286,3 +286,30 @@ func TestSessionCapReturns503AndFreesSlots(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+func TestWebSocketReturnsRequestTraces(t *testing.T) {
+	ts := newTestServer(t)
+	c, ctx := dial(t, ts)
+	sc := scenarios.Get("opening-night")
+	readType(t, c, ctx, "frame")
+
+	// before any run there is nothing to show, but the answer must still be well-formed arrays
+	sendMsg(t, c, ctx, clientMsg{Type: "traces"})
+	var empty tracesMsg
+	if err := json.Unmarshal(readType(t, c, ctx, "traces"), &empty); err != nil || empty.OK == nil || empty.Failed == nil {
+		t.Fatalf("empty traces must be [] not null: %+v err=%v", empty, err)
+	}
+
+	sendMsg(t, c, ctx, clientMsg{Type: "init", Diagram: &sc.Solution})
+	for i := 0; i < 100; i++ {
+		sendMsg(t, c, ctx, clientMsg{Type: "step"})
+	}
+	sendMsg(t, c, ctx, clientMsg{Type: "traces"})
+	var got tracesMsg
+	if err := json.Unmarshal(readType(t, c, ctx, "traces"), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.OK) == 0 || len(got.OK[0].Spans) < 3 {
+		t.Fatalf("expected successful traces with several spans, got %+v", got.OK)
+	}
+}
