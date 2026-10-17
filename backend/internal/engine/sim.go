@@ -394,3 +394,9 @@ func (s *Sim) Finished() bool {
 }
 
 func (s *Sim) backlog() int { return s.jobEnqueued - s.jobCompleted - s.jobLost }
+
+// service draws a service time for one unit of work at node n, honouring its "variability" setting.
+func (s *Sim) service(n *node, mean float64) float64 {
+	mode, _ := n.p["variability"].(string)
+	return s.rng.ServiceDist(mean, mode)
+}

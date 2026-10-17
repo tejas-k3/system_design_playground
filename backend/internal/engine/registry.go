@@ -57,6 +57,13 @@ func flag(key, label, group string, def bool, help string) ParamSpec {
 	return ParamSpec{Key: key, Label: label, Group: group, Type: "boolean", Default: def, Help: help}
 }
 
+// variability is the shared "service-time spread" setting of nodes that do work (see RNG.ServiceDist).
+func variability(group string) ParamSpec {
+	return sel("variability", "Service-time spread", group, "steady",
+		"How much individual requests differ from the average. Steady is tidy; exponential is the textbook case; heavy-tailed has rare very slow requests, like real services.",
+		opt("steady", "Steady"), opt("exponential", "Exponential"), opt("heavy", "Heavy-tailed")).adv()
+}
+
 func opt(v, l string) Option { return Option{Value: v, Label: l} }
 
 func (p ParamSpec) showIf(key string, in ...string) ParamSpec {
@@ -132,6 +139,7 @@ func init() {
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				num("cpuMs", "CPU time", "Capacity", 20, 1, 500, 1, "ms", "Compute per request, not counting time waiting on dependencies.").fixed(),
+				variability("Capacity"),
 				num("queueCap", "Queue size", "Capacity", 50, 0, 2000, 10, "", "Requests that may wait for a thread. When full, new ones get a 503."),
 				sel("queueOrder", "Queue order", "Capacity", "fifo", "Who gets the next free thread. Under overload newest-first serves people still waiting.",
 					opt("fifo", "Oldest first"), opt("lifo", "Newest first")),
@@ -171,6 +179,7 @@ func init() {
 				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it can work on at once."),
 				num("readMs", "Read time", "Speed", 10, 1, 500, 1, "ms", "Time for one read."),
 				num("writeMs", "Write time", "Speed", 30, 1, 1000, 1, "ms", "Time for one write."),
+				variability("Speed"),
 				num("maxConnections", "Max connections", "Capacity", 500, 10, 5000, 10, "", "Hard limit on open connections from all servers; beyond it connections are refused."),
 				num("queueCap", "Queue size", "Capacity", 100, 0, 5000, 10, "", "Queries that may wait for a free slot."),
 				flag("spatialIndex", "Spatial index", "Features", false, "Makes nearby-location searches cheap."),
@@ -207,6 +216,7 @@ func init() {
 			Params: []ParamSpec{
 				num("concurrency", "Concurrency", "Capacity", 4, 1, 64, 1, "", "Jobs it works on at once."),
 				num("processMs", "Processing time", "Speed", 10, 1, 2000, 1, "ms", "Compute per job."),
+				variability("Speed"),
 			},
 			cost: func(p Params) float64 { return 0.05 * pf(p, "concurrency", 4) / 4 },
 		},
@@ -244,6 +254,7 @@ func init() {
 			Accent: "#495057", Width: 160, Height: 72, CanConnect: nil,
 			Params: []ParamSpec{
 				num("latencyMs", "Latency", "Behavior", 80, 1, 5000, 5, "ms", "Typical response time."),
+				variability("Behavior"),
 				num("errorPct", "Error rate", "Behavior", 1, 0, 100, 1, "%", "Share of calls that fail."),
 				sel("calledFor", "Called for", "Behavior", "writes", "Which requests call this service.",
 					opt("writes", "Writes"), opt("all", "Everything")),
