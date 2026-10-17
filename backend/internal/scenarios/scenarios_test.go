@@ -130,6 +130,19 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatal("a router feeding a single shard should not beat the single database")
 		}
 	})
+	t.Run("the capstone is not solved by capacity alone", func(t *testing.T) {
+		sc := Get("launch-day-capstone")
+		d := sc.Solution
+		for i := 1; i <= 5; i++ {
+			id := fmt.Sprintf("app%d", i)
+			d = withParam(d, id, "callTimeoutMs", 0.0)
+			d = withParam(d, id, "queueTimeoutMs", 0.0)
+			d = withParam(d, id, "queueOrder", "fifo")
+		}
+		if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatal("without timeouts and a short queue the slow database should break the latency goal")
+		}
+	})
 	t.Run("results are stable across seeds for the reference solutions", func(t *testing.T) {
 		for _, sc := range All() {
 			for _, seed := range []uint32{1, 2, 3} {

@@ -520,4 +520,36 @@ func init() {
 		Debrief: "Sharding multiplies write capacity by splitting the data, at the price of complexity: queries across shards get hard and skew can recreate the hotspot you were escaping.",
 	})
 
+	// 18 ─ Hard capstone ───────────────────────────────────────────────────────────────
+	capstone := func(hardened bool) engine.Diagram {
+		clients := P{"readPct": 85.0, "keySpace": 8000.0, "timeoutMs": 1500.0, "retries": 2.0, "backoff": "exponential"}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, clients).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowMid, P{"readMs": 15.0})
+		b.e("users", "lb")
+		if !hardened {
+			return b.servers(2, cols[2], rowTop, 120, P{"threads": 8.0}).done()
+		}
+		b.n("cache", engine.KCache, cols[3], rowTop, P{"capacityItems": 3000.0}).e("cache", "db")
+		return b.servers(5, cols[2], 0, 80, P{"threads": 8.0, "callTimeoutMs": 500.0, "queueOrder": "lifo", "queueTimeoutMs": 400.0}, "cache").done()
+	}
+	register(&Scenario{
+		ID: "launch-day-capstone", Title: "Launch day", Difficulty: "Hard",
+		Summary: "A traffic ramp, a database slowdown and a crashed server, all in one afternoon.",
+		Story:   "Traffic climbs from 100 to 800 requests per second. Midway the database slows down for a while, and shortly after a server crashes. Clients retry, as clients do. Design a system that keeps most users happy through all of it.",
+		Diagram: capstone(false), Solution: capstone(true),
+		Traffic:     map[string][]engine.TrafficPoint{"users": {{0, 100}, {10, 100}, {40, 800}, {75, 800}, {85, 150}, {100, 150}}},
+		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 45, Factor: 4, DurationSec: 12}, {Type: "crash", NodeID: "random:appServer", AtSec: 60, DownSec: 15}},
+		Goals:       engine.Goals{MinSuccessRate: 0.93, MaxP95Ms: f(700), MaxCostPerHour: f(1.8)},
+		DurationSec: 100, WarmupSec: 8, Speed: 2,
+		Hints: [3]string{
+			"Three things go wrong at different times: load, a slow dependency and a lost server. Which parts of your design handle each?",
+			"A cache takes load off the database, spare servers survive a crash, and timeouts with a short queue stop a slow dependency from tying up every thread.",
+			"Try a load balancer, five servers with call timeouts and a short newest-first queue, and a cache in front of the database.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "The database becomes four times slower for twelve seconds. Which setting stops the slowdown from taking the whole system down?", Options: []string{"A call timeout on the app servers", "More threads", "Longer client timeouts"}, Answer: 0,
+			Explain: "A timeout frees the thread instead of leaving it stuck behind the slow database, so servers keep answering what they can (from cache, for example)."}},
+		Debrief: "Real outages stack: capacity, a slow dependency and a failure arrive together. The designs that survive layer defences: caches to cut load, redundancy for failures, and timeouts and short queues so slowness cannot spread.",
+	})
 }
