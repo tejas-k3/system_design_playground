@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Diagram, Edge, Node, Note, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
-import { isNarrow } from '../model/responsive'
+import { isCompact, isNarrow } from '../model/responsive'
 
 export type Tool = 'select' | 'connect'
 export interface Viewport {
@@ -132,7 +132,7 @@ export const useStore = create<State>()((set, get) => {
     cost: 0,
     scenario: null,
     sandbox: null,
-    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isNarrow(), result: false },
+    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false },
     toasts: [],
     connection: 'connecting',
     past: [],
