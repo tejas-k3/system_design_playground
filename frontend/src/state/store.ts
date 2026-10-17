@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Diagram, Edge, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
+import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
 import { isCompact, isNarrow } from '../model/responsive'
 
@@ -34,6 +34,7 @@ export interface State {
   reg: Reg | null
   diagram: Diagram
   selection: string[]
+  findings: Finding[] // advisory design lint for the current diagram
   tool: Tool
   viewport: Viewport
   theme: 'light' | 'dark'
@@ -84,6 +85,7 @@ export interface State {
   setNodeSeries(s: { nodeId: string; points: NodePoint[] } | null): void
   setTraces(t: TraceSet | null): void
   setCost(c: number): void
+  setFindings(f: Finding[]): void
   setConnection(c: Connection): void
   toast(text: string, kind?: Toast['kind'], ms?: number): void
   dismissToast(id: number): void
@@ -124,6 +126,7 @@ export const useStore = create<State>()((set, get) => {
     reg: null,
     diagram: emptyDiagram(),
     selection: [],
+    findings: [],
     tool: 'select',
     viewport: { scrollX: 0, scrollY: 0, zoom: 1 },
     theme: typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
@@ -277,6 +280,7 @@ export const useStore = create<State>()((set, get) => {
     setTraces: (traces) => set({ traces }),
     setNodeSeries: (nodeSeries) => set({ nodeSeries }),
     setCost: (cost) => set({ cost }),
+    setFindings: (findings) => set({ findings }),
     setConnection: (connection) => set({ connection }),
 
     toast: (text, kind = 'info', ms = 3500) => {

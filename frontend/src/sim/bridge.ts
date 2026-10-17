@@ -67,7 +67,10 @@ export function startBridge(): () => void {
       debounce('diagram', 120, () => socket?.send({ type: 'diagram', diagram: useStore.getState().diagram }))
       debounce('cost', 250, () => {
         validate(useStore.getState().diagram)
-          .then((r) => useStore.getState().setCost(r.costPerHour))
+          .then((r) => {
+            useStore.getState().setCost(r.costPerHour)
+            useStore.getState().setFindings(r.findings ?? [])
+          })
           .catch(() => undefined)
       })
     }
