@@ -118,7 +118,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 30; }
 .toast { background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 10px; box-shadow: var(--shadow); cursor: pointer; max-width: 90vw; } .toast.warn { background: var(--warn); color: #1f1f1f; } .toast.error { background: var(--bad); color: #fff; }
 
-@media (max-width: 1599px) { /* compact tier: keep in step with COMPACT_PX in model/responsive.ts */
+@media (max-width: 1359px) { /* compact tier: keep in step with COMPACT_PX in model/responsive.ts */
   .inspector { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
   .inspector-tab { top: 8px; }
 }
