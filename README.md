@@ -105,14 +105,14 @@ and the inspector becomes a bottom sheet.
 
 | Area | Behaviour |
 |---|---|
-| Traffic | Poisson arrivals; constant / ramp / spike / wave or authored curves; read/write mix; Zipf, uniform or scan key popularity; hot key |
+| Traffic | Independent (Poisson), bursty (short rushes, same average) or closed-loop users (a fixed crowd that waits and thinks); Poisson arrivals; constant / ramp / spike / wave or authored curves; read/write mix; Zipf, uniform or scan key popularity; hot key |
 | Clients | Timeouts, retries with exponential backoff + jitter or immediate retry; abandoned ("ghost") attempts keep consuming resources downstream |
 | Service times | Steady by default; an advanced *service-time spread* setting (app server, database, worker, external API) switches to exponential or heavy-tailed, same mean, to show how variability lengthens queues and tails |
 | Autoscaling | Optional per app server: a fleet of identical servers that grows when the last 30 s of thread utilisation is above a target, after a boot delay, and shrinks one server at a time after a quiet period; cost is the average number of servers that ran |
 | App servers | Thread pool, bounded FIFO/LIFO queue, queue-wait timeout, call timeouts, circuit breaker, idempotency keys |
 | Connection pools | Per server per database; databases refuse connections beyond their limit |
 | Caches / CDN | LRU, LFU, FIFO, random eviction; TTL (with optional jitter); warm start; optional sharing of concurrent misses; read-through or cache-aside; invalidate / write-through |
-| Replication | Replica serves the version from `now − lag`; strong / bounded / eventual reads and a stale-read count; optional failover: promote a replica after a detection and promotion time, losing writes newer than its lag |
+| Replication | Replica serves the version from `now − lag`; strong / bounded / eventual reads and a stale-read count; optional failover: promote a replica after a detection and promotion time, losing writes newer than its lag (or nothing, with a synchronous replica that slows every write); an unfenced old primary that returns loses the writes made since |
 | Load balancing | Round robin, least connections, random; health-check delay; outlier ejection |
 | Queues | Bounded queue + workers, retries, backlog and job-latency metrics |
 | Rate limiter | Token bucket |
