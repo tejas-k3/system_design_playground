@@ -3,7 +3,7 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
-import { clientRateLabel, edgeLabel, utilBarWidth } from '../model/rates'
+import { clientRateLabel, edgeLabel, smoothRate, utilBarWidth } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, handleRadius, legibleSize, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
@@ -119,22 +119,6 @@ function drawEdge(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, nod
     ctx.lineTo(g.b.x, g.b.y)
     ctx.lineTo(g.b.x - 11 * Math.cos(ang + 0.45), g.b.y - 11 * Math.sin(ang + 0.45))
     ctx.stroke()
-    // label
-    const label = edgeLabel(e.latencyMs, st?.rps ?? 0, selected || hot, sc.running)
-    if (label) {
-      const mx = (g.a.x + g.b.x) / 2
-      const my = (g.a.y + g.b.y) / 2
-      ctx.font = `13px ${FONT}`
-      const tw = ctx.measureText(label).width
-      ctx.fillStyle = p.bg
-      ctx.globalAlpha = 0.9
-      ctx.fillRect(mx - tw / 2 - 3, my - 9, tw + 6, 17)
-      ctx.globalAlpha = 1
-      ctx.fillStyle = st?.breaker === 'open' ? p.bad : p.muted
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(st?.breaker === 'open' ? `open · ${label}` : label, mx, my)
-    }
   }
 }
 
@@ -159,6 +143,43 @@ function drawParticles(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<stri
     ctx.fill()
   }
   ctx.globalAlpha = 1
+}
+
+// last displayed rate per connection, eased so the number glides instead of flickering
+const shownRate = new Map<string, { v: number; at: number }>()
+
+/** Rate / latency labels, drawn after the particles so the moving dots never cover them, on an opaque pill. */
+function drawEdgeLabels(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>) {
+  const { palette: p, stats } = sc
+  const size = legibleSize(13, sc.viewport.zoom, 11)
+  for (const e of sc.diagram.edges) {
+    const g = edgeGeom(e, nodes, sc.reg)
+    if (!g) continue
+    const st = stats.edges[e.id]
+    const prev = shownRate.get(e.id)
+    const rps = smoothRate(prev?.v, st?.rps ?? 0, prev ? Math.min(1000, sc.now - prev.at) : 0)
+    shownRate.set(e.id, { v: rps, at: sc.now })
+    const label = edgeLabel(e.latencyMs, rps, sc.selection.has(e.id) || sc.hover === e.id, sc.running)
+    if (!label) continue
+    const open = st?.breaker === 'open'
+    const text = open ? `open · ${label}` : label
+    const mx = (g.a.x + g.b.x) / 2
+    const my = (g.a.y + g.b.y) / 2
+    ctx.font = `${size}px ${FONT}`
+    const w = ctx.measureText(text).width + 10
+    const h = size + 6
+    ctx.fillStyle = p.card
+    ctx.strokeStyle = open ? p.bad : p.grid
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.roundRect(mx - w / 2, my - h / 2, w, h, h / 2)
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = open ? p.bad : p.ink
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(text, mx, my + 0.5)
+  }
 }
 
 /** Requests per second leaving a node, from the live stats of its outgoing connections. */
@@ -372,6 +393,7 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
   const nodes = new Map(sc.diagram.nodes.map((n) => [n.id, n]))
   drawEdge(ctx, rc, sc, nodes)
   if (sc.showParticles) drawParticles(ctx, sc, nodes)
+  drawEdgeLabels(ctx, sc, nodes)
   // dim nodes that cannot accept the connection being dragged
   for (const n of sc.diagram.nodes) {
     if (sc.connect && n.id !== sc.connect.from && !sc.validTargets.has(n.id)) ctx.globalAlpha = 0.35

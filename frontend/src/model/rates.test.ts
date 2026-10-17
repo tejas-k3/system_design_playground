@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clientRateLabel, edgeLabel, utilBarWidth } from './rates'
+import { clientRateLabel, edgeLabel, smoothRate, utilBarWidth } from './rates'
 
 describe('clientRateLabel', () => {
   it('shows the configured rate before a run, with the peak for a pattern', () => {
@@ -43,5 +43,22 @@ describe('utilBarWidth', () => {
     expect(utilBarWidth(0.01, 100)).toBe(4)
     expect(utilBarWidth(0.5, 100)).toBe(50)
     expect(utilBarWidth(3, 100)).toBe(100)
+  })
+})
+
+describe('smoothRate', () => {
+  it('starts at the first value', () => {
+    expect(smoothRate(undefined, 120, 16)).toBe(120)
+  })
+  it('moves toward the target without jumping', () => {
+    const next = smoothRate(100, 200, 16)
+    expect(next).toBeGreaterThan(100)
+    expect(next).toBeLessThan(130)
+  })
+  it('settles on the target given time, and tolerates a long pause', () => {
+    let v = 100
+    for (let i = 0; i < 120; i++) v = smoothRate(v, 200, 16)
+    expect(v).toBeCloseTo(200, 0)
+    expect(smoothRate(100, 200, 5000)).toBeCloseTo(200, 0)
   })
 })
