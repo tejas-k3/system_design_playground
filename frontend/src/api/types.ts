@@ -149,6 +149,9 @@ export interface NodeStats {
   cut?: boolean // partitioned from the network
   primary?: boolean // a replica that took over as the primary
   instances?: number // autoscaled app server: servers running now
+  phase?: 'detecting' | 'promoting' // failover step in progress on a crashed database
+  phaseLeftSec?: number
+  booting?: number // autoscaled app server: servers still booting
   slow?: number
   extra?: Record<string, number>
 }

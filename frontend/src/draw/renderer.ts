@@ -3,6 +3,7 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
+import { phaseChip } from '../model/phase'
 import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
@@ -338,6 +339,8 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
   if (down) cx -= chip(ctx, 'DOWN', cx, cy, p.bad, '#fff', ck)
   else if (ns?.cut) cx -= chip(ctx, 'CUT OFF', cx, cy, p.bad, '#fff', ck)
   else if (ns?.slow) cx -= chip(ctx, `${ns.slow}× slow`, cx, cy, p.warn, '#1f1f1f', ck)
+  const phase = phaseChip(ns)
+  if (phase) cx -= chip(ctx, phase, cx, cy, p.warn, '#1f1f1f', ck)
   if (ns?.instances && ns.instances > 1) cx -= chip(ctx, `${ns.instances} servers`, cx, cy, p.grid, p.ink, ck)
   if (ns?.primary) cx -= chip(ctx, 'PRIMARY', cx, cy, p.ok, '#fff', ck)
   if (ns && sc.running) {
