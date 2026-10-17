@@ -43,11 +43,13 @@ func (s *Sim) configStore(n *node) {
 	capItems := int(n.f("capacityItems"))
 	if n.store == nil || n.storePol != pol {
 		n.store = NewStore(pol, capItems, n.f("ttlSec")*1000, s.rng)
+		n.store.SetJitter(n.f("ttlJitterPct") / 100)
 		n.storePol = pol
 		return
 	}
 	n.c.evict += n.store.SetCapacity(capItems)
 	n.store.SetTTL(n.f("ttlSec") * 1000)
+	n.store.SetJitter(n.f("ttlJitterPct") / 100)
 }
 
 func (s *Sim) addEdge(d Edge) {

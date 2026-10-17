@@ -105,6 +105,7 @@ type node struct {
 	// cache / cdn
 	store    *Store
 	storePol string
+	fetching map[int][]func(Result) // cache: waiters sharing an in-flight miss fetch, by key (coalescing)
 
 	// rate limiter
 	tokens   float64
