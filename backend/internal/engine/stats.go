@@ -95,7 +95,7 @@ type Stats struct {
 	Global GlobalStats          `json:"global"`
 	Nodes  map[string]NodeStats `json:"nodes"`
 	Edges  map[string]EdgeStats `json:"edges"`
-	Events []Event              `json:"events"`
+	Events []Event              `json:"events,omitempty"` // omitted by the session when unchanged since the last frame
 	Series []SeriesPoint        `json:"series"`
 }
 
