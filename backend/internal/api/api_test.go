@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -578,5 +579,32 @@ func TestEventLogIsSentOnlyWhenItChanges(t *testing.T) {
 	}
 	if withEvents == 0 || quietAfter < 3 {
 		t.Fatalf("events should appear when logged and be left out of later unchanged frames: with=%d quiet=%d", withEvents, quietAfter)
+	}
+}
+
+func TestValidateReturnsLintFindingsAndNeverNull(t *testing.T) {
+	ts := newTestServer(t)
+	var v struct {
+		Findings []engine.Finding `json:"findings"`
+	}
+	if post(t, ts.URL+"/api/validate", map[string]any{"diagram": scenarios.Get("connection-crunch").Diagram}, &v) != 200 {
+		t.Fatal("validate failed")
+	}
+	found := false
+	for _, f := range v.Findings {
+		found = found || f.Rule == "pool-exceeds-db"
+	}
+	if !found {
+		t.Fatalf("connection-crunch should be flagged for its pools: %+v", v.Findings)
+	}
+	body, _ := json.Marshal(map[string]any{"diagram": engine.Diagram{}})
+	resp, err := http.Post(ts.URL+"/api/validate", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if bytes.Contains(raw, []byte(`"findings":null`)) {
+		t.Fatalf("an empty design must give [], not null: %s", raw)
 	}
 }

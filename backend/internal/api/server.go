@@ -204,7 +204,11 @@ func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, adjusted := engine.Sanitize(req.Diagram)
-	writeJSON(w, 200, map[string]any{"diagram": d, "adjusted": adjusted, "costPerHour": engine.DiagramCost(d)})
+	findings := engine.Lint(d)
+	if findings == nil {
+		findings = []engine.Finding{}
+	}
+	writeJSON(w, 200, map[string]any{"diagram": d, "adjusted": adjusted, "costPerHour": engine.DiagramCost(d), "findings": findings})
 }
 
 type runReq struct {
