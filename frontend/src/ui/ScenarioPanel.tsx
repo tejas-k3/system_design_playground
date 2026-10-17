@@ -4,6 +4,7 @@ import { goalRows, starTargets } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { reset } from '../sim/bridge'
 import { useStore } from '../state/store'
+import { CONFIG_ONLY_HELP } from './copy'
 
 export function ScenarioPanel() {
   const sc = useStore((s) => s.scenario)
@@ -29,7 +30,7 @@ export function ScenarioPanel() {
         <button className="link" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? '▾' : '▸'}</button>
         <h2>{def.title}</h2>
         <span className={`badge ${def.difficulty.toLowerCase()}`}>{def.difficulty}</span>
-        {def.configOnly && <span className="badge cfg" title="The architecture is fixed; only settings can change">config only</span>}
+        {def.configOnly && <span className="badge cfg" title={CONFIG_ONLY_HELP}>config only</span>}
         <button className="x" onClick={() => { reset(); exit() }} aria-label="Leave challenge" title="Leave challenge">×</button>
       </header>
       {open && (

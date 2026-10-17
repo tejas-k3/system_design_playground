@@ -4,6 +4,7 @@ import type { ScenarioSummary } from '../api/types'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
+import { CONFIG_ONLY_HELP } from './copy'
 import { Stars } from './Stars'
 import { useEscapeKey } from './useEscapeKey'
 
@@ -29,7 +30,7 @@ export function ScenarioPicker() {
           <h2>Challenges</h2>
           <button className="x" autoFocus onClick={() => setUi({ picker: false })} aria-label="Close">×</button>
         </header>
-        <p className="muted small">Each challenge starts with a broken system. Change it until it meets the goals. Earn up to three stars.</p>
+        <p className="muted small">Each challenge starts with a broken system. Change it until it meets the goals. Earn up to three stars. <em>config only</em> means {CONFIG_ONLY_HELP.charAt(0).toLowerCase() + CONFIG_ONLY_HELP.slice(1)}</p>
         {err && <p className="bad">{err}</p>}
         {!list && !err && <p className="muted">Loading…</p>}
         {groups.map((g) => {
@@ -43,7 +44,7 @@ export function ScenarioPicker() {
                   <button key={s.id} className={`card ${active === s.id ? 'active' : ''}`} onClick={() => loadScenario(s.id)}>
                     <span className="card-top"><b>{s.title}</b><Stars n={progress[s.id] ?? 0} size={14} /></span>
                     <small>{s.summary}</small>
-                    {s.configOnly && <em>config only</em>}
+                    {s.configOnly && <em title={CONFIG_ONLY_HELP}>config only</em>}
                   </button>
                 ))}
               </div>
