@@ -61,6 +61,13 @@ type tracesMsg struct {
 	engine.TraceSet
 }
 
+// nodeSeriesMsg answers a "nodeSeries" request with one node's recent per-second history.
+type nodeSeriesMsg struct {
+	Type   string             `json:"type"`
+	NodeID string             `json:"nodeId"`
+	Points []engine.NodePoint `json:"points"`
+}
+
 type errMsg struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
@@ -303,6 +310,12 @@ func (ss *session) handle(ctx context.Context, m clientMsg) bool {
 			set = ss.sim.Traces()
 		}
 		return ss.send(ctx, tracesMsg{Type: "traces", TraceSet: set})
+	case "nodeSeries":
+		pts := []engine.NodePoint{}
+		if ss.sim != nil {
+			pts = ss.sim.NodeSeries(m.NodeID)
+		}
+		return ss.send(ctx, nodeSeriesMsg{Type: "nodeSeries", NodeID: m.NodeID, Points: pts})
 	case "crash":
 		if ss.sim != nil {
 			ss.sim.CrashNode(m.NodeID, 0)
