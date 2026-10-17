@@ -351,3 +351,20 @@ func BenchmarkLargeDesign(b *testing.B) {
 		}
 	}
 }
+
+// A server that crashes while a request is waiting on its database must not report that request
+// as a success once the database answers: the work was lost with the process.
+func TestCrashFailsRequestsAlreadyInFlight(t *testing.T) {
+	b := &builder{}
+	b.node("u", KClient, Params{"rps": 60.0, "readPct": 100.0, "timeoutMs": 5000.0})
+	// 60 rps x ~0.65 s per request is ~40 busy threads of 64 and the pool is large: nothing queues, so every request
+	// that fails at the crash was genuinely in flight.
+	b.node("a", KAppServer, Params{"threads": 64.0, "dbPool": 200.0}).node("db", KDatabase, Params{"readMs": 600.0, "connections": 128.0})
+	b.edge("u", "a").edge("a", "db")
+	// a 10 ms outage: almost no new arrivals fall inside it
+	s := run(b.d, Options{Seed: 3, Chaos: []ChaosEvent{{Type: "crash", NodeID: "a", AtSec: 3, DownSec: 0.01}}}, 8)
+	lost := s.Snapshot().Global.Run.Errors["nodeDown"]
+	if lost < 25 {
+		t.Fatalf("only %d requests failed with nodeDown; in-flight work should be lost with the crash", lost)
+	}
+}

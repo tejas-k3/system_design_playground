@@ -64,8 +64,13 @@ func (s *Sim) redisEdge(n *node) *edge {
 // ---- app server ---------------------------------------------------------------------
 
 func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
+	ep := n.epoch
 	done := func(res Result) {
 		release()
+		if n.epoch != ep || n.removed {
+			// the process died or was replaced while this request was waiting: its work is lost
+			res = fail(RNodeDown)
+		}
 		if res.OK {
 			n.c.ok++
 		} else {
@@ -75,10 +80,9 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		cb(res)
 	}
 	cpu := s.rng.Service(n.f("cpuMs")) * n.slow
-	ep := n.epoch
 	s.after(cpu, func() {
 		if n.epoch != ep || n.removed {
-			done(fail(RNodeDown))
+			done(fail(RNodeDown)) // crashed while computing: do not start downstream work
 			return
 		}
 		cc := *c
