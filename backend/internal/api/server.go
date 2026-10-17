@@ -26,11 +26,15 @@ const (
 // DefaultMaxSessions bounds concurrent live simulations; each one burns CPU while running.
 const DefaultMaxSessions = 64
 
+// DefaultIdleTimeout is how long a stopped or paused session may sit untouched before it is closed.
+const DefaultIdleTimeout = 10 * time.Minute
+
 // Config configures a Server.
 type Config struct {
-	StaticDir      string   // built frontend to serve with an index.html fallback (optional)
-	OriginPatterns []string // allowed WebSocket origins
-	MaxSessions    int      // concurrent live simulations; 0 means DefaultMaxSessions
+	StaticDir      string        // built frontend to serve with an index.html fallback (optional)
+	OriginPatterns []string      // allowed WebSocket origins
+	MaxSessions    int           // concurrent live simulations; 0 means DefaultMaxSessions
+	IdleTimeout    time.Duration // close a session that is not running and has been silent this long; 0 means DefaultIdleTimeout
 }
 
 // Server wires the routes together.
@@ -39,6 +43,7 @@ type Server struct {
 	staticDir string
 	origins   []string
 	slots     chan struct{} // one token per live simulation session
+	idle      time.Duration
 }
 
 // New builds a server from cfg.
@@ -46,7 +51,10 @@ func New(cfg Config) *Server {
 	if cfg.MaxSessions <= 0 {
 		cfg.MaxSessions = DefaultMaxSessions
 	}
-	s := &Server{mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions)}
+	if cfg.IdleTimeout <= 0 {
+		cfg.IdleTimeout = DefaultIdleTimeout
+	}
+	s := &Server{mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), idle: cfg.IdleTimeout}
 	staticDir := cfg.StaticDir
 	s.mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
 	s.mux.HandleFunc("GET /api/registry", s.registry)

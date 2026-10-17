@@ -20,12 +20,13 @@ func main() {
 	addr := flag.String("addr", envOr("ADDR", ":8090"), "listen address")
 	static := flag.String("static", envOr("STATIC_DIR", ""), "directory with the built frontend to serve (optional)")
 	origins := flag.String("origins", envOr("ALLOWED_ORIGINS", "localhost:*,127.0.0.1:*"), "comma-separated WebSocket origin patterns")
+	idle := flag.Duration("idle-timeout", api.DefaultIdleTimeout, "close stopped or paused sessions after this much silence")
 	maxSessions := flag.Int("max-sessions", envInt("MAX_SESSIONS", api.DefaultMaxSessions), "maximum concurrent live simulations")
 	flag.Parse()
 
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           api.New(api.Config{StaticDir: *static, OriginPatterns: strings.Split(*origins, ","), MaxSessions: *maxSessions}).Handler(),
+		Handler:           api.New(api.Config{StaticDir: *static, OriginPatterns: strings.Split(*origins, ","), MaxSessions: *maxSessions, IdleTimeout: *idle}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {

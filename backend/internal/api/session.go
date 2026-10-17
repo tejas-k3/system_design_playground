@@ -72,6 +72,8 @@ type session struct {
 	pending    []notice
 	lastWall   time.Time
 	lastStat   time.Time
+	active     time.Time // last client message, or the last moment the simulation was running
+	idle       time.Duration
 }
 
 func emptyStats() *engine.Stats {
@@ -116,7 +118,7 @@ func (s *Server) sim(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	ss := &session{conn: conn, seed: 42, speed: 1, status: "stopped"}
+	ss := &session{conn: conn, seed: 42, speed: 1, status: "stopped", active: time.Now(), idle: s.idle}
 	ticker := time.NewTicker(frameEvery)
 	defer ticker.Stop()
 	ss.send(ctx, frameMsg{Type: "frame", Status: ss.status, Speed: ss.speed, Stats: emptyStats()})
@@ -125,6 +127,7 @@ func (s *Server) sim(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			return
 		case m := <-in:
+			ss.active = time.Now()
 			if !ss.handle(ctx, m) {
 				return
 			}
@@ -294,9 +297,14 @@ func (ss *session) handle(ctx context.Context, m clientMsg) bool {
 // tick advances a running simulation by the wall time elapsed (scaled by speed) and sends a frame.
 func (ss *session) tick(ctx context.Context) bool {
 	if ss.status != "running" || ss.sim == nil {
+		if time.Since(ss.active) > ss.idle {
+			ss.conn.Close(websocket.StatusGoingAway, "idle")
+			return false
+		}
 		return true
 	}
 	now := time.Now()
+	ss.active = now
 	dt := float64(now.Sub(ss.lastWall).Microseconds()) / 1000
 	ss.lastWall = now
 	if dt > maxDtMs {

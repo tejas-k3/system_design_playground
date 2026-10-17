@@ -223,6 +223,26 @@ func TestFramesNeverCarryNullArrays(t *testing.T) {
 	}
 }
 
+func TestIdleSessionsAreClosedButRunningOnesAreNot(t *testing.T) {
+	ts := newTestServerWith(t, Config{OriginPatterns: []string{"*"}, IdleTimeout: 300 * time.Millisecond})
+	sc := scenarios.Get("hello-world")
+
+	idle, ctx := dial(t, ts)
+	readType(t, idle, ctx, "frame")
+	_, _, err := idle.Read(ctx) // nothing more is sent, so the server must hang up
+	if websocket.CloseStatus(err) != websocket.StatusGoingAway {
+		t.Fatalf("idle session should close with going-away, got %v", err)
+	}
+
+	busy, ctx2 := dial(t, ts)
+	sendMsg(t, busy, ctx2, clientMsg{Type: "init", Diagram: &sc.Solution})
+	sendMsg(t, busy, ctx2, clientMsg{Type: "play"})
+	deadline := time.Now().Add(900 * time.Millisecond) // three idle timeouts
+	for time.Now().Before(deadline) {
+		readType(t, busy, ctx2, "frame") // still streaming: a running simulation is not idle
+	}
+}
+
 func TestSessionCapReturns503AndFreesSlots(t *testing.T) {
 	ts := newTestServerWith(t, Config{OriginPatterns: []string{"*"}, MaxSessions: 1})
 	first, ctx := dial(t, ts)
