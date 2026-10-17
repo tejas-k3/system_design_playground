@@ -30,7 +30,8 @@ make run              # builds both, then http://localhost:8090
 ```
 
 Other targets: `make test`, `make lint` (gofmt + staticcheck), `make bench`, `make build`, `make docker-run`.
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker, configuration, reverse proxy, metrics and capacity notes. Use `PORT=9000 make dev` to change the port.
+Use `PORT=9000 make dev` to change the port. For Docker, configuration, reverse proxy, metrics and capacity notes see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## How to play
 
