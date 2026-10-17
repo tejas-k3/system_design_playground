@@ -17,6 +17,15 @@ describe('clientRateLabel', () => {
     expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, false, 0, [[0, 100], [10, 100]])).toBe('100 rps')
     expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, true, 580, curve)).toBe('now 580/s')
   })
+  it('describes a closed crowd by its size, since the rate depends on how fast the system answers', () => {
+    const closed = { rps: 50, pattern: 'constant', peakRps: 50, arrival: 'closed', users: 100, thinkMs: 1000 }
+    expect(clientRateLabel(closed, false, 0)).toBe('100 users · 1 s think')
+    expect(clientRateLabel({ ...closed, thinkMs: 2500 }, false, 0)).toBe('100 users · 2.5 s think')
+    expect(clientRateLabel(closed, true, 18.2)).toBe('now 18/s')
+  })
+  it('marks bursty users', () => {
+    expect(clientRateLabel({ rps: 50, pattern: 'constant', peakRps: 50, arrival: 'bursty' }, false, 0)).toBe('50 rps · bursty')
+  })
   it('falls back to the configured rate while the first numbers are still arriving', () => {
     expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, true, 0)).toBe('80 rps')
   })
