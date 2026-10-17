@@ -16,9 +16,12 @@ type NodeStats struct {
 	Size      int                `json:"size,omitempty"`
 	Reasons   map[string]float64 `json:"reasons,omitempty"`
 	Down      bool               `json:"down,omitempty"`
-	Cut       bool               `json:"cut,omitempty"`       // partitioned from the network
-	Primary   bool               `json:"primary,omitempty"`   // a replica that took over as the primary
-	Instances int                `json:"instances,omitempty"` // autoscaled app server: instances running now
+	Cut       bool               `json:"cut,omitempty"`          // partitioned from the network
+	Primary   bool               `json:"primary,omitempty"`      // a replica that took over as the primary
+	Phase     string             `json:"phase,omitempty"`        // failover in progress on a crashed database: detecting | promoting
+	PhaseLeft float64            `json:"phaseLeftSec,omitempty"` // seconds until that phase ends
+	Booting   int                `json:"booting,omitempty"`      // autoscaled app server: servers still booting
+	Instances int                `json:"instances,omitempty"`    // autoscaled app server: instances running now
 	Slow      float64            `json:"slow,omitempty"`
 	Extra     map[string]float64 `json:"extra,omitempty"`
 }
@@ -119,6 +122,10 @@ func (s *Sim) Snapshot() Stats {
 		ns := NodeStats{
 			ID: n.id, Arr: float64(sum.arr) / span, Ok: float64(sum.ok) / span, Err: float64(sum.err) / span,
 			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted, Instances: s.scaledInstances(n),
+		}
+		ns.Phase, ns.PhaseLeft = s.failoverPhase(n)
+		if s.autoscaled(n) {
+			ns.Booting = n.as.pending
 		}
 		if c := s.capacity(n); c < 1<<20 {
 			ns.Cap = c
@@ -275,4 +282,20 @@ func (s *Sim) NodeSeries(id string) []NodePoint {
 		return []NodePoint{}
 	}
 	return append([]NodePoint{}, n.hist...)
+}
+
+// failoverPhase says where a crashed database is in its failover and how long that step has left.
+func (s *Sim) failoverPhase(n *node) (string, float64) {
+	if n.kind != KDatabase || !n.down || n.successor != nil || n.s("onFailure") != "promote" {
+		return "", 0
+	}
+	elapsed := (s.now - n.downAt) / 1000
+	detect, promote := n.f("detectSec"), n.f("promoteSec")
+	switch {
+	case elapsed < detect:
+		return "detecting", detect - elapsed
+	case elapsed < detect+promote:
+		return "promoting", detect + promote - elapsed
+	}
+	return "", 0
 }
