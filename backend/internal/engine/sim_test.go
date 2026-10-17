@@ -422,3 +422,27 @@ func TestRedisCrashLosesUnpersistedWrites(t *testing.T) {
 		t.Fatalf("with an append-only file only ~1 s x 300 writes should be lost, lost %d", aof)
 	}
 }
+
+// A failure is only half the story if you cannot tell when it happened: a fast 503 and a request that
+// hung until the user gave up are different problems, and the headline p95 (successes only) hides both.
+func TestRunReportsHowLongFailuresTook(t *testing.T) {
+	// users give up after 800 ms; the single slow server never answers in time
+	slow := Params{"rps": 40.0, "retries": 0.0, "timeoutMs": 800.0}
+	b := &builder{}
+	b.node("u", KClient, slow).node("a", KAppServer, Params{"cpuMs": 400.0, "threads": 2.0, "queueCap": 500.0}).edge("u", "a")
+	r := run(b.d, Options{Seed: 3}, 20).RunSnapshot()
+	if r.Failed == 0 {
+		t.Fatalf("expected timeouts: %+v", r)
+	}
+	if r.FailP50 < 700 || r.FailP50 > 900 {
+		t.Errorf("median failure took %.0f ms, want about the 800 ms timeout", r.FailP50)
+	}
+
+	// an overloaded server with a tiny queue rejects at once: failures are fast
+	b2 := &builder{}
+	b2.node("u", KClient, Params{"rps": 800.0, "retries": 0.0, "timeoutMs": 5000.0}).node("a", KAppServer, Params{"cpuMs": 40.0, "threads": 4.0, "queueCap": 1.0}).edge("u", "a")
+	r2 := run(b2.d, Options{Seed: 3}, 20).RunSnapshot()
+	if r2.Failed == 0 || r2.FailP50 > 100 {
+		t.Errorf("queue-full rejections should be fast, median %.0f ms (failed %d)", r2.FailP50, r2.Failed)
+	}
+}
