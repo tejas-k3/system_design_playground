@@ -1,0 +1,232 @@
+package engine
+
+import (
+	"fmt"
+	"math"
+)
+
+// Goals are the pass criteria and star thresholds of a challenge. Pointers mean "not required".
+type Goals struct {
+	MinSuccessRate   float64  `json:"minSuccessRate"`
+	MaxP50Ms         *float64 `json:"maxP50Ms,omitempty"`
+	MaxP95Ms         *float64 `json:"maxP95Ms,omitempty"`
+	MaxCostPerHour   *float64 `json:"maxCostPerHour,omitempty"`
+	MinJobsCompleted *float64 `json:"minJobsCompleted,omitempty"` // fraction 0..1
+	MaxJobP95Ms      *float64 `json:"maxJobP95Ms,omitempty"`
+	MaxConflicts     *int     `json:"maxConflicts,omitempty"`
+	MaxStaleReadPct  *float64 `json:"maxStaleReadPct,omitempty"` // fraction 0..1
+	MaxDuplicates    *int     `json:"maxDuplicates,omitempty"`
+	StarCostPerHour  *float64 `json:"starCostPerHour,omitempty"`
+	StarP95Ms        *float64 `json:"starP95Ms,omitempty"`
+}
+
+type Check struct {
+	Label  string `json:"label"`
+	Target string `json:"target"`
+	Actual string `json:"actual"`
+	Pass   bool   `json:"pass"`
+}
+
+// Score is the verdict for one finished run.
+type Score struct {
+	Pass        bool     `json:"pass"`
+	Stars       int      `json:"stars"`
+	Checks      []Check  `json:"checks"`
+	Run         RunStats `json:"run"`
+	CostPerHour float64  `json:"costPerHour"`
+}
+
+const eps = 1e-9
+
+func pct(f float64) string { return fmt.Sprintf("%.1f%%", math.Floor(f*1000+eps)/10) }
+
+func msStr(v float64) string {
+	if v >= 10000 {
+		return fmt.Sprintf("%.1f s", v/1000)
+	}
+	return fmt.Sprintf("%d ms", int(math.Round(v)))
+}
+
+// Unwired lists app servers that answer without any data store, and workers that never write.
+func Unwired(d Diagram) []Node {
+	kind := map[string]string{}
+	for _, n := range d.Nodes {
+		kind[n.ID] = n.Kind
+	}
+	isData := func(k string) bool {
+		switch k {
+		case KDatabase, KReplica, KCache, KRedis, KQueue, KShardRouter:
+			return true
+		}
+		return false
+	}
+	hasData := false
+	for _, n := range d.Nodes {
+		if isData(n.Kind) {
+			hasData = true
+		}
+	}
+	if !hasData {
+		return nil
+	}
+	var out []Node
+	for _, n := range d.Nodes {
+		switch n.Kind {
+		case KAppServer:
+			incoming, reaches := false, false
+			for _, e := range d.Edges {
+				if e.To == n.ID {
+					incoming = true
+				}
+				if e.From == n.ID && isData(kind[e.To]) {
+					reaches = true
+				}
+			}
+			if incoming && !reaches {
+				out = append(out, n)
+			}
+		case KWorker:
+			fed, writes := false, false
+			for _, e := range d.Edges {
+				if e.To == n.ID && kind[e.From] == KQueue {
+					fed = true
+				}
+				if e.From == n.ID && (kind[e.To] == KDatabase || kind[e.To] == KShardRouter || kind[e.To] == KRedis) {
+					writes = true
+				}
+			}
+			if fed && !writes {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
+}
+
+// Evaluate checks a finished run against goals and awards 0-3 stars.
+func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
+	var checks []Check
+	total := run.Resolved + run.Pending
+	rate := 0.0
+	if total > 0 {
+		rate = float64(run.OK) / float64(total)
+	}
+	actual := "no requests"
+	if total > 0 {
+		actual = pct(rate)
+	}
+	checks = append(checks, Check{"Success rate", "≥ " + pct(g.MinSuccessRate), actual, rate+eps >= g.MinSuccessRate})
+	hasOK := run.OK > 0
+	if g.MaxP50Ms != nil {
+		a := "—"
+		if hasOK {
+			a = msStr(run.P50)
+		}
+		checks = append(checks, Check{"Median latency", "≤ " + msStr(*g.MaxP50Ms), a, hasOK && run.P50 <= *g.MaxP50Ms+eps})
+	}
+	if g.MaxP95Ms != nil {
+		a := "—"
+		if hasOK {
+			a = msStr(run.P95)
+		}
+		checks = append(checks, Check{"p95 latency", "≤ " + msStr(*g.MaxP95Ms), a, hasOK && run.P95 <= *g.MaxP95Ms+eps})
+	}
+	if g.MaxConflicts != nil {
+		checks = append(checks, Check{"Double bookings", fmt.Sprintf("≤ %d", *g.MaxConflicts), fmt.Sprint(run.Conflicts), run.Conflicts <= *g.MaxConflicts})
+	}
+	if g.MaxStaleReadPct != nil {
+		frac := 0.0
+		a := "no fresh reads"
+		if run.Fresh > 0 {
+			frac = float64(run.Stale) / float64(run.Fresh)
+			a = pct(frac)
+		}
+		checks = append(checks, Check{"Too-stale reads", "≤ " + pct(*g.MaxStaleReadPct), a, frac <= *g.MaxStaleReadPct+eps})
+	}
+	if g.MaxDuplicates != nil {
+		checks = append(checks, Check{"Duplicate writes", fmt.Sprintf("≤ %d", *g.MaxDuplicates), fmt.Sprint(run.Dups), run.Dups <= *g.MaxDuplicates})
+	}
+	if g.MinJobsCompleted != nil {
+		enq, frac := 0, 1.0
+		if run.Jobs != nil {
+			enq = run.Jobs.Enqueued
+			if enq > 0 {
+				frac = float64(run.Jobs.Completed) / float64(enq)
+			}
+		}
+		a := "no jobs"
+		if enq > 0 {
+			a = pct(frac)
+		}
+		checks = append(checks, Check{"Jobs processed", "≥ " + pct(*g.MinJobsCompleted), a, frac+eps >= *g.MinJobsCompleted})
+	}
+	if g.MaxJobP95Ms != nil {
+		ok, a := true, "no jobs"
+		if run.Jobs != nil && run.Jobs.Completed > 0 {
+			ok, a = run.Jobs.P95 <= *g.MaxJobP95Ms+eps, msStr(run.Jobs.P95)
+		} else if run.Jobs != nil && run.Jobs.Enqueued > 0 {
+			ok, a = false, "—"
+		}
+		checks = append(checks, Check{"Processing delay p95", "≤ " + msStr(*g.MaxJobP95Ms), a, ok})
+	}
+	if g.MaxCostPerHour != nil {
+		checks = append(checks, Check{"Cost", fmt.Sprintf("≤ $%.2f/hr", *g.MaxCostPerHour), fmt.Sprintf("$%.2f/hr", cost), cost <= *g.MaxCostPerHour+eps})
+	}
+	if un := Unwired(d); len(un) > 0 {
+		who := un[0].Label
+		if len(un) > 1 {
+			who += fmt.Sprintf(" and %d more", len(un)-1)
+		}
+		checks = append(checks, Check{"Wired to data", "every server", who + " never touches a data store", false})
+	}
+	pass := true
+	for _, c := range checks {
+		pass = pass && c.Pass
+	}
+	stars := 0
+	if pass {
+		stars = 1
+		starCost := g.StarCostPerHour
+		if starCost == nil && g.MaxCostPerHour != nil {
+			v := 0.8 * *g.MaxCostPerHour
+			starCost = &v
+		}
+		if starCost == nil || cost <= *starCost+eps {
+			stars = 2
+			starP95 := g.StarP95Ms
+			if starP95 == nil && g.MaxP95Ms != nil {
+				v := 0.6 * *g.MaxP95Ms
+				starP95 = &v
+			}
+			switch {
+			case starP95 != nil:
+				if hasOK && run.P95 <= *starP95+eps {
+					stars = 3
+				}
+			case g.MaxP50Ms != nil:
+				if hasOK && run.P50 <= 0.5**g.MaxP50Ms+eps {
+					stars = 3
+				}
+			default:
+				if rate >= 0.999-eps {
+					stars = 3
+				}
+			}
+		}
+	}
+	return Score{Pass: pass, Stars: stars, Checks: checks, Run: run, CostPerHour: cost}
+}
+
+// RunToEnd simulates a scenario headlessly until it finishes and scores it.
+func RunToEnd(d Diagram, opts Options, g Goals) Score {
+	d, _ = Sanitize(d)
+	s := New(d, opts)
+	limit := opts.StopTrafficAtMs + 60000
+	if opts.StopTrafficAtMs <= 0 {
+		limit = 60000
+	}
+	for !s.Finished() && s.Now() < limit {
+		s.Advance(100)
+	}
+	return Evaluate(g, d, s.RunSnapshot(), DiagramCost(d))
+}
