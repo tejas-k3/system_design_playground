@@ -11,6 +11,7 @@ import { Toasts } from './ui/Toasts'
 import { Toolbar } from './ui/Toolbar'
 import { Welcome } from './ui/Welcome'
 import { togglePlay } from './sim/bridge'
+import { parseHash } from './model/links'
 import { loadScenario } from './sim/loadScenario'
 import { useStore } from './state/store'
 
@@ -28,11 +29,11 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // deep link: /#challenge=<id>, on load and when the hash changes in an open tab
+  // deep links: /#challenge=<id> and /#design=<id>, on load and when the hash changes in an open tab
   useEffect(() => {
     const open = () => {
-      const m = /challenge=([a-z0-9-]+)/.exec(location.hash)
-      if (m) loadScenario(m[1])
+      const link = parseHash(location.hash)
+      if (link?.kind === 'challenge') loadScenario(link.id)
     }
     open()
     window.addEventListener('hashchange', open)
