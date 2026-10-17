@@ -734,6 +734,33 @@ func init() {
 		Debrief: "Sharding balances many keys, not one. A hot key needs a different tool: a cache in front, a replica set for that key, or splitting the key (for example, a counter sharded into N sub-counters). Check the load per shard, not the average.",
 	})
 
+	// 14m ─ Medium, config only: a scan flushes the useful part of the cache ────────────────
+	scanned := func(cache engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowTop, P{"rps": 300.0, "readPct": 100.0, "keyDist": "zipf", "keySpace": 500.0, "timeoutMs": 2000.0}).
+			n("crawler", engine.KClient, cols[0], rowBot, P{"rps": 150.0, "readPct": 100.0, "keyDist": "scan", "keySpace": 100000.0, "timeoutMs": 2000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("cache", engine.KCache, cols[3], rowTop, cache).
+			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 8.0, "readMs": 40.0}).
+			e("users", "lb").e("crawler", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 32.0, "queueCap": 300.0}, "cache").e("cache", "db").done()
+	}
+	register(&Scenario{
+		ID: "scan-pollution", Title: "The crawler that ate the cache", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Real users ask for the same few hundred items. A crawler reads every item exactly once.",
+		Story:   "Users keep asking for the same 500 popular items, and the cache holds 600. A search-engine crawler is walking your whole catalogue of 100,000 items, once each, at 150 requests a second. Every item the crawler touches goes into the cache and pushes out something users want. The database can only do 200 reads a second. Keep users fast. The architecture is fixed: fix it with configuration.",
+		Diagram: scanned(P{"capacityItems": 600.0, "eviction": "fifo"}), Solution: scanned(P{"capacityItems": 600.0, "eviction": "lfu"}),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(400)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Items the crawler reads once go into the cache and are never read again. What do they push out?",
+			"Open the cache's eviction setting. Which policy decides by how recently an item was used, and which by how often?",
+			"Switch eviction to LFU (least frequently used): an item read once has a count of one and is the first to go, so the popular items stay. LRU is better than FIFO here but still lets a long scan push things out; a much bigger cache also works but is the expensive answer.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Which eviction policy best protects a small popular set from a one-pass scan?", Options: []string{"FIFO: oldest out first", "LFU: least frequently used out first", "Random"}, Answer: 1,
+			Explain: "A scan produces many items with a count of one. LFU evicts those first and keeps the items that are read again and again."}},
+		Debrief: "Eviction policy is a bet about the future. LRU assumes recent means useful, which a scan breaks; FIFO ignores use altogether; LFU assumes frequent means useful, which resists scans (but can hold stale favourites). Real systems often add scan-resistant variants or keep crawler traffic out of the cache.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
