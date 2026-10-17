@@ -39,6 +39,10 @@ Other targets: `make test`, `make lint` (gofmt + staticcheck), `make bench`, `ma
    throughput, latency, success rate and a breakdown of *why* requests failed.
 3. **Break it.** Select a component and press **Crash it**, or raise the traffic.
 4. **Fix it.** Change settings or structure while it runs.
+5. **Follow a request.** Open the **Request traces** tab under the canvas, pick a failed or successful request
+   and read its waterfall: hatched bars are time spent waiting in a queue, red marks where it failed, and
+   faded bars are work that kept running after the user gave up. A one-line diagnosis says where the time
+   or the failure came from.
 
 Open **Challenges** for guided scenarios. Each has goals (success rate, latency, cost, double
 bookings, stale reads…), three hints, a prediction question, a reference solution you can reveal after
@@ -75,6 +79,7 @@ backend/
     topology.go clients.go   building and live-editing the graph; traffic, retries
     flow.go data.go          request flow, pools, queues; per-node behaviour
     chaos.go versions.go     failure injection; item versions and staleness
+    trace.go                 sampled per-request traces (observation only)
     registry.go sanitize.go  node kinds and parameters; validation of untrusted diagrams
     scoring.go stats.go      goals and stars; the snapshots the UI renders
   internal/scenarios/    challenges as data (+ tests: start must fail, solution must pass)
@@ -106,8 +111,9 @@ A 30 s run of a 1,000 rps, 20-node design takes about 90 ms (`make bench`).
 ### WebSocket protocol (`/api/sim`)
 
 Client → server: `init {diagram, scenarioId?, seed?, speed?}`, `diagram {diagram}` (live edit),
-`play`, `pause`, `step`, `reset`, `speed {speed}`, `crash {nodeId}`, `restart {nodeId}`.
+`play`, `pause`, `step`, `reset`, `speed {speed}`, `traces`, `crash {nodeId}`, `restart {nodeId}`.
 Server → client: `frame {status, speed, stats?, particles?, notices?}` (~25 Hz, stats ~10 Hz),
+`traces {failed, ok}` (answer to `traces`: the most recent traced requests, newest first),
 `result {scenarioId, score}` when a challenge finishes, `error {message}`.
 
 Limits: at most 64 live simulations at once (`-max-sessions` / `MAX_SESSIONS`; further connections get
