@@ -3,7 +3,7 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
-import { clientRateLabel, fmtRate } from '../model/rates'
+import { clientRateLabel, edgeLabel, utilBarWidth } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, handleRadius, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
@@ -119,7 +119,7 @@ function drawEdge(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, nod
     ctx.lineTo(g.b.x - 11 * Math.cos(ang + 0.45), g.b.y - 11 * Math.sin(ang + 0.45))
     ctx.stroke()
     // label
-    const label = selected || hot ? `${e.latencyMs} ms` : sc.running && st && st.rps >= 0.5 ? `${fmtRate(st.rps)}/s` : ''
+    const label = edgeLabel(e.latencyMs, st?.rps ?? 0, selected || hot, sc.running)
     if (label) {
       const mx = (g.a.x + g.b.x) / 2
       const my = (g.a.y + g.b.y) / 2
@@ -271,7 +271,7 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
     ctx.fill()
     ctx.fillStyle = utilColor(ns.util, p)
     ctx.beginPath()
-    ctx.roundRect(bx, by, Math.max(4, bw * Math.min(1, ns.util)), 5, 3)
+    ctx.roundRect(bx, by, utilBarWidth(ns.util, bw), 5, 3)
     ctx.fill()
   }
   // chips

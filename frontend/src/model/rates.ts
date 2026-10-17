@@ -11,3 +11,16 @@ export function clientRateLabel(rp: { rps: number; pattern: string; peakRps: num
   if (running && sentRps >= 0.5) return `now ${fmtRate(sentRps)}/s`
   return `${rp.rps} rps${rp.pattern !== 'constant' ? ` → ${rp.peakRps}` : ''}`
 }
+
+/** Label on a connection: the live rate while running, plus the latency when it is selected or hovered. */
+export function edgeLabel(latencyMs: number, rps: number, detailed: boolean, running: boolean): string {
+  const parts: string[] = []
+  if (running && rps >= 0.5) parts.push(`${fmtRate(rps)}/s`)
+  if (detailed) parts.push(`${latencyMs} ms`)
+  return parts.join(' · ')
+}
+
+/** Filled width of a utilisation bar: nothing when idle (an idle component must not look busy), at least a sliver once busy. */
+export function utilBarWidth(util: number, full: number): number {
+  return util <= 0 ? 0 : Math.max(4, full * Math.min(1, util))
+}
