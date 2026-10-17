@@ -85,7 +85,7 @@ type session struct {
 }
 
 func emptyStats() *engine.Stats {
-	return &engine.Stats{Nodes: map[string]engine.NodeStats{}, Edges: map[string]engine.EdgeStats{}, Series: []engine.SeriesPoint{}}
+	return &engine.Stats{Nodes: map[string]engine.NodeStats{}, Edges: map[string]engine.EdgeStats{}, Series: []engine.SeriesPoint{}, Events: []engine.Event{}}
 }
 
 func (s *Server) sim(w http.ResponseWriter, r *http.Request) {

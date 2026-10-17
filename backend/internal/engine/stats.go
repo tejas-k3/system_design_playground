@@ -60,6 +60,18 @@ type RunStats struct {
 	Jobs       *JobStats      `json:"jobs,omitempty"`
 }
 
+// Event is one thing that happened to the system, for placing on the charts: crashes and restarts, slow-downs and
+// partitions starting and ending, failover steps, autoscaling steps. T is in seconds, like the series.
+type Event struct {
+	T      float64 `json:"t"`
+	Type   string  `json:"type"` // crash restart slow slowEnd partition heal failoverDetected promotion splitbrain scaleUp serverUp scaleDown
+	NodeID string  `json:"nodeId"`
+	Label  string  `json:"label"`
+	Lost   int     `json:"lost,omitempty"` // promotion and split brain: acknowledged writes lost
+}
+
+const maxEvents = 200
+
 type GlobalStats struct {
 	Now      float64  `json:"now"` // seconds
 	InFlight int      `json:"inFlight"`
@@ -73,6 +85,7 @@ type Stats struct {
 	Global GlobalStats          `json:"global"`
 	Nodes  map[string]NodeStats `json:"nodes"`
 	Edges  map[string]EdgeStats `json:"edges"`
+	Events []Event              `json:"events"`
 	Series []SeriesPoint        `json:"series"`
 }
 
@@ -195,6 +208,7 @@ func (s *Sim) Snapshot() Stats {
 	}
 	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: cost, AvgCost: s.CostPerHour(), Run: run}
 	st.Series = append(make([]SeriesPoint, 0, len(s.series)), s.series...) // never nil: JSON must be [] not null
+	st.Events = append(make([]Event, 0, len(s.events)), s.events...)
 	return st
 }
 
