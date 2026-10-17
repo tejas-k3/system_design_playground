@@ -73,3 +73,7 @@ down:
 
 logs:
 	docker logs -f $(CONTAINER)
+
+# enable the repository's git hooks (blocks committing working-note markdown)
+hooks:
+	git config core.hooksPath .githooks

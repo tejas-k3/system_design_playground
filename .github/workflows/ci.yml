@@ -9,6 +9,15 @@ permissions:
   contents: read
 
 jobs:
+  hygiene:
+    name: no working-note markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Only the published markdown files may be tracked
+        run: |
+          bad=$(git ls-files '*.md' | grep -vE '^(README\.md|docs/DEPLOYMENT\.md|docs/ACCESSIBILITY_TESTING\.md)$' || true)
+          if [ -n "$bad" ]; then echo "Unexpected tracked markdown:"; echo "$bad"; exit 1; fi
   backend:
     name: backend (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
