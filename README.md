@@ -118,6 +118,7 @@ and the inspector becomes a bottom sheet.
 | Rate limiter | Token bucket |
 | Sharding / geo / leaderboard / booking | Shard routing by key; spatial index; Redis sorted-set style ops; row locks and Redis locks with TTL, double-booking detection |
 | Chaos | Crash (auto-restart), slow-down (steady or pulsing) and network-partition events, scheduled or manual |
+| Observation | Charts mark crashes, restarts, partitions, failover steps, split brain and autoscaler steps at the time they happened; latency distribution with p50 / p95 / p99; per-component 1 Hz timelines; countdown chips for failover and booting servers. Observation only: none of it changes a result |
 
 Runs are **deterministic**: the same diagram and seed always produce the same result.
 
