@@ -154,4 +154,15 @@ describe('stats', () => {
     st().loadDiagram({ nodes: [], edges: [], notes: [] })
     expect(st().cost).toBeNull()
   })
+
+  it('hides the unusable component library in a config-only challenge and brings it back afterwards', () => {
+    expect(st().ui.library).toBe(true)
+    st().openScenario(scenario(true))
+    expect(st().ui.library).toBe(false)
+    st().openScenario(scenario(false))
+    expect(st().ui.library).toBe(true)
+    st().openScenario(scenario(true))
+    st().exitScenario()
+    expect(st().ui.library).toBe(true)
+  })
 })
