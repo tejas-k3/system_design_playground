@@ -4,7 +4,7 @@
 PORT ?= 8090
 export ADDR := :$(PORT)
 
-.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend bench
+.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench
 
 help:
 	@echo "make install   install frontend dependencies"
@@ -12,6 +12,7 @@ help:
 	@echo "make build     build the Go binary and the production frontend"
 	@echo "make run       serve the built frontend from the Go binary on :$(PORT)"
 	@echo "make test      run backend and frontend tests"
+	@echo "make lint      gofmt check and staticcheck on the backend"
 	@echo "make bench     engine benchmark (30 simulated seconds of a 1k rps system)"
 
 install:
@@ -41,6 +42,9 @@ test-backend:
 
 test-frontend:
 	cd frontend && npm run typecheck && npm test
+
+lint:
+	cd backend && test -z "$$(gofmt -l .)" && go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
 
 bench:
 	cd backend && go test -run xxx -bench . -benchtime 5x ./internal/engine/
