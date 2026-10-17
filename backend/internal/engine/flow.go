@@ -634,7 +634,7 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 	case KRedis:
 		s.procRedis(n, c, cb, release)
 	case KExternalAPI:
-		s.hold(n, s.rng.Service(n.f("latencyMs"))*n.slow, release, cb, func() {
+		s.hold(n, s.service(n, n.f("latencyMs"))*n.slow, release, cb, func() {
 			release()
 			if s.rng.Next() < n.f("errorPct")/100 {
 				s.failAt(n, RDependency, cb)

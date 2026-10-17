@@ -31,3 +31,23 @@ func Hash32(x uint32) uint32 {
 	x ^= x >> 16
 	return x
 }
+
+// ServiceDist draws a service time with the given mean and the spread a node's "variability" setting asks for:
+//
+//	steady (default, ""):  0.5*mean + Exp(0.5*mean), SCV 0.25, the original model
+//	exponential:           Exp(mean), SCV 1, what queueing textbooks assume
+//	heavy:                 lognormal with SCV 4, a long right tail like real services
+//
+// SCV is the squared coefficient of variation (variance / mean^2). The mean is the same in every mode.
+func (r *RNG) ServiceDist(mean float64, mode string) float64 {
+	switch mode {
+	case "exponential":
+		return mean * r.Exp()
+	case "heavy":
+		const sigma2 = 1.6094379124341003 // ln(1 + SCV) for SCV = 4
+		u1, u2 := 1-r.Next(), r.Next()
+		z := math.Sqrt(-2*math.Log(u1)) * math.Cos(2*math.Pi*u2)
+		return mean * math.Exp(math.Sqrt(sigma2)*z-sigma2/2)
+	}
+	return r.Service(mean)
+}

@@ -79,7 +79,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		}
 		cb(res)
 	}
-	cpu := s.rng.Service(n.f("cpuMs")) * n.slow
+	cpu := s.service(n, n.f("cpuMs")) * n.slow
 	s.after(cpu, func() {
 		if n.epoch != ep || n.removed {
 			done(fail(RNodeDown)) // crashed while computing: do not start downstream work
@@ -325,7 +325,7 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 			ms++
 		}
 	}
-	s.hold(n, s.rng.Service(ms)*n.slow, release, cb, func() {
+	s.hold(n, s.service(n, ms)*n.slow, release, cb, func() {
 		release()
 		res := Result{Ver: -1, Done: true, Src: n}
 		switch {
@@ -380,7 +380,7 @@ func (s *Sim) dbBooking(n *node, c *call, cb func(Result), release func()) {
 	}
 	proceed := func(unlock func()) {
 		// step 1: the availability check is a read
-		s.after(s.rng.Service(n.f("readMs"))*n.slow, func() {
+		s.after(s.service(n, n.f("readMs"))*n.slow, func() {
 			if crashed(unlock) {
 				return
 			}
@@ -391,7 +391,7 @@ func (s *Sim) dbBooking(n *node, c *call, cb func(Result), release func()) {
 				return
 			}
 			// step 2: the write; anyone who checked in the meantime may also be writing
-			ms := s.rng.Service(n.f("writeMs")) * n.slow
+			ms := s.service(n, n.f("writeMs")) * n.slow
 			if c.idem {
 				ms++
 			}
@@ -571,7 +571,7 @@ func (s *Sim) runJob(q, w *node, j *job) {
 		s.dispatch(q)
 	}
 	w.c.arr++
-	s.after(s.rng.Service(w.f("processMs"))*w.slow, func() {
+	s.after(s.service(w, w.f("processMs"))*w.slow, func() {
 		if w.epoch != ep || w.removed {
 			fin(fail(RNodeDown))
 			return
