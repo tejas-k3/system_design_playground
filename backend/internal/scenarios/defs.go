@@ -457,6 +457,33 @@ func init() {
 		Debrief: "Failover has two costs. Time: while the failure is noticed and a replica takes over, nothing can write. Data: with asynchronous replication, whatever the replica had not yet copied is gone. Both are settings you choose: faster detection risks false alarms, and a smaller lag costs the primary more work.",
 	})
 
+	// 14c ─ Hard, config only: the traffic ramps and the fleet is fixed ─────────────────────
+	elastic := func(app engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 80.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "lb").servers(1, cols[2], rowMid, 100, app).done()
+	}
+	register(&Scenario{
+		ID: "morning-rush", Title: "Morning rush", Difficulty: "Hard", ConfigOnly: true,
+		Summary:     "Traffic climbs to seven times its normal level, then falls. One server does not follow.",
+		Story:       "Over a minute traffic climbs from 80 to 600 requests per second, stays there for 40 seconds, then drops. You run a single app server. A new server takes 20 seconds to boot, and every running server costs money, so buying a huge fleet for the whole day is not the answer. The architecture is fixed: fix it with configuration.",
+		Diagram:     elastic(P{"threads": 8.0, "scaleUpDelaySec": 20.0}),
+		Solution:    elastic(P{"threads": 8.0, "scaleUpDelaySec": 20.0, "autoscale": true, "maxInstances": 4.0, "targetUtilPct": 40.0}),
+		Traffic:     map[string][]engine.TrafficPoint{"users": {{0, 80}, {10, 80}, {70, 600}, {110, 600}, {130, 100}, {150, 100}}},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(600), MaxCostPerHour: f(0.85)},
+		DurationSec: 150, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"One server has a fixed number of threads. What if the number of servers could follow the traffic?",
+			"Open the App Server's settings, choose 'Show advanced' and look at the Scaling group.",
+			"Turn on autoscaling, then lower the target busy level: new servers take 20 seconds to boot, so they must be ordered while the old ones still have room.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A new server takes 20 seconds to boot and traffic climbs for a minute. When should the scaler start adding servers?", Options: []string{"As late as possible, to save money", "Early, while the existing servers still have spare room", "Only once requests start failing"}, Answer: 1,
+			Explain: "Capacity ordered now only arrives in 20 seconds. A scaler that waits until the servers are full has already started failing requests by the time help arrives."}},
+		Debrief: "Autoscaling trades money for time. A low target busy level orders servers early and costs more; a high one is cheap and late. Boot time sets how far ahead you must look, and a wait before removing servers stops the fleet flapping. The very large fixed fleet works too, but costs all day what you only need at the peak.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
