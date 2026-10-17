@@ -192,7 +192,7 @@ function nodeSubtitle(n: Node, sc: Scene): string {
   const rp = sc.reg.resolve(n)
   switch (n.kind) {
     case 'client':
-      return clientRateLabel(rp as { rps: number; pattern: string; peakRps: number }, sc.running, sentRate(n.id, sc), sc.traffic?.[n.id])
+      return clientRateLabel(rp as { rps: number; pattern: string; peakRps: number; arrival?: string; users?: number; thinkMs?: number }, sc.running, sentRate(n.id, sc), sc.traffic?.[n.id])
     case 'loadBalancer':
       return sc.reg.optionLabel(n.kind, 'algorithm', rp.algorithm) ?? spec.name
     case 'appServer':

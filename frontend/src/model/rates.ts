@@ -7,14 +7,20 @@ export function fmtRate(v: number): string {
 
 /** Subtitle of a Users node: the configured rate at rest, the rate really being sent while running
  *  (a challenge's traffic curve overrides the node's own setting, so the setting alone would mislead). */
-export function clientRateLabel(rp: { rps: number; pattern: string; peakRps: number }, running: boolean, sentRps: number, curve?: [number, number][]): string {
+export function clientRateLabel(
+  rp: { rps: number; pattern: string; peakRps: number; arrival?: string; users?: number; thinkMs?: number },
+  running: boolean,
+  sentRps: number,
+  curve?: [number, number][],
+): string {
   if (running && sentRps >= 0.5) return `now ${fmtRate(sentRps)}/s`
+  if (rp.arrival === 'closed') return `${rp.users ?? 0} users · ${+((rp.thinkMs ?? 0) / 1000).toFixed(1)} s think`
   if (curve && curve.length > 0) {
     const rates = curve.map((p) => p[1])
     const [lo, hi] = [Math.min(...rates), Math.max(...rates)]
     return lo === hi ? `${Math.round(lo)} rps` : `${Math.round(lo)} → ${Math.round(hi)} rps`
   }
-  return `${rp.rps} rps${rp.pattern !== 'constant' ? ` → ${rp.peakRps}` : ''}`
+  return `${rp.rps} rps${rp.pattern !== 'constant' ? ` → ${rp.peakRps}` : ''}${rp.arrival === 'bursty' ? ' · bursty' : ''}`
 }
 
 /** Label on a connection: the live rate while running, plus the latency when it is selected or hovered. */
