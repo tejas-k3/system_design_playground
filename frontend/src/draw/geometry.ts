@@ -23,6 +23,8 @@ export function nodeRect(n: Node, reg: Reg): Rect {
 }
 
 export const center = (r: Rect): Pt => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 })
+/** Font size in canvas units that is at least minScreen pixels on screen, capped at 1.5x the design size so text still fits. */
+export const legibleSize = (base: number, zoom: number, minScreen: number): number => Math.min(base * 1.5, Math.max(base, minScreen / zoom))
 export const handleRadius = (zoom: number): number => Math.max(HANDLE_R, HANDLE_MIN_SCREEN_R / zoom)
 export const handlePos = (r: Rect, zoom: number): Pt => ({ x: r.x + r.w + handleRadius(zoom) + 2, y: r.y + r.h / 2 })
 

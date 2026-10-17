@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Diagram } from '../api/types'
 import type { Reg } from '../model/diagram'
-import { HANDLE_R, handlePos, handleRadius, hitTest, nodeRect } from './geometry'
+import { HANDLE_R, handlePos, handleRadius, hitTest, legibleSize, nodeRect } from './geometry'
 
 const reg = { spec: () => ({ width: 160, height: 72 }) } as unknown as Reg
 const diagram = { nodes: [{ id: 'a', kind: 'appServer', x: 0, y: 0, label: 'a', params: {} }], edges: [], notes: [] } as unknown as Diagram
@@ -26,5 +26,18 @@ describe('connection handle', () => {
     const zoom = 0.25
     const r = nodeRect(diagram.nodes[0], reg)
     expect(handlePos(r, zoom).x - handleRadius(zoom)).toBeGreaterThanOrEqual(r.x + r.w)
+  })
+})
+
+describe('legibleSize', () => {
+  it('leaves text alone while it is big enough on screen', () => {
+    expect(legibleSize(13, 1, 10)).toBe(13)
+    expect(legibleSize(13, 0.7, 9)).toBe(13)
+  })
+  it('grows text in canvas units so it keeps a minimum size on screen when zoomed out', () => {
+    expect(legibleSize(13, 0.6, 10) * 0.6).toBeCloseTo(10)
+  })
+  it('never more than one and a half times the design size, so it still fits its box', () => {
+    expect(legibleSize(13, 0.1, 10)).toBe(19.5)
   })
 })
