@@ -63,7 +63,8 @@ type RunStats struct {
 type GlobalStats struct {
 	Now      float64  `json:"now"` // seconds
 	InFlight int      `json:"inFlight"`
-	Cost     float64  `json:"cost"` // dollars per hour of the current diagram
+	Cost     float64  `json:"cost"`    // dollars per hour of the current diagram, with the servers running now
+	AvgCost  float64  `json:"avgCost"` // the same averaged over the run so far: what a challenge scores
 	Run      RunStats `json:"run"`
 }
 
@@ -192,7 +193,7 @@ func (s *Sim) Snapshot() Stats {
 			cost += Spec(n.kind).cost(n.p) * float64(s.instancesOf(n))
 		}
 	}
-	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: cost, Run: run}
+	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: cost, AvgCost: s.CostPerHour(), Run: run}
 	st.Series = append(make([]SeriesPoint, 0, len(s.series)), s.series...) // never nil: JSON must be [] not null
 	return st
 }

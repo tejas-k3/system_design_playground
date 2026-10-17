@@ -145,3 +145,15 @@ func TestAFleetCostsAtLeastItsMinimum(t *testing.T) {
 		t.Errorf("minInstances is ignored while autoscaling is off: %v vs %v", off, one)
 	}
 }
+
+func TestSnapshotCarriesTheRunAverageCostForScoring(t *testing.T) {
+	s := scaleSim(Params{}, step, 3)
+	s.Advance(150000)
+	g := s.Snapshot().Global
+	if math.Abs(g.AvgCost-s.CostPerHour()) > 1e-9 {
+		t.Errorf("avgCost %.4f should equal the scored cost %.4f", g.AvgCost, s.CostPerHour())
+	}
+	if g.AvgCost >= g.Cost && g.Cost > 0 && s.nodes["a"].as.instances > 1 {
+		t.Errorf("after a scale-up the live cost (%.3f) is above the run average (%.3f)", g.Cost, g.AvgCost)
+	}
+}
