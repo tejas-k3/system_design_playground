@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -396,5 +398,43 @@ func TestLimiterWindowResets(t *testing.T) {
 	now = now.Add(61 * time.Second)
 	if !l.allow("a") {
 		t.Fatal("the allowance should return after the window")
+	}
+}
+
+func TestSecurityHeadersAndStaticCaching(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.MkdirAll(filepath.Join(dir, "assets"), 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>app</html>"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "assets", "app-abc123.js"), []byte("console.log(1)"), 0o644)
+	ts := newTestServerWith(t, Config{OriginPatterns: []string{"*"}, StaticDir: dir})
+
+	get := func(path string) *http.Response {
+		r, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		return r
+	}
+	for _, path := range []string{"/", "/assets/app-abc123.js", "/api/healthz", "/some/client/route"} {
+		r := get(path)
+		csp := r.Header.Get("Content-Security-Policy")
+		if !strings.Contains(csp, "script-src 'self';") || strings.Contains(csp, "script-src 'self' 'unsafe-inline'") || !strings.Contains(csp, "frame-ancestors 'none'") {
+			t.Errorf("%s: weak or missing CSP %q", path, csp)
+		}
+		if r.Header.Get("X-Content-Type-Options") != "nosniff" || r.Header.Get("X-Frame-Options") != "DENY" {
+			t.Errorf("%s: missing hardening headers", path)
+		}
+	}
+	if cc := get("/assets/app-abc123.js").Header.Get("Cache-Control"); !strings.Contains(cc, "immutable") {
+		t.Errorf("hashed assets should be cached forever, got %q", cc)
+	}
+	for _, path := range []string{"/", "/some/client/route"} {
+		if cc := get(path).Header.Get("Cache-Control"); cc != "no-cache" {
+			t.Errorf("%s must be revalidated so deploys are picked up, got %q", path, cc)
+		}
+	}
+	if got := get("/some/client/route"); got.StatusCode != 200 {
+		t.Errorf("unknown routes fall back to the app, got %d", got.StatusCode)
 	}
 }

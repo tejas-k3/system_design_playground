@@ -89,7 +89,7 @@ func New(cfg Config) *Server {
 	return s
 }
 
-func (s *Server) Handler() http.Handler { return logRequests(s.mux) }
+func (s *Server) Handler() http.Handler { return secureHeaders(logRequests(s.mux)) }
 
 type statusWriter struct {
 	http.ResponseWriter
@@ -309,8 +309,10 @@ func (s *Server) loadDesign(w http.ResponseWriter, r *http.Request) {
 func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 	p := filepath.Join(s.staticDir, filepath.Clean("/"+r.URL.Path))
 	if st, err := os.Stat(p); err == nil && !st.IsDir() {
+		w.Header().Set("Cache-Control", cacheControl(r.URL.Path))
 		http.ServeFile(w, r, p)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, filepath.Join(s.staticDir, "index.html"))
 }
