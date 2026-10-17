@@ -424,4 +424,35 @@ func init() {
 			Explain: "The file is flushed about once a second, so writes acknowledged since the last flush can still be lost."}},
 		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose how many seconds of data you can afford to lose, then pick the setting that guarantees it.",
 	})
+
+	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
+	edge := func(cdn bool) engine.Diagram {
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 900.0, "readPct": 98.0, "keySpace": 3000.0, "zipfS": 1.1}).
+			n("lb", engine.KLoadBalancer, cols[2], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowMid, nil)
+		if cdn {
+			b.n("cdn", engine.KCDN, cols[1], rowMid, P{"capacityItems": 3000.0}).e("users", "cdn").e("cdn", "lb")
+		} else {
+			b.e("users", "lb")
+		}
+		return b.servers(3, cols[3], rowTop, 100, nil).done()
+	}
+	register(&Scenario{
+		ID: "edge-cache", Title: "Serve it from the edge", Difficulty: "Easy",
+		Summary: "Nearly everyone asks for the same pages, and every request still reaches your servers.",
+		Story:   "A product page goes viral: 900 requests per second, almost all reads of a small set of popular items. Your three servers answer every one themselves and cannot keep up.",
+		Diagram: edge(false), Solution: edge(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(250), MaxCostPerHour: f(1.2)},
+		DurationSec: 45, WarmupSec: 6, Speed: 1,
+		Hints: [3]string{
+			"Why should a request for the same popular page travel all the way to your servers?",
+			"A CDN keeps copies close to the users and only forwards what it does not have.",
+			"Put a CDN between the users and the load balancer.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A CDN with a 60 second TTL serves a page that changes every few seconds. What is the catch?", Options: []string{"Users may see stale copies until the TTL expires", "The page loads slower", "Writes stop working"}, Answer: 0,
+			Explain: "Cached copies are served until they expire, so freshness is traded for speed unless writes invalidate them."}},
+		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is freshness, which is why caching suits content that changes slowly.",
+	})
+
 }
