@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Announcer } from './ui/Announcer'
 import { Board } from './ui/Board'
 import { Charts } from './ui/Charts'
 import { Inspector } from './ui/Inspector'
@@ -49,13 +50,14 @@ export function App() {
 
   return (
     <div className="app">
+      <a className="skip" href="#canvas-area" onClick={(e) => { e.preventDefault(); document.getElementById('canvas-area')?.focus() }}>Skip to the canvas</a>
       <Toolbar />
       <div className="main">
         <Library />
         <div className="center-col">
           <div className="board-wrap">
             <ScenarioPanel />
-            <div className="board-main">
+            <div className="board-main" id="canvas-area" tabIndex={-1}>
               {registryReady && <Board />}
               <Welcome />
             </div>
@@ -68,6 +70,7 @@ export function App() {
       <ResultModal />
       <Help />
       <Toasts />
+      <Announcer />
     </div>
   )
 }

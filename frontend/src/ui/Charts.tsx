@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SeriesPoint } from '../api/types'
 import { palettes } from '../draw/theme'
+import { describeChart } from '../model/announce'
 import { failedAfter, pct, successRate } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { useStore } from '../state/store'
@@ -84,7 +85,7 @@ function Chart({ title, unit, lines, series, theme, fixedMax, fmt }: { title: st
           ))}
         </span>
       </figcaption>
-      <canvas ref={ref} aria-label={`${title} chart`} />
+      <canvas ref={ref} role="img" aria-label={describeChart(title, unit, series.length ? lines.map((l) => ({ label: l.label, value: l.value(series[series.length - 1]) })) : [])} />
     </figure>
   )
 }
@@ -146,7 +147,7 @@ export function Charts() {
               <Chart title="Latency" unit="ms" lines={latLines} series={series} theme={theme} />
               <Chart title="Success" unit="%" lines={succLines} series={series} theme={theme} fixedMax={100} fmt={(v) => `${Math.round(v)}`} />
               <div className="chart errors-box">
-                <h4>Why requests failed</h4>
+                <h3>Why requests failed</h3>
                 {Object.keys(run.errors).length ? <Errors errors={run.errors} total={run.failed} /> : <p className="muted small">No failures so far.</p>}
               </div>
             </>
