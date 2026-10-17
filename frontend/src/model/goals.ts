@@ -16,6 +16,11 @@ export const fmtCost = (c: number | null): string => (c === null ? '—' : `$${c
 /** Median time a failed request took (the headline latencies count successes only). */
 export const failedAfter = (r: Stats['global']['run']): string => (r.failed > 0 ? ms(r.failP50) : '—')
 
+/** The cost a goal row should judge: the run average while running (an autoscaled fleet's live cost swings, the score uses the average). */
+export function goalCost(cost: number | null, stats: Stats, started: boolean): number | null {
+  return started && stats.global.avgCost > 0 ? stats.global.avgCost : cost
+}
+
 /** Share of finished requests that succeeded (null before any finish). The one success figure shown anywhere on screen;
  *  requests still in flight count once they resolve, and the final verdict agrees because nothing is pending by then. */
 export function successRate(r: Stats['global']['run']): number | null {

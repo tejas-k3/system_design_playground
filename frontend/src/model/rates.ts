@@ -35,3 +35,8 @@ export function smoothRate(shown: number | undefined, target: number, dtMs: numb
   if (shown === undefined) return target
   return shown + (target - shown) * (1 - Math.exp(-dtMs / 300))
 }
+
+/** Subtitle of an app server: its threads, times the number of servers when it is autoscaled and running several. */
+export function serverSubtitle(threads: number, instances?: number): string {
+  return instances && instances > 1 ? `${threads} threads × ${instances}` : `${threads} threads`
+}
