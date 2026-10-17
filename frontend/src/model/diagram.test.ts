@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { reg } from '../test/fixtures'
-import { connectableTargets, openOutputs, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
+import { connectableTargets, nothingToRun, openOutputs, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
 
 
 
@@ -106,5 +106,22 @@ describe('openOutputs', () => {
   it('is empty once everything that can connect is connected', () => {
     const done = { ...d, edges: [...d.edges, { id: 'a>d', from: 'a', to: 'd', latencyMs: 5 }] }
     expect(openOutputs(reg, done).size).toBe(0)
+  })
+})
+
+describe('nothingToRun', () => {
+  const node = (id: string, kind: string) => ({ id, kind, x: 0, y: 0, label: id, params: {} })
+  const dia = (nodes: ReturnType<typeof node>[], edges: { from: string; to: string }[]) =>
+    ({ nodes, edges: edges.map((e) => ({ id: e.from + e.to, ...e, latencyMs: 5 })), notes: [] }) as unknown as Parameters<typeof nothingToRun>[0]
+
+  it('says to add Users when the canvas has no traffic source', () => {
+    expect(nothingToRun(dia([], []))).toMatch(/Add Users/)
+    expect(nothingToRun(dia([node('a', 'appServer')], []))).toMatch(/Add Users/)
+  })
+  it('says to connect Users when nothing receives their requests', () => {
+    expect(nothingToRun(dia([node('u', 'client'), node('a', 'appServer')], []))).toMatch(/Connect Users/)
+  })
+  it('lets a wired design run', () => {
+    expect(nothingToRun(dia([node('u', 'client'), node('a', 'appServer')], [{ from: 'u', to: 'a' }]))).toBeNull()
   })
 })

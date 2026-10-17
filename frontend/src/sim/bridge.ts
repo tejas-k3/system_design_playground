@@ -1,5 +1,6 @@
 import { validate } from '../api/client'
 import type { ServerMsg } from '../api/types'
+import { nothingToRun } from '../model/diagram'
 import { useStore } from '../state/store'
 import { pushParticles } from './particles'
 import { SimSocket } from './socket'
@@ -88,7 +89,16 @@ function withSocket(fn: (sock: SimSocket) => void): void {
   sock.whenOpen(() => fn(sock))
 }
 
+/** A new run needs traffic to simulate; say what is missing instead of starting a run that does nothing. */
+function blockedStart(): boolean {
+  const s = useStore.getState()
+  const why = s.sim.status === 'stopped' || !!s.scenario?.result ? nothingToRun(s.diagram) : null
+  if (why) s.toast(why, 'info')
+  return !!why
+}
+
 export function play(): void {
+  if (blockedStart()) return
   withSocket((sock) => {
     const s = useStore.getState()
     if (s.sim.status === 'stopped' || !!s.scenario?.result) {
@@ -110,6 +120,7 @@ export function reset(): void {
 }
 
 export function step(): void {
+  if (blockedStart()) return
   withSocket((sock) => {
     if (useStore.getState().sim.status === 'stopped') sendInit()
     sock.send({ type: 'step' })
