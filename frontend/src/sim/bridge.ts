@@ -28,6 +28,9 @@ function onMessage(m: ServerMsg) {
     case 'traces':
       st.setTraces({ failed: m.failed ?? [], ok: m.ok ?? [] })
       break
+    case 'nodeSeries':
+      st.setNodeSeries({ nodeId: m.nodeId, points: m.points ?? [] })
+      break
     case 'result':
       if (st.scenario?.def.id === m.scenarioId) st.setResult(m.score)
       break
@@ -111,6 +114,9 @@ export function play(): void {
 
 /** Ask the server for the latest request traces; the answer lands in the store. */
 export const requestTraces = () => socket?.open && socket.send({ type: 'traces' })
+
+/** Ask the server for one component's per-second history; the answer lands in the store. */
+export const requestNodeSeries = (nodeId: string) => socket?.open && socket.send({ type: 'nodeSeries', nodeId })
 
 export const pause = () => withSocket((sock) => sock.send({ type: 'pause' }))
 

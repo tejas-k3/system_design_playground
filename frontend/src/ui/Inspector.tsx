@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
+import { palettes } from '../draw/theme'
 import { connectableTargets, paramVisible } from '../model/diagram'
 import { isCompact } from '../model/responsive'
 import { fmtCost, pct, successRate } from '../model/goals'
-import { crashNode, restartNode } from '../sim/bridge'
+import { sparkPoints, sparkSummary } from '../model/spark'
+import { crashNode, requestNodeSeries, restartNode } from '../sim/bridge'
 import { useStore } from '../state/store'
 
 const whole = (v: number) => `${Math.round(v * 100)}%`
@@ -124,6 +126,7 @@ function NodePanel({ id }: { id: string }) {
       <p className="lesson">💡 {spec.lesson}</p>
 
       {stats && status !== 'stopped' && <LiveStats s={stats} kind={node.kind} />}
+      {status !== 'stopped' && <Timelines nodeId={id} status={status} />}
       {status !== 'stopped' && node.kind !== 'client' && (
         <div className="row-btns">
           {stats?.down ? (
@@ -195,6 +198,63 @@ function Connections({ nodeId }: { nodeId: string }) {
         </div>
       )}
     </section>
+  )
+}
+
+/** A tiny canvas line of one metric over the last two minutes; the text below it is what a screen reader gets. */
+function Spark({ label, values, max, fmt, theme }: { label: string; values: number[]; max?: number; fmt: (v: number) => string; theme: 'light' | 'dark' }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const cv = ref.current
+    if (!cv) return
+    const dpr = window.devicePixelRatio || 1
+    const w = cv.clientWidth
+    const h = cv.clientHeight
+    cv.width = Math.round(w * dpr)
+    cv.height = Math.round(h * dpr)
+    const ctx = cv.getContext('2d')!
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, w, h)
+    const pts = sparkPoints(values, { width: w - 2, height: h - 4, max })
+    if (!pts.length) return
+    const p = palettes[theme]
+    ctx.strokeStyle = p.accent
+    ctx.lineWidth = 1.6
+    ctx.lineJoin = 'round'
+    ctx.beginPath()
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x + 1, y + 2) : ctx.moveTo(x + 1, y + 2)))
+    ctx.stroke()
+  }, [values, max, theme])
+  const text = sparkSummary(label, values, fmt)
+  return (
+    <div className="spark">
+      <span className="small muted">{label}</span>
+      <canvas ref={ref} role="img" aria-label={text} />
+    </div>
+  )
+}
+
+/** Per-second history of the selected component, fetched from the server every two seconds while a run exists. */
+function Timelines({ nodeId, status }: { nodeId: string; status: string }) {
+  const series = useStore((st) => st.nodeSeries)
+  const theme = useStore((st) => st.theme)
+  useEffect(() => {
+    if (status === 'stopped') return
+    requestNodeSeries(nodeId)
+    if (status !== 'running') return
+    const t = setInterval(() => requestNodeSeries(nodeId), 2000)
+    return () => clearInterval(t)
+  }, [nodeId, status])
+  const pts = series?.nodeId === nodeId ? series.points : []
+  if (pts.length < 2) return null
+  return (
+    <div className="timelines">
+      <h3>Last {pts.length} s</h3>
+      <Spark label="Busy" values={pts.map((p) => p.util)} max={1} fmt={whole} theme={theme} />
+      <Spark label="Waiting" values={pts.map((p) => p.qLen)} fmt={(v) => `${Math.round(v)}`} theme={theme} />
+      <Spark label="Failed per second" values={pts.map((p) => p.err)} fmt={(v) => `${rate(v)}/s`} theme={theme} />
+      {pts.some((p) => p.instances) && <Spark label="Servers" values={pts.map((p) => p.instances ?? 0)} fmt={(v) => `${v}`} theme={theme} />}
+    </div>
   )
 }
 
