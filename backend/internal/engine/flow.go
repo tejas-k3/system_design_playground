@@ -50,6 +50,8 @@ type call struct {
 	ttl     float64
 	token   int
 	job     *job
+	tr      *tracer // non-nil for sampled requests
+	sp      *span   // the span of the node currently handling this call
 }
 
 func fail(r Reason) Result { return Result{Reason: r, Ver: -1} }
@@ -471,6 +473,9 @@ func (s *Sim) submit(n *node, c *call, cb func(Result), run func(release func())
 	if n.busy < s.capacity(n) {
 		s.markBusy(n)
 		n.busy++
+		if c.sp != nil {
+			c.sp.start = s.now
+		}
 		run(s.releaser(n))
 		return
 	}
@@ -502,6 +507,9 @@ func (s *Sim) startNext(n *node) {
 		}
 		s.markBusy(n)
 		n.busy++
+		if t.c.sp != nil {
+			t.c.sp.start = s.now // waiting in the queue ends here
+		}
 		t.run(s.releaser(n))
 	}
 }
@@ -545,6 +553,9 @@ func (s *Sim) passBack(n *node, res Result, cb func(Result)) {
 // ---- arrival -----------------------------------------------------------------------
 
 func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
+	if c.tr != nil {
+		cb = s.traceArrive(n, c, cb)
+	}
 	if n.removed {
 		cb(fail(RNodeDown))
 		return

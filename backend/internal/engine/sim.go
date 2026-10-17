@@ -202,10 +202,14 @@ type Sim struct {
 	series    []SeriesPoint
 	chaosLog  []ChaosRecord
 
-	born     []Particle
-	bornOn   bool
-	stride   int
-	hopCount int
+	born       []Particle
+	bornOn     bool
+	traceOn    bool
+	traceEvery int
+	failedTr   []*tracer
+	okTr       []*tracer
+	stride     int
+	hopCount   int
 }
 
 // SeriesPoint is one point of the global time series.
@@ -353,6 +357,7 @@ func (s *Sim) tick() {
 	if s.tickCount%10 == 0 {
 		s.pruneCommitted()
 	}
+	s.retuneTraceRate()
 	cut := s.now - statsWindow
 	s.res.Prune(cut)
 	s.created.Prune(cut)

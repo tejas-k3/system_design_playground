@@ -83,6 +83,7 @@ type logical struct {
 	key       int
 	wl        int
 	hash      uint32
+	tr        *tracer
 }
 
 type attempt struct {
@@ -127,6 +128,7 @@ func (s *Sim) createLogical(c *node) {
 		s.runPending++
 	}
 	s.created.Push(s.now, true, 0)
+	lg.tr = s.startTrace(lg)
 	s.startAttempt(lg)
 }
 
@@ -143,7 +145,7 @@ func (s *Sim) startAttempt(lg *logical) {
 	lg.attempts++
 	s.attempts.Push(s.now, true, 0)
 	at := &attempt{lg: lg, at: s.now, n: lg.attempts}
-	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1}
+	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr}
 	s.hop(c, e, call, func(res Result) {
 		if at.done {
 			return
@@ -186,6 +188,9 @@ func (s *Sim) resolve(lg *logical, res Result) {
 	}
 	lg.resolved = true
 	s.unresolved--
+	if lg.tr != nil {
+		s.finishTrace(lg, res)
+	}
 	lat := s.now - lg.createdAt
 	s.res.Push(s.now, res.OK, lat)
 	cl := lg.client
