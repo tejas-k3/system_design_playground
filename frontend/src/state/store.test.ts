@@ -142,7 +142,7 @@ describe('viewport', () => {
 
 describe('stats', () => {
   it('tolerates a server frame with missing collections', () => {
-    st().setStats({ global: { now: 1, inFlight: 0, cost: 0, run: st().stats.global.run }, series: null, nodes: null, edges: null } as never)
+    st().setStats({ global: { now: 1, inFlight: 0, cost: 0, avgCost: 0, run: st().stats.global.run }, series: null, nodes: null, edges: null } as never)
     expect(st().stats.series).toEqual([])
     expect(st().stats.nodes).toEqual({})
   })

@@ -133,6 +133,7 @@ export interface NodeStats {
   down?: boolean
   cut?: boolean // partitioned from the network
   primary?: boolean // a replica that took over as the primary
+  instances?: number // autoscaled app server: servers running now
   slow?: number
   extra?: Record<string, number>
 }
@@ -179,7 +180,7 @@ export interface RunStats {
   jobs?: JobStats
 }
 export interface Stats {
-  global: { now: number; inFlight: number; cost: number; run: RunStats }
+  global: { now: number; inFlight: number; cost: number; avgCost: number; run: RunStats }
   nodes: Record<string, NodeStats>
   edges: Record<string, EdgeStats>
   series: SeriesPoint[]

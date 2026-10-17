@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Stats } from '../api/types'
 import { emptyStats } from '../state/store'
-import { failedAfter, fmtCost, goalRows, starTargets, successRate } from './goals'
+import { failedAfter, fmtCost, goalCost, goalRows, starTargets, successRate } from './goals'
 
-const stats = (run: Partial<Stats['global']['run']>): Stats => ({ ...emptyStats(), global: { now: 5, inFlight: 0, cost: 0, run: { ...emptyStats().global.run, ...run } } })
+const stats = (run: Partial<Stats['global']['run']>): Stats => ({ ...emptyStats(), global: { now: 5, inFlight: 0, cost: 0, avgCost: 0, run: { ...emptyStats().global.run, ...run } } })
 const row = (rows: ReturnType<typeof goalRows>, label: string) => rows.find((r) => r.label === label)!
 
 describe('goalRows', () => {
@@ -75,5 +75,17 @@ describe('failedAfter', () => {
   it('is the median time to failure, or a dash when nothing has failed', () => {
     expect(failedAfter({ ...emptyStats().global.run, failed: 3, failP50: 812.4 })).toBe('812 ms')
     expect(failedAfter({ ...emptyStats().global.run, failed: 0, failP50: 0 })).toBe('—')
+  })
+})
+
+describe('goalCost', () => {
+  const withAvg = (avg: number) => ({ ...emptyStats(), global: { ...emptyStats().global, avgCost: avg } })
+  it('is the run average while a run is going, because that is what gets scored', () => {
+    expect(goalCost(1.02, withAvg(0.66), true)).toBe(0.66)
+  })
+  it('is the design cost before a run, or when no average exists yet', () => {
+    expect(goalCost(0.5, withAvg(0.66), false)).toBe(0.5)
+    expect(goalCost(0.5, withAvg(0), true)).toBe(0.5)
+    expect(goalCost(null, withAvg(0), true)).toBeNull()
   })
 })

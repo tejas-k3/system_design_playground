@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clientRateLabel, edgeLabel, smoothRate, utilBarWidth } from './rates'
+import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from './rates'
 
 describe('clientRateLabel', () => {
   it('shows the configured rate before a run, with the peak for a pattern', () => {
@@ -60,5 +60,16 @@ describe('smoothRate', () => {
     for (let i = 0; i < 120; i++) v = smoothRate(v, 200, 16)
     expect(v).toBeCloseTo(200, 0)
     expect(smoothRate(100, 200, 5000)).toBeCloseTo(200, 0)
+  })
+})
+
+describe('serverSubtitle', () => {
+  it('is the thread count of one server', () => {
+    expect(serverSubtitle(8)).toBe('8 threads')
+    expect(serverSubtitle(8, 0)).toBe('8 threads')
+    expect(serverSubtitle(8, 1)).toBe('8 threads')
+  })
+  it('multiplies by the servers an autoscaled node is running', () => {
+    expect(serverSubtitle(8, 3)).toBe('8 threads × 3')
   })
 })

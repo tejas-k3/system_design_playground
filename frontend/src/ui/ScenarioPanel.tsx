@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchSolution } from '../api/client'
-import { goalRows, starTargets } from '../model/goals'
+import { goalCost, goalRows, starTargets } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { reset } from '../sim/bridge'
 import { useStore } from '../state/store'
@@ -19,7 +19,7 @@ export function ScenarioPanel() {
   useEffect(() => setOpen(!isNarrow()), [sc?.def.id])
   if (!sc) return null
   const { def } = sc
-  const rows = goalRows(def.goals, stats, cost, status !== 'stopped')
+  const rows = goalRows(def.goals, stats, goalCost(cost, stats, status !== 'stopped'), status !== 'stopped')
   const stars = starTargets(def.goals)
   const pred = def.predictions?.[0]
   const picked = pred ? sc.predictions[pred.id] : undefined
