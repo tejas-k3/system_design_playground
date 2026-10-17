@@ -100,11 +100,6 @@ func (b *bld) e(from, to string) *bld {
 	return b
 }
 
-func (b *bld) note(id string, x, y float64, text string) *bld {
-	b.d.Notes = append(b.d.Notes, engine.Note{ID: id, X: x, Y: y, Text: text})
-	return b
-}
-
 func (b *bld) done() engine.Diagram {
 	d, _ := engine.Sanitize(b.d)
 	return d

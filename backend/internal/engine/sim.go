@@ -103,9 +103,8 @@ type node struct {
 	keys       KeySampler
 
 	// cache / cdn
-	store     *Store
-	storePol  string
-	preloaded bool
+	store    *Store
+	storePol string
 
 	// rate limiter
 	tokens   float64
@@ -200,11 +199,10 @@ type Sim struct {
 	series    []SeriesPoint
 	chaosLog  []ChaosRecord
 
-	born      []Particle
-	bornOn    bool
-	stride    int
-	hopCount  int
-	finalized bool
+	born     []Particle
+	bornOn   bool
+	stride   int
+	hopCount int
 }
 
 type verLog struct {

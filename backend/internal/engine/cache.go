@@ -36,7 +36,6 @@ func NewStore(policy string, capacity int, ttlMs float64, rng *RNG) *Store {
 	return &Store{policy: policy, cap: capacity, ttlMs: ttlMs, rng: rng, m: map[int]*entry{}, ll: list.New(), freq: map[int]*list.List{}, minF: 1}
 }
 
-func (s *Store) Policy() string    { return s.policy }
 func (s *Store) Size() int         { return len(s.m) }
 func (s *Store) Capacity() int     { return s.cap }
 func (s *Store) SetTTL(ms float64) { s.ttlMs = ms }

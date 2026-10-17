@@ -114,8 +114,6 @@ func (s *Sim) Snapshot() Stats {
 		}
 		if sum.hit+sum.miss > 0 {
 			ns.HitRate = float64(sum.hit) / float64(sum.hit+sum.miss)
-		} else if n.store != nil {
-			ns.HitRate = -1
 		}
 		if n.store != nil {
 			ns.Size = n.store.Size()
