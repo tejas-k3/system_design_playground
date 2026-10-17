@@ -119,6 +119,12 @@ export interface Scenario extends ScenarioSummary {
 }
 
 /** Something that happened during the run, for markers on the charts (times in seconds, like the series). */
+/** One bar of the latency distribution: successes up to leMs (the last bar has leMs 1e9, meaning 'and above'). */
+export interface LatencyBucket {
+  leMs: number
+  count: number
+}
+
 export interface SimEvent {
   t: number
   type: string
@@ -179,6 +185,7 @@ export interface RunStats {
   p95: number
   p99: number
   failP50: number // median time to failure; p50/p95/p99 count successes only
+  latencyBuckets: LatencyBucket[] // distribution of successful requests
   mean: number
   errors: Record<string, number>
   conflicts: number

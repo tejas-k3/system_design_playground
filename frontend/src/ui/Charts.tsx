@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SeriesPoint, SimEvent } from '../api/types'
+import type { LatencyBucket, SeriesPoint, SimEvent } from '../api/types'
 import { palettes } from '../draw/theme'
 import { describeChart } from '../model/announce'
 import { type EventMark, eventLabel, eventMarks } from '../model/events'
+import { bucketLabel, cdf, describeHistogram, quantileBucket } from '../model/histogram'
 import { failedAfter, pct, successRate } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { useStore } from '../state/store'
@@ -136,9 +137,90 @@ function niceMax(v: number): number {
 }
 const compact = (v: number) => (v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : v >= 10 ? `${Math.round(v)}` : `${+v.toFixed(1)}`)
 
+/** Histogram of successful-request latency with the cumulative share as a line and p50/p95/p99 called out. */
+function Distribution({ buckets, p50, p95, p99, theme }: { buckets: LatencyBucket[]; p50: number; p95: number; p99: number; theme: 'light' | 'dark' }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const cv = ref.current
+    if (!cv) return
+    const dpr = window.devicePixelRatio || 1
+    const w = cv.clientWidth
+    const h = cv.clientHeight
+    if (cv.width !== Math.round(w * dpr)) {
+      cv.width = Math.round(w * dpr)
+      cv.height = Math.round(h * dpr)
+    }
+    const ctx = cv.getContext('2d')!
+    const p = palettes[theme]
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, w, h)
+    const n = buckets.reduce((a, b) => a + b.count, 0)
+    if (!n) return
+    const left = 40
+    const right = 40
+    const top = 8
+    const bottom = 34
+    const pw = w - left - right
+    const ph = h - top - bottom
+    const max = Math.max(...buckets.map((b) => b.count))
+    const bw = pw / buckets.length
+    const cum = cdf(buckets)
+    const marked = new Map<number, string>([[quantileBucket(buckets, 0.5), 'p50'], [quantileBucket(buckets, 0.95), 'p95'], [quantileBucket(buckets, 0.99), 'p99']])
+    ctx.font = '11px system-ui, sans-serif'
+    buckets.forEach((b, i) => {
+      const bh = (b.count / max) * ph
+      ctx.fillStyle = p.accent
+      ctx.globalAlpha = 0.75
+      ctx.fillRect(left + i * bw + 2, top + ph - bh, bw - 4, bh)
+      ctx.globalAlpha = 1
+      ctx.fillStyle = p.muted
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      ctx.save()
+      ctx.translate(left + i * bw + bw / 2, top + ph + 4)
+      ctx.rotate(-0.5)
+      ctx.textAlign = 'right'
+      ctx.fillText(bucketLabel(buckets, i).replace(' ms', '').replace(' s', 's'), 4, 0)
+      ctx.restore()
+      const tag = marked.get(i)
+      if (tag) {
+        ctx.fillStyle = p.ink
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText(tag, left + i * bw + bw / 2, top + ph - bh - 2)
+      }
+    })
+    // cumulative share line, dashed so it never relies on colour to be told from the bars
+    ctx.strokeStyle = p.ink
+    ctx.setLineDash([5, 3])
+    ctx.lineWidth = 1.6
+    ctx.beginPath()
+    cum.forEach((v, i) => {
+      const x = left + i * bw + bw / 2
+      const y = top + ph - v * ph
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)
+    })
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = p.muted
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    for (const f of [0, 0.5, 1]) ctx.fillText(`${f * 100}%`, left + pw + 4, top + ph - f * ph)
+    ctx.textAlign = 'right'
+    ctx.fillText(`${max}`, left - 4, top + 6)
+  }, [buckets, theme, p50, p95, p99])
+  const text = describeHistogram(buckets)
+  return (
+    <div className="distribution">
+      <canvas ref={ref} role="img" aria-label={text} />
+      <p className="muted small">{text}</p>
+    </div>
+  )
+}
+
 export function Charts() {
   const [open, setOpen] = useState(!isNarrow())
-  const [tab, setTab] = useState<'metrics' | 'traces'>('metrics')
+  const [tab, setTab] = useState<'metrics' | 'latency' | 'traces'>('metrics')
   const series = useStore((s) => s.stats.series)
   const events = useStore((s) => s.stats.events)
   const run = useStore((s) => s.stats.global.run)
@@ -164,6 +246,7 @@ export function Charts() {
         <button className="link" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? 'Collapse metrics' : 'Expand metrics'}>{open ? '▾' : '▸'}</button>
         <div className="seg" role="tablist" aria-label="Metrics view">
           <button role="tab" aria-selected={tab === 'metrics'} className={tab === 'metrics' ? 'on' : ''} onClick={() => { setTab('metrics'); setOpen(true) }}>Metrics</button>
+          <button role="tab" aria-selected={tab === 'latency'} className={tab === 'latency' ? 'on' : ''} onClick={() => { setTab('latency'); setOpen(true) }}>Latency distribution</button>
           <button role="tab" aria-selected={tab === 'traces'} className={tab === 'traces' ? 'on' : ''} onClick={() => { setTab('traces'); setOpen(true) }}>Request traces</button>
         </div>
         <span className="tiles">
@@ -171,11 +254,13 @@ export function Charts() {
           <Tile label="Success" value={rate === null ? '—' : pct(rate)} bad={total > 20 && (rate ?? 1) < 0.95} />
           <Tile label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
           <Tile label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
+          <Tile label="p99" value={run.ok ? `${Math.round(run.p99)} ms` : '—'} />
           <Tile label="Failures took" value={failedAfter(run)} hint="Median time a failed request took, from the user's first attempt. p50 and p95 count successes only." />
           <Tile label="In flight" value={String(inFlight)} />
         </span>
       </div>
       {open && tab === 'traces' && <Traces />}
+      {open && tab === 'latency' && <Distribution buckets={run.latencyBuckets} p50={run.p50} p95={run.p95} p99={run.p99} theme={theme} />}
       {open && tab === 'metrics' && (
         <div className="charts-body">
           {status === 'stopped' && series.length === 0 ? (

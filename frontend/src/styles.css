@@ -189,3 +189,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 /* tooltip for a chart event marker */
 .chart { position: relative; }
 .chart-tip { position: absolute; top: 22px; transform: translateX(-50%); max-width: 240px; padding: 4px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); font-size: 12px; pointer-events: none; z-index: 5; }
+
+.distribution { display: flex; flex-direction: column; padding: 0 10px 10px; height: 168px; flex: none; }
+.distribution canvas { flex: 1; width: 100%; min-height: 0; }
+.distribution p { margin: 2px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
