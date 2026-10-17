@@ -4,6 +4,7 @@ import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screen
 import { palettes } from '../draw/theme'
 import { drainParticles } from '../sim/particles'
 import { useStore } from '../state/store'
+import { NodeOutline } from './board/NodeOutline'
 import { NoteEditor, type NoteEdit } from './board/NoteEditor'
 import { type PinchState, pinchOf, pinchStep } from './board/pinch'
 import { useBoardShortcuts } from './board/useBoardShortcuts'
@@ -361,6 +362,7 @@ export function Board() {
       {noteEdit && (
         <NoteEditor edit={noteEdit} initialText={useStore.getState().diagram.notes.find((n) => n.id === noteEdit.id)?.text ?? ''} onCommit={commitNote} />
       )}
+      <NodeOutline />
       <ZoomBadge fit={fitView} by={zoomBy} />
     </div>
   )

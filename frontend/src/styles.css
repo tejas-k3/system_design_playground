@@ -165,3 +165,8 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .conns li { display: flex; align-items: center; justify-content: space-between; background: var(--panel2); border-radius: 8px; padding: 3px 4px 3px 10px; }
 .conns .x { margin: 0; font-size: 18px; }
 .conn-add { display: flex; gap: 6px; margin-top: 6px; } .conn-add select { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+
+/* keyboard / screen-reader outline of the canvas: off-screen until focused */
+.outline { position: absolute; left: -9999px; top: 8px; margin: 0; padding: 6px; list-style: none; max-height: 70%; overflow: auto; background: var(--panel); border: 2px solid var(--accent); border-radius: 10px; z-index: 7; }
+.outline:focus-within { left: 8px; }
+.outline li { margin: 2px 0; } .outline button { width: 100%; text-align: left; } .outline button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
