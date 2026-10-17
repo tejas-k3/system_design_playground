@@ -110,7 +110,7 @@ and the inspector becomes a bottom sheet.
 | Service times | Steady by default; an advanced *service-time spread* setting (app server, database, worker, external API) switches to exponential or heavy-tailed, same mean, to show how variability lengthens queues and tails |
 | App servers | Thread pool, bounded FIFO/LIFO queue, queue-wait timeout, call timeouts, circuit breaker, idempotency keys |
 | Connection pools | Per server per database; databases refuse connections beyond their limit |
-| Caches / CDN | LRU, LFU, FIFO, random eviction; TTL; warm start; read-through or cache-aside; invalidate / write-through |
+| Caches / CDN | LRU, LFU, FIFO, random eviction; TTL (with optional jitter); warm start; optional sharing of concurrent misses; read-through or cache-aside; invalidate / write-through |
 | Replication | Replica serves the version from `now − lag`; strong / bounded / eventual reads and a stale-read count |
 | Load balancing | Round robin, least connections, random; health-check delay; outlier ejection |
 | Queues | Bounded queue + workers, retries, backlog and job-latency metrics |
