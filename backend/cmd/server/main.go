@@ -25,7 +25,15 @@ func main() {
 	maxSessions := flag.Int("max-sessions", envInt("MAX_SESSIONS", api.DefaultMaxSessions), "maximum concurrent live simulations")
 	dataDir := flag.String("data-dir", envOr("DATA_DIR", ""), "directory for shared designs (empty keeps them in memory only)")
 	maxDesigns := flag.Int("max-designs", envInt("MAX_DESIGNS", designs.DefaultMax), "how many shared designs to keep before dropping the oldest")
+	healthcheck := flag.Bool("healthcheck", false, "probe a running server on -addr and exit 0 if it is healthy (for container health checks)")
 	flag.Parse()
+
+	if *healthcheck {
+		if err := checkHealth(healthURL(*addr)); err != nil {
+			log.Fatalf("unhealthy: %v", err)
+		}
+		return
+	}
 
 	store, err := designs.New(*dataDir, *maxDesigns)
 	if err != nil {
