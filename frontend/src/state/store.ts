@@ -41,7 +41,7 @@ export interface State {
   sim: { status: SimStatus; speed: number; seed: number }
   stats: Stats
   traces: TraceSet | null // latest request traces from the server; null before the first answer
-  cost: number
+  cost: number | null // null until the server has priced the current diagram
   scenario: ScenarioState | null
   sandbox: Diagram | null // sandbox saved while a scenario is open
   ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean }
@@ -129,7 +129,7 @@ export const useStore = create<State>()((set, get) => {
     sim: { status: 'stopped', speed: 1, seed: 42 },
     stats: emptyStats(),
     traces: null,
-    cost: 0,
+    cost: null,
     scenario: null,
     sandbox: null,
     ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false },
@@ -247,7 +247,7 @@ export const useStore = create<State>()((set, get) => {
       mutate(() => emptyDiagram())
       set({ selection: [], ui: { ...get().ui, welcome: true } })
     },
-    loadDiagram: (d) => set({ diagram: d, past: [], future: [], selection: [] }),
+    loadDiagram: (d) => set({ diagram: d, past: [], future: [], selection: [], cost: null }),
     // like loadDiagram but undoable, so opening someone else's design never destroys your own
     importDiagram: (d) => {
       mutate(() => d)

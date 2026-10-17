@@ -146,4 +146,12 @@ describe('stats', () => {
     expect(st().stats.series).toEqual([])
     expect(st().stats.nodes).toEqual({})
   })
+
+  it('does not know the cost of a diagram until the server has priced it', () => {
+    expect(st().cost).toBeNull()
+    st().setCost(0.5)
+    expect(st().cost).toBe(0.5)
+    st().loadDiagram({ nodes: [], edges: [], notes: [] })
+    expect(st().cost).toBeNull()
+  })
 })

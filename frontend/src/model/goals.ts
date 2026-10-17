@@ -10,6 +10,9 @@ export interface GoalRow {
 export const pct = (f: number) => `${(Math.floor(f * 1000) / 10).toFixed(1)}%`
 const ms = (v: number) => (v >= 10000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`)
 
+/** Hourly cost as shown on screen; a dash until the server has priced the design. */
+export const fmtCost = (c: number | null): string => (c === null ? '—' : `$${c.toFixed(2)}/hr`)
+
 /** Share of finished requests that succeeded (null before any finish). The one success figure shown anywhere on screen;
  *  requests still in flight count once they resolve, and the final verdict agrees because nothing is pending by then. */
 export function successRate(r: Stats['global']['run']): number | null {
@@ -25,7 +28,7 @@ export function starTargets(g: Goals): string {
 }
 
 /** Live read-out of how a run is tracking against the goals (the server gives the final verdict). */
-export function goalRows(g: Goals, stats: Stats, cost: number, started: boolean): GoalRow[] {
+export function goalRows(g: Goals, stats: Stats, cost: number | null, started: boolean): GoalRow[] {
   const r = stats.global.run
   const rows: GoalRow[] = []
   const rate = successRate(r)
@@ -52,6 +55,6 @@ export function goalRows(g: Goals, stats: Stats, cost: number, started: boolean)
     const j = r.jobs
     rows.push({ label: 'Job delay p95', target: `≤ ${ms(g.maxJobP95Ms)}`, actual: j?.completed ? ms(j.p95) : '—', state: !started || !j?.completed ? 'pending' : j.p95 <= g.maxJobP95Ms ? 'pass' : 'fail' })
   }
-  if (g.maxCostPerHour !== undefined) rows.push({ label: 'Cost', target: `≤ $${g.maxCostPerHour.toFixed(2)}/hr`, actual: `$${cost.toFixed(2)}/hr`, state: cost <= g.maxCostPerHour + 1e-9 ? 'pass' : 'fail' })
+  if (g.maxCostPerHour !== undefined) rows.push({ label: 'Cost', target: `≤ $${g.maxCostPerHour.toFixed(2)}/hr`, actual: fmtCost(cost), state: cost === null ? 'pending' : cost <= g.maxCostPerHour + 1e-9 ? 'pass' : 'fail' })
   return rows
 }
