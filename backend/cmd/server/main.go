@@ -23,6 +23,7 @@ func main() {
 	origins := flag.String("origins", envOr("ALLOWED_ORIGINS", "localhost:*,127.0.0.1:*"), "comma-separated WebSocket origin patterns")
 	idle := flag.Duration("idle-timeout", api.DefaultIdleTimeout, "close stopped or paused sessions after this much silence")
 	maxSessions := flag.Int("max-sessions", envInt("MAX_SESSIONS", api.DefaultMaxSessions), "maximum concurrent live simulations")
+	maxRuns := flag.Int("max-runs", envInt("MAX_RUNS", 0), "maximum concurrent headless runs (0 = one per CPU core, at least 2)")
 	dataDir := flag.String("data-dir", envOr("DATA_DIR", ""), "directory for shared designs (empty keeps them in memory only)")
 	maxDesigns := flag.Int("max-designs", envInt("MAX_DESIGNS", designs.DefaultMax), "how many shared designs to keep before dropping the oldest")
 	healthcheck := flag.Bool("healthcheck", false, "probe a running server on -addr and exit 0 if it is healthy (for container health checks)")
@@ -42,7 +43,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           api.New(api.Config{StaticDir: *static, OriginPatterns: strings.Split(*origins, ","), MaxSessions: *maxSessions, IdleTimeout: *idle, Designs: store}).Handler(),
+		Handler:           api.New(api.Config{StaticDir: *static, OriginPatterns: strings.Split(*origins, ","), MaxSessions: *maxSessions, MaxRuns: *maxRuns, IdleTimeout: *idle, Designs: store}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {

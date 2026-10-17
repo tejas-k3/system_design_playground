@@ -15,6 +15,7 @@ type metrics struct {
 	designsSaved     atomic.Int64
 	designsRateLimit atomic.Int64
 	runs             atomic.Int64
+	runsRefused      atomic.Int64
 }
 
 func (m *metrics) serve(storedDesigns func() int) http.HandlerFunc {
@@ -27,6 +28,7 @@ func (m *metrics) serve(storedDesigns func() int) http.HandlerFunc {
 		line("sdp_sessions_total", "Simulation sessions opened since start.", "counter", m.sessionsTotal.Load())
 		line("sdp_sessions_refused_total", "Sessions refused because the server was full.", "counter", m.sessionsRefused.Load())
 		line("sdp_runs_total", "Headless runs requested through /api/run.", "counter", m.runs.Load())
+		line("sdp_runs_refused_total", "Headless runs refused because too many were already running.", "counter", m.runsRefused.Load())
 		line("sdp_designs_saved_total", "Designs shared since start.", "counter", m.designsSaved.Load())
 		line("sdp_designs_rate_limited_total", "Design saves refused by the rate limit.", "counter", m.designsRateLimit.Load())
 		line("sdp_designs_stored", "Designs currently kept.", "gauge", int64(storedDesigns()))

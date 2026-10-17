@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -27,6 +28,10 @@ const (
 // DefaultMaxSessions bounds concurrent live simulations; each one burns CPU while running.
 const DefaultMaxSessions = 64
 
+// defaultMaxRuns bounds concurrent headless runs (0 in Config means this many per CPU core, at least 2): each
+// holds a whole simulation in memory (about 12 MB for a heavy design), and the CPU is the real limit anyway.
+func defaultMaxRuns() int { return max(2, runtime.GOMAXPROCS(0)) }
+
 // DefaultSaveLimit is how many designs one client may share per minute.
 const DefaultSaveLimit = 20
 
@@ -41,6 +46,7 @@ type Config struct {
 	StaticDir      string         // built frontend to serve with an index.html fallback (optional)
 	OriginPatterns []string       // allowed WebSocket origins
 	MaxSessions    int            // concurrent live simulations; 0 means DefaultMaxSessions
+	MaxRuns        int            // concurrent headless /api/run simulations; 0 means one per CPU core (at least 2)
 	IdleTimeout    time.Duration  // close a session that is not running and has been silent this long; 0 means DefaultIdleTimeout
 	Designs        *designs.Store // where shared designs live; nil means an in-memory store
 	SaveLimit      int            // designs one client may save per minute; 0 means DefaultSaveLimit
@@ -52,6 +58,7 @@ type Server struct {
 	staticDir string
 	origins   []string
 	slots     chan struct{} // one token per live simulation session
+	runSlots  chan struct{} // one token per headless run in progress
 	idle      time.Duration
 	designs   *designs.Store
 	saves     *limiter
@@ -63,6 +70,9 @@ func New(cfg Config) *Server {
 	if cfg.MaxSessions <= 0 {
 		cfg.MaxSessions = DefaultMaxSessions
 	}
+	if cfg.MaxRuns <= 0 {
+		cfg.MaxRuns = defaultMaxRuns()
+	}
 	if cfg.IdleTimeout <= 0 {
 		cfg.IdleTimeout = DefaultIdleTimeout
 	}
@@ -72,7 +82,7 @@ func New(cfg Config) *Server {
 	if cfg.Designs == nil {
 		cfg.Designs, _ = designs.New("", 0) // in-memory never fails
 	}
-	s := &Server{designs: cfg.Designs, saves: newLimiter(cfg.SaveLimit, time.Minute), mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), idle: cfg.IdleTimeout}
+	s := &Server{designs: cfg.Designs, saves: newLimiter(cfg.SaveLimit, time.Minute), mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), runSlots: make(chan struct{}, cfg.MaxRuns), idle: cfg.IdleTimeout}
 	staticDir := cfg.StaticDir
 	s.mux.HandleFunc("GET /api/metrics", s.metrics.serve(cfg.Designs.Len))
 	s.mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
@@ -245,6 +255,15 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 			dur = 300
 		}
 		opts.StopTrafficAtMs = dur * 1000
+	}
+	select {
+	case s.runSlots <- struct{}{}:
+		defer func() { <-s.runSlots }()
+	default:
+		s.metrics.runsRefused.Add(1)
+		w.Header().Set("Retry-After", "2")
+		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+		return
 	}
 	sim := engine.New(d, opts)
 	deadline := time.Now().Add(10 * time.Second)
