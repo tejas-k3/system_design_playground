@@ -110,6 +110,7 @@ type ChaosEvent struct {
 	DownSec     float64 `json:"downSec,omitempty"`
 	Factor      float64 `json:"factor,omitempty"`
 	DurationSec float64 `json:"durationSec,omitempty"` // slow and partition
+	PulseSec    float64 `json:"pulseSec,omitempty"`    // slow only: alternate slow and normal every PulseSec until DurationSec is over
 }
 
 // TrafficPoint is (seconds, rps) on a piecewise-linear traffic curve.
