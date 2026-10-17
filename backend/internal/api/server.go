@@ -23,16 +23,31 @@ const (
 	maxEdges = 300
 )
 
+// DefaultMaxSessions bounds concurrent live simulations; each one burns CPU while running.
+const DefaultMaxSessions = 64
+
+// Config configures a Server.
+type Config struct {
+	StaticDir      string   // built frontend to serve with an index.html fallback (optional)
+	OriginPatterns []string // allowed WebSocket origins
+	MaxSessions    int      // concurrent live simulations; 0 means DefaultMaxSessions
+}
+
 // Server wires the routes together.
 type Server struct {
 	mux       *http.ServeMux
 	staticDir string
-	devOrigin []string
+	origins   []string
+	slots     chan struct{} // one token per live simulation session
 }
 
-// New builds a server. staticDir, when non-empty, is served as the SPA with an index fallback.
-func New(staticDir string, originPatterns []string) *Server {
-	s := &Server{mux: http.NewServeMux(), staticDir: staticDir, devOrigin: originPatterns}
+// New builds a server from cfg.
+func New(cfg Config) *Server {
+	if cfg.MaxSessions <= 0 {
+		cfg.MaxSessions = DefaultMaxSessions
+	}
+	s := &Server{mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions)}
+	staticDir := cfg.StaticDir
 	s.mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
 	s.mux.HandleFunc("GET /api/registry", s.registry)
 	s.mux.HandleFunc("GET /api/scenarios", s.listScenarios)

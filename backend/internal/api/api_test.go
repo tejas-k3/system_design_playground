@@ -18,7 +18,12 @@ import (
 
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	ts := httptest.NewServer(New("", []string{"*"}).Handler())
+	return newTestServerWith(t, Config{OriginPatterns: []string{"*"}})
+}
+
+func newTestServerWith(t *testing.T, cfg Config) *httptest.Server {
+	t.Helper()
+	ts := httptest.NewServer(New(cfg).Handler())
 	t.Cleanup(ts.Close)
 	return ts
 }
@@ -215,5 +220,37 @@ func TestFramesNeverCarryNullArrays(t *testing.T) {
 		if bytes.Contains(data, []byte(`"series":null`)) || bytes.Contains(data, []byte(`"nodes":null`)) || bytes.Contains(data, []byte(`"edges":null`)) {
 			t.Fatalf("frame contains a null collection: %s", data)
 		}
+	}
+}
+
+func TestSessionCapReturns503AndFreesSlots(t *testing.T) {
+	ts := newTestServerWith(t, Config{OriginPatterns: []string{"*"}, MaxSessions: 1})
+	first, ctx := dial(t, ts)
+	readType(t, first, ctx, "frame")
+
+	resp, err := http.Get(ts.URL + "/api/sim")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Retry-After") == "" {
+		t.Fatalf("expected 503 with Retry-After while full, got %d", resp.StatusCode)
+	}
+	if _, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(ts.URL, "http")+"/api/sim", nil); err == nil {
+		t.Fatal("second WebSocket should have been refused")
+	}
+
+	first.Close(websocket.StatusNormalClosure, "bye")
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(ts.URL, "http")+"/api/sim", nil)
+		if err == nil {
+			c.CloseNow()
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("slot was never released after the first session closed: %v", err)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
