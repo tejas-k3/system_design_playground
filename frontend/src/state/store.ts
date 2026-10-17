@@ -294,7 +294,7 @@ export const useStore = create<State>()((set, get) => {
         traces: null,
         scenario: { def, hintLevel: 0, result: null, predictions: {}, solved: false },
         sim: { ...s.sim, status: 'stopped', speed: def.speed || 1 },
-        ui: { ...s.ui, picker: false, welcome: false, result: false },
+        ui: { ...s.ui, picker: false, welcome: false, result: false, library: !def.configOnly && !isNarrow() },
       })
     },
     exitScenario: () => {
@@ -309,7 +309,7 @@ export const useStore = create<State>()((set, get) => {
         traces: null,
         scenario: null,
         sim: { ...s.sim, status: 'stopped' },
-        ui: { ...s.ui, welcome: !(s.sandbox?.nodes.length), result: false },
+        ui: { ...s.ui, welcome: !(s.sandbox?.nodes.length), result: false, library: !isNarrow() },
       })
     },
     answerPrediction: (p, choice) =>
