@@ -447,7 +447,7 @@ func init() {
 		Summary: "Nearly everyone asks for the same pages, and every request still reaches your servers.",
 		Story:   "A product page goes viral: 900 requests per second, almost all reads of a small set of popular items. Your three servers answer every one themselves and cannot keep up.",
 		Diagram: edge(false), Solution: edge(true),
-		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(250), MaxCostPerHour: f(1.2)},
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(250), MaxCostPerHour: f(1.2), StarP95Ms: f(175)},
 		DurationSec: 45, WarmupSec: 6, Speed: 1,
 		Hints: [3]string{
 			"Why should a request for the same popular page travel all the way to your servers?",
