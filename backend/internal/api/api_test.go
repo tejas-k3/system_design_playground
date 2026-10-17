@@ -554,3 +554,29 @@ func TestRunCapReturns503WhileAllSlotsAreBusy(t *testing.T) {
 		t.Fatal("the slot was not released after the run")
 	}
 }
+
+func TestEventLogIsSentOnlyWhenItChanges(t *testing.T) {
+	ts := newTestServer(t)
+	c, ctx := dial(t, ts)
+	sc := scenarios.Get("primary-dies")
+	readType(t, c, ctx, "frame")
+	sendMsg(t, c, ctx, clientMsg{Type: "init", Diagram: &sc.Solution, ScenarioID: sc.ID, Speed: 8})
+	sendMsg(t, c, ctx, clientMsg{Type: "play"})
+	deadline := time.Now().Add(15 * time.Second)
+	withEvents, quietAfter := 0, 0
+	for time.Now().Before(deadline) && quietAfter < 3 {
+		var f frameMsg
+		_ = json.Unmarshal(readType(t, c, ctx, "frame"), &f)
+		if f.Stats == nil {
+			continue
+		}
+		if len(f.Stats.Events) > 0 {
+			withEvents++
+		} else if withEvents > 0 {
+			quietAfter++
+		}
+	}
+	if withEvents == 0 || quietAfter < 3 {
+		t.Fatalf("events should appear when logged and be left out of later unchanged frames: with=%d quiet=%d", withEvents, quietAfter)
+	}
+}

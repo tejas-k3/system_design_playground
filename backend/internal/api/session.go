@@ -85,6 +85,7 @@ type session struct {
 	chaosSeen  int
 	slowWarned bool
 	pending    []notice
+	eventsKey  [2]float64 // len and last time of the event log last sent, so unchanged logs are left out of frames
 	lastWall   time.Time
 	lastStat   time.Time
 	active     time.Time // last client message, or the last moment the simulation was running
@@ -182,6 +183,14 @@ func (ss *session) frame(withStats bool) frameMsg {
 		f.Particles = ss.sim.TakeParticles()
 		if withStats {
 			st := ss.sim.Snapshot()
+			key := [2]float64{float64(len(st.Events)), 0}
+			if n := len(st.Events); n > 0 {
+				key[1] = st.Events[n-1].T
+			}
+			if key == ss.eventsKey && st.Global.Now > 0 {
+				st.Events = nil
+			}
+			ss.eventsKey = key
 			f.Stats = &st
 		}
 	} else if withStats {
