@@ -326,17 +326,31 @@ func DiagramCost(d Diagram) float64 {
 	return c
 }
 
+// LatencyRule gives the default one-way latency for edges matching From and To; an empty field
+// matches anything. The first matching rule wins, so the last one is the catch-all.
+type LatencyRule struct {
+	From string  `json:"from,omitempty"`
+	To   string  `json:"to,omitempty"`
+	Ms   float64 `json:"ms"`
+}
+
+var latencyRules = []LatencyRule{
+	{From: KClient, To: KCDN, Ms: 10},
+	{From: KClient, Ms: 40},
+	{From: KCDN, Ms: 40},
+	{To: KExternalAPI, Ms: 20},
+	{Ms: 5},
+}
+
+// LatencyRules returns the default-latency table, served to clients so they apply the same rules.
+func LatencyRules() []LatencyRule { return latencyRules }
+
 // DefaultLatency is the default one-way latency of an edge between two kinds.
 func DefaultLatency(from, to string) float64 {
-	switch {
-	case from == KClient && to == KCDN:
-		return 10
-	case from == KClient:
-		return 40
-	case from == KCDN:
-		return 40
-	case to == KExternalAPI:
-		return 20
+	for _, r := range latencyRules {
+		if (r.From == "" || r.From == from) && (r.To == "" || r.To == to) {
+			return r.Ms
+		}
 	}
 	return 5
 }

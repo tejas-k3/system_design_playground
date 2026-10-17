@@ -52,6 +52,18 @@ func TestRegistryAndScenarios(t *testing.T) {
 	if len(reg.Nodes) != 13 {
 		t.Fatalf("registry has %d kinds", len(reg.Nodes))
 	}
+	var meta struct {
+		Latency struct {
+			Rules []engine.LatencyRule `json:"rules"`
+		} `json:"latency"`
+		Speeds  []float64           `json:"speeds"`
+		Reasons []engine.ReasonInfo `json:"reasons"`
+	}
+	resp, _ = http.Get(ts.URL + "/api/registry")
+	_ = json.NewDecoder(resp.Body).Decode(&meta)
+	if len(meta.Speeds) != len(Speeds) || len(meta.Reasons) != int(engine.NumReasons) || len(meta.Latency.Rules) == 0 {
+		t.Fatalf("registry is missing shared constants: %+v", meta)
+	}
 	var list []scenarioSummary
 	resp, _ = http.Get(ts.URL + "/api/scenarios")
 	_ = json.NewDecoder(resp.Body).Decode(&list)

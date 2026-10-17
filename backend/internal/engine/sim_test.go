@@ -56,6 +56,34 @@ func stack(apps int, client, app, cache, db Params) *builder {
 	return b
 }
 
+func TestDefaultLatencyRules(t *testing.T) {
+	for _, c := range []struct {
+		from, to string
+		want     float64
+	}{
+		{KClient, KCDN, 10}, {KClient, KAppServer, 40}, {KClient, KLoadBalancer, 40}, {KCDN, KAppServer, 40},
+		{KAppServer, KExternalAPI, 20}, {KWorker, KExternalAPI, 20}, {KAppServer, KDatabase, 5}, {KLoadBalancer, KAppServer, 5},
+	} {
+		if got := DefaultLatency(c.from, c.to); got != c.want {
+			t.Errorf("%s -> %s: got %v, want %v", c.from, c.to, got, c.want)
+		}
+	}
+}
+
+func TestEveryReasonHasAnIDAndLabel(t *testing.T) {
+	infos := ReasonInfos()
+	if len(infos) != int(NumReasons) {
+		t.Fatalf("got %d reasons, want %d", len(infos), NumReasons)
+	}
+	seen := map[string]bool{}
+	for i, r := range infos {
+		if r.ID == "" || r.Label == "" || seen[r.ID] || r.ID != Reason(i).String() {
+			t.Errorf("reason %d is malformed or duplicated: %+v", i, r)
+		}
+		seen[r.ID] = true
+	}
+}
+
 func TestSanitizeRejectsBadEdgesAndClamps(t *testing.T) {
 	d := Diagram{
 		Nodes: []Node{

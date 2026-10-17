@@ -75,6 +75,26 @@ var reasonNames = [NumReasons]string{
 	"callTimeout", "circuitOpen", "dependencyError", "lockBusy", "queueTimeout", "connRefused",
 }
 
+var reasonLabels = [NumReasons]string{
+	"Timeouts", "Queue full (503)", "Node down", "No route", "No healthy backend", "Rate limited (429)",
+	"Call timeouts (504)", "Circuit open", "Vendor errors", "Lock busy", "Waited too long in queue", "DB connections refused",
+}
+
+// ReasonInfo names a failure reason for clients: a stable id and a human label.
+type ReasonInfo struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// ReasonInfos lists every failure reason so clients need not hard-code their names.
+func ReasonInfos() []ReasonInfo {
+	out := make([]ReasonInfo, NumReasons)
+	for r := Reason(0); r < NumReasons; r++ {
+		out[r] = ReasonInfo{ID: reasonNames[r], Label: reasonLabels[r]}
+	}
+	return out
+}
+
 func (r Reason) String() string {
 	if r < 0 || r >= NumReasons {
 		return "unknown"

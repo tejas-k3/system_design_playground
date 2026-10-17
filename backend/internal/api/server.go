@@ -117,7 +117,12 @@ func tooBig(d engine.Diagram) bool { return len(d.Nodes) > maxNodes || len(d.Edg
 // ---- handlers -------------------------------------------------------------------------
 
 func (s *Server) registry(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"nodes": engine.Specs(), "latency": map[string]float64{"min": engine.MinLatencyMs, "max": engine.MaxLatencyMs}})
+	writeJSON(w, 200, map[string]any{
+		"nodes":   engine.Specs(),
+		"latency": map[string]any{"min": engine.MinLatencyMs, "max": engine.MaxLatencyMs, "rules": engine.LatencyRules()},
+		"speeds":  Speeds,
+		"reasons": engine.ReasonInfos(),
+	})
 }
 
 type scenarioSummary struct {

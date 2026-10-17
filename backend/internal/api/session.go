@@ -22,7 +22,8 @@ const (
 	maxDtMs     = 100.0
 )
 
-var validSpeeds = []float64{0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 4}
+// Speeds are the simulation speed multipliers a session accepts; clients offer exactly these.
+var Speeds = []float64{0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 4}
 
 type clientMsg struct {
 	Type       string          `json:"type"`
@@ -207,8 +208,8 @@ func (ss *session) build() {
 }
 
 func nearestSpeed(v float64) float64 {
-	best := validSpeeds[0]
-	for _, s := range validSpeeds {
+	best := Speeds[0]
+	for _, s := range Speeds {
 		if math.Abs(s-v) < math.Abs(best-v) {
 			best = s
 		}
