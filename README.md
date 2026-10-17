@@ -106,6 +106,7 @@ A 30 s run of a 1,000 rps, 20-node design takes about 90 ms (`make bench`).
 | `POST /api/validate` | Sanitize a diagram, returns `{diagram, adjusted, costPerHour}` |
 | `POST /api/run` | Headless run `{diagram, scenarioId?, seed?, durationSec?}` → stats (+ score for a scenario) |
 | `GET /api/sim` (WebSocket) | Live simulation session |
+| `POST /api/designs`, `GET /api/designs/{id}` | Share a design: save returns `{id}` (rate-limited, sanitized); the id opens it |
 | `GET /api/healthz` | Liveness |
 
 ### WebSocket protocol (`/api/sim`)
@@ -132,11 +133,17 @@ Challenges live in `backend/internal/scenarios/defs.go`: a starting `Diagram`, a
 them across several seeds, so a mistuned scenario is caught immediately. `VERBOSE=1 go test -v
 ./internal/scenarios` prints every check.
 
-## Persistence
+## Persistence and sharing
 
 The sandbox diagram, theme, view position and challenge stars are stored in the browser's
-`localStorage` (`sdp:v1`), validated on load. There is no account system and the server keeps no state
-between sessions.
+`localStorage` (`sdp:v1`), validated on load.
+
+The **Share** button saves the current design on the server and copies a link such as `/#design=3ibupvsc57zfg`;
+opening it loads the design into your sandbox as an undoable step. There are no accounts: the 13-character
+random id is the only access control, so anyone with the link can open that design and nothing else is
+readable. Designs live in memory unless the server is started with `-data-dir` (`DATA_DIR`), in which case they
+are also written there and survive restarts. At most 5,000 are kept (`-max-designs`), oldest dropped first,
+and one client may share 20 a minute.
 
 ## Tests
 
