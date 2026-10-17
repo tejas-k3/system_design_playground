@@ -130,6 +130,7 @@ export interface NodeStats {
   size?: number
   reasons?: Record<string, number>
   down?: boolean
+  cut?: boolean // partitioned from the network
   slow?: number
   extra?: Record<string, number>
 }
