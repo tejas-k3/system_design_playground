@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Stats } from '../api/types'
 import { emptyStats } from '../state/store'
-import { goalRows } from './goals'
+import { goalRows, starTargets } from './goals'
 
 const stats = (run: Partial<Stats['global']['run']>): Stats => ({ ...emptyStats(), global: { now: 5, inFlight: 0, cost: 0, run: { ...emptyStats().global.run, ...run } } })
 const row = (rows: ReturnType<typeof goalRows>, label: string) => rows.find((r) => r.label === label)!
@@ -34,5 +34,16 @@ describe('goalRows', () => {
 
   it('only lists goals the challenge defines', () => {
     expect(goalRows({ minSuccessRate: 0.9 }, emptyStats(), 0, false).map((r) => r.label)).toEqual(['Success rate'])
+  })
+})
+
+describe('starTargets', () => {
+  it('spells out what each extra star needs', () => {
+    expect(starTargets({ minSuccessRate: 0.99, starCostPerHour: 0.48, starP95Ms: 240 })).toBe('Stars: 2 need cost ≤ $0.48/hr, 3 also need p95 ≤ 240 ms.')
+  })
+  it('names only the targets a challenge has', () => {
+    expect(starTargets({ minSuccessRate: 0.99, starP95Ms: 240 })).toBe('Stars: 3 need p95 ≤ 240 ms.')
+    expect(starTargets({ minSuccessRate: 0.99, starCostPerHour: 1.05 })).toBe('Stars: 2 need cost ≤ $1.05/hr.')
+    expect(starTargets({ minSuccessRate: 0.99 })).toBe('')
   })
 })

@@ -85,6 +85,8 @@ export interface Goals {
   maxStaleReadPct?: number
   maxDuplicates?: number
   maxLostWrites?: number
+  starCostPerHour?: number
+  starP95Ms?: number
 }
 
 export interface Prediction {
