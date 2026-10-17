@@ -5,6 +5,7 @@ import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
 import { Stars } from './Stars'
+import { useEscapeKey } from './useEscapeKey'
 
 export function ScenarioPicker() {
   const open = useStore((s) => s.ui.picker)
@@ -18,6 +19,7 @@ export function ScenarioPicker() {
     if (!open) return
     fetchScenarios().then(setList).catch((e: Error) => setErr(e.message))
   }, [open])
+  useEscapeKey(open, () => setUi({ picker: false }))
   if (!open) return null
   const groups = ['Tutorial', 'Easy', 'Medium', 'Hard']
   return (
@@ -25,7 +27,7 @@ export function ScenarioPicker() {
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <h2>Challenges</h2>
-          <button className="x" onClick={() => setUi({ picker: false })} aria-label="Close">×</button>
+          <button className="x" autoFocus onClick={() => setUi({ picker: false })} aria-label="Close">×</button>
         </header>
         <p className="muted small">Each challenge starts with a broken system. Change it until it meets the goals. Earn up to three stars.</p>
         {err && <p className="bad">{err}</p>}

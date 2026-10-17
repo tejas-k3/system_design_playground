@@ -5,6 +5,7 @@ import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
 import { Stars } from './Stars'
+import { useEscapeKey } from './useEscapeKey'
 
 export function ResultModal() {
   const sc = useStore((s) => s.scenario)
@@ -14,6 +15,7 @@ export function ResultModal() {
   useEffect(() => {
     if (open) fetchScenarios().then(setList).catch(() => undefined)
   }, [open])
+  useEscapeKey(open && !!sc?.result, () => setUi({ result: false }))
   if (!sc?.result || !open) return null
   const r = sc.result
   const idx = list.findIndex((s) => s.id === sc.def.id)
@@ -41,7 +43,7 @@ export function ResultModal() {
         </table>
         {r.pass && <p className="debrief">{sc.def.debrief}</p>}
         <div className="row-btns end">
-          <button onClick={close}>Keep tweaking</button>
+          <button autoFocus onClick={close}>Keep tweaking</button>
           <button onClick={() => { close(); reset() }}>Try again</button>
           {r.pass && next && <button className="primary" onClick={() => { close(); loadScenario(next.id) }}>Next: {next.title}</button>}
         </div>

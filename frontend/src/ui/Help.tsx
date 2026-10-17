@@ -1,8 +1,10 @@
 import { useStore } from '../state/store'
+import { useEscapeKey } from './useEscapeKey'
 
 export function Help() {
   const open = useStore((s) => s.ui.help)
   const setUi = useStore((s) => s.setUi)
+  useEscapeKey(open, () => setUi({ help: false }))
   if (!open) return null
   const keys: [string, string][] = [
     ['Space', 'Play / pause'],
@@ -19,7 +21,7 @@ export function Help() {
   return (
     <div className="modal-back" role="dialog" aria-modal aria-label="Help" onClick={() => setUi({ help: false })}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <header className="modal-head"><h2>How it works</h2><button className="x" onClick={() => setUi({ help: false })} aria-label="Close">×</button></header>
+        <header className="modal-head"><h2>How it works</h2><button className="x" autoFocus onClick={() => setUi({ help: false })} aria-label="Close">×</button></header>
         <ol className="how">
           <li><b>Build.</b> Add users, servers, caches, databases, queues… and draw connections (drag from the round handle on a component's right edge).</li>
           <li><b>Run.</b> Press Play. Requests flow along the connections; bars show how busy each part is and why requests fail.</li>
