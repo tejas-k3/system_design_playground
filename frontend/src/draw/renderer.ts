@@ -4,7 +4,7 @@ import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
 import { clientRateLabel, fmtRate } from '../model/rates'
-import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, noteRect, nodeRect, HANDLE_R } from './geometry'
+import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, handlePos, handleRadius, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
 
@@ -24,6 +24,7 @@ export interface Scene {
   palette: Palette
   selection: Set<string>
   hover: string | null
+  handles: Set<string> // components that show their connection handle
   connect: { from: string; to: Pt; target: string | null } | null
   validTargets: Set<string>
   marquee: Rect | null
@@ -299,20 +300,23 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
 }
 
 function drawHandle(ctx: CanvasRenderingContext2D, sc: Scene, n: Node) {
-  const h = handlePos(nodeRect(n, sc.reg))
+  const zoom = sc.viewport.zoom
+  const h = handlePos(nodeRect(n, sc.reg), zoom)
+  const r = handleRadius(zoom)
+  const k = r / HANDLE_R
   ctx.fillStyle = sc.palette.card
   ctx.strokeStyle = sc.palette.accent
-  ctx.lineWidth = 2
+  ctx.lineWidth = 2 * Math.max(1, k)
   ctx.beginPath()
-  ctx.arc(h.x, h.y, HANDLE_R, 0, Math.PI * 2)
+  ctx.arc(h.x, h.y, r, 0, Math.PI * 2)
   ctx.fill()
   ctx.stroke()
   ctx.beginPath()
-  ctx.moveTo(h.x - 3.5, h.y)
-  ctx.lineTo(h.x + 3.5, h.y)
-  ctx.moveTo(h.x + 0.5, h.y - 3)
-  ctx.lineTo(h.x + 3.5, h.y)
-  ctx.lineTo(h.x + 0.5, h.y + 3)
+  ctx.moveTo(h.x - 3.5 * k, h.y)
+  ctx.lineTo(h.x + 3.5 * k, h.y)
+  ctx.moveTo(h.x + 0.5 * k, h.y - 3 * k)
+  ctx.lineTo(h.x + 3.5 * k, h.y)
+  ctx.lineTo(h.x + 0.5 * k, h.y + 3 * k)
   ctx.stroke()
 }
 
@@ -369,7 +373,7 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
     ctx.globalAlpha = 1
   }
   for (const n of sc.diagram.nodes) {
-    if (sc.hover === n.id || sc.selection.has(n.id)) drawHandle(ctx, sc, n)
+    if (sc.handles.has(n.id)) drawHandle(ctx, sc, n)
   }
   if (sc.connect) {
     const from = nodes.get(sc.connect.from)

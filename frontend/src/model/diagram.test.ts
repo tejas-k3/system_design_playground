@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { reg } from '../test/fixtures'
-import { connectableTargets, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
+import { connectableTargets, openOutputs, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
 
 
 
@@ -86,5 +86,25 @@ describe('helpers', () => {
     const withEdge = { nodes: [node, { id: 'd', kind: 'database', x: 0, y: 0, label: '', params: {} }], edges: [{ id: 'e', from: 'a', to: 'd', latencyMs: 5 }], notes: [] }
     expect(paramVisible(without, node, pool, reg.defaults('appServer'))).toBe(false)
     expect(paramVisible(withEdge, node, pool, reg.defaults('appServer'))).toBe(true)
+  })
+})
+
+describe('openOutputs', () => {
+  const d = {
+    nodes: [
+      { id: 'u', kind: 'client', x: 0, y: 0, label: 'u', params: {} },
+      { id: 'a', kind: 'appServer', x: 0, y: 0, label: 'a', params: {} },
+      { id: 'd', kind: 'database', x: 0, y: 0, label: 'd', params: {} },
+    ],
+    edges: [{ id: 'u>a', from: 'u', to: 'a', latencyMs: 5 }],
+    notes: [],
+  } as unknown as Parameters<typeof openOutputs>[1]
+
+  it('lists components that can send requests but do not yet send them anywhere', () => {
+    expect([...openOutputs(reg, d)]).toEqual(['a'])
+  })
+  it('is empty once everything that can connect is connected', () => {
+    const done = { ...d, edges: [...d.edges, { id: 'a>d', from: 'a', to: 'd', latencyMs: 5 }] }
+    expect(openOutputs(reg, done).size).toBe(0)
   })
 })

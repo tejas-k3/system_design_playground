@@ -13,6 +13,8 @@ export interface Pt {
 }
 
 export const HANDLE_R = 8
+/** On-screen radius the connection handle never drops below, so it stays easy to see and grab when zoomed out. */
+const HANDLE_MIN_SCREEN_R = 12
 export const NOTE_FONT = 18
 
 export function nodeRect(n: Node, reg: Reg): Rect {
@@ -21,7 +23,8 @@ export function nodeRect(n: Node, reg: Reg): Rect {
 }
 
 export const center = (r: Rect): Pt => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 })
-export const handlePos = (r: Rect): Pt => ({ x: r.x + r.w + HANDLE_R + 2, y: r.y + r.h / 2 })
+export const handleRadius = (zoom: number): number => Math.max(HANDLE_R, HANDLE_MIN_SCREEN_R / zoom)
+export const handlePos = (r: Rect, zoom: number): Pt => ({ x: r.x + r.w + handleRadius(zoom) + 2, y: r.y + r.h / 2 })
 
 export function inRect(p: Pt, r: Rect, pad = 0): boolean {
   return p.x >= r.x - pad && p.x <= r.x + r.w + pad && p.y >= r.y - pad && p.y <= r.y + r.h + pad
@@ -92,8 +95,8 @@ export function hitTest(
   for (const id of handleFor) {
     const n = byId.get(id)
     if (n) {
-      const h = handlePos(nodeRect(n, reg))
-      if (Math.hypot(p.x - h.x, p.y - h.y) <= HANDLE_R + 4 / zoom) return { type: 'handle', id }
+      const h = handlePos(nodeRect(n, reg), zoom)
+      if (Math.hypot(p.x - h.x, p.y - h.y) <= handleRadius(zoom) + 4 / zoom) return { type: 'handle', id }
     }
   }
   for (let i = d.notes.length - 1; i >= 0; i--) if (inRect(p, noteRect(d.notes[i], measure))) return { type: 'note', id: d.notes[i].id }
