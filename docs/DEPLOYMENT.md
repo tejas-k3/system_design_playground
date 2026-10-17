@@ -26,6 +26,7 @@ Every setting is a flag or an environment variable (the flag wins).
 | `-data-dir` | `DATA_DIR` | *(none; `/data` in the image)* | Where shared designs are stored; empty keeps them in memory only |
 | `-max-designs` | `MAX_DESIGNS` | `5000` | Designs kept before the oldest are dropped |
 | `-max-sessions` | `MAX_SESSIONS` | `64` | Concurrent live simulations; more get `503` with `Retry-After` |
+| `-max-runs` | `MAX_RUNS` | one per CPU core (min 2) | Concurrent headless `/api/run` simulations (each can hold ~12 MB); more get `503` with `Retry-After` |
 | `-idle-timeout` | | `10m` | Close a stopped or paused session after this much silence |
 | `-origins` | `ALLOWED_ORIGINS` | `localhost:*,127.0.0.1:*` | Extra WebSocket origins to accept (comma-separated host patterns) |
 | `-healthcheck` | | | Probe a running server on `-addr` and exit 0 only if healthy |
@@ -71,7 +72,7 @@ Stopped and paused sessions cost almost nothing.
 
 - `GET /api/healthz` returns `{"status":"ok"}`; use it for load balancer and orchestrator probes.
 - `GET /api/metrics` is Prometheus text: `sdp_sessions_active`, `sdp_sessions_total`, `sdp_sessions_refused_total`
-  (a rising value means `MAX_SESSIONS` is too low or you are being hammered), `sdp_runs_total`,
+  (a rising value means `MAX_SESSIONS` is too low or you are being hammered), `sdp_runs_total`, `sdp_runs_refused_total`,
   `sdp_designs_saved_total`, `sdp_designs_rate_limited_total` and `sdp_designs_stored`.
   Expose it only to your monitoring network.
 - Requests under `/api` are logged with method, path, status and duration.
