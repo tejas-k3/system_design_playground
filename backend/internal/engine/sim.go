@@ -106,6 +106,8 @@ type node struct {
 
 	// client
 	arrivalGen int
+	burstOn    bool    // bursty client: inside a rush now
+	burstUntil float64 // bursty client: when the current phase ends
 	keys       KeySampler
 
 	// cache / cdn

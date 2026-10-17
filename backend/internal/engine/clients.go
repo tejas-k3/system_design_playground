@@ -51,7 +51,47 @@ func (s *Sim) trafficStopped() bool {
 
 func (s *Sim) startClient(n *node) {
 	n.arrivalGen++
+	if n.s("arrival") == "closed" {
+		s.startCrowd(n, n.arrivalGen)
+		return
+	}
 	s.nextArrival(n, n.arrivalGen)
+}
+
+// startCrowd runs a closed-loop population: each user sends one request, waits for it to finish (success, failure or
+// give-up, retries included), thinks for a random time, and goes again. Offered load therefore falls as latency rises.
+func (s *Sim) startCrowd(n *node, gen int) {
+	think := func() float64 { return s.rng.Exp() * n.f("thinkMs") }
+	var user func()
+	user = func() {
+		if gen != n.arrivalGen || n.removed || n.down || s.trafficStopped() {
+			return
+		}
+		s.createLogical(n).after = func() { s.after(think(), user) }
+	}
+	for i := 0; i < int(n.f("users")); i++ {
+		s.after(think()+1, user) // staggered starts, as if the users had been there a while
+	}
+}
+
+// burstMultiplier scales a bursty client's rate: rushes take a fifth of the time at burstFactor times the average, and the
+// quiet phases run slower so that the long-run average is unchanged.
+func (s *Sim) burstMultiplier(n *node) float64 {
+	factor := math.Min(5, math.Max(1.5, n.f("burstFactor")))
+	mean := math.Max(0.5, n.f("burstSec")) * 1000
+	for s.now >= n.burstUntil {
+		n.burstOn = !n.burstOn
+		phase := mean
+		if !n.burstOn {
+			phase = mean * 4
+		}
+		// Erlang-4 phase lengths: random, but regular enough that the long-run average does not wander
+		n.burstUntil = math.Max(n.burstUntil, s.now) + (s.rng.Exp()+s.rng.Exp()+s.rng.Exp()+s.rng.Exp())/4*phase
+	}
+	if n.burstOn {
+		return factor
+	}
+	return math.Max(0.05, (1-0.2*factor)/0.8)
 }
 
 func (s *Sim) nextArrival(n *node, gen int) {
@@ -59,11 +99,21 @@ func (s *Sim) nextArrival(n *node, gen int) {
 		return
 	}
 	r := s.rate(n, s.now)
+	if n.s("arrival") == "bursty" {
+		r *= s.burstMultiplier(n)
+	}
 	if r <= 0 {
 		s.after(100, func() { s.nextArrival(n, gen) })
 		return
 	}
-	s.after(s.rng.Exp()/r*1000, func() {
+	gap := s.rng.Exp() / r * 1000
+	if n.s("arrival") == "bursty" && s.now+gap > n.burstUntil {
+		// the rate changes before this arrival would happen: redraw at the change (exponential gaps are memoryless),
+		// otherwise a long quiet-phase gap would swallow the start of the next rush and the average would sag
+		s.after(math.Max(1, n.burstUntil-s.now), func() { s.nextArrival(n, gen) })
+		return
+	}
+	s.after(gap, func() {
 		if gen != n.arrivalGen || n.removed || n.down || s.trafficStopped() {
 			return
 		}
@@ -84,6 +134,7 @@ type logical struct {
 	wl        int
 	hash      uint32
 	tr        *tracer
+	after     func() // called once, when the request is resolved (closed-loop users think, then ask again)
 }
 
 type attempt struct {
@@ -113,7 +164,7 @@ func workloadOf(n *node) int {
 	return wlKV
 }
 
-func (s *Sim) createLogical(c *node) {
+func (s *Sim) createLogical(c *node) *logical {
 	s.logicalSeq++
 	lg := &logical{
 		id: s.logicalSeq, client: c, createdAt: s.now,
@@ -130,6 +181,7 @@ func (s *Sim) createLogical(c *node) {
 	s.created.Push(s.now, true, 0)
 	lg.tr = s.startTrace(lg)
 	s.startAttempt(lg)
+	return lg
 }
 
 func (s *Sim) startAttempt(lg *logical) {
@@ -187,6 +239,9 @@ func (s *Sim) resolve(lg *logical, res Result) {
 		return
 	}
 	lg.resolved = true
+	if lg.after != nil {
+		defer lg.after()
+	}
 	s.unresolved--
 	if lg.tr != nil {
 		s.finishTrace(lg, res)
