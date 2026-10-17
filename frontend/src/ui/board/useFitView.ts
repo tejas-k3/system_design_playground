@@ -4,7 +4,6 @@ import { measureText } from '../../draw/renderer'
 import { fitViewport } from '../../model/fit'
 import { isNarrow } from '../../model/responsive'
 import { useStore } from '../../state/store'
-import type { CanvasSize } from './useCanvasSize'
 
 const PADDING = 80
 const PADDING_NARROW = 24 // phones have no room to spare
@@ -12,13 +11,19 @@ const PADDING_NARROW = 24 // phones have no room to spare
 /**
  * Returns a function that zooms and centres the viewport on the whole design, and runs it when
  * a fit is requested (toolbar, F key) or a different challenge is opened.
+ *
+ * The canvas is measured at the moment of fitting, not read from a cached size: opening a challenge
+ * mounts a side panel in the same render that triggers the fit, and the resize that follows has not
+ * been observed yet, so a cached size is still the old, wider one and the design ends up clipped.
  */
-export function useFitView(size: RefObject<CanvasSize>): () => void {
+export function useFitView(wrap: RefObject<HTMLElement | null>): () => void {
   const fit = useCallback(() => {
     const st = useStore.getState()
-    if (!st.reg) return
-    st.setViewport(fitViewport(boundsOf(st.diagram, st.reg, measureText), size.current, isNarrow() ? PADDING_NARROW : PADDING))
-  }, [size])
+    const el = wrap.current
+    if (!st.reg || !el) return
+    const { width, height } = el.getBoundingClientRect()
+    st.setViewport(fitViewport(boundsOf(st.diagram, st.reg, measureText), { w: width, h: height }, isNarrow() ? PADDING_NARROW : PADDING))
+  }, [wrap])
 
   const fitRequest = useStore((s) => s.fitRequest)
   const scenarioId = useStore((s) => s.scenario?.def.id)
