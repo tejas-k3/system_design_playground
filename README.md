@@ -201,3 +201,7 @@ and one client may share 20 a minute.
 
 `make test` runs `go vet` + Go tests (engine mechanisms, scenario calibration, API and WebSocket
 sessions) and the frontend type-check + unit tests.
+
+## License
+
+[MIT](LICENSE) © 2026 Tejas Kothari.
