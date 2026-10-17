@@ -3,7 +3,7 @@
 Sketch a system, send traffic, watch it break, then fix it. A browser-based simulator for learning
 system design: drag servers, caches, databases, queues and more onto a canvas, wire them together,
 press Play, and see queues fill, connection pools run dry, retries pile up and stale reads appear.
-Thirteen guided challenges start from a broken design and score your fix from one to three stars.
+Guided challenges start from a broken design and score your fix from one to three stars.
 
 ```
 frontend/   React + TypeScript + Vite + zustand + roughjs (hand-drawn canvas)
