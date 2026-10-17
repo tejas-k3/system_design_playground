@@ -44,7 +44,10 @@ export function startBridge(): () => void {
     const st = useStore.getState()
     st.setConnection(state)
     if (state === 'open') sendInit()
-    if (state === 'closed' && st.sim.status === 'running') {
+    if (state === 'closed' && socket?.asleep) {
+      st.setSim({ status: 'stopped' })
+      st.toast('Disconnected after being idle. Press Play to reconnect.', 'info', 5000)
+    } else if (state === 'closed' && st.sim.status === 'running') {
       st.setSim({ status: 'paused' })
       st.toast('Lost connection to the simulator. Reconnecting…', 'warn')
     }
@@ -73,33 +76,38 @@ export function startBridge(): () => void {
 
 // ---- commands ---------------------------------------------------------------------------
 
-function ready(): boolean {
-  if (socket?.open) return true
-  useStore.getState().toast('Not connected to the simulator yet', 'warn')
-  return false
+/** Run a command once connected, waking a dormant socket (or waiting for the first connect). */
+function withSocket(fn: (sock: SimSocket) => void): void {
+  const sock = socket
+  if (!sock) return
+  if (sock.open) return fn(sock)
+  useStore.getState().toast('Connecting to the simulator…', 'info')
+  sock.whenOpen(() => fn(sock))
 }
 
 export function play(): void {
-  if (!ready()) return
-  const s = useStore.getState()
-  const fresh = s.sim.status === 'stopped' || !!s.scenario?.result
-  if (fresh) {
-    useStore.getState().setUi({ welcome: false })
-    sendInit()
-  }
-  socket!.send({ type: 'play' })
+  withSocket((sock) => {
+    const s = useStore.getState()
+    if (s.sim.status === 'stopped' || !!s.scenario?.result) {
+      s.setUi({ welcome: false })
+      sendInit()
+    }
+    sock.send({ type: 'play' })
+  })
 }
 
-export const pause = () => ready() && socket!.send({ type: 'pause' })
+export const pause = () => withSocket((sock) => sock.send({ type: 'pause' }))
+
 export function reset(): void {
   useStore.getState().clearRun()
-  if (ready()) socket!.send({ type: 'reset' })
+  if (socket?.open) socket.send({ type: 'reset' }) // nothing to reset on a closed connection
 }
+
 export function step(): void {
-  if (!ready()) return
-  const s = useStore.getState()
-  if (s.sim.status === 'stopped') sendInit()
-  socket!.send({ type: 'step' })
+  withSocket((sock) => {
+    if (useStore.getState().sim.status === 'stopped') sendInit()
+    sock.send({ type: 'step' })
+  })
 }
 export const togglePlay = () => (useStore.getState().sim.status === 'running' ? pause() : play())
 export const crashNode = (nodeId: string) => socket?.send({ type: 'crash', nodeId })
