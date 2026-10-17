@@ -1,8 +1,6 @@
 import { SPEEDS } from '../model/diagram'
-import { pause, play, reset, step, togglePlay } from '../sim/bridge'
+import { reset, step, togglePlay } from '../sim/bridge'
 import { useStore } from '../state/store'
-
-const fmtSpeed = (s: number) => (s < 1 ? `${s}×` : `${s}×`)
 
 export function Toolbar() {
   const tool = useStore((s) => s.tool)
@@ -21,7 +19,6 @@ export function Toolbar() {
   const setUi = useStore((s) => s.setUi)
   const ui = useStore((s) => s.ui)
   const connection = useStore((s) => s.connection)
-  const scenario = useStore((s) => s.scenario)
   const requestFit = useStore((s) => s.requestFit)
   const running = status === 'running'
 
@@ -71,7 +68,7 @@ export function Toolbar() {
           <span className="sr">Speed</span>
           <select value={speed} onChange={(e) => setSim({ speed: Number(e.target.value) })} aria-label="Simulation speed">
             {SPEEDS.map((s) => (
-              <option key={s} value={s}>{fmtSpeed(s)}</option>
+              <option key={s} value={s}>{s}×</option>
             ))}
           </select>
         </label>
@@ -81,7 +78,7 @@ export function Toolbar() {
       <div className="spacer" />
       <span className="pill" title="Estimated hourly cost of this design">${cost.toFixed(2)}/hr</span>
       <button className="wide" onClick={() => setUi({ picker: true })}>
-        {scenario ? 'Challenges' : 'Challenges'}
+        Challenges
       </button>
       <button onClick={() => setUi({ library: !ui.library })} title="Toggle library" aria-label="Toggle library" className={ui.library ? 'on' : ''}>
         <Icon d="M4 6h16M4 12h16M4 18h16" />
@@ -110,4 +107,3 @@ export function Icon({ d, fill }: { d: string; fill?: boolean }) {
     </svg>
   )
 }
-export { pause, play }

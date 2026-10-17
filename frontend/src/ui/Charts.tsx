@@ -98,12 +98,12 @@ export function Charts() {
   const [open, setOpen] = useState(true)
   const series = useStore((s) => s.stats.series)
   const run = useStore((s) => s.stats.global.run)
+  const inFlight = useStore((s) => s.stats.global.inFlight)
   const theme = useStore((s) => s.theme)
   const status = useStore((s) => s.sim.status)
   const p = palettes[theme]
   const total = run.resolved
-  const okLines = useRef<Line[]>([])
-  okLines.current = [
+  const okLines: Line[] = [
     { label: 'ok', color: p.ok, value: (s) => s.okRps },
     { label: 'errors', color: p.bad, value: (s) => s.errRps },
   ]
@@ -122,7 +122,7 @@ export function Charts() {
           <Tile label="Success" value={total ? `${(Math.floor((run.ok / total) * 1000) / 10).toFixed(1)}%` : '—'} bad={total > 20 && run.ok / total < 0.95} />
           <Tile label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
           <Tile label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
-          <Tile label="In flight" value={String(useStore.getState().stats.global.inFlight)} />
+          <Tile label="In flight" value={String(inFlight)} />
         </span>
       </div>
       {open && (
@@ -131,7 +131,7 @@ export function Charts() {
             <p className="muted center">Press Play to start sending traffic.</p>
           ) : (
             <>
-              <Chart title="Throughput" unit="req/s" lines={okLines.current} series={series} theme={theme} />
+              <Chart title="Throughput" unit="req/s" lines={okLines} series={series} theme={theme} />
               <Chart title="Latency" unit="ms" lines={latLines} series={series} theme={theme} />
               <Chart title="Success" unit="%" lines={succLines} series={series} theme={theme} fixedMax={100} fmt={(v) => `${Math.round(v)}`} />
               <div className="chart errors-box">
