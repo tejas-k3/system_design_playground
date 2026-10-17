@@ -15,10 +15,11 @@ export function Inspector() {
   const open = useStore((s) => s.ui.inspector)
   const setUi = useStore((s) => s.setUi)
   const reg = useStore((s) => s.reg)
-  // below the wide layout the inspector is an overlay (drawer or bottom sheet): bring it up when something gets selected
+  // below the wide layout the inspector is an overlay (drawer or bottom sheet): bring it up when a component gets selected.
+  // A freshly drawn connection is selected too, but covering the canvas then would hide the very thing just built.
   useEffect(() => {
-    if (isCompact() && selection.length > 0) setUi({ inspector: true })
-  }, [selection, setUi])
+    if (isCompact() && selection.some((id) => diagram.nodes.some((n) => n.id === id))) setUi({ inspector: true })
+  }, [selection, diagram.nodes, setUi])
   if (!reg) return null
   if (!open) {
     return (
