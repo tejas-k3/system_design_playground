@@ -5,3 +5,7 @@ backend/bin/
 .DS_Store
 .env
 coverage/
+
+# working notes (review reports, plans, findings) stay on the local disk only; README.md and docs/DEPLOYMENT.md are the published docs
+docs/**/*.md
+!docs/DEPLOYMENT.md
