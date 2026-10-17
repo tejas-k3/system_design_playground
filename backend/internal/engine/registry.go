@@ -64,6 +64,11 @@ func variability(group string) ParamSpec {
 		opt("steady", "Steady"), opt("exponential", "Exponential"), opt("heavy", "Heavy-tailed")).adv()
 }
 
+// ttlJitter spreads entry lifetimes so a whole cache does not expire in the same instant.
+func ttlJitter() ParamSpec {
+	return num("ttlJitterPct", "TTL jitter", "Freshness", 0, 0, 90, 5, "%", "Each entry lives its TTL plus or minus this much, so entries do not all expire together.").adv()
+}
+
 func opt(v, l string) Option { return Option{Value: v, Label: l} }
 
 func (p ParamSpec) showIf(key string, in ...string) ParamSpec {
@@ -166,6 +171,8 @@ func init() {
 				sel("writePolicy", "On writes", "Freshness", "none", "What happens to cached copies when data is written.",
 					opt("none", "Do nothing"), opt("invalidate", "Invalidate"), opt("writeThrough", "Write through")),
 				num("ttlSec", "Time to live", "Freshness", 0, 0, 3600, 1, "s", "Entries expire after this long (0 = never)."),
+				ttlJitter(),
+				flag("coalesce", "Share concurrent misses", "Freshness", false, "When several requests miss on the same key at once, only one goes to the data store and the rest wait for its answer.").adv(),
 				flag("startWarm", "Start warm", "Memory", true, "Begin the run with popular items already cached."),
 				num("latencyMs", "Latency", "Speed", 1, 0.1, 50, 0.1, "ms", "Time per lookup.").adv(),
 			},
@@ -227,6 +234,7 @@ func init() {
 			Params: []ParamSpec{
 				num("capacityItems", "Capacity", "Memory", 5000, 0, 200000, 100, "items", "How many items it can hold."),
 				num("ttlSec", "Time to live", "Freshness", 60, 0, 3600, 1, "s", "Entries expire after this long."),
+				ttlJitter(),
 				flag("startWarm", "Start warm", "Memory", true, "Begin with popular items cached."),
 			},
 			cost: func(Params) float64 { return 0.1 },

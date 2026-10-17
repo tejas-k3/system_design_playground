@@ -275,11 +275,29 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 			}
 			n.c.miss++
 			if e := s.readThroughEdge(n); e != nil {
+				coalesce := n.b("coalesce")
+				if coalesce {
+					if waiters, busy := n.fetching[c.key]; busy { // someone is already fetching this key: wait for their answer
+						n.fetching[c.key] = append(waiters, func(res Result) { s.passBack(n, res, cb) })
+						return
+					}
+					if n.fetching == nil {
+						n.fetching = map[int][]func(Result){}
+					}
+					n.fetching[c.key] = nil
+				}
 				s.callCmd(n, e, c, cmdRead, 0, func(res Result) {
 					if res.OK && res.Ver >= 0 {
 						n.c.evict += n.store.Set(s.now, c.key, res.Ver)
 					}
 					s.passBack(n, res, cb)
+					if coalesce {
+						waiters := n.fetching[c.key]
+						delete(n.fetching, c.key)
+						for _, w := range waiters {
+							w(res)
+						}
+					}
 				})
 				return
 			}

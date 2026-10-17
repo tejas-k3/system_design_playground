@@ -16,6 +16,7 @@ type Store struct {
 	policy string
 	cap    int
 	ttlMs  float64
+	jitter float64 // 0..0.9: each entry lives ttl*(1 +/- jitter), spread deterministically by key and time
 	rng    *RNG
 	m      map[int]*entry
 	ll     *list.List         // lru / fifo: front = newest
@@ -36,9 +37,10 @@ func NewStore(policy string, capacity int, ttlMs float64, rng *RNG) *Store {
 	return &Store{policy: policy, cap: capacity, ttlMs: ttlMs, rng: rng, m: map[int]*entry{}, ll: list.New(), freq: map[int]*list.List{}, minF: 1}
 }
 
-func (s *Store) Size() int         { return len(s.m) }
-func (s *Store) Capacity() int     { return s.cap }
-func (s *Store) SetTTL(ms float64) { s.ttlMs = ms }
+func (s *Store) Size() int           { return len(s.m) }
+func (s *Store) Capacity() int       { return s.cap }
+func (s *Store) SetTTL(ms float64)   { s.ttlMs = ms }
+func (s *Store) SetJitter(f float64) { s.jitter = f }
 
 // SetCapacity resizes the store, evicting if it shrank. Returns evictions.
 func (s *Store) SetCapacity(c int) int {
@@ -80,7 +82,12 @@ func (s *Store) Set(now float64, key, ver int) int {
 	}
 	exp := 0.0
 	if s.ttlMs > 0 {
-		exp = now + s.ttlMs
+		life := s.ttlMs
+		if s.jitter > 0 {
+			u := float64(Hash32(uint32(key)*0x9e3779b1^uint32(now))) / 4294967296
+			life *= 1 + s.jitter*(2*u-1)
+		}
+		exp = now + life
 	}
 	if e, ok := s.m[key]; ok {
 		e.ver, e.exp = ver, exp
