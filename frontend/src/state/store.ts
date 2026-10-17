@@ -24,7 +24,7 @@ export type Connection = 'connecting' | 'open' | 'closed'
 
 export const emptyStats = (): Stats => ({ global: { now: 0, inFlight: 0, cost: 0, run: emptyRun() }, nodes: {}, edges: {}, series: [] })
 function emptyRun() {
-  return { resolved: 0, pending: 0, ok: 0, failed: 0, p50: 0, p95: 0, p99: 0, mean: 0, errors: {}, conflicts: 0, freshReads: 0, staleReads: 0, duplicates: 0 }
+  return { resolved: 0, pending: 0, ok: 0, failed: 0, p50: 0, p95: 0, p99: 0, mean: 0, errors: {}, conflicts: 0, freshReads: 0, staleReads: 0, duplicates: 0, lostWrites: 0 }
 }
 
 const HISTORY = 100

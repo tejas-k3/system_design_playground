@@ -25,6 +25,13 @@ describe('goalRows', () => {
     expect(['Success rate', 'p95 latency', 'Double bookings', 'Cost'].map((l) => row(bad, l).state)).toEqual(['fail', 'fail', 'fail', 'fail'])
   })
 
+  it('tracks writes lost in a crash against its limit', () => {
+    const g = { minSuccessRate: 0.9, maxLostWrites: 400 }
+    expect(row(goalRows(g, stats({ lostWrites: 226 }), 0, true), 'Writes lost in a crash')).toMatchObject({ state: 'pass', actual: '226' })
+    expect(row(goalRows(g, stats({ lostWrites: 4777 }), 0, true), 'Writes lost in a crash').state).toBe('fail')
+    expect(row(goalRows(g, emptyStats(), 0, false), 'Writes lost in a crash').state).toBe('pending')
+  })
+
   it('only lists goals the challenge defines', () => {
     expect(goalRows({ minSuccessRate: 0.9 }, emptyStats(), 0, false).map((r) => r.label)).toEqual(['Success rate'])
   })

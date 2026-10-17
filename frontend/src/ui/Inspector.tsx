@@ -54,6 +54,7 @@ function Overview({ count }: { count: number }) {
             <dt>Requests</dt><dd>{run.resolved.toLocaleString()}</dd>
             <dt>Succeeded</dt><dd>{pct(run.ok / Math.max(1, total))}</dd>
             <dt>p50 / p95</dt><dd>{Math.round(run.p50)} / {Math.round(run.p95)} ms</dd>
+            {run.lostWrites > 0 && (<><dt>Writes lost in a crash</dt><dd className="bad">{run.lostWrites.toLocaleString()}</dd></>)}
           </dl>
           <Errors errors={run.errors} total={run.failed} />
         </>

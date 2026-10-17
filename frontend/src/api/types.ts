@@ -84,6 +84,7 @@ export interface Goals {
   maxConflicts?: number
   maxStaleReadPct?: number
   maxDuplicates?: number
+  maxLostWrites?: number
 }
 
 export interface Prediction {
@@ -168,6 +169,7 @@ export interface RunStats {
   freshReads: number
   staleReads: number
   duplicates: number
+  lostWrites: number
   jobs?: JobStats
 }
 export interface Stats {
