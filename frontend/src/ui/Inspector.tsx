@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
 import { connectableTargets, paramVisible } from '../model/diagram'
 import { isCompact } from '../model/responsive'
+import { pct, successRate } from '../model/goals'
 import { crashNode, restartNode } from '../sim/bridge'
 import { useStore } from '../state/store'
 
-const pct = (v: number) => `${Math.round(v * 100)}%`
+const whole = (v: number) => `${Math.round(v * 100)}%`
 const rate = (v: number) => (v >= 100 ? Math.round(v).toString() : v.toFixed(1))
 
 export function Inspector() {
@@ -57,7 +58,7 @@ function Overview({ count }: { count: number }) {
           <h3>This run</h3>
           <dl className="kv">
             <dt>Requests</dt><dd>{run.resolved.toLocaleString()}</dd>
-            <dt>Succeeded</dt><dd>{pct(run.ok / Math.max(1, total))}</dd>
+            <dt>Succeeded</dt><dd>{pct(successRate(run) ?? 0)}</dd>
             <dt>p50 / p95</dt><dd>{Math.round(run.p50)} / {Math.round(run.p95)} ms</dd>
             {run.lostWrites > 0 && (<><dt>Writes lost in a crash</dt><dd className="bad">{run.lostWrites.toLocaleString()}</dd></>)}
           </dl>
@@ -209,11 +210,11 @@ function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
         <dt>Failed</dt><dd className={s.err > 0.5 ? 'bad' : ''}>{rate(s.err)}/s</dd>
         {kind !== 'client' && kind !== 'loadBalancer' && (
           <>
-            <dt>Busy</dt><dd>{pct(s.util)}{s.cap ? ` · ${s.busy}/${s.cap}` : ''}</dd>
+            <dt>Busy</dt><dd>{whole(s.util)}{s.cap ? ` · ${s.busy}/${s.cap}` : ''}</dd>
             <dt>Waiting</dt><dd>{s.qLen}</dd>
           </>
         )}
-        {s.hitRate >= 0 && (<><dt>Hit rate</dt><dd>{pct(s.hitRate)}</dd></>)}
+        {s.hitRate >= 0 && (<><dt>Hit rate</dt><dd>{whole(s.hitRate)}</dd></>)}
         {s.size !== undefined && s.size > 0 && (<><dt>Cached</dt><dd>{s.size.toLocaleString()}</dd></>)}
         {s.extra?.poolWaiting !== undefined && (<><dt>Waiting for a DB connection</dt><dd>{s.extra.poolWaiting}</dd></>)}
         {s.extra?.openConns !== undefined && (<><dt>Open connections</dt><dd className={s.extra.openConns >= (s.extra.maxConns ?? 1e9) ? 'bad' : ''}>{s.extra.openConns} / {s.extra.maxConns}</dd></>)}

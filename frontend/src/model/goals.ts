@@ -7,8 +7,14 @@ export interface GoalRow {
   state: 'pass' | 'fail' | 'pending'
 }
 
-const pct = (f: number) => `${(Math.floor(f * 1000) / 10).toFixed(1)}%`
+export const pct = (f: number) => `${(Math.floor(f * 1000) / 10).toFixed(1)}%`
 const ms = (v: number) => (v >= 10000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`)
+
+/** Share of finished requests that succeeded (null before any finish). The one success figure shown anywhere on screen;
+ *  requests still in flight count once they resolve, and the final verdict agrees because nothing is pending by then. */
+export function successRate(r: Stats['global']['run']): number | null {
+  return r.resolved > 0 ? r.ok / r.resolved : null
+}
 
 /** What the extra stars need, in words ('' when a challenge has no star targets). */
 export function starTargets(g: Goals): string {
@@ -21,10 +27,9 @@ export function starTargets(g: Goals): string {
 /** Live read-out of how a run is tracking against the goals (the server gives the final verdict). */
 export function goalRows(g: Goals, stats: Stats, cost: number, started: boolean): GoalRow[] {
   const r = stats.global.run
-  const total = r.resolved + r.pending
   const rows: GoalRow[] = []
-  const rate = total > 0 ? r.ok / total : 0
-  rows.push({ label: 'Success rate', target: `≥ ${pct(g.minSuccessRate)}`, actual: total ? pct(rate) : '—', state: !started || !total ? 'pending' : rate >= g.minSuccessRate ? 'pass' : 'fail' })
+  const rate = successRate(r)
+  rows.push({ label: 'Success rate', target: `≥ ${pct(g.minSuccessRate)}`, actual: rate === null ? '—' : pct(rate), state: !started || rate === null ? 'pending' : rate >= g.minSuccessRate ? 'pass' : 'fail' })
   const lat = (label: string, limit: number | undefined, v: number) => {
     if (limit === undefined) return
     rows.push({ label, target: `≤ ${ms(limit)}`, actual: r.ok ? ms(v) : '—', state: !started || !r.ok ? 'pending' : v <= limit ? 'pass' : 'fail' })

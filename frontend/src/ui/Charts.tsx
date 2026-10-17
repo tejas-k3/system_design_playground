@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SeriesPoint } from '../api/types'
 import { palettes } from '../draw/theme'
+import { pct, successRate } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { useStore } from '../state/store'
 import { Errors } from './Inspector'
@@ -106,6 +107,7 @@ export function Charts() {
   const status = useStore((s) => s.sim.status)
   const p = palettes[theme]
   const total = run.resolved
+  const rate = successRate(run)
   const okLines: Line[] = [
     { label: 'ok', color: p.ok, value: (s) => s.okRps },
     { label: 'errors', color: p.bad, value: (s) => s.errRps },
@@ -126,7 +128,7 @@ export function Charts() {
         </div>
         <span className="tiles">
           <Tile label="Requests" value={run.resolved.toLocaleString()} />
-          <Tile label="Success" value={total ? `${(Math.floor((run.ok / total) * 1000) / 10).toFixed(1)}%` : '—'} bad={total > 20 && run.ok / total < 0.95} />
+          <Tile label="Success" value={rate === null ? '—' : pct(rate)} bad={total > 20 && (rate ?? 1) < 0.95} />
           <Tile label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
           <Tile label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
           <Tile label="In flight" value={String(inFlight)} />
