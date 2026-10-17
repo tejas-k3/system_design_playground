@@ -318,6 +318,38 @@ func TestWebSocketReturnsRequestTraces(t *testing.T) {
 	}
 }
 
+func TestNodeSeriesAnswersWithOneSecondPointsAndNeverNull(t *testing.T) {
+	ts := newTestServer(t)
+	c, ctx := dial(t, ts)
+	sc := scenarios.Get("opening-night")
+	readType(t, c, ctx, "frame")
+
+	sendMsg(t, c, ctx, clientMsg{Type: "nodeSeries", NodeID: "app1"})
+	var empty nodeSeriesMsg
+	if err := json.Unmarshal(readType(t, c, ctx, "nodeSeries"), &empty); err != nil || empty.Points == nil || empty.NodeID != "app1" {
+		t.Fatalf("before any run the answer is an empty list, not null, naming the node: %+v err=%v", empty, err)
+	}
+
+	sendMsg(t, c, ctx, clientMsg{Type: "init", Diagram: &sc.Solution})
+	for i := 0; i < 50; i++ { // 5 simulated seconds
+		sendMsg(t, c, ctx, clientMsg{Type: "step"})
+	}
+	var id string
+	for _, n := range sc.Solution.Nodes {
+		if n.Kind == engine.KAppServer {
+			id = n.ID
+		}
+	}
+	sendMsg(t, c, ctx, clientMsg{Type: "nodeSeries", NodeID: id})
+	var got nodeSeriesMsg
+	if err := json.Unmarshal(readType(t, c, ctx, "nodeSeries"), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.NodeID != id || len(got.Points) < 4 || len(got.Points) > 5 {
+		t.Fatalf("5 simulated seconds should give 4-5 points for %s, got %d (%+v)", id, len(got.Points), got.NodeID)
+	}
+}
+
 func TestSharedDesignsRoundTripAreSanitizedAndGuarded(t *testing.T) {
 	ts := newTestServer(t)
 	sc := scenarios.Get("opening-night")

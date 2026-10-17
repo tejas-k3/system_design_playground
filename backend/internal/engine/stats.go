@@ -115,15 +115,7 @@ func (s *Sim) Snapshot() Stats {
 		if n.removed {
 			continue
 		}
-		var sum counters
-		for i := range n.ring {
-			sum.add(&n.ring[i])
-		}
-		var u float64
-		for _, v := range n.util {
-			u += v
-		}
-		u /= ringSize
+		sum, u := s.nodeWindow(n)
 		ns := NodeStats{
 			ID: n.id, Arr: float64(sum.arr) / span, Ok: float64(sum.ok) / span, Err: float64(sum.err) / span,
 			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted, Instances: s.scaledInstances(n),
@@ -230,3 +222,57 @@ func (s *Sim) Snapshot() Stats {
 
 // RunSnapshot returns just the run totals (cheap, used by scoring).
 func (s *Sim) RunSnapshot() RunStats { return s.Snapshot().Global.Run }
+
+// nodeWindow sums a node's counters over the stats window (one second) and averages its utilisation.
+func (s *Sim) nodeWindow(n *node) (counters, float64) {
+	var sum counters
+	for i := range n.ring {
+		sum.add(&n.ring[i])
+	}
+	var u float64
+	for _, v := range n.util {
+		u += v
+	}
+	return sum, u / ringSize
+}
+
+// nodeHistory is how many one-second points of per-node history are kept.
+const nodeHistory = 120
+
+// NodePoint is one second of a node's life: for the timelines shown when a component is selected.
+type NodePoint struct {
+	T         float64 `json:"t"` // seconds
+	Util      float64 `json:"util"`
+	QLen      int     `json:"qLen"`
+	Arr       float64 `json:"arr"`
+	Err       float64 `json:"err"`
+	Instances int     `json:"instances,omitempty"`
+}
+
+// recordNodePoints appends one point per node; called once per simulated second.
+func (s *Sim) recordNodePoints() {
+	span := s.ringSpan()
+	for _, n := range s.order {
+		if n.removed {
+			continue
+		}
+		sum, u := s.nodeWindow(n)
+		q := len(n.q) - n.qh
+		if n.kind == KQueue {
+			q = len(n.jobs) - n.jh
+		}
+		n.hist = append(n.hist, NodePoint{T: s.now / 1000, Util: math.Min(1, u), QLen: q, Arr: float64(sum.arr) / span, Err: float64(sum.err) / span, Instances: s.scaledInstances(n)})
+		if len(n.hist) > nodeHistory {
+			n.hist = append([]NodePoint(nil), n.hist[len(n.hist)-nodeHistory:]...)
+		}
+	}
+}
+
+// NodeSeries returns the recorded history of one node (empty, never nil, for an unknown node).
+func (s *Sim) NodeSeries(id string) []NodePoint {
+	n := s.nodes[id]
+	if n == nil {
+		return []NodePoint{}
+	}
+	return append([]NodePoint{}, n.hist...)
+}

@@ -89,12 +89,13 @@ type node struct {
 	epoch           int
 	slow            float64
 	slowUntil       float64
-	cut             bool     // partitioned: calls to it get no answer
-	promoted        bool     // replica that took over as the primary after a failover
-	as              scaler   // app server autoscaling state
-	successor       *node    // database: the replica that replaced it
-	sincePromotion  int      // writes a promoted replica has accepted since it took over
-	held            []func() // calls waiting out a partition, delivered when it heals
+	cut             bool        // partitioned: calls to it get no answer
+	promoted        bool        // replica that took over as the primary after a failover
+	as              scaler      // app server autoscaling state
+	hist            []NodePoint // one point per second for the node timelines
+	successor       *node       // database: the replica that replaced it
+	sincePromotion  int         // writes a promoted replica has accepted since it took over
+	held            []func()    // calls waiting out a partition, delivered when it heals
 	out, in         []*edge
 
 	busy     int
@@ -368,6 +369,7 @@ func (s *Sim) tick() {
 	}
 	if s.tickCount%10 == 0 {
 		s.pruneCommitted()
+		s.recordNodePoints()
 	}
 	s.retuneTraceRate()
 	cut := s.now - statsWindow
