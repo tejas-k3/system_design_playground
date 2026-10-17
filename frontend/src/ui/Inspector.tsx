@@ -4,6 +4,7 @@ import { palettes } from '../draw/theme'
 import { connectableTargets, paramVisible } from '../model/diagram'
 import { isCompact } from '../model/responsive'
 import { fmtCost, pct, successRate } from '../model/goals'
+import { phaseChip } from '../model/phase'
 import { sparkPoints, sparkSummary } from '../model/spark'
 import { crashNode, requestNodeSeries, restartNode } from '../sim/bridge'
 import { useStore } from '../state/store'
@@ -269,6 +270,7 @@ function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
         <dt>In</dt><dd>{rate(s.arr)}/s</dd>
         <dt>Succeeded</dt><dd>{rate(s.ok)}/s</dd>
         <dt>Failed</dt><dd className={s.err > 0.5 ? 'bad' : ''}>{rate(s.err)}/s</dd>
+        {phaseChip(s) && (<><dt>In progress</dt><dd>{phaseChip(s)}</dd></>)}
         {kind !== 'client' && kind !== 'loadBalancer' && (
           <>
             <dt>Busy</dt><dd>{whole(s.util)}{s.cap ? ` · ${s.busy}/${s.cap}` : ''}</dd>
