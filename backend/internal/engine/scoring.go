@@ -238,5 +238,5 @@ func RunToEnd(d Diagram, opts Options, g Goals) Score {
 	for !s.Finished() && s.Now() < limit {
 		s.Advance(100)
 	}
-	return Evaluate(g, d, s.RunSnapshot(), DiagramCost(d))
+	return Evaluate(g, d, s.RunSnapshot(), s.CostPerHour())
 }

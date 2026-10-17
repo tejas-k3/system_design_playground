@@ -4,22 +4,23 @@ import "math"
 
 // NodeStats is the per-node view the UI draws.
 type NodeStats struct {
-	ID      string             `json:"id"`
-	Arr     float64            `json:"arr"`
-	Ok      float64            `json:"ok"`
-	Err     float64            `json:"err"`
-	Util    float64            `json:"util"`
-	Busy    int                `json:"busy"`
-	Cap     int                `json:"cap"`
-	QLen    int                `json:"qLen"`
-	HitRate float64            `json:"hitRate"` // -1 when not applicable
-	Size    int                `json:"size,omitempty"`
-	Reasons map[string]float64 `json:"reasons,omitempty"`
-	Down    bool               `json:"down,omitempty"`
-	Cut     bool               `json:"cut,omitempty"`     // partitioned from the network
-	Primary bool               `json:"primary,omitempty"` // a replica that took over as the primary
-	Slow    float64            `json:"slow,omitempty"`
-	Extra   map[string]float64 `json:"extra,omitempty"`
+	ID        string             `json:"id"`
+	Arr       float64            `json:"arr"`
+	Ok        float64            `json:"ok"`
+	Err       float64            `json:"err"`
+	Util      float64            `json:"util"`
+	Busy      int                `json:"busy"`
+	Cap       int                `json:"cap"`
+	QLen      int                `json:"qLen"`
+	HitRate   float64            `json:"hitRate"` // -1 when not applicable
+	Size      int                `json:"size,omitempty"`
+	Reasons   map[string]float64 `json:"reasons,omitempty"`
+	Down      bool               `json:"down,omitempty"`
+	Cut       bool               `json:"cut,omitempty"`       // partitioned from the network
+	Primary   bool               `json:"primary,omitempty"`   // a replica that took over as the primary
+	Instances int                `json:"instances,omitempty"` // autoscaled app server: instances running now
+	Slow      float64            `json:"slow,omitempty"`
+	Extra     map[string]float64 `json:"extra,omitempty"`
 }
 
 type EdgeStats struct {
@@ -104,7 +105,7 @@ func (s *Sim) Snapshot() Stats {
 		u /= ringSize
 		ns := NodeStats{
 			ID: n.id, Arr: float64(sum.arr) / span, Ok: float64(sum.ok) / span, Err: float64(sum.err) / span,
-			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted,
+			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted, Instances: s.scaledInstances(n),
 		}
 		if c := s.capacity(n); c < 1<<20 {
 			ns.Cap = c
@@ -188,7 +189,7 @@ func (s *Sim) Snapshot() Stats {
 	var cost float64
 	for _, n := range s.order {
 		if !n.removed {
-			cost += Spec(n.kind).cost(n.p)
+			cost += Spec(n.kind).cost(n.p) * float64(s.instancesOf(n))
 		}
 	}
 	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: cost, Run: run}
