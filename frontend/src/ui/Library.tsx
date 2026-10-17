@@ -1,4 +1,5 @@
 import { nodeRect, rectsIntersect } from '../draw/geometry'
+import { groupKinds } from '../model/library'
 import { useStore } from '../state/store'
 
 export function Library() {
@@ -37,29 +38,37 @@ export function Library() {
     <aside className="library" aria-label="Component library">
       <h2>Components</h2>
       {configOnly && <p className="hint-box">This challenge is configuration-only: select a node and tune its settings.</p>}
-      <ul>
-        {reg.nodes.map((n) => (
-          <li key={n.kind}>
-            <button
-              className="lib-item"
-              draggable={!configOnly}
-              disabled={configOnly}
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/x-sdp-kind', n.kind)
-                e.dataTransfer.effectAllowed = 'copy'
-              }}
-              onClick={() => addAtCenter(n.kind)}
-              title={n.description}
-            >
-              <span className="swatch" style={{ background: n.accent }} />
-              <span className="lib-text">
-                <b>{n.name}</b>
-                <small>{n.description}</small>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {groupKinds(reg.nodes.map((n) => n.kind)).map((g) => (
+        <section key={g.title} aria-label={g.title}>
+          <h3>{g.title}</h3>
+          <ul>
+            {g.kinds.map((kind) => {
+              const n = reg.spec(kind)!
+              return (
+                <li key={kind}>
+                  <button
+                    className="lib-item"
+                    draggable={!configOnly}
+                    disabled={configOnly}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/x-sdp-kind', n.kind)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                    onClick={() => addAtCenter(n.kind)}
+                    title={n.description}
+                  >
+                    <span className="swatch" style={{ background: n.accent }} />
+                    <span className="lib-text">
+                      <b>{n.name}</b>
+                      <small>{n.description}</small>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ))}
       <p className="muted small">Click or drag onto the canvas. Drag from a node's right-hand handle to connect.</p>
     </aside>
   )
