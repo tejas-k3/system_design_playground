@@ -492,3 +492,33 @@ func TestMetricsReflectActivity(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+func TestRunCapReturns503WhileAllSlotsAreBusy(t *testing.T) {
+	srv := New(Config{MaxRuns: 1})
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	body := map[string]any{"scenarioId": "hello-world"}
+
+	srv.runSlots <- struct{}{} // another headless run is in progress
+	b, _ := json.Marshal(body)
+	resp, err := http.Post(ts.URL+"/api/run", "application/json", bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Retry-After") == "" {
+		t.Fatalf("expected 503 with Retry-After while the slot is taken, got %d", resp.StatusCode)
+	}
+	if got := srv.metrics.runsRefused.Load(); got != 1 {
+		t.Fatalf("runs refused = %d, want 1", got)
+	}
+
+	<-srv.runSlots // the other run finished
+	sc := scenarios.Get("hello-world")
+	if code := post(t, ts.URL+"/api/run", map[string]any{"diagram": sc.Solution, "scenarioId": "hello-world"}, nil); code != 200 {
+		t.Fatalf("run after the slot freed up: %d", code)
+	}
+	if len(srv.runSlots) != 0 {
+		t.Fatal("the slot was not released after the run")
+	}
+}
