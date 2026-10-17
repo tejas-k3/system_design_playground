@@ -11,6 +11,7 @@ import { Traces } from './Traces'
 interface Line {
   label: string
   color: string
+  dash?: number[] // a dashed line, so two series never differ by colour alone
   value: (p: SeriesPoint) => number
 }
 
@@ -64,6 +65,7 @@ function Chart({ title, unit, lines, series, theme, fixedMax, fmt }: { title: st
     ctx.fillText(`${Math.round(t1)}s`, left + pw, h - bottom + 3)
     for (const l of lines) {
       ctx.strokeStyle = l.color
+      ctx.setLineDash(l.dash ?? [])
       ctx.lineWidth = 2
       ctx.lineJoin = 'round'
       ctx.beginPath()
@@ -74,6 +76,7 @@ function Chart({ title, unit, lines, series, theme, fixedMax, fmt }: { title: st
       })
       ctx.stroke()
     }
+    ctx.setLineDash([])
   }, [series, lines, theme, fixedMax, fmt])
   return (
     <figure className="chart">
@@ -81,7 +84,7 @@ function Chart({ title, unit, lines, series, theme, fixedMax, fmt }: { title: st
         {title} <small>{unit}</small>
         <span className="legend">
           {lines.map((l) => (
-            <i key={l.label}><b style={{ background: l.color }} />{l.label}</i>
+            <i key={l.label}><b style={{ background: l.dash ? `repeating-linear-gradient(90deg, ${l.color} 0 5px, transparent 5px 8px)` : l.color }} />{l.label}</i>
           ))}
         </span>
       </figcaption>
@@ -111,7 +114,7 @@ export function Charts() {
   const rate = successRate(run)
   const okLines: Line[] = [
     { label: 'ok', color: p.ok, value: (s) => s.okRps },
-    { label: 'errors', color: p.bad, value: (s) => s.errRps },
+    { label: 'errors', color: p.bad, dash: [5, 3], value: (s) => s.errRps },
   ]
   const latLines: Line[] = [
     { label: 'p50', color: p.accent, value: (s) => s.p50 },

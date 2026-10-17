@@ -31,6 +31,8 @@ export function fitFontSize(measure: (text: string, size: number) => number, tex
   while (size > min && measure(text, size) > maxW) size -= 0.5
   return Math.max(size, min)
 }
+/** Shape of a request particle: failures are crosses, so they stand out without relying on red versus green. */
+export const particleShape = (pt: { fail: boolean; back: boolean }): 'cross' | 'dot' => (pt.fail ? 'cross' : 'dot')
 export const handleRadius = (zoom: number): number => Math.max(HANDLE_R, HANDLE_MIN_SCREEN_R / zoom)
 export const handlePos = (r: Rect, zoom: number): Pt => ({ x: r.x + r.w + handleRadius(zoom) + 2, y: r.y + r.h / 2 })
 
