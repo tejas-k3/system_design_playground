@@ -173,3 +173,11 @@ export function openOutputs(reg: Reg, d: Diagram): Set<string> {
   const sending = new Set(d.edges.map((e) => e.from))
   return new Set(d.nodes.filter((n) => !sending.has(n.id) && (reg.spec(n.kind)?.canConnectTo?.length ?? 0) > 0).map((n) => n.id))
 }
+
+/** Why pressing Play would run nothing, or null when there is traffic to simulate. */
+export function nothingToRun(d: Diagram): string | null {
+  const users = d.nodes.filter((n) => n.kind === 'client')
+  if (users.length === 0) return 'Add Users first: they are where the traffic comes from.'
+  if (!users.some((u) => d.edges.some((e) => e.from === u.id))) return 'Connect Users to something: they have nowhere to send requests yet.'
+  return null
+}
