@@ -209,6 +209,7 @@ func (s *Sim) resolve(lg *logical, res Result) {
 			s.countFreshness(lg, res)
 		} else {
 			s.runFailed++
+			s.failHist.Add(lat)
 			s.runErrors[res.Reason]++
 		}
 	}

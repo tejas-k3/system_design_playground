@@ -182,6 +182,7 @@ type Sim struct {
 
 	res, created, attempts, jobsW, conflictsW Window
 	hist                                      Hist
+	failHist                                  Hist
 
 	runResolved, runOK, runFailed, runPending int
 	runErrors                                 [NumReasons]int

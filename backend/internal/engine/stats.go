@@ -46,6 +46,7 @@ type RunStats struct {
 	P50        float64        `json:"p50"`
 	P95        float64        `json:"p95"`
 	P99        float64        `json:"p99"`
+	FailP50    float64        `json:"failP50"` // median time to failure; the latencies above count successes only
 	Mean       float64        `json:"mean"`
 	Errors     map[string]int `json:"errors"`
 	Conflicts  int            `json:"conflicts"`
@@ -168,7 +169,7 @@ func (s *Sim) Snapshot() Stats {
 	}
 	run := RunStats{
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
-		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(),
+		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
 		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, LostWrites: s.runLost,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
