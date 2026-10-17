@@ -537,6 +537,82 @@ func init() {
 		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because a sick server is the one with the most unfinished work.",
 	})
 
+	// 14f ─ Medium, config only: every cache entry expires at the same instant ────────────
+	stampede := func(cache engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 400.0, "readPct": 97.0, "consistency": "bounded", "maxStaleMs": 15000.0, "keyDist": "zipf", "keySpace": 1000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("cache", engine.KCache, cols[3], rowTop, cache).
+			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 8.0, "readMs": 100.0}).
+			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 32.0, "queueCap": 500.0}, "cache").e("cache", "db").done()
+	}
+	register(&Scenario{
+		ID: "cache-stampede", Title: "Everything expires at once", Difficulty: "Medium", ConfigOnly: true,
+		Summary:     "The cache starts full, every entry lives exactly ten seconds, and then they all die together.",
+		Story:       "You warmed the cache before launch, so the database sees almost nothing. Entries live ten seconds, because prices change and users must not see data older than about fifteen. At the first expiry the whole popular set misses at the same moment and four hundred reads a second land on a database that can answer eighty. Keep it standing without letting data go stale. The architecture is fixed: fix it with configuration.",
+		Diagram:     stampede(P{"capacityItems": 2000.0, "ttlSec": 10.0, "startWarm": true}),
+		Solution:    stampede(P{"capacityItems": 2000.0, "ttlSec": 10.0, "startWarm": true, "ttlJitterPct": 50.0, "coalesce": true}),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(500), MaxStaleReadPct: f(0.12)},
+		DurationSec: 50, WarmupSec: 3, Speed: 1,
+		Hints: [3]string{
+			"Every entry was created at the same moment with the same lifetime. What happens when the lifetime ends?",
+			"Open the cache's settings: look at Freshness and at 'Show advanced'. You need the entries to stop expiring together, and concurrent misses for one item to stop piling onto the database.",
+			"Add TTL jitter so entries expire at different times, and turn on 'Share concurrent misses'. Do not simply raise the TTL: the data would go stale.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "The cache is warm and the hit rate is near 100%. Why can the database still be overwhelmed after ten seconds?", Options: []string{"The cache fills up and evicts popular items", "Every entry expires at the same instant, so almost every request misses at once", "The database slows down over time"}, Answer: 1,
+			Explain: "A warm start gives every entry the same creation time, so they share one expiry time. Misses arrive as a wave, not a trickle."}},
+		Debrief: "A cache hides load until the moment it cannot. Synchronised expiry turns a 99% hit rate into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the stampede, but it trades it for stale data, which is why this challenge limits staleness.",
+	})
+
+	// 14g ─ Medium, config only: how much data may a failover lose? ─────────────────────
+	replicas := func(db, rep engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 80.0, "readPct": 0.0, "keyDist": "uniform", "keySpace": 100000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowTop, db).
+			n("replica", engine.KReplica, cols[4], rowBot, rep).
+			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
+	}
+	promote := P{"onFailure": "promote", "detectSec": 5.0, "promoteSec": 10.0}
+	register(&Scenario{
+		ID: "sync-or-async", Title: "Sync or async?", Difficulty: "Medium", ConfigOnly: true,
+		Summary:     "The primary dies. How many acknowledged writes does the replica know about?",
+		Story:       "Every request is a write that users were told succeeded. At 20 seconds the primary database dies and the replica is promoted. The replica is three seconds behind, so it never saw the last three seconds of writes. Lose at most twenty acknowledged writes and keep the slowest ten percent of writes under about a quarter of a second. The architecture is fixed: fix it with configuration.",
+		Diagram:     replicas(promote, P{"replicationLagMs": 3000.0}),
+		Solution:    replicas(promote, P{"replicationLagMs": 3000.0, "replication": "sync"}),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "db", AtSec: 20, DownSec: 300}},
+		Goals:       engine.Goals{MinSuccessRate: 0.70, MaxP95Ms: f(260), MaxLostWrites: i(20), StarP95Ms: f(250)},
+		DurationSec: 65, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"A write was acknowledged to the user, then the primary died. Where else did that write exist at that moment?",
+			"Open the replica's settings and read the Replication help text: who waits for whom?",
+			"Switch the replica to synchronous replication: the primary only acknowledges once the replica has the write, so nothing acknowledged is lost. Check what it does to write latency.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "What is the price of synchronous replication?", Options: []string{"Nothing: it is strictly better", "Every write also waits for the replica, and writes stop if the replica is down", "Reads become stale"}, Answer: 1,
+			Explain: "Synchronous replication buys zero data loss with latency, and with a dependency: the primary cannot acknowledge what its replica has not confirmed."}},
+		Debrief: "Replication lag is your data-loss window in a failover. Synchronous replication closes it, at the cost of slower writes and a new way to be unavailable (a dead replica blocks writes). Shrinking the lag also helps; in this simulator lag is free to configure, but in a real system a tiny lag costs primary throughput or is simply unachievable across regions.",
+	})
+
+	// 14h ─ Hard, config only: the old primary comes back ────────────────────────────────
+	register(&Scenario{
+		ID: "fence-the-old-primary", Title: "Fence the old primary", Difficulty: "Hard", ConfigOnly: true,
+		Summary:     "The failover worked. Then the dead primary woke up.",
+		Story:       "The primary dies at 10 seconds and a replica is promoted by 25 seconds. At 50 seconds the old primary restarts. Nobody told it that it was replaced. Keep the data: lose at most a hundred acknowledged writes, and keep most requests succeeding. The architecture is fixed: fix it with configuration.",
+		Diagram:     replicas(P{"onFailure": "promote", "detectSec": 5.0, "promoteSec": 10.0, "fencing": false}, P{"replicationLagMs": 500.0}),
+		Solution:    replicas(promote, P{"replicationLagMs": 500.0}),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "db", AtSec: 10, DownSec: 40}},
+		Goals:       engine.Goals{MinSuccessRate: 0.68, MaxLostWrites: i(100)},
+		DurationSec: 65, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"The new primary has been taking writes for 25 seconds when the old one comes back. Who do clients talk to then?",
+			"Look at the database's Failover settings: there is one that decides whether a recovered old primary is allowed back in.",
+			"Turn on 'Fence the old primary'. Without it the old primary rejoins as primary and everything written to the replacement since promotion is lost. Do not just disable failover: writes would fail for the whole outage.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "The old primary restarts and nothing stops it. What happens to writes made to the new primary in the meantime?", Options: []string{"They are merged into the old primary", "They exist only on the new primary, and clients go back to the old one: they are lost", "Nothing, both stay in sync"}, Answer: 1,
+			Explain: "Two nodes that both believe they are the primary diverge. Without fencing, the survivor of the confusion silently drops the other's writes."}},
+		Debrief: "Failover is only half the job: you also have to make sure the old primary cannot come back as one. Fencing (a token, a lease, or simply keeping the node out until it is reconciled) is what prevents split brain. Staying down avoids the problem but costs the whole outage.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
