@@ -273,7 +273,7 @@ export const useStore = create<State>()((set, get) => {
     },
     setUi: (p) => set((s) => ({ ui: { ...s.ui, ...p } })),
     setSim: (p) => set((s) => ({ sim: { ...s.sim, ...p } })),
-    setStats: (stats) => set({ stats: { ...stats, series: stats.series ?? [], events: stats.events ?? [], nodes: stats.nodes ?? {}, edges: stats.edges ?? {}, global: { ...stats.global, run: { ...stats.global.run, latencyBuckets: stats.global.run.latencyBuckets ?? [] } } } }),
+    setStats: (stats) => set((st) => ({ stats: { ...stats, series: stats.series ?? [], events: stats.events ?? (stats.global.now > 0 && stats.global.now >= st.stats.global.now ? st.stats.events : []), nodes: stats.nodes ?? {}, edges: stats.edges ?? {}, global: { ...stats.global, run: { ...stats.global.run, latencyBuckets: stats.global.run.latencyBuckets ?? [] } } } })),
     setTraces: (traces) => set({ traces }),
     setNodeSeries: (nodeSeries) => set({ nodeSeries }),
     setCost: (cost) => set({ cost }),
