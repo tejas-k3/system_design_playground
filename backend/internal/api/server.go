@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"sysdesign/internal/designs"
 	"sysdesign/internal/engine"
 	"sysdesign/internal/scenarios"
 )
@@ -26,15 +27,23 @@ const (
 // DefaultMaxSessions bounds concurrent live simulations; each one burns CPU while running.
 const DefaultMaxSessions = 64
 
+// DefaultSaveLimit is how many designs one client may share per minute.
+const DefaultSaveLimit = 20
+
+// maxDesignBody bounds a shared design; a full 120-node diagram is far smaller.
+const maxDesignBody = 256 << 10
+
 // DefaultIdleTimeout is how long a stopped or paused session may sit untouched before it is closed.
 const DefaultIdleTimeout = 10 * time.Minute
 
 // Config configures a Server.
 type Config struct {
-	StaticDir      string        // built frontend to serve with an index.html fallback (optional)
-	OriginPatterns []string      // allowed WebSocket origins
-	MaxSessions    int           // concurrent live simulations; 0 means DefaultMaxSessions
-	IdleTimeout    time.Duration // close a session that is not running and has been silent this long; 0 means DefaultIdleTimeout
+	StaticDir      string         // built frontend to serve with an index.html fallback (optional)
+	OriginPatterns []string       // allowed WebSocket origins
+	MaxSessions    int            // concurrent live simulations; 0 means DefaultMaxSessions
+	IdleTimeout    time.Duration  // close a session that is not running and has been silent this long; 0 means DefaultIdleTimeout
+	Designs        *designs.Store // where shared designs live; nil means an in-memory store
+	SaveLimit      int            // designs one client may save per minute; 0 means DefaultSaveLimit
 }
 
 // Server wires the routes together.
@@ -44,6 +53,8 @@ type Server struct {
 	origins   []string
 	slots     chan struct{} // one token per live simulation session
 	idle      time.Duration
+	designs   *designs.Store
+	saves     *limiter
 }
 
 // New builds a server from cfg.
@@ -54,7 +65,13 @@ func New(cfg Config) *Server {
 	if cfg.IdleTimeout <= 0 {
 		cfg.IdleTimeout = DefaultIdleTimeout
 	}
-	s := &Server{mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), idle: cfg.IdleTimeout}
+	if cfg.SaveLimit <= 0 {
+		cfg.SaveLimit = DefaultSaveLimit
+	}
+	if cfg.Designs == nil {
+		cfg.Designs, _ = designs.New("", 0) // in-memory never fails
+	}
+	s := &Server{designs: cfg.Designs, saves: newLimiter(cfg.SaveLimit, time.Minute), mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), idle: cfg.IdleTimeout}
 	staticDir := cfg.StaticDir
 	s.mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
 	s.mux.HandleFunc("GET /api/registry", s.registry)
@@ -63,6 +80,8 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/scenarios/{id}/solution", s.getSolution)
 	s.mux.HandleFunc("POST /api/validate", s.validate)
 	s.mux.HandleFunc("POST /api/run", s.run)
+	s.mux.HandleFunc("POST /api/designs", s.saveDesign)
+	s.mux.HandleFunc("GET /api/designs/{id}", s.loadDesign)
 	s.mux.HandleFunc("GET /api/sim", s.sim)
 	if staticDir != "" {
 		s.mux.HandleFunc("GET /", s.static)
@@ -241,6 +260,49 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 		resp.Score = &sc
 	}
 	writeJSON(w, 200, resp)
+}
+
+// saveDesign stores a diagram (sanitized first) and returns the id that opens it.
+func (s *Server) saveDesign(w http.ResponseWriter, r *http.Request) {
+	if !s.saves.allow(clientAddr(r)) {
+		w.Header().Set("Retry-After", "60")
+		writeErr(w, http.StatusTooManyRequests, "too many designs shared, try again in a minute")
+		return
+	}
+	var req validateReq
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxDesignBody))
+	if err := dec.Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid or oversized design")
+		return
+	}
+	if tooBig(req.Diagram) {
+		writeErr(w, http.StatusRequestEntityTooLarge, "diagram too large")
+		return
+	}
+	d, _ := engine.Sanitize(req.Diagram)
+	if len(d.Nodes) == 0 {
+		writeErr(w, http.StatusBadRequest, "nothing to share: the design is empty")
+		return
+	}
+	id, err := s.designs.Put(d)
+	if err != nil {
+		log.Printf("save design: %v", err)
+		writeErr(w, http.StatusInternalServerError, "could not save the design")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"id": id})
+}
+
+func (s *Server) loadDesign(w http.ResponseWriter, r *http.Request) {
+	d, ok, err := s.designs.Get(r.PathValue("id"))
+	switch {
+	case errors.Is(err, designs.ErrBadID), err == nil && !ok:
+		writeErr(w, http.StatusNotFound, "no such design")
+	case err != nil:
+		writeErr(w, http.StatusInternalServerError, "could not read the design")
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"diagram": d})
+	}
 }
 
 // static serves the built frontend, falling back to index.html for client-side routes.

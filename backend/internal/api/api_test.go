@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -311,5 +312,89 @@ func TestWebSocketReturnsRequestTraces(t *testing.T) {
 	}
 	if len(got.OK) == 0 || len(got.OK[0].Spans) < 3 {
 		t.Fatalf("expected successful traces with several spans, got %+v", got.OK)
+	}
+}
+
+func TestSharedDesignsRoundTripAreSanitizedAndGuarded(t *testing.T) {
+	ts := newTestServer(t)
+	sc := scenarios.Get("opening-night")
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	dirty := sc.Solution
+	dirty.Nodes = append(append([]engine.Node(nil), dirty.Nodes...), engine.Node{ID: "evil", Kind: "nope"}) // must not survive
+	if code := post(t, ts.URL+"/api/designs", map[string]any{"diagram": dirty}, &created); code != http.StatusCreated || len(created.ID) != 13 {
+		t.Fatalf("save: status %d id %q", code, created.ID)
+	}
+	resp, err := http.Get(ts.URL + "/api/designs/" + created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var got struct {
+		Diagram engine.Diagram `json:"diagram"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&got)
+	if resp.StatusCode != 200 || len(got.Diagram.Nodes) != len(sc.Solution.Nodes) {
+		t.Fatalf("load: status %d, %d nodes (want %d, the invalid node dropped)", resp.StatusCode, len(got.Diagram.Nodes), len(sc.Solution.Nodes))
+	}
+
+	for path, want := range map[string]int{"/api/designs/aaaaaaaaaaaaa": 404, "/api/designs/..%2f..%2fetc": 404, "/api/designs/short": 404} {
+		r, _ := http.Get(ts.URL + path)
+		r.Body.Close()
+		if r.StatusCode != want {
+			t.Errorf("GET %s = %d, want %d", path, r.StatusCode, want)
+		}
+	}
+	if code := post(t, ts.URL+"/api/designs", map[string]any{"diagram": engine.Diagram{}}, nil); code != http.StatusBadRequest {
+		t.Fatalf("an empty design should be refused, got %d", code)
+	}
+	huge := engine.Diagram{}
+	for i := 0; i < 130; i++ {
+		huge.Nodes = append(huge.Nodes, engine.Node{ID: fmt.Sprint("n", i), Kind: engine.KCache})
+	}
+	if code := post(t, ts.URL+"/api/designs", map[string]any{"diagram": huge}, nil); code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("an oversized design should be refused, got %d", code)
+	}
+}
+
+func TestSavingDesignsIsRateLimitedPerClient(t *testing.T) {
+	ts := newTestServerWith(t, Config{OriginPatterns: []string{"*"}, SaveLimit: 3})
+	d := scenarios.Get("hello-world").Solution
+	for i := 0; i < 3; i++ {
+		if code := post(t, ts.URL+"/api/designs", map[string]any{"diagram": d}, nil); code != http.StatusCreated {
+			t.Fatalf("save %d: %d", i, code)
+		}
+	}
+	b, _ := json.Marshal(map[string]any{"diagram": d})
+	resp, err := http.Post(ts.URL+"/api/designs", "application/json", bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests || resp.Header.Get("Retry-After") == "" {
+		t.Fatalf("expected 429 with Retry-After, got %d", resp.StatusCode)
+	}
+}
+
+func TestLimiterWindowResets(t *testing.T) {
+	now := time.Unix(0, 0)
+	l := newLimiter(2, time.Minute)
+	l.now = func() time.Time { return now }
+	for i := 1; i <= 2; i++ {
+		if !l.allow("a") {
+			t.Fatalf("request %d of 2 should be allowed", i)
+		}
+	}
+	if l.allow("a") {
+		t.Fatal("the third request in the window should be blocked")
+	}
+	if !l.allow("b") {
+		t.Fatal("a different client has its own allowance")
+	}
+	now = now.Add(61 * time.Second)
+	if !l.allow("a") {
+		t.Fatal("the allowance should return after the window")
 	}
 }
