@@ -39,11 +39,7 @@ func init() {
 			return b.done()
 		}
 		b.n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb")
-		for k := 0; k < servers; k++ {
-			id := "app" + string(rune('1'+k))
-			b.n(id, engine.KAppServer, cols[2], rowTop+float64(k)*100, P{"threads": 8.0}).e("lb", id).e(id, "db")
-		}
-		return b.done()
+		return b.servers(servers, cols[2], rowTop, 100, P{"threads": 8.0}).done()
 	}
 	register(&Scenario{
 		ID: "opening-night", Title: "Opening night", Difficulty: "Easy",
@@ -72,12 +68,10 @@ func init() {
 		if cache {
 			b.n("cache", engine.KCache, cols[3], rowTop, P{"capacityItems": 2000.0})
 		}
-		for k := 0; k < 3; k++ {
-			id := "app" + string(rune('1'+k))
-			b.n(id, engine.KAppServer, cols[2], rowTop+float64(k)*100, nil).e("lb", id).e(id, "db")
-			if cache {
-				b.e(id, "cache")
-			}
+		if cache {
+			b.servers(3, cols[2], rowTop, 100, nil, "cache")
+		} else {
+			b.servers(3, cols[2], rowTop, 100, nil)
 		}
 		if cache {
 			b.e("cache", "db")
@@ -107,11 +101,7 @@ func init() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
 			n("db", engine.KDatabase, cols[4], rowMid, P{"readMs": 60.0, "connections": 128.0, "maxConnections": 64.0}).
 			e("users", "lb")
-		for k := 0; k < 6; k++ {
-			id := "app" + string(rune('1'+k))
-			b.n(id, engine.KAppServer, cols[2], 20+float64(k)*70, P{"threads": 24.0, "dbPool": pool, "queueCap": 200.0}).e("lb", id).e(id, "db")
-		}
-		return b.done()
+		return b.servers(6, cols[2], 20, 70, P{"threads": 24.0, "dbPool": pool, "queueCap": 200.0}).done()
 	}
 	register(&Scenario{
 		ID: "connection-crunch", Title: "Connection crunch", Difficulty: "Medium", ConfigOnly: true,
@@ -142,11 +132,7 @@ func init() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
 			n("db", engine.KDatabase, cols[4], rowMid, P{"readMs": 10.0}).
 			e("users", "lb")
-		for k := 0; k < 3; k++ {
-			id := "app" + string(rune('1'+k))
-			b.n(id, engine.KAppServer, cols[2], rowTop+float64(k)*100, app).e("lb", id).e(id, "db")
-		}
-		return b.done()
+		return b.servers(3, cols[2], rowTop, 100, app).done()
 	}
 	register(&Scenario{
 		ID: "retry-pileup", Title: "Retry pile-up", Difficulty: "Medium", ConfigOnly: true,
@@ -263,12 +249,10 @@ func init() {
 			n("ext", engine.KExternalAPI, cols[4], rowTop, P{"latencyMs": 400.0, "errorPct": 1.0}).label("ext", "Email vendor").
 			n("db", engine.KDatabase, cols[4], rowBot, nil).
 			e("users", "lb")
-		for k := 0; k < 2; k++ {
-			id := "app" + string(rune('1'+k))
-			b.n(id, engine.KAppServer, cols[2], rowTop+float64(k)*100, P{"threads": 8.0}).e("lb", id).e(id, "db")
-			if !fixed {
-				b.e(id, "ext")
-			}
+		if fixed {
+			b.servers(2, cols[2], rowTop, 100, P{"threads": 8.0})
+		} else {
+			b.servers(2, cols[2], rowTop, 100, P{"threads": 8.0}, "ext")
 		}
 		if fixed {
 			b.n("q", engine.KQueue, cols[3], rowTop, nil).n("w", engine.KWorker, cols[3], rowMid, P{"concurrency": 40.0}).
@@ -333,11 +317,7 @@ func init() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, P{"healthCheckSec": 2.0}).
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb")
-		for k := 0; k < servers; k++ {
-			id := "app" + string(rune('1'+k))
-			b.n(id, engine.KAppServer, cols[2], rowTop+float64(k)*90, nil).e("lb", id).e(id, "db")
-		}
-		return b.done()
+		return b.servers(servers, cols[2], rowTop, 90, nil).done()
 	}
 	register(&Scenario{
 		ID: "server-down", Title: "A server falls over", Difficulty: "Medium",
@@ -367,12 +347,10 @@ func init() {
 		if fixed {
 			b.n("redis", engine.KRedis, cols[3], rowTop, nil)
 		}
-		for k := 0; k < 3; k++ {
-			id := "app" + string(rune('1'+k))
-			b.n(id, engine.KAppServer, cols[2], rowTop+float64(k)*100, nil).e("lb", id).e(id, "db")
-			if fixed {
-				b.e(id, "redis")
-			}
+		if fixed {
+			b.servers(3, cols[2], rowTop, 100, nil, "redis")
+		} else {
+			b.servers(3, cols[2], rowTop, 100, nil)
 		}
 		return b.done()
 	}

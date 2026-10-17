@@ -3,6 +3,7 @@
 package scenarios
 
 import (
+	"fmt"
 	"sort"
 
 	"sysdesign/internal/engine"
@@ -74,6 +75,19 @@ type bld struct{ d engine.Diagram }
 func (b *bld) n(id, kind string, x, y float64, p engine.Params) *bld {
 	label := engine.Spec(kind).Name
 	b.d.Nodes = append(b.d.Nodes, engine.Node{ID: id, Kind: kind, X: x, Y: y, Label: label, Params: p, Locked: kind == engine.KClient})
+	return b
+}
+
+// servers adds n app servers (app1..appN) in a column. Each is fed by the "lb" node and wired to
+// "db" plus any extra targets, which is the shape most challenges share.
+func (b *bld) servers(n int, x, y0, dy float64, p engine.Params, extra ...string) *bld {
+	for k := 0; k < n; k++ {
+		id := fmt.Sprintf("app%d", k+1)
+		b.n(id, engine.KAppServer, x, y0+float64(k)*dy, p).e("lb", id).e(id, "db")
+		for _, t := range extra {
+			b.e(id, t)
+		}
+	}
 	return b
 }
 
