@@ -116,6 +116,20 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("outlier ejection failed: %+v", res.Checks)
 		}
 	})
+	t.Run("split-the-database needs the data actually spread over the shards", func(t *testing.T) {
+		sc := Get("split-the-database")
+		d := sc.Solution
+		var edges []engine.Edge
+		for _, e := range d.Edges {
+			if e.ID != "router>shard2" { // second shard exists but receives nothing
+				edges = append(edges, e)
+			}
+		}
+		d.Edges = edges
+		if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatal("a router feeding a single shard should not beat the single database")
+		}
+	})
 	t.Run("results are stable across seeds for the reference solutions", func(t *testing.T) {
 		for _, sc := range All() {
 			for _, seed := range []uint32{1, 2, 3} {

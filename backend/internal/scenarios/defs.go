@@ -1,6 +1,10 @@
 package scenarios
 
-import "sysdesign/internal/engine"
+import (
+	"fmt"
+
+	"sysdesign/internal/engine"
+)
 
 func init() {
 	// 1 ─ Tutorial ───────────────────────────────────────────────────────────────────
@@ -479,6 +483,41 @@ func init() {
 		Predictions: []Prediction{{ID: "p1", Question: "Why does a least-connections balancer help when one server is slow?", Options: []string{"A slow server accumulates open requests, so it is picked less often", "It makes the slow server faster", "It restarts the slow server"}, Answer: 0,
 			Explain: "Requests pile up on the slow server, so its in-flight count is high and new requests go elsewhere."}},
 		Debrief: "Balancing is not about equal shares, it is about equal outcomes. Least connections adapts to slowness automatically; ejecting outliers goes further and rests a sick server entirely.",
+	})
+
+	// 17 ─ Hard ────────────────────────────────────────────────────────────────────────
+	sharded := func(shards int) engine.Diagram {
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 700.0, "readPct": 10.0, "keyDist": "uniform", "keySpace": 100000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil)
+		db := P{"writeMs": 40.0, "connections": 16.0}
+		if shards <= 1 {
+			b.n("db", engine.KDatabase, cols[4], rowMid, db).e("users", "lb")
+			return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}).done()
+		}
+		b.n("router", engine.KShardRouter, cols[3], rowMid, nil)
+		for k := 0; k < shards; k++ {
+			id := fmt.Sprintf("shard%d", k+1)
+			b.n(id, engine.KDatabase, cols[4], rowTop+float64(k)*140, db).e("router", id)
+		}
+		b.e("users", "lb")
+		return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}, "router").done()
+	}
+	register(&Scenario{
+		ID: "split-the-database", Title: "Split the database", Difficulty: "Hard",
+		Summary: "630 writes a second against a database that can commit about 400.",
+		Story:   "A busy write-heavy service has outgrown its single database. Buying a bigger one is not an option, so the data has to be spread over several databases.",
+		Diagram: sharded(1), Solution: sharded(2),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(500), MaxCostPerHour: f(2.5)},
+		DurationSec: 45, WarmupSec: 6, Speed: 1,
+		Hints: [3]string{
+			"Count the writes per second and divide by what one database can commit.",
+			"Shard the data: a router sends each key to one of several databases.",
+			"Put a shard router between the servers and two databases, and connect each server to the router.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A shard router picks the database from the item's key. What goes wrong if a few keys are far hotter than the rest?", Options: []string{"One shard can get most of the traffic", "Nothing, sharding balances load perfectly", "Writes become reads"}, Answer: 0,
+			Explain: "Hashing spreads keys, not requests. If a handful of keys dominate, whichever shard owns them becomes the bottleneck again."}},
+		Debrief: "Sharding multiplies write capacity by splitting the data, at the price of complexity: queries across shards get hard and skew can recreate the hotspot you were escaping.",
 	})
 
 }
