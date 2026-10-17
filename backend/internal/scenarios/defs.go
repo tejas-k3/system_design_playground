@@ -429,6 +429,34 @@ func init() {
 		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose how many seconds of data you can afford to lose, then pick the setting that guarantees it.",
 	})
 
+	// 14b ─ Hard, config only: the primary database dies ───────────────────────────────
+	failover := func(db, replica engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 40.0, "keyDist": "uniform", "keySpace": 20000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowTop, db).
+			n("replica", engine.KReplica, cols[4], rowBot, replica).
+			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
+	}
+	register(&Scenario{
+		ID: "primary-dies", Title: "The primary dies", Difficulty: "Hard", ConfigOnly: true,
+		Summary:     "The database server is gone for a minute. A replica is sitting right there.",
+		Story:       "Six in ten requests write to the database. At 20 seconds the primary crashes and stays down for a minute. There is a read replica, three seconds behind. Keep most requests succeeding and lose as few acknowledged writes as you can. The architecture is fixed: fix it with configuration.",
+		Diagram:     failover(P{}, P{"replicationLagMs": 3000.0}),
+		Solution:    failover(P{"onFailure": "promote", "detectSec": 3.0, "promoteSec": 5.0}, P{"replicationLagMs": 500.0}),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "db", AtSec: 20, DownSec: 60}},
+		Goals:       engine.Goals{MinSuccessRate: 0.85, MaxP95Ms: f(800), MaxLostWrites: i(100)},
+		DurationSec: 70, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"For a minute every write fails. Is there another machine that already has most of the data?",
+			"The database can promote a replica when it fails. Look at its 'If it fails' setting, and at how long it takes to notice and to switch.",
+			"Promote a replica, shorten the detection and promotion times, and shrink the replica's replication lag: whatever it had not copied yet is lost.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "The replica is 3 seconds behind and gets promoted. What happens to the writes from the last 3 seconds before the crash?", Options: []string{"They are safe: the primary saved them", "They are lost: the replica never received them", "They are replayed when the old primary returns"}, Answer: 1,
+			Explain: "Asynchronous replication acknowledges a write before the replica has it, so a failover keeps only what had already been copied."}},
+		Debrief: "Failover has two costs. Time: while the failure is noticed and a replica takes over, nothing can write. Data: with asynchronous replication, whatever the replica had not yet copied is gone. Both are settings you choose: faster detection risks false alarms, and a smaller lag costs the primary more work.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
