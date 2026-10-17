@@ -675,6 +675,65 @@ func init() {
 		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so size for the arrival rate, not for the number of testers.",
 	})
 
+	// 14k ─ Medium, config only: short intense rushes at a modest average ───────────────────
+	rush := func(app engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"arrival": "bursty", "rps": 90.0, "burstFactor": 3.0, "burstSec": 1.5, "readPct": 100.0, "timeoutMs": 3000.0}).
+			n("limiter", engine.KRateLimiter, cols[1], rowMid, P{"limitRps": 1000.0, "burst": 1000.0}).
+			n("lb", engine.KLoadBalancer, cols[2], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "limiter").e("limiter", "lb").servers(1, cols[3], rowMid, 100, app).done()
+	}
+	register(&Scenario{
+		ID: "flash-crowd", Title: "Short, sharp rushes", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The average load is fine. The load a second at a time is not.",
+		Story:   "Traffic averages 90 requests a second, comfortably inside what one server can do. But it arrives in rushes: for a second or two the rate triples, then it eases off. Your server's queue only holds ten requests, so every rush drops hundreds. A rate limiter sits in front of the server. Keep requests succeeding and the slowest ones under 0.7 s, on a budget of 45 cents an hour. The architecture is fixed: fix it with configuration.",
+		Diagram: rush(P{"threads": 8.0, "cpuMs": 20.0, "queueCap": 10.0}), Solution: rush(P{"threads": 10.0, "cpuMs": 20.0, "queueCap": 100.0}),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(700), MaxCostPerHour: f(0.45), StarCostPerHour: f(0.42), StarP95Ms: f(500)},
+		DurationSec: 90, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Average load and peak load are different numbers. What does the server do during a rush, and what happens to the requests that arrive while all threads are busy?",
+			"A queue turns a spike into a delay, as long as it is big enough and the wait stays acceptable. The rate limiter rejects traffic: a rejected request is still a failed request.",
+			"Make the queue big enough to hold a rush (about a hundred) and give the server a few more threads so the queue drains quickly. A huge queue alone pushes the slowest requests past 0.7 s; sixteen threads cost too much.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Average load is 70% of capacity. Why do users still see errors?", Options: []string{"The average is wrong", "Traffic comes in rushes well above capacity, and a short queue overflows during them", "The database is slow"}, Answer: 1,
+			Explain: "Utilisation is an average over time; failures happen in the moments when arrivals exceed capacity. Queues and headroom absorb those moments."}},
+		Debrief: "Provision for the burst, not the mean. A queue absorbs a burst only if it is large enough and drains fast enough; it trades errors for waiting time. Rate limiting protects a system from overload but does not make rejected users succeed, so it is the wrong tool when the burst is short enough to wait out.",
+	})
+
+	// 14l ─ Medium: a hot key overloads one shard; more shards do not help ────────────────
+	hotShard := func(shards int, cache bool) engine.Diagram {
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 700.0, "readPct": 90.0, "keySpace": 100000.0, "hotKeyPct": 35.0, "timeoutMs": 2000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("router", engine.KShardRouter, cols[3], rowMid, nil)
+		for k := 0; k < shards; k++ {
+			b.n(fmt.Sprintf("db%d", k+1), engine.KDatabase, cols[4], rowTop+float64(k)*60, P{"connections": 8.0, "readMs": 30.0, "writeMs": 40.0}).e("router", fmt.Sprintf("db%d", k+1))
+		}
+		b.e("users", "lb")
+		if cache {
+			b.n("cache", engine.KCache, cols[3], rowTop, P{"capacityItems": 1000.0}).e("cache", "router")
+			return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}, "router", "cache").done()
+		}
+		return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}, "router").done()
+	}
+	register(&Scenario{
+		ID: "hot-shard", Title: "One shard on fire", Difficulty: "Medium",
+		Summary: "The data is split four ways, and one celebrity item gets a third of all reads.",
+		Story:   "You sharded the database four ways so no shard sees more than a quarter of the traffic. Then one item went viral: 35% of all requests ask for it, and it lives on exactly one shard, which now takes half the load and falls over while the other three idle. Fix it. You may add and connect components.",
+		Diagram: hotShard(4, false), Solution: hotShard(4, true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(500), MaxCostPerHour: f(1.7), StarCostPerHour: f(1.65)},
+		DurationSec: 50, WarmupSec: 3, Speed: 1,
+		Hints: [3]string{
+			"Which shard is failing, and why does adding capacity to the other three not help?",
+			"More shards will not spread one item: it still maps to a single shard. What could answer the popular reads without touching that shard at all?",
+			"Put a cache in front of the shard router (connect the app servers to it and the cache to the router). A tiny cache is enough: the hot item stays in it.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "One item gets 35% of reads. What does going from 4 shards to 8 do?", Options: []string{"Halves the hot shard's load", "Helps a little, but the hot item still lives on one shard", "Nothing at all"}, Answer: 1,
+			Explain: "Resharding spreads the other keys thinner, but a single key cannot be split by hashing: its load stays on whichever shard owns it."}},
+		Debrief: "Sharding balances many keys, not one. A hot key needs a different tool: a cache in front, a replica set for that key, or splitting the key (for example, a counter sharded into N sub-counters). Check the load per shard, not the average.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
