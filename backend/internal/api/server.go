@@ -55,6 +55,7 @@ type Server struct {
 	idle      time.Duration
 	designs   *designs.Store
 	saves     *limiter
+	metrics   metrics
 }
 
 // New builds a server from cfg.
@@ -73,6 +74,7 @@ func New(cfg Config) *Server {
 	}
 	s := &Server{designs: cfg.Designs, saves: newLimiter(cfg.SaveLimit, time.Minute), mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), idle: cfg.IdleTimeout}
 	staticDir := cfg.StaticDir
+	s.mux.HandleFunc("GET /api/metrics", s.metrics.serve(cfg.Designs.Len))
 	s.mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
 	s.mux.HandleFunc("GET /api/registry", s.registry)
 	s.mux.HandleFunc("GET /api/scenarios", s.listScenarios)
@@ -216,6 +218,7 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
+	s.metrics.runs.Add(1)
 	if tooBig(req.Diagram) {
 		writeErr(w, 413, "diagram too large")
 		return
@@ -265,6 +268,7 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 // saveDesign stores a diagram (sanitized first) and returns the id that opens it.
 func (s *Server) saveDesign(w http.ResponseWriter, r *http.Request) {
 	if !s.saves.allow(clientAddr(r)) {
+		s.metrics.designsRateLimit.Add(1)
 		w.Header().Set("Retry-After", "60")
 		writeErr(w, http.StatusTooManyRequests, "too many designs shared, try again in a minute")
 		return
@@ -290,6 +294,7 @@ func (s *Server) saveDesign(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "could not save the design")
 		return
 	}
+	s.metrics.designsSaved.Add(1)
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id})
 }
 

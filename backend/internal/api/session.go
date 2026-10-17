@@ -90,8 +90,14 @@ func emptyStats() *engine.Stats {
 func (s *Server) sim(w http.ResponseWriter, r *http.Request) {
 	select {
 	case s.slots <- struct{}{}:
-		defer func() { <-s.slots }()
+		s.metrics.sessionsActive.Add(1)
+		s.metrics.sessionsTotal.Add(1)
+		defer func() {
+			<-s.slots
+			s.metrics.sessionsActive.Add(-1)
+		}()
 	default:
+		s.metrics.sessionsRefused.Add(1)
 		w.Header().Set("Retry-After", "5")
 		writeErr(w, http.StatusServiceUnavailable, "too many active simulations, try again shortly")
 		return

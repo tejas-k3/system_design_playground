@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -436,5 +437,58 @@ func TestSecurityHeadersAndStaticCaching(t *testing.T) {
 	}
 	if got := get("/some/client/route"); got.StatusCode != 200 {
 		t.Errorf("unknown routes fall back to the app, got %d", got.StatusCode)
+	}
+}
+
+func TestMetricsReflectActivity(t *testing.T) {
+	ts := newTestServerWith(t, Config{OriginPatterns: []string{"*"}, MaxSessions: 1, SaveLimit: 1})
+	read := func() map[string]int {
+		resp, err := http.Get(ts.URL + "/api/metrics")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
+			t.Fatalf("metrics content type %q", ct)
+		}
+		out := map[string]int{}
+		sc := bufio.NewScanner(resp.Body)
+		for sc.Scan() {
+			var name string
+			var v int
+			if n, _ := fmt.Sscanf(sc.Text(), "%s %d", &name, &v); n == 2 && !strings.HasPrefix(name, "#") {
+				out[name] = v
+			}
+		}
+		return out
+	}
+	if m := read(); m["sdp_sessions_active"] != 0 || m["sdp_designs_stored"] != 0 {
+		t.Fatalf("a fresh server should be idle: %v", m)
+	}
+
+	c, ctx := dial(t, ts)
+	readType(t, c, ctx, "frame")
+	if r, err := http.Get(ts.URL + "/api/sim"); err == nil { // refused: the only slot is taken
+		r.Body.Close()
+	}
+	d := scenarios.Get("hello-world").Solution
+	post(t, ts.URL+"/api/designs", map[string]any{"diagram": d}, nil)
+	post(t, ts.URL+"/api/designs", map[string]any{"diagram": d}, nil) // over the limit of 1
+	post(t, ts.URL+"/api/run", map[string]any{"diagram": d, "durationSec": 2}, nil)
+
+	m := read()
+	want := map[string]int{"sdp_sessions_active": 1, "sdp_sessions_total": 1, "sdp_sessions_refused_total": 1, "sdp_designs_saved_total": 1, "sdp_designs_rate_limited_total": 1, "sdp_designs_stored": 1, "sdp_runs_total": 1}
+	for k, v := range want {
+		if m[k] != v {
+			t.Errorf("%s = %d, want %d (all: %v)", k, m[k], v, m)
+		}
+	}
+	c.Close(websocket.StatusNormalClosure, "bye")
+	deadline := time.Now().Add(3 * time.Second)
+	for read()["sdp_sessions_active"] != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("active sessions gauge never returned to zero")
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
