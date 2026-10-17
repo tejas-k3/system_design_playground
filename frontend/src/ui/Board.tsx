@@ -76,6 +76,7 @@ export function Board() {
       selection: new Set(st.selection),
       hover: hover.current,
       handles: handleSet(st, hover.current),
+      traffic: st.scenario?.def.traffic,
       connect: conn ? { from: conn, to: screenToWorld(pointer.current, st.viewport), target: connectTo.current.target } : null,
       validTargets: valid,
       marquee: marquee.current,

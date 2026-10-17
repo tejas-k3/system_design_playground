@@ -25,6 +25,7 @@ export interface Scene {
   selection: Set<string>
   hover: string | null
   handles: Set<string> // components that show their connection handle
+  traffic?: Record<string, [number, number][]> // the challenge's traffic curves, by client id
   connect: { from: string; to: Pt; target: string | null } | null
   validTargets: Set<string>
   marquee: Rect | null
@@ -170,7 +171,7 @@ function nodeSubtitle(n: Node, sc: Scene): string {
   const rp = sc.reg.resolve(n)
   switch (n.kind) {
     case 'client':
-      return clientRateLabel(rp as { rps: number; pattern: string; peakRps: number }, sc.running, sentRate(n.id, sc))
+      return clientRateLabel(rp as { rps: number; pattern: string; peakRps: number }, sc.running, sentRate(n.id, sc), sc.traffic?.[n.id])
     case 'appServer':
       return `${rp.threads} threads`
     case 'database':
@@ -295,7 +296,7 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
     ctx.fillStyle = p.muted
     ctx.font = `11px ${FONT}`
     ctx.textAlign = 'right'
-    ctx.fillText('fixed', r.x + r.w - 8, r.y + r.h - 18)
+    ctx.fillText('fixed', r.x + r.w - 8, r.y + r.h - 6)
   }
 }
 

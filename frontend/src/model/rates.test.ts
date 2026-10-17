@@ -11,6 +11,12 @@ describe('clientRateLabel', () => {
     expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, true, 7.25)).toBe('now 7.3/s')
     expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, true, 1234)).toBe('now 1.2k/s')
   })
+  it('previews a challenge curve at rest instead of the node setting it overrides', () => {
+    const curve: [number, number][] = [[0, 80], [8, 80], [14, 600], [50, 600], [56, 80]]
+    expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, false, 0, curve)).toBe('80 → 600 rps')
+    expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, false, 0, [[0, 100], [10, 100]])).toBe('100 rps')
+    expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, true, 580, curve)).toBe('now 580/s')
+  })
   it('falls back to the configured rate while the first numbers are still arriving', () => {
     expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, true, 0)).toBe('80 rps')
   })
