@@ -40,3 +40,18 @@ jobs:
       - run: make test-frontend
       - run: npm run build
         working-directory: frontend
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t system-design-playground .
+      - name: Smoke test the image
+        run: |
+          docker run -d --name app -p 8090:8090 system-design-playground
+          for i in $(seq 1 20); do
+            curl -fs http://localhost:8090/api/healthz && echo && exit 0
+            sleep 1
+          done
+          docker logs app
+          exit 1
