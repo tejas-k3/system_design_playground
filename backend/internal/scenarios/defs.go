@@ -397,4 +397,31 @@ func init() {
 			Explain: "Spatial indexes organise points by location so a proximity query touches only nearby entries."}},
 		Debrief: "The cheapest scaling fix is often a better index. Measure first: the database was doing 25× the work for every search.",
 	})
+
+	// 14 ─ Hard, config only ──────────────────────────────────────────────────────────
+	durable := func(persistence string) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 300.0, "readPct": 20.0, "workload": "leaderboard", "keySpace": 1000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowBot, nil).
+			n("redis", engine.KRedis, cols[3], rowTop, P{"persistence": persistence}).
+			e("users", "lb").servers(3, cols[2], rowTop, 100, nil, "redis").done()
+	}
+	register(&Scenario{
+		ID: "scoreboard-survives", Title: "Scoreboard survives a crash", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Redis holds every score in memory. Pull the plug and watch them vanish.",
+		Story:   "Players submit scores all game long and Redis keeps them. At 25 seconds Redis crashes and comes back three seconds later. How many scores did you lose? The architecture is fixed: fix it with configuration.",
+		Diagram: durable("none"), Solution: durable("aof"),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "redis", AtSec: 25, DownSec: 3}},
+		Goals:       engine.Goals{MinSuccessRate: 0.9, MaxP95Ms: f(300), MaxLostWrites: i(400)},
+		DurationSec: 50, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"A crash empties anything that only lives in memory. What does Redis offer to keep a copy on disk?",
+			"Open the Redis settings and look at what it says about persistence.",
+			"Switch Redis persistence to the append-only file: a crash then loses at most the last second of writes.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "With an append-only file, what is the most you can lose in a crash?", Options: []string{"Nothing at all", "About the last second of writes", "Everything since the last backup"}, Answer: 1,
+			Explain: "The file is flushed about once a second, so writes acknowledged since the last flush can still be lost."}},
+		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose how many seconds of data you can afford to lose, then pick the setting that guarantees it.",
+	})
 }

@@ -67,8 +67,8 @@ func TestRegistryAndScenarios(t *testing.T) {
 	var list []scenarioSummary
 	resp, _ = http.Get(ts.URL + "/api/scenarios")
 	_ = json.NewDecoder(resp.Body).Decode(&list)
-	if len(list) != 13 {
-		t.Fatalf("%d scenarios", len(list))
+	if len(list) != len(scenarios.All()) || len(list) == 0 {
+		t.Fatalf("%d scenarios listed, %d registered", len(list), len(scenarios.All()))
 	}
 	resp, _ = http.Get(ts.URL + "/api/scenarios/nope")
 	if resp.StatusCode != 404 {
