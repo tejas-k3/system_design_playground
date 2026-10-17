@@ -16,7 +16,7 @@ simulation live.
 
 ## Quick start
 
-Requires Go 1.23+ and Node 20+.
+Requires Go 1.23+ and Node 22.12+.
 
 ```sh
 make install          # once: frontend dependencies
