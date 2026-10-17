@@ -5,6 +5,8 @@ import { palettes } from '../draw/theme'
 import { MIN_ZOOM } from '../model/diagram'
 import { drainParticles } from '../sim/particles'
 import { useStore } from '../state/store'
+import { NoteEditor, type NoteEdit } from './board/NoteEditor'
+import { ZoomBadge } from './board/ZoomBadge'
 
 type Mode =
   | { k: 'idle' }
@@ -12,14 +14,6 @@ type Mode =
   | { k: 'drag'; last: Pt; ids: string[] }
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
   | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
-
-interface NoteEdit {
-  id: string
-  left: number
-  top: number
-  w: number
-  size: number
-}
 
 const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
 
@@ -406,34 +400,9 @@ export function Board() {
         aria-label="System design canvas"
       />
       {noteEdit && (
-        <textarea
-          autoFocus
-          className="note-edit"
-          defaultValue={useStore.getState().diagram.notes.find((n) => n.id === noteEdit.id)?.text ?? ''}
-          style={{ left: noteEdit.left, top: noteEdit.top, width: noteEdit.w, fontSize: noteEdit.size }}
-          onBlur={(e) => commitNote(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') (e.currentTarget as HTMLTextAreaElement).blur()
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              ;(e.currentTarget as HTMLTextAreaElement).blur()
-            }
-          }}
-        />
+        <NoteEditor edit={noteEdit} initialText={useStore.getState().diagram.notes.find((n) => n.id === noteEdit.id)?.text ?? ''} onCommit={commitNote} />
       )}
       <ZoomBadge fit={fitView} by={(f) => useStore.getState().zoomAt(f, size.current.w / 2, size.current.h / 2)} />
     </div>
   )
 }
-
-function ZoomBadge({ fit, by }: { fit: () => void; by: (f: number) => void }) {
-  const zoom = useStore((s) => s.viewport.zoom)
-  return (
-    <div className="zoom-badge" role="group" aria-label="Zoom">
-      <button onClick={() => by(1 / 1.2)} aria-label="Zoom out" title="Zoom out (-)">−</button>
-      <button className="zoom-val" onClick={fit} title="Fit to content (F)">{Math.round(zoom * 100)}%</button>
-      <button onClick={() => by(1.2)} aria-label="Zoom in" title="Zoom in (+)">+</button>
-    </div>
-  )
-}
-
