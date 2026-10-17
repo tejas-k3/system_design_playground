@@ -1,0 +1,326 @@
+import { create } from 'zustand'
+import type { Diagram, Edge, Node, Note, Prediction, Scenario, Score, SimStatus, Stats } from '../api/types'
+import { MAX_ZOOM, MIN_ZOOM, Reg, defaultLatency, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
+
+export type Tool = 'select' | 'connect'
+export interface Viewport {
+  scrollX: number
+  scrollY: number
+  zoom: number
+}
+export interface ScenarioState {
+  def: Scenario
+  hintLevel: number
+  result: Score | null
+  predictions: Record<string, number>
+  solved: boolean
+}
+export interface Toast {
+  id: number
+  kind: 'info' | 'warn' | 'error'
+  text: string
+}
+export type Connection = 'connecting' | 'open' | 'closed'
+
+export const emptyStats = (): Stats => ({ global: { now: 0, inFlight: 0, cost: 0, run: emptyRun() }, nodes: {}, edges: {}, series: [] })
+function emptyRun() {
+  return { resolved: 0, pending: 0, ok: 0, failed: 0, p50: 0, p95: 0, p99: 0, mean: 0, errors: {}, conflicts: 0, freshReads: 0, staleReads: 0, duplicates: 0 }
+}
+
+const HISTORY = 100
+
+export interface State {
+  reg: Reg | null
+  diagram: Diagram
+  selection: string[]
+  tool: Tool
+  viewport: Viewport
+  theme: 'light' | 'dark'
+  progress: Record<string, number>
+  sim: { status: SimStatus; speed: number; seed: number }
+  stats: Stats
+  cost: number
+  scenario: ScenarioState | null
+  sandbox: Diagram | null // sandbox saved while a scenario is open
+  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean }
+  toasts: Toast[]
+  connection: Connection
+  past: Diagram[]
+  future: Diagram[]
+  gesture: Diagram | null
+  fitRequest: number
+
+  setReg(reg: Reg): void
+  requestFit(): void
+  clearRun(): void
+  addNode(kind: string, x: number, y: number): string | null
+  moveNodes(ids: string[], dx: number, dy: number): void
+  updateNode(id: string, patch: Partial<Pick<Node, 'label'>>): void
+  setParam(id: string, key: string, value: number | string | boolean): void
+  addEdge(from: string, to: string): string | null
+  updateEdge(id: string, patch: Partial<Pick<Edge, 'latencyMs'>>): void
+  addNote(x: number, y: number): string
+  updateNote(id: string, patch: Partial<Note>): void
+  deleteIds(ids: string[]): void
+  deleteSelection(): void
+  beginGesture(): void
+  endGesture(): void
+  undo(): void
+  redo(): void
+  newDiagram(): void
+  loadDiagram(d: Diagram): void
+  setSelection(ids: string[]): void
+  setTool(t: Tool): void
+  setViewport(v: Partial<Viewport>): void
+  zoomAt(factor: number, cx: number, cy: number): void
+  setTheme(t: 'light' | 'dark'): void
+  setUi(p: Partial<State['ui']>): void
+  setSim(p: Partial<State['sim']>): void
+  setStats(s: Stats): void
+  setCost(c: number): void
+  setConnection(c: Connection): void
+  toast(text: string, kind?: Toast['kind'], ms?: number): void
+  dismissToast(id: number): void
+  openScenario(def: Scenario): void
+  exitScenario(): void
+  answerPrediction(p: Prediction, choice: number): void
+  revealHint(): void
+  showSolution(d: Diagram): void
+  setResult(score: Score): void
+  hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport }): void
+}
+
+let toastSeq = 1
+
+export const useStore = create<State>()((set, get) => {
+  /** Apply a diagram change and record undo history. */
+  const mutate = (fn: (d: Diagram) => Diagram) => {
+    const cur = get().diagram
+    const next = fn(cur)
+    if (next === cur) return
+    if (get().gesture) {
+      set({ diagram: next, future: [] })
+      return
+    }
+    set((s) => ({ diagram: next, past: [...s.past, cur].slice(-HISTORY), future: [] }))
+  }
+  const configOnly = () => !!get().scenario?.def.configOnly
+  const guardTopology = (): boolean => {
+    if (configOnly()) {
+      get().toast('Incident mode: fix it with configuration, the architecture is fixed', 'warn')
+      return true
+    }
+    return false
+  }
+  const locked = (id: string) => get().diagram.nodes.some((n) => n.id === id && n.locked)
+
+  return {
+    reg: null,
+    diagram: emptyDiagram(),
+    selection: [],
+    tool: 'select',
+    viewport: { scrollX: 0, scrollY: 0, zoom: 1 },
+    theme: typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+    progress: {},
+    sim: { status: 'stopped', speed: 1, seed: 42 },
+    stats: emptyStats(),
+    cost: 0,
+    scenario: null,
+    sandbox: null,
+    ui: { library: typeof window === 'undefined' || window.innerWidth >= 1000, help: false, welcome: true, picker: false, inspector: true, result: false },
+    toasts: [],
+    connection: 'connecting',
+    past: [],
+    future: [],
+    gesture: null,
+    fitRequest: 0,
+
+    setReg: (reg) => set({ reg }),
+    requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
+    clearRun: () =>
+      set((s) => ({
+        stats: emptyStats(),
+        scenario: s.scenario ? { ...s.scenario, result: null } : null,
+        ui: { ...s.ui, result: false },
+      })),
+
+    addNode: (kind, x, y) => {
+      const reg = get().reg
+      const spec = reg?.spec(kind)
+      if (!spec || guardTopology()) return null
+      const id = newId('n')
+      mutate((d) => ({
+        ...d,
+        nodes: [...d.nodes, { id, kind, x, y, label: uniqueLabel(d, spec.name), params: {} }],
+      }))
+      set({ selection: [id], ui: { ...get().ui, welcome: false } })
+      return id
+    },
+
+    moveNodes: (ids, dx, dy) => {
+      const set_ = new Set(ids)
+      mutate((d) => ({
+        ...d,
+        nodes: d.nodes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
+        notes: d.notes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
+      }))
+    },
+
+    updateNode: (id, patch) => mutate((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
+
+    setParam: (id, key, value) =>
+      mutate((d) => ({
+        ...d,
+        nodes: d.nodes.map((n) => (n.id === id ? { ...n, params: { ...n.params, [key]: value } } : n)),
+      })),
+
+    addEdge: (from, to) => {
+      const { reg, diagram } = get()
+      const f = diagram.nodes.find((n) => n.id === from)
+      const t = diagram.nodes.find((n) => n.id === to)
+      if (!reg || !f || !t || from === to) return null
+      if (guardTopology()) return null
+      if (!reg.canConnect(f.kind, t.kind)) {
+        get().toast(`${reg.spec(f.kind)?.name} can't connect to ${reg.spec(t.kind)?.name}`, 'warn')
+        return null
+      }
+      if (diagram.edges.some((e) => e.from === from && e.to === to)) return null
+      const id = newId('e')
+      mutate((d) => ({ ...d, edges: [...d.edges, { id, from, to, latencyMs: defaultLatency(f.kind, t.kind) }] }))
+      set({ selection: [id] })
+      return id
+    },
+
+    updateEdge: (id, patch) => mutate((d) => ({ ...d, edges: d.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+
+    addNote: (x, y) => {
+      const id = newId('t')
+      mutate((d) => ({ ...d, notes: [...d.notes, { id, x, y, text: '' }] }))
+      set({ selection: [id] })
+      return id
+    },
+
+    updateNote: (id, patch) => mutate((d) => ({ ...d, notes: d.notes.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
+
+    deleteIds: (ids) => {
+      const kill = new Set(ids.filter((id) => !locked(id)))
+      if (kill.size === 0) return
+      const structural = get().diagram.nodes.some((n) => kill.has(n.id)) || get().diagram.edges.some((e) => kill.has(e.id))
+      if (structural && guardTopology()) return
+      mutate((d) => ({
+        nodes: d.nodes.filter((n) => !kill.has(n.id)),
+        edges: d.edges.filter((e) => !kill.has(e.id) && !kill.has(e.from) && !kill.has(e.to)),
+        notes: d.notes.filter((n) => !kill.has(n.id)),
+      }))
+      set((s) => ({ selection: s.selection.filter((id) => !kill.has(id)) }))
+    },
+    deleteSelection: () => get().deleteIds(get().selection),
+
+    beginGesture: () => {
+      if (!get().gesture) set({ gesture: get().diagram })
+    },
+    endGesture: () => {
+      const g = get().gesture
+      if (!g) return
+      set((s) => (s.diagram === g ? { gesture: null } : { gesture: null, past: [...s.past, g].slice(-HISTORY), future: [] }))
+    },
+
+    undo: () => {
+      const { past, diagram } = get()
+      if (!past.length) return
+      set((s) => ({ diagram: past[past.length - 1], past: past.slice(0, -1), future: [diagram, ...s.future], selection: [] }))
+    },
+    redo: () => {
+      const { future, diagram } = get()
+      if (!future.length) return
+      set((s) => ({ diagram: future[0], future: future.slice(1), past: [...s.past, diagram], selection: [] }))
+    },
+
+    newDiagram: () => {
+      if (get().scenario) return
+      mutate(() => emptyDiagram())
+      set({ selection: [], ui: { ...get().ui, welcome: true } })
+    },
+    loadDiagram: (d) => set({ diagram: d, past: [], future: [], selection: [] }),
+
+    setSelection: (ids) => set({ selection: ids }),
+    setTool: (tool) => set({ tool }),
+    setViewport: (v) => set((s) => ({ viewport: { ...s.viewport, ...v } })),
+    zoomAt: (factor, cx, cy) =>
+      set((s) => {
+        const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, s.viewport.zoom * factor))
+        const k = z / s.viewport.zoom
+        // keep the world point under (cx, cy) fixed
+        return { viewport: { zoom: z, scrollX: cx - (cx - s.viewport.scrollX) * k, scrollY: cy - (cy - s.viewport.scrollY) * k } }
+      }),
+    setTheme: (theme) => {
+      document.documentElement.setAttribute('data-theme', theme)
+      set({ theme })
+    },
+    setUi: (p) => set((s) => ({ ui: { ...s.ui, ...p } })),
+    setSim: (p) => set((s) => ({ sim: { ...s.sim, ...p } })),
+    setStats: (stats) => set({ stats: { ...stats, series: stats.series ?? [], nodes: stats.nodes ?? {}, edges: stats.edges ?? {} } }),
+    setCost: (cost) => set({ cost }),
+    setConnection: (connection) => set({ connection }),
+
+    toast: (text, kind = 'info', ms = 3500) => {
+      const id = toastSeq++
+      set((s) => ({ toasts: [...s.toasts.slice(-3), { id, kind, text }] }))
+      setTimeout(() => get().dismissToast(id), ms)
+    },
+    dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+    openScenario: (def) => {
+      const s = get()
+      set({
+        sandbox: s.scenario ? s.sandbox : s.diagram,
+        diagram: structuredClone(def.diagram),
+        past: [],
+        future: [],
+        selection: [],
+        stats: emptyStats(),
+        scenario: { def, hintLevel: 0, result: null, predictions: {}, solved: false },
+        sim: { ...s.sim, status: 'stopped', speed: def.speed || 1 },
+        ui: { ...s.ui, picker: false, welcome: false, result: false },
+      })
+    },
+    exitScenario: () => {
+      const s = get()
+      set({
+        diagram: s.sandbox ?? emptyDiagram(),
+        sandbox: null,
+        past: [],
+        future: [],
+        selection: [],
+        stats: emptyStats(),
+        scenario: null,
+        sim: { ...s.sim, status: 'stopped' },
+        ui: { ...s.ui, welcome: !(s.sandbox?.nodes.length), result: false },
+      })
+    },
+    answerPrediction: (p, choice) =>
+      set((s) => (s.scenario && !(p.id in s.scenario.predictions) ? { scenario: { ...s.scenario, predictions: { ...s.scenario.predictions, [p.id]: choice } } } : {})),
+    revealHint: () => set((s) => (s.scenario ? { scenario: { ...s.scenario, hintLevel: Math.min(3, s.scenario.hintLevel + 1) } } : {})),
+    showSolution: (d) => {
+      if (!get().scenario) return
+      mutate(() => structuredClone(d))
+      set((s) => ({ scenario: s.scenario ? { ...s.scenario, solved: true } : null, selection: [] }))
+    },
+    setResult: (score) =>
+      set((s) => {
+        if (!s.scenario) return {}
+        const id = s.scenario.def.id
+        const better = score.stars > (s.progress[id] ?? 0)
+        return { scenario: { ...s.scenario, result: score }, ui: { ...s.ui, result: true }, progress: better ? { ...s.progress, [id]: score.stars } : s.progress }
+      }),
+
+    hydrate: (p) =>
+      set((s) => ({
+        diagram: p.sandbox ?? s.diagram,
+        theme: p.theme ?? s.theme,
+        progress: p.progress ?? s.progress,
+        viewport: p.viewport ?? s.viewport,
+        ui: { ...s.ui, welcome: !(p.sandbox?.nodes.length) },
+      })),
+  }
+})
