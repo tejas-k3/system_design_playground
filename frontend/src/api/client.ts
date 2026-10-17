@@ -18,6 +18,16 @@ export const fetchScenarios = () => fetch('/api/scenarios').then((r) => json<Sce
 export const fetchScenario = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}`).then((r) => json<Scenario>(r))
 export const fetchSolution = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/solution`).then((r) => json<Diagram>(r))
 
+/** Store a diagram on the server and return the id that opens it. */
+export async function saveDesign(diagram: Diagram): Promise<string> {
+  const res = await fetch('/api/designs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram }) })
+  return (await json<{ id: string }>(res)).id
+}
+
+export async function fetchDesign(id: string): Promise<Diagram> {
+  return (await json<{ diagram: Diagram }>(await fetch(`/api/designs/${encodeURIComponent(id)}`))).diagram
+}
+
 export async function validate(diagram: Diagram): Promise<{ diagram: Diagram; adjusted: boolean; costPerHour: number }> {
   const res = await fetch('/api/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram }) })
   return json(res)

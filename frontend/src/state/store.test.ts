@@ -67,6 +67,16 @@ describe('diagram editing', () => {
     expect(st().diagram.edges).toHaveLength(0)
   })
 
+  it('imports a whole diagram as one undoable step', () => {
+    setup()
+    const before = st().diagram
+    st().importDiagram({ nodes: [{ id: 'x', kind: 'cache', x: 0, y: 0, label: 'Cache', params: {} }], edges: [], notes: [] })
+    expect(st().diagram.nodes.map((n) => n.id)).toEqual(['x'])
+    expect(st().selection).toEqual([])
+    st().undo()
+    expect(st().diagram).toEqual(before)
+  })
+
   it('updates parameters without mutating earlier history', () => {
     const { a } = setup()
     st().setParam(a, 'threads', 32)

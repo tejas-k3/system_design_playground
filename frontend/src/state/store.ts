@@ -70,6 +70,7 @@ export interface State {
   redo(): void
   newDiagram(): void
   loadDiagram(d: Diagram): void
+  importDiagram(d: Diagram): void
   setSelection(ids: string[]): void
   setTool(t: Tool): void
   setViewport(v: Partial<Viewport>): void
@@ -246,6 +247,11 @@ export const useStore = create<State>()((set, get) => {
       set({ selection: [], ui: { ...get().ui, welcome: true } })
     },
     loadDiagram: (d) => set({ diagram: d, past: [], future: [], selection: [] }),
+    // like loadDiagram but undoable, so opening someone else's design never destroys your own
+    importDiagram: (d) => {
+      mutate(() => d)
+      set({ selection: [], ui: { ...get().ui, welcome: false } })
+    },
 
     setSelection: (ids) => set({ selection: ids }),
     setTool: (tool) => set({ tool }),
