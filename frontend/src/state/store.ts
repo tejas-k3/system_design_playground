@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Diagram, Edge, Node, Note, Prediction, Scenario, Score, SimStatus, Stats } from '../api/types'
-import { MAX_ZOOM, MIN_ZOOM, Reg, defaultLatency, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
+import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
 
 export type Tool = 'select' | 'connect'
 export interface Viewport {
@@ -186,7 +186,7 @@ export const useStore = create<State>()((set, get) => {
       }
       if (diagram.edges.some((e) => e.from === from && e.to === to)) return null
       const id = newId('e')
-      mutate((d) => ({ ...d, edges: [...d.edges, { id, from, to, latencyMs: defaultLatency(f.kind, t.kind) }] }))
+      mutate((d) => ({ ...d, edges: [...d.edges, { id, from, to, latencyMs: reg.defaultLatency(f.kind, t.kind) }] }))
       set({ selection: [id] })
       return id
     },

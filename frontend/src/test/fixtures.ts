@@ -3,7 +3,14 @@ import { Reg } from '../model/diagram'
 
 // A small registry shared by unit tests so they do not need the Go server.
 export const registry: Registry = {
-  latency: { min: 1, max: 200 },
+  latency: {
+    min: 1,
+    max: 200,
+    // same first-match table the server serves
+    rules: [{ from: 'client', to: 'cdn', ms: 10 }, { from: 'client', ms: 40 }, { from: 'cdn', ms: 40 }, { to: 'externalApi', ms: 20 }, { ms: 5 }],
+  },
+  speeds: [0.5, 1, 2],
+  reasons: [{ id: 'queueFull', label: 'Queue full (503)' }],
   nodes: [
     {
       kind: 'client', name: 'Users', description: '', lesson: '', accent: '#000', width: 160, height: 72,

@@ -61,9 +61,17 @@ export interface NodeSpec {
   params: ParamSpec[] | null
 }
 
+export interface LatencyRule {
+  from?: string
+  to?: string
+  ms: number
+}
+
 export interface Registry {
   nodes: NodeSpec[]
-  latency: { min: number; max: number }
+  latency: { min: number; max: number; rules: LatencyRule[] }
+  speeds: number[]
+  reasons: { id: string; label: string }[]
 }
 
 export interface Goals {

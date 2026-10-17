@@ -1,6 +1,5 @@
 import type { Diagram, Edge, Node, NodeSpec, Params, ParamSpec, ParamValue, Registry } from '../api/types'
 
-export const SPEEDS = [0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 4]
 export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 4
 
@@ -37,15 +36,17 @@ export class Reg {
   canConnect(from: string, to: string): boolean {
     return !!this.byKind.get(from)?.canConnectTo?.includes(to)
   }
-}
-
-/** Default one-way latency of an edge, mirroring the server's rules. */
-export function defaultLatency(from: string, to: string): number {
-  if (from === 'client' && to === 'cdn') return 10
-  if (from === 'client') return 40
-  if (from === 'cdn') return 40
-  if (to === 'externalApi') return 20
-  return 5
+  /** Default one-way latency of a new edge: the first matching server rule wins. */
+  defaultLatency(from: string, to: string): number {
+    const rule = this.raw.latency.rules.find((r) => (!r.from || r.from === from) && (!r.to || r.to === to))
+    return rule?.ms ?? 5
+  }
+  get speeds(): number[] {
+    return this.raw.speeds
+  }
+  reasonLabel(id: string): string {
+    return this.raw.reasons.find((r) => r.id === id)?.label ?? id
+  }
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -121,7 +122,7 @@ export function sanitizeDiagram(reg: Reg, raw: unknown): { diagram: Diagram; adj
       continue
     }
     pairs.add(key)
-    let lat = num(e.latencyMs) && e.latencyMs > 0 ? e.latencyMs : defaultLatency(fk, tk)
+    let lat = num(e.latencyMs) && e.latencyMs > 0 ? e.latencyMs : reg.defaultLatency(fk, tk)
     const c = clamp(lat, reg.raw.latency.min, reg.raw.latency.max)
     if (c !== e.latencyMs) adjusted = true
     lat = c

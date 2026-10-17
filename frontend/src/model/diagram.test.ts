@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { reg } from '../test/fixtures'
-import { defaultLatency, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
+import { paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
 
 
 
@@ -46,12 +46,18 @@ describe('sanitizeDiagram', () => {
 })
 
 describe('helpers', () => {
-  it('uses the same default latencies as the server', () => {
-    expect(defaultLatency('client', 'cdn')).toBe(10)
-    expect(defaultLatency('client', 'appServer')).toBe(40)
-    expect(defaultLatency('cdn', 'appServer')).toBe(40)
-    expect(defaultLatency('appServer', 'externalApi')).toBe(20)
-    expect(defaultLatency('appServer', 'database')).toBe(5)
+  it('applies the default-latency rules the server provides, first match winning', () => {
+    expect(reg.defaultLatency('client', 'cdn')).toBe(10)
+    expect(reg.defaultLatency('client', 'appServer')).toBe(40)
+    expect(reg.defaultLatency('cdn', 'appServer')).toBe(40)
+    expect(reg.defaultLatency('appServer', 'externalApi')).toBe(20)
+    expect(reg.defaultLatency('appServer', 'database')).toBe(5)
+  })
+
+  it('labels failure reasons from the registry and falls back to the id', () => {
+    expect(reg.reasonLabel('queueFull')).toBe('Queue full (503)')
+    expect(reg.reasonLabel('mystery')).toBe('mystery')
+    expect(reg.speeds).toEqual([0.5, 1, 2])
   })
 
   it('numbers duplicate labels', () => {

@@ -1,10 +1,10 @@
-import { SPEEDS } from '../model/diagram'
 import { reset, step, togglePlay } from '../sim/bridge'
 import { useStore } from '../state/store'
 
 export function Toolbar() {
   const tool = useStore((s) => s.tool)
   const setTool = useStore((s) => s.setTool)
+  const speeds = useStore((s) => s.reg?.speeds ?? [1])
   const status = useStore((s) => s.sim.status)
   const speed = useStore((s) => s.sim.speed)
   const setSim = useStore((s) => s.setSim)
@@ -67,7 +67,7 @@ export function Toolbar() {
         <label className="speed">
           <span className="sr">Speed</span>
           <select value={speed} onChange={(e) => setSim({ speed: Number(e.target.value) })} aria-label="Simulation speed">
-            {SPEEDS.map((s) => (
+            {speeds.map((s) => (
               <option key={s} value={s}>{s}×</option>
             ))}
           </select>

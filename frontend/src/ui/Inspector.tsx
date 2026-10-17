@@ -63,26 +63,9 @@ function Overview({ count }: { count: number }) {
   )
 }
 
-const REASON: Record<string, string> = {
-  timeout: 'Timeouts',
-  queueFull: 'Queue full (503)',
-  nodeDown: 'Node down',
-  noRoute: 'No route',
-  noBackend: 'No healthy backend',
-  rateLimited: 'Rate limited (429)',
-  callTimeout: 'Call timeouts (504)',
-  circuitOpen: 'Circuit open',
-  dependencyError: 'Vendor errors',
-  lockBusy: 'Lock busy',
-  queueTimeout: 'Waited too long',
-  connRefused: 'DB connections refused',
-}
-
-export function reasonLabel(k: string) {
-  return REASON[k] ?? k
-}
-
 export function Errors({ errors, total }: { errors: Record<string, number>; total: number }) {
+  const reg = useStore((s) => s.reg)
+  const reasonLabel = (k: string) => reg?.reasonLabel(k) ?? k
   const rows = Object.entries(errors).sort((a, b) => b[1] - a[1])
   if (!rows.length) return null
   return (
@@ -160,6 +143,8 @@ function NodePanel({ id }: { id: string }) {
 }
 
 function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
+  const reg = useStore((st) => st.reg)
+  const reasonLabel = (k: string) => reg?.reasonLabel(k) ?? k
   const reasons = Object.entries(s.reasons ?? {}).sort((a, b) => b[1] - a[1])
   return (
     <div className="live">
