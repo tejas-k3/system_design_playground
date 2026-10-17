@@ -360,6 +360,15 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		if c.idem {
 			ms++
 		}
+		if n.kind == KDatabase {
+			wait, down := s.syncReplicaCost(n)
+			if down {
+				release()
+				s.failAt(n, RSyncReplica, cb) // the primary cannot acknowledge what its synchronous replica has not confirmed
+				return
+			}
+			ms += wait
+		}
 	}
 	s.hold(n, s.service(n, ms)*n.slow, release, cb, func() {
 		release()
@@ -367,9 +376,12 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		switch {
 		case write:
 			res.Ver = s.commit(n, c)
+			if n.promoted {
+				n.sincePromotion++
+			}
 		case c.wl == wlGeo || c.wl == wlLeader:
 		case n.kind == KReplica && !n.promoted:
-			res.Ver = s.verAt(c.key, s.now-n.f("replicationLagMs"))
+			res.Ver = s.verAt(c.key, s.now-s.replicaLag(n))
 		default:
 			res.Ver = s.itemVer(c.key)
 		}

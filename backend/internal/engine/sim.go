@@ -93,6 +93,7 @@ type node struct {
 	promoted        bool     // replica that took over as the primary after a failover
 	as              scaler   // app server autoscaling state
 	successor       *node    // database: the replica that replaced it
+	sincePromotion  int      // writes a promoted replica has accepted since it took over
 	held            []func() // calls waiting out a partition, delivered when it heals
 	out, in         []*edge
 

@@ -103,7 +103,7 @@ func (s *Sim) promote(db *node) {
 	if r == nil {
 		return // nothing to promote: the database stays down
 	}
-	lost := s.truncateVersions(db.downAt - r.f("replicationLagMs"))
+	lost := s.truncateVersions(db.downAt - s.replicaLag(r))
 	s.runLost += lost
 	r.promoted = true
 	db.successor = r
@@ -145,6 +145,9 @@ func (s *Sim) RestartNode(id string) {
 	}
 	n.down = false
 	n.slow = 1
+	if n.kind == KDatabase && n.successor != nil && n.successor.promoted && !n.b("fencing") {
+		s.rejoinUnfenced(n)
+	}
 	if n.kind == KClient {
 		s.startClient(n)
 	}
@@ -156,3 +159,37 @@ func (s *Sim) RestartNode(id string) {
 
 // ChaosLog returns chaos events that have fired so far.
 func (s *Sim) ChaosLog() []ChaosRecord { return s.chaosLog }
+
+// replicaLag is how far behind a replica effectively runs: none when it replicates synchronously.
+func (s *Sim) replicaLag(r *node) float64 {
+	if r.s("replication") == "sync" {
+		return 0
+	}
+	return r.f("replicationLagMs")
+}
+
+// syncReplicaCost is the extra time a write to this primary spends waiting for its synchronous replicas
+// (their write time plus a network round trip), and whether one of them is down, which blocks the write.
+func (s *Sim) syncReplicaCost(db *node) (wait float64, down bool) {
+	for _, r := range s.order {
+		if r.kind != KReplica || r.removed || r.promoted || r.s("replication") != "sync" {
+			continue
+		}
+		if r.down {
+			return 0, true
+		}
+		wait = math.Max(wait, r.f("writeMs")+10)
+	}
+	return wait, false
+}
+
+// rejoinUnfenced is the split-brain ending: with no fencing the old primary comes back believing it is still the
+// primary, clients return to it, and every write the promoted replica accepted in the meantime exists only there: lost.
+func (s *Sim) rejoinUnfenced(db *node) {
+	r := db.successor
+	lost := r.sincePromotion
+	s.runLost += lost
+	r.promoted, r.sincePromotion = false, 0
+	db.successor = nil
+	s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "splitbrain", NodeID: db.id, Label: db.label, Lost: lost})
+}
