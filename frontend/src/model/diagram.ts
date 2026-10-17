@@ -146,6 +146,16 @@ export function uniqueLabel(d: Diagram, base: string): string {
   for (let i = 2; ; i++) if (!used.has(`${base} ${i}`)) return `${base} ${i}`
 }
 
+/** Nodes this node could still be connected to: allowed by the registry, not itself, not already linked. */
+export function connectableTargets(d: Diagram, reg: Reg, nodeId: string): Node[] {
+  const from = d.nodes.find((n) => n.id === nodeId)
+  if (!from) return []
+  const linked = new Set(d.edges.filter((e) => e.from === nodeId).map((e) => e.to))
+  return d.nodes
+    .filter((n) => n.id !== nodeId && !linked.has(n.id) && reg.canConnect(from.kind, n.kind))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
 export function hasEdgeTo(d: Diagram, nodeId: string, kinds: string[]): boolean {
   const kindOf = new Map(d.nodes.map((n) => [n.id, n.kind]))
   return d.edges.some((e) => e.from === nodeId && kinds.includes(kindOf.get(e.to) ?? ''))

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
-import { paramVisible } from '../model/diagram'
+import { connectableTargets, paramVisible } from '../model/diagram'
 import { isNarrow } from '../model/responsive'
 import { crashNode, restartNode } from '../sim/bridge'
 import { useStore } from '../state/store'
@@ -143,8 +143,56 @@ function NodePanel({ id }: { id: string }) {
       {hasAdvanced && (
         <button className="link" onClick={() => setAdv(!adv)}>{adv ? 'Hide' : 'Show'} advanced</button>
       )}
+      <Connections nodeId={id} />
       {!node.locked && <button className="danger-outline" onClick={() => del([id])}>Delete component</button>}
     </div>
+  )
+}
+
+/** Wire components without dragging: lists what this node sends to, and adds or removes links. */
+function Connections({ nodeId }: { nodeId: string }) {
+  const diagram = useStore((s) => s.diagram)
+  const reg = useStore((s) => s.reg)!
+  const addEdge = useStore((s) => s.addEdge)
+  const deleteIds = useStore((s) => s.deleteIds)
+  const setSelection = useStore((s) => s.setSelection)
+  const [target, setTarget] = useState('')
+  const out = diagram.edges.filter((e) => e.from === nodeId)
+  const label = (id: string) => diagram.nodes.find((n) => n.id === id)?.label ?? id
+  const options = connectableTargets(diagram, reg, nodeId)
+  const chosen = options.some((o) => o.id === target) ? target : (options[0]?.id ?? '')
+  if (out.length === 0 && options.length === 0) return null
+  return (
+    <section aria-label="Connections">
+      <h3>Sends requests to</h3>
+      {out.length === 0 && <p className="muted small">Nothing yet.</p>}
+      <ul className="conns">
+        {out.map((e) => (
+          <li key={e.id}>
+            <span>{label(e.to)}</span>
+            <button className="x" aria-label={`Remove connection to ${label(e.to)}`} onClick={() => deleteIds([e.id])}>×</button>
+          </li>
+        ))}
+      </ul>
+      {options.length > 0 && (
+        <div className="conn-add">
+          <label className="sr" htmlFor="conn-target">Connect to</label>
+          <select id="conn-target" value={chosen} onChange={(e) => setTarget(e.target.value)}>
+            {options.map((o) => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              // addEdge selects the new link; stay on this node so several links can be added in a row
+              if (chosen && addEdge(nodeId, chosen)) setSelection([nodeId])
+            }}
+          >
+            Connect
+          </button>
+        </div>
+      )}
+    </section>
   )
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { reg } from '../test/fixtures'
-import { paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
+import { connectableTargets, paramVisible, sanitizeDiagram, uniqueLabel } from './diagram'
 
 
 
@@ -58,6 +58,19 @@ describe('helpers', () => {
     expect(reg.reasonLabel('queueFull')).toBe('Queue full (503)')
     expect(reg.reasonLabel('mystery')).toBe('mystery')
     expect(reg.speeds).toEqual([0.5, 1, 2])
+  })
+
+  it('lists only the components a node may still connect to', () => {
+    const node = (id: string, kind: string, label: string) => ({ id, kind, x: 0, y: 0, label, params: {} })
+    const d = {
+      nodes: [node('u', 'client', 'Users'), node('a1', 'appServer', 'B server'), node('a2', 'appServer', 'A server'), node('db', 'database', 'DB')],
+      edges: [{ id: 'e1', from: 'u', to: 'a1', latencyMs: 40 }],
+      notes: [],
+    }
+    expect(connectableTargets(d, reg, 'u').map((n) => n.id)).toEqual(['a2']) // a1 already linked, db not allowed
+    expect(connectableTargets(d, reg, 'a1').map((n) => n.id)).toEqual(['db'])
+    expect(connectableTargets(d, reg, 'db')).toEqual([]) // databases connect to nothing
+    expect(connectableTargets(d, reg, 'missing')).toEqual([])
   })
 
   it('numbers duplicate labels', () => {
