@@ -1,0 +1,439 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ActiveParticle, PARTICLE_MS, createRough, measureText, render } from '../draw/renderer'
+import { type Pt, type Rect, boundsOf, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld } from '../draw/geometry'
+import { palettes } from '../draw/theme'
+import { MIN_ZOOM } from '../model/diagram'
+import { drainParticles } from '../sim/particles'
+import { useStore } from '../state/store'
+
+type Mode =
+  | { k: 'idle' }
+  | { k: 'pan'; sx: number; sy: number; moved: boolean }
+  | { k: 'drag'; last: Pt; ids: string[] }
+  | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
+  | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
+
+interface NoteEdit {
+  id: string
+  left: number
+  top: number
+  w: number
+  size: number
+}
+
+const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
+
+export function Board() {
+  const wrap = useRef<HTMLDivElement>(null)
+  const canvas = useRef<HTMLCanvasElement>(null)
+  const mode = useRef<Mode>({ k: 'idle' })
+  const hover = useRef<string | null>(null)
+  const pointer = useRef<Pt>({ x: 0, y: 0 })
+  const connectTo = useRef<{ target: string | null; pending: string | null }>({ target: null, pending: null })
+  const marquee = useRef<Rect | null>(null)
+  const particles = useRef<ActiveParticle[]>([])
+  const raf = useRef(0)
+  const size = useRef({ w: 0, h: 0, dpr: 1 })
+  const [noteEdit, setNoteEdit] = useState<NoteEdit | null>(null)
+  const [cursor, setCursor] = useState('default')
+
+  const draw = useCallback(() => {
+    raf.current = 0
+    const cv = canvas.current
+    const st = useStore.getState()
+    if (!cv || !st.reg) return
+    const ctx = cv.getContext('2d')!
+    const rc = createRough(cv)
+    const now = performance.now()
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    for (const p of drainParticles()) if (!reduced) particles.current.push({ edge: p.e, back: !!p.b, fail: !!p.f, t0: now })
+    if (particles.current.length > 700) particles.current = particles.current.slice(-700)
+    particles.current = particles.current.filter((p) => now - p.t0 < PARTICLE_MS)
+
+    const conn = mode.current.k === 'connect' ? mode.current.from : connectTo.current.pending
+    const byId = new Map(st.diagram.nodes.map((n) => [n.id, n]))
+    const valid = new Set<string>()
+    if (conn) {
+      const src = byId.get(conn)
+      if (src) for (const n of st.diagram.nodes) if (n.id !== conn && st.reg.canConnect(src.kind, n.kind)) valid.add(n.id)
+    }
+    render(ctx, rc, size.current.w, size.current.h, size.current.dpr, {
+      diagram: st.diagram,
+      reg: st.reg,
+      stats: st.stats,
+      running: st.sim.status !== 'stopped',
+      viewport: st.viewport,
+      palette: palettes[st.theme],
+      selection: new Set(st.selection),
+      hover: hover.current,
+      connect: conn ? { from: conn, to: screenToWorld(pointer.current, st.viewport), target: connectTo.current.target } : null,
+      validTargets: valid,
+      marquee: marquee.current,
+      particles: particles.current,
+      now,
+      editingNote: noteEdit?.id ?? null,
+      showParticles: true,
+    })
+    if (particles.current.length > 0 || st.sim.status === 'running') raf.current = requestAnimationFrame(draw)
+  }, [noteEdit])
+
+  const wake = useCallback(() => {
+    if (!raf.current) raf.current = requestAnimationFrame(draw)
+  }, [draw])
+
+  // keep a stable handle for subscribers
+  const wakeRef = useRef(wake)
+  wakeRef.current = wake
+
+  useEffect(() => {
+    const unsub = useStore.subscribe(() => wakeRef.current())
+    return () => {
+      unsub()
+      cancelAnimationFrame(raf.current)
+      raf.current = 0
+    }
+  }, [])
+  useEffect(() => wake(), [wake])
+
+  // size the canvas to its container
+  useLayoutEffect(() => {
+    const el = wrap.current
+    const cv = canvas.current
+    if (!el || !cv) return
+    const fit = () => {
+      const dpr = window.devicePixelRatio || 1
+      const r = el.getBoundingClientRect()
+      size.current = { w: r.width, h: r.height, dpr }
+      cv.width = Math.max(1, Math.round(r.width * dpr))
+      cv.height = Math.max(1, Math.round(r.height * dpr))
+      cv.style.width = `${r.width}px`
+      cv.style.height = `${r.height}px`
+      wakeRef.current()
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const fitView = useCallback(() => {
+    const st = useStore.getState()
+    if (!st.reg) return
+    const b = boundsOf(st.diagram, st.reg, measureText)
+    const { w, h } = size.current
+    if (!b || !w) {
+      st.setViewport({ scrollX: 0, scrollY: 0, zoom: 1 })
+      return
+    }
+    const pad = 80
+    const zoom = Math.min(1.2, Math.max(MIN_ZOOM, Math.min((w - pad * 2) / b.w, (h - pad * 2) / b.h)))
+    st.setViewport({ zoom, scrollX: (w - b.w * zoom) / 2 - b.x * zoom, scrollY: (h - b.h * zoom) / 2 - b.y * zoom })
+  }, [])
+
+  const fitRequest = useStore((s) => s.fitRequest)
+  const scenarioId = useStore((s) => s.scenario?.def.id)
+  useEffect(() => {
+    fitView()
+  }, [fitRequest, scenarioId, fitView])
+
+  // ---- pointer handling -------------------------------------------------------------
+
+  const local = (e: { clientX: number; clientY: number }): Pt => {
+    const r = canvas.current!.getBoundingClientRect()
+    return { x: e.clientX - r.left, y: e.clientY - r.top }
+  }
+  const world = (p: Pt) => screenToWorld(p, useStore.getState().viewport)
+
+  const hitAt = (w: Pt) => {
+    const st = useStore.getState()
+    const handles = new Set<string>(st.selection.filter((id) => st.diagram.nodes.some((n) => n.id === id)))
+    if (hover.current && st.diagram.nodes.some((n) => n.id === hover.current)) handles.add(hover.current)
+    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handles)
+  }
+
+  const finishConnect = (from: string, to: string | null) => {
+    const st = useStore.getState()
+    connectTo.current = { target: null, pending: null }
+    if (to && to !== from) st.addEdge(from, to)
+    mode.current = { k: 'idle' }
+    wake()
+  }
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (noteEdit) return
+    const st = useStore.getState()
+    if (!st.reg) return
+    canvas.current!.setPointerCapture(e.pointerId)
+    const sp = local(e)
+    pointer.current = sp
+    const w = world(sp)
+    if (e.button === 1 || e.button === 2) {
+      mode.current = { k: 'pan', sx: sp.x, sy: sp.y, moved: false }
+      setCursor('grabbing')
+      return
+    }
+    if (e.button !== 0) return
+    const hit = hitAt(w)
+
+    // click-click connect: second click completes
+    if (connectTo.current.pending) {
+      const from = connectTo.current.pending
+      finishConnect(from, hit?.type === 'node' ? hit.id : null)
+      return
+    }
+    if (st.tool === 'connect') {
+      if (hit && (hit.type === 'node' || hit.type === 'handle')) {
+        mode.current = { k: 'connect', from: hit.id, downAt: sp, moved: false }
+      } else mode.current = { k: 'pan', sx: sp.x, sy: sp.y, moved: false }
+      wake()
+      return
+    }
+    if (hit?.type === 'handle') {
+      mode.current = { k: 'connect', from: hit.id, downAt: sp, moved: false }
+      wake()
+      return
+    }
+    if (hit && (hit.type === 'node' || hit.type === 'note')) {
+      if (e.shiftKey) {
+        st.setSelection(st.selection.includes(hit.id) ? st.selection.filter((i) => i !== hit.id) : [...st.selection, hit.id])
+      } else if (!st.selection.includes(hit.id)) st.setSelection([hit.id])
+      const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id))
+      st.beginGesture()
+      mode.current = { k: 'drag', last: w, ids }
+      setCursor('grabbing')
+      return
+    }
+    if (hit?.type === 'edge') {
+      st.setSelection(e.shiftKey ? [...st.selection, hit.id] : [hit.id])
+      return
+    }
+    if (e.shiftKey) {
+      mode.current = { k: 'marquee', start: w, additive: true, base: st.selection }
+      return
+    }
+    mode.current = { k: 'pan', sx: sp.x, sy: sp.y, moved: false }
+  }
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const st = useStore.getState()
+    if (!st.reg) return
+    const sp = local(e)
+    pointer.current = sp
+    const w = world(sp)
+    const m = mode.current
+    switch (m.k) {
+      case 'pan': {
+        const dx = sp.x - m.sx
+        const dy = sp.y - m.sy
+        if (Math.abs(dx) + Math.abs(dy) > 2) m.moved = true
+        m.sx = sp.x
+        m.sy = sp.y
+        st.setViewport({ scrollX: st.viewport.scrollX + dx, scrollY: st.viewport.scrollY + dy })
+        return
+      }
+      case 'drag': {
+        st.moveNodes(m.ids, w.x - m.last.x, w.y - m.last.y)
+        m.last = w
+        return
+      }
+      case 'connect': {
+        if (Math.hypot(sp.x - m.downAt.x, sp.y - m.downAt.y) > 4) m.moved = true
+        const hit = hitAt(w)
+        const src = st.diagram.nodes.find((n) => n.id === m.from)
+        const tgt = hit?.type === 'node' ? st.diagram.nodes.find((n) => n.id === hit.id) : undefined
+        connectTo.current.target = src && tgt && tgt.id !== src.id && st.reg.canConnect(src.kind, tgt.kind) ? tgt.id : null
+        wake()
+        return
+      }
+      case 'marquee': {
+        const r: Rect = { x: Math.min(m.start.x, w.x), y: Math.min(m.start.y, w.y), w: Math.abs(w.x - m.start.x), h: Math.abs(w.y - m.start.y) }
+        marquee.current = r
+        const ids = [
+          ...st.diagram.nodes.filter((n) => rectsIntersect(r, nodeRect(n, st.reg!))).map((n) => n.id),
+          ...st.diagram.notes.filter((n) => rectsIntersect(r, noteRect(n, measureText))).map((n) => n.id),
+        ]
+        st.setSelection(Array.from(new Set([...(m.additive ? m.base : []), ...ids])))
+        wake()
+        return
+      }
+    }
+    // idle: hover feedback
+    const hit = hitAt(w)
+    const id = hit && hit.type !== 'handle' ? hit.id : hit?.type === 'handle' ? hit.id : null
+    if (id !== hover.current) {
+      hover.current = id
+      wake()
+    }
+    if (connectTo.current.pending) {
+      const src = st.diagram.nodes.find((n) => n.id === connectTo.current.pending)
+      const tgt = hit?.type === 'node' ? st.diagram.nodes.find((n) => n.id === hit.id) : undefined
+      connectTo.current.target = src && tgt && tgt.id !== src.id && st.reg.canConnect(src.kind, tgt.kind) ? tgt.id : null
+      wake()
+    }
+    setCursor(hit?.type === 'handle' ? 'crosshair' : hit ? 'pointer' : st.tool === 'connect' ? 'crosshair' : 'default')
+  }
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const st = useStore.getState()
+    const m = mode.current
+    canvas.current?.releasePointerCapture(e.pointerId)
+    if (m.k === 'drag') st.endGesture()
+    if (m.k === 'pan' && !m.moved) st.setSelection([])
+    if (m.k === 'connect') {
+      if (m.moved) {
+        finishConnect(m.from, connectTo.current.target)
+        setCursor('default')
+        return
+      }
+      if (st.tool === 'connect') {
+        // plain click on a node: wait for the second click
+        connectTo.current = { target: null, pending: m.from }
+        mode.current = { k: 'idle' }
+        wake()
+        return
+      }
+      mode.current = { k: 'idle' }
+      st.setSelection([m.from])
+    }
+    marquee.current = null
+    mode.current = { k: 'idle' }
+    setCursor('default')
+    wake()
+  }
+
+  const beginNoteEdit = (id: string) => {
+    const st = useStore.getState()
+    const n = st.diagram.notes.find((x) => x.id === id)
+    if (!n) return
+    const r = noteRect(n, measureText)
+    const v = st.viewport
+    setNoteEdit({ id, left: r.x * v.zoom + v.scrollX, top: r.y * v.zoom + v.scrollY, w: Math.max(160, r.w * v.zoom), size: (n.fontSize ?? 18) * v.zoom })
+  }
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    const st = useStore.getState()
+    if (!st.reg) return
+    const w = world(local(e))
+    const hit = hitAt(w)
+    if (hit?.type === 'note') beginNoteEdit(hit.id)
+    else if (!hit) {
+      const id = st.addNote(w.x - 20, w.y - 14)
+      setTimeout(() => beginNoteEdit(id), 0)
+    }
+  }
+
+  const commitNote = (text: string) => {
+    const st = useStore.getState()
+    if (!noteEdit) return
+    const id = noteEdit.id
+    setNoteEdit(null)
+    if (text.trim() === '') st.deleteIds([id])
+    else st.updateNote(id, { text })
+  }
+
+  // wheel zoom (non-passive so we can prevent page scroll)
+  useEffect(() => {
+    const el = canvas.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))
+      useStore.getState().zoomAt(factor, e.clientX - r.left, e.clientY - r.top)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  // keyboard handled at board level so typing in inputs is unaffected
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return
+      const st = useStore.getState()
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        e.shiftKey ? st.redo() : st.undo()
+      } else if (mod && e.key.toLowerCase() === 'y') {
+        e.preventDefault()
+        st.redo()
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        st.deleteSelection()
+      } else if (e.key === 'Escape') {
+        connectTo.current = { target: null, pending: null }
+        mode.current = { k: 'idle' }
+        st.setSelection([])
+        wake()
+      } else if (!mod && e.key.toLowerCase() === 'v') st.setTool('select')
+      else if (!mod && e.key.toLowerCase() === 'c') st.setTool('connect')
+      else if (!mod && e.key.toLowerCase() === 'f') fitView()
+      else if (!mod && (e.key === '+' || e.key === '=')) st.zoomAt(1.2, size.current.w / 2, size.current.h / 2)
+      else if (!mod && e.key === '-') st.zoomAt(1 / 1.2, size.current.w / 2, size.current.h / 2)
+    }
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
+  }, [fitView, wake])
+
+  // ---- drag & drop from the library ----------------------------------------------------
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const kind = e.dataTransfer.getData('application/x-sdp-kind')
+    const st = useStore.getState()
+    const spec = st.reg?.spec(kind)
+    if (!spec) return
+    const w = world(local(e))
+    st.addNode(kind, w.x - spec.width / 2, w.y - spec.height / 2)
+  }
+
+  return (
+    <div
+      ref={wrap}
+      className="board"
+      onDragOver={(e) => e.dataTransfer.types.includes('application/x-sdp-kind') && e.preventDefault()}
+      onDrop={onDrop}
+    >
+      <canvas
+        ref={canvas}
+        style={{ cursor, touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label="System design canvas"
+      />
+      {noteEdit && (
+        <textarea
+          autoFocus
+          className="note-edit"
+          defaultValue={useStore.getState().diagram.notes.find((n) => n.id === noteEdit.id)?.text ?? ''}
+          style={{ left: noteEdit.left, top: noteEdit.top, width: noteEdit.w, fontSize: noteEdit.size }}
+          onBlur={(e) => commitNote(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') (e.currentTarget as HTMLTextAreaElement).blur()
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              ;(e.currentTarget as HTMLTextAreaElement).blur()
+            }
+          }}
+        />
+      )}
+      <ZoomBadge fit={fitView} by={(f) => useStore.getState().zoomAt(f, size.current.w / 2, size.current.h / 2)} />
+    </div>
+  )
+}
+
+function ZoomBadge({ fit, by }: { fit: () => void; by: (f: number) => void }) {
+  const zoom = useStore((s) => s.viewport.zoom)
+  return (
+    <div className="zoom-badge" role="group" aria-label="Zoom">
+      <button onClick={() => by(1 / 1.2)} aria-label="Zoom out" title="Zoom out (-)">−</button>
+      <button className="zoom-val" onClick={fit} title="Fit to content (F)">{Math.round(zoom * 100)}%</button>
+      <button onClick={() => by(1.2)} aria-label="Zoom in" title="Zoom in (+)">+</button>
+    </div>
+  )
+}
+
