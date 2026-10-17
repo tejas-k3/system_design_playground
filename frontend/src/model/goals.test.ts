@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Stats } from '../api/types'
 import { emptyStats } from '../state/store'
-import { goalRows, starTargets, successRate } from './goals'
+import { fmtCost, goalRows, starTargets, successRate } from './goals'
 
 const stats = (run: Partial<Stats['global']['run']>): Stats => ({ ...emptyStats(), global: { now: 5, inFlight: 0, cost: 0, run: { ...emptyStats().global.run, ...run } } })
 const row = (rows: ReturnType<typeof goalRows>, label: string) => rows.find((r) => r.label === label)!
@@ -56,5 +56,17 @@ describe('successRate', () => {
   it('is what the success goal reports', () => {
     const run = { resolved: 80, ok: 60, pending: 20 }
     expect(row(goalRows({ minSuccessRate: 0.7 }, stats(run), 0, true), 'Success rate').actual).toBe('75.0%')
+  })
+})
+
+describe('unknown cost', () => {
+  it('is neither a pass nor a fail until the server has priced the design', () => {
+    const rows = goalRows({ minSuccessRate: 0.99, maxCostPerHour: 0.6 }, emptyStats(), null, false)
+    expect(row(rows, 'Cost').state).toBe('pending')
+    expect(row(rows, 'Cost').actual).toBe('—')
+  })
+  it('is written as a dash, never as $0.00', () => {
+    expect(fmtCost(null)).toBe('—')
+    expect(fmtCost(0.5)).toBe('$0.50/hr')
   })
 })

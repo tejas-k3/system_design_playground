@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
 import { connectableTargets, paramVisible } from '../model/diagram'
 import { isCompact } from '../model/responsive'
-import { pct, successRate } from '../model/goals'
+import { fmtCost, pct, successRate } from '../model/goals'
 import { crashNode, restartNode } from '../sim/bridge'
 import { useStore } from '../state/store'
 
@@ -52,7 +52,7 @@ function Overview({ count }: { count: number }) {
       <dl className="kv">
         <dt>Components</dt><dd>{diagram.nodes.length}</dd>
         <dt>Connections</dt><dd>{diagram.edges.length}</dd>
-        <dt>Cost</dt><dd>${cost.toFixed(2)}/hr</dd>
+        <dt>Cost</dt><dd>{fmtCost(cost)}</dd>
       </dl>
       {status !== 'stopped' && total > 0 && (
         <>
