@@ -396,3 +396,29 @@ func TestCrashFailsRequestsAlreadyInFlight(t *testing.T) {
 		t.Fatalf("only %d requests failed with nodeDown; in-flight work should be lost with the crash", lost)
 	}
 }
+
+// Redis keeps scores in memory. A crash loses the writes that were never persisted: everything
+// without persistence, only the last second with an append-only file.
+func TestRedisCrashLosesUnpersistedWrites(t *testing.T) {
+	lost := func(persistence string, crashAt float64) int {
+		b := &builder{}
+		b.node("u", KClient, Params{"rps": 300.0, "readPct": 0.0, "workload": "leaderboard", "keySpace": 1000.0})
+		b.node("a", KAppServer, Params{"threads": 32.0}).node("r", KRedis, Params{"persistence": persistence})
+		b.edge("u", "a").edge("a", "r")
+		var chaos []ChaosEvent
+		if crashAt > 0 {
+			chaos = []ChaosEvent{{Type: "crash", NodeID: "r", AtSec: crashAt, DownSec: 2}}
+		}
+		return run(b.d, Options{Seed: 5, Chaos: chaos}, 20).Snapshot().Global.Run.LostWrites
+	}
+	if got := lost("none", 0); got != 0 {
+		t.Fatalf("no crash should lose nothing, lost %d", got)
+	}
+	none, aof := lost("none", 12), lost("aof", 12)
+	if none < 2500 {
+		t.Fatalf("without persistence about 12 s x 300 writes should be lost, lost %d", none)
+	}
+	if aof < 100 || aof > 500 {
+		t.Fatalf("with an append-only file only ~1 s x 300 writes should be lost, lost %d", aof)
+	}
+}

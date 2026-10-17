@@ -255,7 +255,7 @@ func init() {
 			Lesson: "One thread means commands queue up behind each other.",
 			Accent: "#c92a2a", Width: 160, Height: 72, CanConnect: nil,
 			Params: []ParamSpec{
-				sel("persistence", "Persistence", "Durability", "none", "Whether data survives a restart.", opt("none", "None"), opt("aof", "Append-only file")),
+				sel("persistence", "Persistence", "Durability", "none", "What a crash loses. None: every write since it started. Append-only file: at most the last second.", opt("none", "None (memory only)"), opt("aof", "Append-only file")),
 				num("geoSearchMs", "Geo search time", "Speed", 0.4, 0.05, 20, 0.05, "ms", "Time for one nearby search."),
 				num("queueCap", "Queue size", "Capacity", 2000, 0, 20000, 100, "", "Commands that may wait."),
 			},

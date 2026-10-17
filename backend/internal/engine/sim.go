@@ -119,7 +119,9 @@ type node struct {
 	pools map[*node]*pool
 
 	// redis
-	locks map[int]redisLock
+	locks    map[int]redisLock
+	rwTotal  int       // counted writes since the process last started
+	rwRecent []float64 // times of counted writes in the last second (what an append-only file could still lose)
 
 	// queue
 	jobs []*job
@@ -184,6 +186,7 @@ type Sim struct {
 	runResolved, runOK, runFailed, runPending int
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
+	runLost                                   int // writes lost when an in-memory store crashed
 
 	jobEnqueued, jobCompleted, jobLost, jobRetried int
 	jobHist                                        Hist

@@ -59,7 +59,7 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	s.closePools(n)
 	s.dropConns(n)
 	if n.kind == KRedis {
-		n.locks = map[int]redisLock{}
+		s.loseRedisData(n)
 	}
 	if downSec > 0 {
 		ep := n.epoch

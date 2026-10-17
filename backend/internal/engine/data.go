@@ -449,9 +449,44 @@ func (s *Sim) procRedis(n *node, c *call, cb func(Result), release func()) {
 			if l, ok := n.locks[c.key]; ok && l.token == c.token {
 				delete(n.locks, c.key)
 			}
+		case cmdScore:
+			s.noteRedisWrite(n, c.counted)
 		}
 		s.okAt(n, Result{Ver: -1, Done: true, Src: n}, cb)
 	})
+}
+
+// noteRedisWrite remembers a counted write so a later crash can tell how much was lost.
+func (s *Sim) noteRedisWrite(n *node, counted bool) {
+	if !counted {
+		return
+	}
+	n.rwTotal++
+	if n.s("persistence") == "aof" {
+		n.rwRecent = append(n.rwRecent, s.now)
+		s.pruneRecentWrites(n)
+	}
+}
+
+func (s *Sim) pruneRecentWrites(n *node) {
+	i := 0
+	for i < len(n.rwRecent) && n.rwRecent[i] < s.now-1000 {
+		i++
+	}
+	n.rwRecent = n.rwRecent[i:]
+}
+
+// loseRedisData is called when a Redis node crashes: without persistence every write since it
+// started is gone; with an append-only file only the last second (not yet fsynced) is.
+func (s *Sim) loseRedisData(n *node) {
+	lost := n.rwTotal
+	if n.s("persistence") == "aof" {
+		s.pruneRecentWrites(n)
+		lost = len(n.rwRecent)
+	}
+	s.runLost += lost
+	n.rwTotal, n.rwRecent = 0, nil
+	n.locks = map[int]redisLock{}
 }
 
 // ---- queue + workers ----------------------------------------------------------------

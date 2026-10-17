@@ -39,20 +39,21 @@ type JobStats struct {
 
 // RunStats are totals over the counted part of the run.
 type RunStats struct {
-	Resolved  int            `json:"resolved"`
-	Pending   int            `json:"pending"`
-	OK        int            `json:"ok"`
-	Failed    int            `json:"failed"`
-	P50       float64        `json:"p50"`
-	P95       float64        `json:"p95"`
-	P99       float64        `json:"p99"`
-	Mean      float64        `json:"mean"`
-	Errors    map[string]int `json:"errors"`
-	Conflicts int            `json:"conflicts"`
-	Fresh     int            `json:"freshReads"`
-	Stale     int            `json:"staleReads"`
-	Dups      int            `json:"duplicates"`
-	Jobs      *JobStats      `json:"jobs,omitempty"`
+	Resolved   int            `json:"resolved"`
+	Pending    int            `json:"pending"`
+	OK         int            `json:"ok"`
+	Failed     int            `json:"failed"`
+	P50        float64        `json:"p50"`
+	P95        float64        `json:"p95"`
+	P99        float64        `json:"p99"`
+	Mean       float64        `json:"mean"`
+	Errors     map[string]int `json:"errors"`
+	Conflicts  int            `json:"conflicts"`
+	Fresh      int            `json:"freshReads"`
+	Stale      int            `json:"staleReads"`
+	Dups       int            `json:"duplicates"`
+	LostWrites int            `json:"lostWrites"`
+	Jobs       *JobStats      `json:"jobs,omitempty"`
 }
 
 type GlobalStats struct {
@@ -168,7 +169,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, LostWrites: s.runLost,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {
