@@ -613,6 +613,68 @@ func init() {
 		Debrief: "Failover is only half the job: you also have to make sure the old primary cannot come back as one. Fencing (a token, a lease, or simply keeping the node out until it is reconciled) is what prevents split brain. Staying down avoids the problem but costs the whole outage.",
 	})
 
+	// 14i ─ Medium, config only: demand swings faster than a new server boots ─────────────
+	var waves []engine.TrafficPoint
+	waves = append(waves, engine.TrafficPoint{0, 40})
+	for k := 0; k < 6; k++ {
+		at := float64(20 + 40*k)
+		waves = append(waves, engine.TrafficPoint{at, 40}, engine.TrafficPoint{at + 2, 180}, engine.TrafficPoint{at + 22, 180}, engine.TrafficPoint{at + 24, 40})
+	}
+	waveFleet := func(app engine.Params) engine.Diagram {
+		base := P{"threads": 4.0, "cpuMs": 40.0, "queueCap": 100.0, "autoscale": true, "maxInstances": 8.0, "scaleUpDelaySec": 10.0, "scaleDownDelaySec": 0.0, "targetUtilPct": 60.0}
+		for k, v := range app {
+			base[k] = v
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 100.0, "timeoutMs": 1500.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "lb").servers(1, cols[2], rowMid, 100, base).done()
+	}
+	register(&Scenario{
+		ID: "wave-rider", Title: "Waves faster than boot time", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Autoscaling is on, and users still get errors at the start of every wave.",
+		Story:   "Every forty seconds traffic jumps from 40 to 180 requests a second for twenty seconds and drops again. Autoscaling is switched on, yet each wave starts with a burst of failures: a new server takes ten seconds to boot, and the scaler only looks at the last thirty seconds of load. Keep success high and the slowest requests fast without buying a big fleet for the whole run. The architecture is fixed: fix it with configuration.",
+		Diagram: waveFleet(nil), Solution: waveFleet(P{"minInstances": 3.0}),
+		Traffic:     map[string][]engine.TrafficPoint{"users": waves},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(500), MaxCostPerHour: f(0.5)},
+		DurationSec: 260, WarmupSec: 5, Speed: 4,
+		Hints: [3]string{
+			"Look at when the failures happen: at the start of each wave. How much capacity is running at that moment, and how long until more arrives?",
+			"Open the app server's settings, 'Show advanced', Scaling group. Waiting longer before removing servers is not the whole story: think about the floor and about when the scaler decides to act.",
+			"Keep a floor of servers that covers the wave (minimum servers 3), or make the scaler act earlier with a lower target busy level. Compare the cost of each.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A wave arrives every 40 seconds and a server takes 10 seconds to boot. Which setting helps most?", Options: []string{"Remove idle servers sooner, to save money", "Keep a floor of servers (or a lower target), because help arrives after the damage is done", "A longer boot time"}, Answer: 1,
+			Explain: "Reactive scaling always lags demand by the measuring window plus the boot time. When waves are shorter than that lag, only capacity that is already running helps."}},
+		Debrief: "Autoscaling is reactive, so it suits changes slower than its own reaction time. For predictable, fast waves, pre-provision a floor (or scale on a schedule); a lower target busy level buys earlier action at a higher cost. Waiting longer before scaling down avoids flapping but would not have fixed the wave start.",
+	})
+
+	// 14j ─ Medium, config only: the load test passed, the launch did not ─────────────────
+	loadTest := func(app engine.Params) engine.Diagram {
+		return (&bld{}).
+			n("staff", engine.KClient, cols[0], rowTop, P{"arrival": "closed", "users": 40.0, "thinkMs": 1000.0, "readPct": 100.0, "timeoutMs": 5000.0}).
+			n("public", engine.KClient, cols[0], rowBot, P{"rps": 80.0, "readPct": 100.0, "timeoutMs": 2000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("staff", "lb").e("public", "lb").servers(1, cols[2], rowMid, 100, app).done()
+	}
+	register(&Scenario{
+		ID: "passed-the-load-test", Title: "It passed the load test", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Forty staff tested the system and everything was fine. Then the public arrived.",
+		Story:   "Your team load-tested with forty staff clicking around, each waiting for an answer before the next click: no errors, fast pages. The public launch brings eighty requests a second from people who do not wait for anyone. Both crowds hit the same server. Make the launch survive. The architecture is fixed: fix it with configuration.",
+		Diagram: loadTest(P{"threads": 4.0, "cpuMs": 40.0, "queueCap": 100.0}), Solution: loadTest(P{"threads": 8.0, "cpuMs": 40.0, "queueCap": 100.0}),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(500), MaxCostPerHour: f(0.6)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Why did the test pass? Think about what the staff do when the server gets slow.",
+			"Staff wait for each answer, so a slow server slows them down. The public keeps arriving regardless. Compare what each crowd does to the queue.",
+			"The public crowd is open-loop: its load does not fall when the server struggles. Give the server the capacity for it: look at the app server's threads.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Why can a closed-loop load test pass at a load that breaks the system in production?", Options: []string{"Test machines are faster", "Users who wait for answers slow themselves down as the system slows, so the queue never explodes", "Production has more data"}, Answer: 1,
+			Explain: "A fixed crowd that waits is self-limiting: latency rises, arrivals fall. Real internet traffic keeps coming at the same rate however slow you are."}},
+		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so size for the arrival rate, not for the number of testers.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
