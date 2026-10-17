@@ -110,6 +110,10 @@ Client → server: `init {diagram, scenarioId?, seed?, speed?}`, `diagram {diagr
 Server → client: `frame {status, speed, stats?, particles?, notices?}` (~25 Hz, stats ~10 Hz),
 `result {scenarioId, score}` when a challenge finishes, `error {message}`.
 
+Limits: at most 64 live simulations at once (`-max-sessions` / `MAX_SESSIONS`; further connections get
+`503` with `Retry-After`), and a stopped or paused session is closed after 10 minutes of silence
+(`-idle-timeout`). The client then goes dormant and reconnects the next time you press Play.
+
 The server advances at most 100 ms of wall time per tick (scaled by speed, in ≤10 ms slices under a
 12 ms CPU budget) and warns when it has to slow down. Configuration-only challenges reject topology
 changes on the server as well as in the UI.
