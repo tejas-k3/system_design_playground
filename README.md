@@ -16,22 +16,65 @@ simulation live.
 
 ## Quick start
 
-Requires Go 1.23+ and Node 22.12+.
+### 1. Prerequisites
+
+Pick **one** route:
+
+- **Docker** (easiest, nothing else to install): any recent Docker Desktop or Engine, plus `make`.
+- **From source**: Go 1.23+ and Node 22.12+ (macOS: `brew install go node`; check with `go version` and `node -v`), plus `make`.
+
+### 2. Get the code
 
 ```sh
-make install          # once: frontend dependencies
-make dev              # Go API on :8090 + Vite on :5173, open http://localhost:5173
+git clone https://github.com/tejas-k3/system_design_playground.git
+cd system_design_playground
 ```
 
-Or as a single binary serving the built UI:
+### 3. Run it
+
+**Docker, in the background** (recommended for trying it out):
 
 ```sh
-make run              # builds both, then http://localhost:8090
+make up               # builds the image and starts it; restarts after a reboot or crash
+# open http://localhost:8090
+make logs             # follow the server log (Ctrl-C to stop following)
+make down             # stop and remove it (shared designs are kept in the sdp-data volume)
 ```
 
-Other targets: `make test`, `make lint` (gofmt + staticcheck), `make bench`, `make build`, `make docker-run`.
-Use `PORT=9000 make dev` to change the port. For Docker, configuration, reverse proxy, metrics and capacity notes see
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+**From source, one process** (builds the UI and serves it from the Go binary):
+
+```sh
+make install          # once: installs the frontend dependencies
+make run              # builds both, then serves http://localhost:8090 (Ctrl-C to stop)
+```
+
+**For development** (live reload while you edit the frontend):
+
+```sh
+make install          # once
+make dev              # Go API on :8090 + Vite on :5173; open http://localhost:5173
+```
+
+Use `PORT=9000 make up` (or `run` / `dev`) to change the port. Other targets: `make test`, `make lint`
+(gofmt + staticcheck), `make bench`, `make build`, `make docker-run` (Docker in the foreground); `make help` lists all.
+For configuration, reverse proxy, metrics and capacity notes see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+### 4. First steps in the app
+
+1. On the welcome screen choose **Load an example**, then press **Play** (or Space) and watch traffic flow.
+2. Or open **Challenges** and start with *Hello, database*: each challenge starts broken and tells you its goals.
+3. Everything you build is saved in your browser; **Share** (toolbar) copies a link to the current design.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Page says "Can't reach the simulator" | The Go server is not running. Use `make up`, `make run`, or `make dev` (which starts both). |
+| `address already in use` / port 8090 taken | Pick another: `PORT=9000 make up`. |
+| `go: command not found` or an old Go | Install Go 1.23+ (`brew install go`) or use the Docker route. |
+| `npm install` warns about the Node version | Install Node 22.12+ or use the Docker route. |
+| Status dot is red / "Disconnected after being idle" | Idle sessions close after 10 minutes; press Play and it reconnects. |
+| Want a clean slate | Clear the site's local storage in your browser; for Docker designs also `docker volume rm sdp-data` after `make down`. |
 
 ## How to play
 
