@@ -1,5 +1,5 @@
 // usage: node walk.mjs <width> <height> <outDir> '<steps json>'
-// steps: {goto:url} {click:"text or css"} {move:[x,y]} {drag:[x1,y1,x2,y2]} {eval:"js", log:"label"} {shot:"name"} {wait:ms}
+// steps: {type:"text"} types into the focused element, {key:"Enter"} presses a key, {goto:url} {click:"text or css"} {move:[x,y]} {drag:[x1,y1,x2,y2]} {eval:"js", log:"label"} {shot:"name"} {wait:ms}
 // WITHIN one step the order is: click, move, drag, eval, shot, THEN wait. To read or capture AFTER a delay, put the
 // eval/shot in the NEXT step. (Reading in the same step as the wait reads too early; this has caused false findings.)
 import { spawn } from 'node:child_process'
@@ -25,6 +25,8 @@ const t0 = Date.now()
 for (const st of JSON.parse(stepsJson)) {
   if (st.goto) { await send('Page.navigate', { url: st.goto }); await sleep(st.wait ?? 2000); continue }
   if (st.click) { const ok = await ev(`(()=>{const q=${JSON.stringify(st.click)};let el=document.querySelector(q.startsWith('css:')?q.slice(4):'__none__');if(!el)el=[...document.querySelectorAll('button,a,[role=tab]')].find(b=>b.textContent.trim().startsWith(q));if(!el)return false;el.click();return true})()`); console.log('click', st.click, ok) }
+  if (st.type) await send('Input.insertText', { text: st.type })
+  if (st.key) { const code = { Enter: 13, Tab: 9, Escape: 27, a: 65 }[st.key] ?? 0; for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: st.key, code: st.key, windowsVirtualKeyCode: code, modifiers: st.mod ?? 0 }) }
   if (st.eval) { const v = await ev(st.eval); if (st.log) console.log(st.log, JSON.stringify(v)) }
   if (st.move) await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: st.move[0], y: st.move[1] })
   if (st.drag) { const [x1, y1, x2, y2] = st.drag; await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x1, y: y1 }); await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x1, y: y1, button: 'left', clickCount: 1 }); for (let k = 1; k <= 8; k++) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x1 + ((x2 - x1) * k) / 8, y: y1 + ((y2 - y1) * k) / 8, buttons: 1 }); await sleep(20) } await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x2, y: y2, button: 'left', clickCount: 1 }) }
