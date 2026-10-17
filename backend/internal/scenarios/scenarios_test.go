@@ -153,3 +153,29 @@ func TestAlternateSolutions(t *testing.T) {
 		}
 	})
 }
+
+// A learner who reproduces the reference solution should be rewarded: at least two stars on every seed.
+func TestReferenceSolutionsEarnTwoStars(t *testing.T) {
+	for _, sc := range All() {
+		sc := sc
+		t.Run(sc.ID, func(t *testing.T) {
+			for _, seed := range []uint32{1, 2, 3} {
+				if s := engine.RunToEnd(sc.Solution, sc.Options(seed), sc.Goals); s.Stars < 2 {
+					t.Errorf("seed %d: reference solution earns %d star(s), cost $%.2f/hr, p95 %.0f ms", seed, s.Stars, s.CostPerHour, s.Run.P95)
+				}
+			}
+		})
+	}
+}
+
+// The star targets are shown to the learner, so every scenario with a cost or p95 goal must publish them.
+func TestStarTargetsArePublished(t *testing.T) {
+	for _, sc := range All() {
+		if sc.Goals.MaxCostPerHour != nil && sc.Goals.StarCostPerHour == nil {
+			t.Errorf("%s: cost goal without a star target", sc.ID)
+		}
+		if sc.Goals.MaxP95Ms != nil && sc.Goals.StarP95Ms == nil {
+			t.Errorf("%s: p95 goal without a star target", sc.ID)
+		}
+	}
+}

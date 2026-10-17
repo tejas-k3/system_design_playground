@@ -207,7 +207,7 @@ func init() {
 		Summary: "Two people buy the same seat at the same moment.",
 		Story:   "Only 300 seats exist and people are racing for them. Booking is 'check, then write', so two overlapping requests for the same seat both succeed.",
 		Diagram: booking(false), Solution: booking(true),
-		Goals:       engine.Goals{MinSuccessRate: 0.98, MaxConflicts: i(0), MaxP95Ms: f(500), MaxCostPerHour: f(1.2)},
+		Goals:       engine.Goals{MinSuccessRate: 0.98, MaxConflicts: i(0), MaxP95Ms: f(500), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.05)},
 		DurationSec: 30, WarmupSec: 0, Speed: 1,
 		Hints: [3]string{
 			"The bug is a race between the check and the write. Something has to make them atomic per seat.",
