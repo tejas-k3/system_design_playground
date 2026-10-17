@@ -4,7 +4,7 @@
 PORT ?= 8090
 export ADDR := :$(PORT)
 
-.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench
+.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench docker-build docker-run
 
 help:
 	@echo "make install   install frontend dependencies"
@@ -14,6 +14,7 @@ help:
 	@echo "make test      run backend and frontend tests"
 	@echo "make lint      gofmt check and staticcheck on the backend"
 	@echo "make bench     engine benchmark (30 simulated seconds of a 1k rps system)"
+	@echo "make docker-build / docker-run   build the image / run it on :$(PORT) with a persistent volume"
 
 install:
 	cd frontend && npm install
@@ -48,3 +49,11 @@ lint:
 
 bench:
 	cd backend && go test -run xxx -bench . -benchtime 5x ./internal/engine/
+
+IMAGE ?= system-design-playground
+
+docker-build:
+	docker build -t $(IMAGE) .
+
+docker-run: docker-build
+	docker run --rm -p $(PORT):8090 -v sdp-data:/data $(IMAGE)
