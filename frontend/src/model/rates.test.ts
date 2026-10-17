@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clientRateLabel } from './rates'
+import { clientRateLabel, edgeLabel, utilBarWidth } from './rates'
 
 describe('clientRateLabel', () => {
   it('shows the configured rate before a run, with the peak for a pattern', () => {
@@ -13,5 +13,29 @@ describe('clientRateLabel', () => {
   })
   it('falls back to the configured rate while the first numbers are still arriving', () => {
     expect(clientRateLabel({ rps: 80, pattern: 'constant', peakRps: 80 }, true, 0)).toBe('80 rps')
+  })
+})
+
+describe('edgeLabel', () => {
+  it('shows the live rate while running', () => {
+    expect(edgeLabel(5, 580, false, true)).toBe('580/s')
+    expect(edgeLabel(5, 0.2, false, true)).toBe('')
+  })
+  it('adds the latency when the connection is selected or hovered, so the label never silently changes meaning', () => {
+    expect(edgeLabel(5, 580, true, true)).toBe('580/s · 5 ms')
+    expect(edgeLabel(5, 0, true, true)).toBe('5 ms')
+    expect(edgeLabel(5, 0, true, false)).toBe('5 ms')
+  })
+  it('shows nothing at rest unless selected', () => {
+    expect(edgeLabel(5, 0, false, false)).toBe('')
+  })
+})
+
+describe('utilBarWidth', () => {
+  it('is empty for an idle component and never invisible for a busy one', () => {
+    expect(utilBarWidth(0, 100)).toBe(0)
+    expect(utilBarWidth(0.01, 100)).toBe(4)
+    expect(utilBarWidth(0.5, 100)).toBe(50)
+    expect(utilBarWidth(3, 100)).toBe(100)
   })
 })
