@@ -108,6 +108,7 @@ and the inspector becomes a bottom sheet.
 | Traffic | Poisson arrivals; constant / ramp / spike / wave or authored curves; read/write mix; Zipf, uniform or scan key popularity; hot key |
 | Clients | Timeouts, retries with exponential backoff + jitter or immediate retry; abandoned ("ghost") attempts keep consuming resources downstream |
 | Service times | Steady by default; an advanced *service-time spread* setting (app server, database, worker, external API) switches to exponential or heavy-tailed, same mean, to show how variability lengthens queues and tails |
+| Autoscaling | Optional per app server: a fleet of identical servers that grows when the last 30 s of thread utilisation is above a target, after a boot delay, and shrinks one server at a time after a quiet period; cost is the average number of servers that ran |
 | App servers | Thread pool, bounded FIFO/LIFO queue, queue-wait timeout, call timeouts, circuit breaker, idempotency keys |
 | Connection pools | Per server per database; databases refuse connections beyond their limit |
 | Caches / CDN | LRU, LFU, FIFO, random eviction; TTL (with optional jitter); warm start; optional sharing of concurrent misses; read-through or cache-aside; invalidate / write-through |
