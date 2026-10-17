@@ -6,6 +6,8 @@ import { MIN_ZOOM } from '../model/diagram'
 import { drainParticles } from '../sim/particles'
 import { useStore } from '../state/store'
 import { NoteEditor, type NoteEdit } from './board/NoteEditor'
+import { useBoardShortcuts } from './board/useBoardShortcuts'
+import { useWheelZoom } from './board/useWheelZoom'
 import { ZoomBadge } from './board/ZoomBadge'
 
 type Mode =
@@ -14,8 +16,6 @@ type Mode =
   | { k: 'drag'; last: Pt; ids: string[] }
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
   | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
-
-const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
 
 export function Board() {
   const wrap = useRef<HTMLDivElement>(null)
@@ -325,49 +325,14 @@ export function Board() {
     else st.updateNote(id, { text })
   }
 
-  // wheel zoom (non-passive so we can prevent page scroll)
-  useEffect(() => {
-    const el = canvas.current
-    if (!el) return
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      const r = el.getBoundingClientRect()
-      const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))
-      useStore.getState().zoomAt(factor, e.clientX - r.left, e.clientY - r.top)
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [])
-
-  // keyboard handled at board level so typing in inputs is unaffected
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (isTyping(e.target)) return
-      const st = useStore.getState()
-      const mod = e.metaKey || e.ctrlKey
-      if (mod && e.key.toLowerCase() === 'z') {
-        e.preventDefault()
-        e.shiftKey ? st.redo() : st.undo()
-      } else if (mod && e.key.toLowerCase() === 'y') {
-        e.preventDefault()
-        st.redo()
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault()
-        st.deleteSelection()
-      } else if (e.key === 'Escape') {
-        connectTo.current = { target: null, pending: null }
-        mode.current = { k: 'idle' }
-        st.setSelection([])
-        wake()
-      } else if (!mod && e.key.toLowerCase() === 'v') st.setTool('select')
-      else if (!mod && e.key.toLowerCase() === 'c') st.setTool('connect')
-      else if (!mod && e.key.toLowerCase() === 'f') fitView()
-      else if (!mod && (e.key === '+' || e.key === '=')) st.zoomAt(1.2, size.current.w / 2, size.current.h / 2)
-      else if (!mod && e.key === '-') st.zoomAt(1 / 1.2, size.current.w / 2, size.current.h / 2)
-    }
-    window.addEventListener('keydown', down)
-    return () => window.removeEventListener('keydown', down)
-  }, [fitView, wake])
+  const zoomBy = useCallback((f: number) => useStore.getState().zoomAt(f, size.current.w / 2, size.current.h / 2), [])
+  const cancelGesture = useCallback(() => {
+    connectTo.current = { target: null, pending: null }
+    mode.current = { k: 'idle' }
+    wake()
+  }, [wake])
+  useWheelZoom(canvas)
+  useBoardShortcuts({ fit: fitView, zoomBy, cancel: cancelGesture })
 
   // ---- drag & drop from the library ----------------------------------------------------
 
@@ -402,7 +367,7 @@ export function Board() {
       {noteEdit && (
         <NoteEditor edit={noteEdit} initialText={useStore.getState().diagram.notes.find((n) => n.id === noteEdit.id)?.text ?? ''} onCommit={commitNote} />
       )}
-      <ZoomBadge fit={fitView} by={(f) => useStore.getState().zoomAt(f, size.current.w / 2, size.current.h / 2)} />
+      <ZoomBadge fit={fitView} by={zoomBy} />
     </div>
   )
 }
