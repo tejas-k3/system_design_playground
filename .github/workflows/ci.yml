@@ -10,14 +10,20 @@ permissions:
 
 jobs:
   backend:
+    name: backend (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.23", stable] # the declared minimum, and whatever is current
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: backend/go.mod
+          go-version: ${{ matrix.go }}
           cache-dependency-path: backend/go.sum
+      # staticcheck needs a recent Go, so lint only on the current release
       - run: make lint
+        if: matrix.go == 'stable'
       - run: make test-backend
 
   frontend:
