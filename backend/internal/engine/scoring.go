@@ -39,6 +39,21 @@ type Score struct {
 
 const eps = 1e-9
 
+// WithStarTargets fills in the star targets a challenge did not set explicitly: two stars need a cost
+// within 80% of the cost goal, three need a p95 within 60% of the p95 goal. Published with the goals so
+// the learner can see the bar, and used by Evaluate so the two can never disagree.
+func (g Goals) WithStarTargets() Goals {
+	if g.StarCostPerHour == nil && g.MaxCostPerHour != nil {
+		v := 0.8 * *g.MaxCostPerHour
+		g.StarCostPerHour = &v
+	}
+	if g.StarP95Ms == nil && g.MaxP95Ms != nil {
+		v := 0.6 * *g.MaxP95Ms
+		g.StarP95Ms = &v
+	}
+	return g
+}
+
 func pct(f float64) string { return fmt.Sprintf("%.1f%%", math.Floor(f*1000+eps)/10) }
 
 func msStr(v float64) string {
@@ -106,6 +121,7 @@ func Unwired(d Diagram) []Node {
 
 // Evaluate checks a finished run against goals and awards 0-3 stars.
 func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
+	g = g.WithStarTargets()
 	var checks []Check
 	total := run.Resolved + run.Pending
 	rate := 0.0
@@ -190,21 +206,11 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	stars := 0
 	if pass {
 		stars = 1
-		starCost := g.StarCostPerHour
-		if starCost == nil && g.MaxCostPerHour != nil {
-			v := 0.8 * *g.MaxCostPerHour
-			starCost = &v
-		}
-		if starCost == nil || cost <= *starCost+eps {
+		if g.StarCostPerHour == nil || cost <= *g.StarCostPerHour+eps {
 			stars = 2
-			starP95 := g.StarP95Ms
-			if starP95 == nil && g.MaxP95Ms != nil {
-				v := 0.6 * *g.MaxP95Ms
-				starP95 = &v
-			}
 			switch {
-			case starP95 != nil:
-				if hasOK && run.P95 <= *starP95+eps {
+			case g.StarP95Ms != nil:
+				if hasOK && run.P95 <= *g.StarP95Ms+eps {
 					stars = 3
 				}
 			case g.MaxP50Ms != nil:

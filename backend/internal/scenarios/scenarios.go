@@ -55,6 +55,7 @@ func register(s *Scenario) {
 	if s.Speed == 0 {
 		s.Speed = 1
 	}
+	s.Goals = s.Goals.WithStarTargets()
 	all = append(all, s)
 	byID[s.ID] = s
 }
