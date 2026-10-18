@@ -299,7 +299,7 @@ export interface NodePoint {
 }
 
 export type ServerMsg =
-  | { type: 'frame'; status: SimStatus; speed: number; stats?: Stats; particles?: Particle[]; notices?: Notice[] }
+  | { type: 'frame'; status: SimStatus; speed: number; stats?: Stats; particles?: Particle[]; notices?: Notice[]; diagram?: Diagram }
   | { type: 'result'; scenarioId: string; score: Score }
   | ({ type: 'traces' } & TraceSet)
   | { type: 'nodeSeries'; nodeId: string; points: NodePoint[] }
@@ -310,6 +310,7 @@ export type ClientMsg =
   | { type: 'diagram'; diagram: Diagram }
   | { type: 'play' | 'pause' | 'step' | 'reset' }
   | { type: 'speed'; speed: number }
+  | { type: 'seek'; t: number }
   | { type: 'traces' }
   | { type: 'nodeSeries'; nodeId: string }
   | { type: 'crash' | 'restart'; nodeId: string }

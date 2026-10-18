@@ -22,6 +22,7 @@ function onMessage(m: ServerMsg) {
         st.setStats(m.stats)
         if (m.stats.global.cost > 0) st.setCost(m.stats.global.cost)
       }
+      if (m.diagram) st.adoptDiagram(m.diagram) // the answer to a seek carries the design as it was then
       pushParticles(m.particles)
       m.notices?.forEach((n) => st.toast(n.text, n.level === 'warn' ? 'warn' : n.level, 4000))
       break
@@ -126,6 +127,11 @@ export const pause = () => withSocket((sock) => sock.send({ type: 'pause' }))
 export function reset(): void {
   useStore.getState().clearRun()
   if (socket?.open) socket.send({ type: 'reset' }) // nothing to reset on a closed connection
+}
+
+/** Rewind the run to `t` simulated seconds (paused there; Play carries on from that moment). */
+export function seek(t: number): void {
+  withSocket((sock) => sock.send({ type: 'seek', t }))
 }
 
 export function step(): void {

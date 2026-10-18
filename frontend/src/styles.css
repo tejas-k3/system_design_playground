@@ -216,3 +216,5 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .sweep-table tr.knee { font-weight: 700; outline: 1px dashed var(--muted); }
 
 .vs-reference ul { margin: 4px 0 8px; padding-left: 18px; font-size: 13px; } .vs-reference li { margin-bottom: 2px; }
+
+.scrub { width: 120px; margin-left: 8px; vertical-align: middle; }
