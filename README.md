@@ -158,6 +158,7 @@ A 30 s run of a 1,000 rps, 20-node design takes about 90 ms (`make bench`).
 | `GET /api/scenarios/{id}/solution` | Reference solution diagram |
 | `POST /api/validate` | Sanitize a diagram, returns `{diagram, adjusted, costPerHour}` |
 | `POST /api/run` | Headless run `{diagram, scenarioId?, seed?, durationSec?}` → stats (+ score for a scenario) |
+| `POST /api/sweep` | Same design at several loads (`loads`: multiples of every client's rate) or one setting at several values (`param`, `values`, clamped to the setting's range); up to 20 points, `durationSec` ≤ 60, one run slot and a 20 s deadline for the whole sweep |
 | `GET /api/sim` (WebSocket) | Live simulation session |
 | `POST /api/designs`, `GET /api/designs/{id}` | Share a design: save returns `{id}` (rate-limited, sanitized); the id opens it |
 | `GET /api/healthz` | Liveness |

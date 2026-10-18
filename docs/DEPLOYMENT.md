@@ -26,7 +26,7 @@ Every setting is a flag or an environment variable (the flag wins).
 | `-data-dir` | `DATA_DIR` | *(none; `/data` in the image)* | Where shared designs are stored; empty keeps them in memory only |
 | `-max-designs` | `MAX_DESIGNS` | `5000` | Designs kept before the oldest are dropped |
 | `-max-sessions` | `MAX_SESSIONS` | `64` | Concurrent live simulations; more get `503` with `Retry-After` |
-| `-max-runs` | `MAX_RUNS` | one per CPU core (min 2) | Concurrent headless `/api/run` simulations (each can hold ~12 MB); more get `503` with `Retry-After` |
+| `-max-runs` | `MAX_RUNS` | one per CPU core (min 2) | Concurrent headless `/api/run` and `/api/sweep` simulations (a sweep holds one slot for all its points) (each can hold ~12 MB); more get `503` with `Retry-After` |
 | `-idle-timeout` | | `10m` | Close a stopped or paused session after this much silence |
 | `-origins` | `ALLOWED_ORIGINS` | `localhost:*,127.0.0.1:*` | Extra WebSocket origins to accept (comma-separated host patterns) |
 | `-healthcheck` | | | Probe a running server on `-addr` and exit 0 only if healthy |
