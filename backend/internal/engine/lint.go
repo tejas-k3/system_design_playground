@@ -161,6 +161,23 @@ func Lint(d Diagram) []Finding {
 		}
 	}
 
+	// reads by another field with no index to serve them
+	secondary := false
+	for _, id := range clients {
+		secondary = secondary || pf(res[id], "secondaryPct", 0) > 0
+	}
+	if secondary {
+		var scans []string
+		for _, n := range d.Nodes {
+			if (n.Kind == KDatabase || n.Kind == KReplica) && pf(res[n.ID], "indexes", 0) < 1 && in[n.ID] > 0 {
+				scans = append(scans, n.ID)
+			}
+		}
+		if len(scans) > 0 {
+			add("secondary-reads-without-index", "warn", "Some reads look items up by a field other than the key, and this database has no secondary index, so each of those reads scans.", "Add a secondary index (each index makes writes about 30% slower).", scans...)
+		}
+	}
+
 	// a payload the queue cannot carry: the users' request size against each queue's message limit
 	biggest := 0.0
 	for _, id := range clients {
