@@ -1,6 +1,9 @@
 package engine
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Chaos: scheduled and manual crashes, slow-downs and network partitions.
 
@@ -14,6 +17,10 @@ type ChaosRecord struct {
 }
 
 func (s *Sim) fireChaos(ev ChaosEvent) {
+	if ev.Type == "linkDown" {
+		s.linkDown(ev)
+		return
+	}
 	var t *node
 	if len(ev.NodeID) > 7 && ev.NodeID[:7] == "random:" {
 		kind := ev.NodeID[7:]
@@ -268,5 +275,42 @@ func (s *Sim) scheduleBurst(n *node) {
 		}
 		n.throttled = n.credits <= 0
 		s.scheduleBurst(n)
+	})
+}
+
+// linkDown breaks one connection (every edge from NodeID to ToID) for DurationSec. mode "replies" is the nasty
+// asymmetric case: requests arrive and are processed, only the answers are lost, so the caller times out
+// although the work was done. Held messages are delivered when the link heals (late: callers that gave up ignore them).
+func (s *Sim) linkDown(ev ChaosEvent) {
+	from, to := s.nodes[ev.NodeID], s.nodes[ev.ToID]
+	if from == nil || to == nil || from.removed || to.removed {
+		return
+	}
+	var es []*edge
+	for _, e := range s.edges {
+		if e.from == from && e.to == to && !e.removed {
+			es = append(es, e)
+		}
+	}
+	if len(es) == 0 {
+		return
+	}
+	sort.Slice(es, func(i, j int) bool { return es[i].id < es[j].id }) // map order must not decide delivery order
+	req, resp := ev.Mode != "replies", ev.Mode != "requests"
+	for _, e := range es {
+		e.downReq, e.downResp = req, resp
+	}
+	s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "linkDown", NodeID: from.id, Label: from.label + " to " + to.label})
+	s.logEvent("partition", from, 0)
+	s.after(ev.DurationSec*1000, func() {
+		s.logEvent("heal", from, 0)
+		for _, e := range es {
+			e.downReq, e.downResp = false, false
+			held := e.held
+			e.held = nil
+			for _, deliver := range held {
+				deliver()
+			}
+		}
 	})
 }
