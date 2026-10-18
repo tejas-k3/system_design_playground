@@ -89,6 +89,7 @@ type node struct {
 	epoch           int
 	slow            float64
 	slowUntil       float64
+	pausedUntil     float64     // a stop-the-world pause (GC) lasts until then; 0 = none
 	cut             bool        // partitioned: calls to it get no answer
 	promoted        bool        // replica that took over as the primary after a failover
 	as              scaler      // app server autoscaling state
@@ -272,6 +273,11 @@ func New(d Diagram, opts Options) *Sim {
 		s.addEdge(e)
 	}
 	s.afterTopologyChange()
+	for _, n := range s.order {
+		if n.kind == KAppServer && n.f("gcPauseMs") > 0 {
+			s.scheduleGC(n)
+		}
+	}
 	for _, ev := range opts.Chaos {
 		ev := ev
 		s.at(ev.AtSec*1000, func() { s.fireChaos(ev) })

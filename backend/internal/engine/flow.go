@@ -506,7 +506,7 @@ func (s *Sim) releaser(n *node) func() {
 }
 
 func (s *Sim) submit(n *node, c *call, cb func(Result), run func(release func())) {
-	if n.busy < s.capacity(n) {
+	if n.busy < s.capacity(n) && n.pausedUntil <= s.now {
 		s.markBusy(n)
 		n.busy++
 		if c.sp != nil {
@@ -523,7 +523,7 @@ func (s *Sim) submit(n *node, c *call, cb func(Result), run func(release func())
 }
 
 func (s *Sim) startNext(n *node) {
-	for !n.down && n.busy < s.capacity(n) && n.qh < len(n.q) {
+	for !n.down && n.pausedUntil <= s.now && n.busy < s.capacity(n) && n.qh < len(n.q) {
 		var t *task
 		if n.kind == KAppServer && n.s("queueOrder") == "lifo" {
 			t = n.q[len(n.q)-1]
@@ -653,14 +653,20 @@ func (s *Sim) takeToken(n *node) bool {
 // hold schedules fn after ms of service, failing the call if the node crashed meanwhile.
 func (s *Sim) hold(n *node, ms float64, release func(), cb func(Result), fn func()) {
 	ep := n.epoch
-	s.after(ms, func() {
+	var fire func()
+	fire = func() {
 		if n.epoch != ep || n.removed {
 			release()
 			s.failAt(n, RNodeDown, cb)
 			return
 		}
+		if n.pausedUntil > s.now { // a stop-the-world pause: the work finishes when it ends
+			s.at(n.pausedUntil, fire)
+			return
+		}
 		fn()
-	})
+	}
+	s.after(ms, fire)
 }
 
 func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
