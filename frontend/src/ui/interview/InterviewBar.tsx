@@ -31,7 +31,7 @@ export function InterviewBar() {
       lastElapsed.current = el
     }
     tick()
-    const id = setInterval(tick, 500)
+    const id = setInterval(tick, 100)
     document.addEventListener('visibilitychange', tick) // catch up the moment the tab is shown again
     return () => {
       clearInterval(id)

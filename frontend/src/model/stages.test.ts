@@ -17,11 +17,14 @@ describe('stage prompts', () => {
 })
 
 describe('countdown', () => {
-  it('shows minutes and seconds, rounding the remaining time up so it never reads 0:00 while time is left', () => {
+  it('shows the nearest whole second (so it is never more than half a second off), but never 0:00 while time is left', () => {
     expect(countdown(45 * 60_000)).toBe('45:00')
     expect(countdown(9 * 60_000 + 5_000)).toBe('9:05')
-    expect(countdown(59_001)).toBe('1:00')
+    expect(countdown(9 * 60_000 + 5_400)).toBe('9:05')
+    expect(countdown(9 * 60_000 + 5_600)).toBe('9:06')
+    expect(countdown(59_001)).toBe('0:59')
     expect(countdown(1)).toBe('0:01')
+    expect(countdown(400)).toBe('0:01')
     expect(countdown(0)).toBe('0:00')
     expect(countdown(-5)).toBe('0:00')
   })
