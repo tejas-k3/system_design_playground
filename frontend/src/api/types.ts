@@ -224,6 +224,7 @@ export interface RunStats {
   mean: number
   errors: Record<string, number>
   conflicts: number
+  hedged?: number // second queries sent because a shard was slow
   partial?: number // answers sent with fewer shards than required
   lostUpdates?: number // transfers that silently overwrote a concurrent commit (read committed)
   txAborts?: number // transactions aborted by a write conflict or as a deadlock victim
