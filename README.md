@@ -77,6 +77,8 @@ For configuration, reverse proxy, metrics and capacity notes see [docs/DEPLOYMEN
 | `make up` / `docker build` sits for minutes at "load metadata" or "pulling" | Docker Hub or gcr.io is unreachable or throttling you. Check `curl -sI https://registry-1.docker.io/v2/` first. The Dockerfile pins every base image by digest, so once the images are cached a rebuild needs no network for them; if the pull keeps stalling, build without Docker (`make run`) or retry later. To refresh the pins deliberately: `bash docs/review/tools/image-digests.sh`. |
 | Want a clean slate | Clear the site's local storage in your browser; for Docker designs also `docker volume rm sdp-data` after `make down`. |
 
+See [docs/COMPONENTS.md](docs/COMPONENTS.md) for what each component does, exactly when it fails, and why those rules are believable.
+
 ## How to play
 
 1. **Build.** Click or drag components onto the canvas. Drag from the round handle on a component's

@@ -10,3 +10,4 @@ coverage/
 docs/**/*.md
 !docs/DEPLOYMENT.md
 !docs/ACCESSIBILITY_TESTING.md
+!docs/COMPONENTS.md
