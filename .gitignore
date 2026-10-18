@@ -9,3 +9,4 @@ coverage/
 # working notes (review reports, plans, findings) stay on the local disk only; README.md and docs/DEPLOYMENT.md are the published docs
 docs/**/*.md
 !docs/DEPLOYMENT.md
+!docs/ACCESSIBILITY_TESTING.md
