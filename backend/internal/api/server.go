@@ -92,6 +92,7 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/scenarios/{id}/solution", s.getSolution)
 	s.mux.HandleFunc("POST /api/validate", s.validate)
 	s.mux.HandleFunc("POST /api/run", s.run)
+	s.mux.HandleFunc("POST /api/sweep", s.sweep)
 	s.mux.HandleFunc("POST /api/designs", s.saveDesign)
 	s.mux.HandleFunc("GET /api/designs/{id}", s.loadDesign)
 	s.mux.HandleFunc("GET /api/sim", s.sim)
