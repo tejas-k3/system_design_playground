@@ -4,6 +4,9 @@ import { starterDiagram } from '../../model/starter'
 import { MAX_ROWS } from '../../model/interview'
 import { addRow, apiHints, blankEndpoint, blankTable, dataHints, removeRow, setRow } from '../../model/pads'
 import type { StageId } from '../../model/timer'
+import { useState } from 'react'
+import { buildMarkdown, fileStamp } from '../../model/exportDoc'
+import { diagramPng, download, slug } from './exportFiles'
 import { useStore } from '../../state/store'
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
@@ -19,9 +22,12 @@ export function StagePad({ stage, data }: { stage: StageId; data: InterviewData 
   if (stage === 'data') return <DataPad data={data} update={update} />
   if (stage === 'design' || stage === 'deepdive' || stage === 'tradeoffs') {
     return (
-      <label className="pad-notes">Notes <span className="muted small">(kept in this browser only)</span>
-        <textarea value={data.notes} maxLength={5000} rows={3} onChange={(e) => update({ notes: e.target.value })} />
-      </label>
+      <div>
+        <label className="pad-notes">Notes <span className="muted small">(kept in this browser only)</span>
+          <textarea value={data.notes} maxLength={5000} rows={3} onChange={(e) => update({ notes: e.target.value })} />
+        </label>
+        {stage === 'tradeoffs' && <ExportPanel data={data} />}
+      </div>
     )
   }
   return null
@@ -161,5 +167,31 @@ function Calculator({ data, update }: Props) {
         <p className="muted small">A starter is users, a balancer, {Number.isFinite(r.servers) ? Math.min(12, r.servers) : 'N'} app server(s) and a database. Your previous canvas stays one undo away.</p>
       </fieldset>
     </div>
+  )
+}
+
+function ExportPanel({ data }: { data: InterviewData }) {
+  const diagram = useStore((s) => s.diagram)
+  const reg = useStore((s) => s.reg)
+  const toast = useStore((s) => s.toast)
+  const [title, setTitle] = useState('My design')
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  if (!reg) return null
+  const stamp = fileStamp(new Date())
+  const base = `${slug(title)}-${stamp}`
+  const png = async () => {
+    const blob = await diagramPng(diagram, reg, theme)
+    if (!blob) return toast('The canvas is empty: nothing to export', 'warn', 3000)
+    download(blob, `${base}.png`)
+  }
+  const md = () => download(new Blob([buildMarkdown(data, diagram, reg, { title, date: stamp, image: diagram.nodes.length ? `${base}.png` : undefined })], { type: 'text/markdown' }), `${base}.md`)
+  return (
+    <fieldset className="pad export">
+      <legend>Take it with you</legend>
+      <label>Title <input value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} aria-label="Title of the write-up" /></label>{' '}
+      <label>Picture <select value={theme} onChange={(e) => setTheme(e.target.value as 'light' | 'dark')} aria-label="Background of the picture"><option value="light">Light background</option><option value="dark">Dark background</option></select></label>{' '}
+      <button onClick={() => void png()}>Download the diagram (PNG)</button>
+      <button onClick={md}>Download the write-up (Markdown)</button>
+    </fieldset>
   )
 }
