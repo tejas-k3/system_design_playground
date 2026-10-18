@@ -257,6 +257,10 @@ func (s *Sim) callDown(from *node, e *edge, c *call, cm cmd, cb func(Result)) {
 	send := func(tk *ticket) {
 		cc := *c
 		cc.ticket = tk
+		lat := lat
+		if tk != nil && tk.opening { // a new connection: the handshake comes before the request can travel
+			lat += from.f("connectMs")
+		}
 		s.hopVia(e, via, t, lat, &cc, func(res Result) {
 			if tk != nil {
 				s.releaseTicket(tk)

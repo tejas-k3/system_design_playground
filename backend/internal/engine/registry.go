@@ -176,6 +176,7 @@ func init() {
 				num("memPerReqMB", "Memory per request", "Failure modes", 1, 0.1, 500, 0.1, "MB", "Memory held by each request that is running or waiting in the queue.").adv(),
 				num("memRestartSec", "Restart time", "Failure modes", 5, 1, 120, 1, "s", "How long the killed server takes to come back.").adv(),
 				num("callTimeoutMs", "Call timeout", "Calls to dependencies", 0, 0, 10000, 50, "ms", "Give up on a dependency call after this long (0 = wait forever)."),
+				num("connectMs", "Connection setup", "Calls to dependencies", 0, 0, 2000, 10, "ms", "Time to open a new database connection (DNS, TCP, TLS, login). Only a request that has to open one pays it; reused connections do not, and a restarted server starts with none open. 0 = not modelled.").adv().needs(KDatabase, KReplica),
 				num("dbPool", "DB pool size", "Calls to dependencies", 20, 1, 200, 1, "", "Max connections this server opens to each database.").needs(KDatabase, KReplica, KShardRouter),
 				flag("circuitBreaker", "Circuit breaker", "Calls to dependencies", false, "After 5 failures in a row to a dependency, fail fast for 5 s, then try once."),
 				sel("readRouting", "Read routing", "Data access", "nearest", "Where reads go: nearest copy (cache, replica, primary), by freshness, or primary only.",
