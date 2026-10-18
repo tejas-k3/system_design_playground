@@ -175,3 +175,18 @@ func TestSeekMessageAnswersPausedAtThatTimeWithTheDesignThenAndErrorsBeforeARun(
 		}
 	}
 }
+
+func TestResendingTheSameDesignIsNotAnEdit(t *testing.T) {
+	sc := scenarios.Get("opening-night")
+	ss := &session{seed: 7, sc: sc, speed: 1, diagram: sc.Diagram}
+	ss.build()
+	ss.sim.Advance(1000)
+	ss.applyDiagram(sc.Diagram)
+	if len(ss.edits) != 0 {
+		t.Fatalf("the client echoes the design back after a seek; that must not grow the log: %d", len(ss.edits))
+	}
+	ss.applyDiagram(bumpThreads(sc.Diagram, 5))
+	if len(ss.edits) != 1 {
+		t.Fatal("a real change must still be logged")
+	}
+}
