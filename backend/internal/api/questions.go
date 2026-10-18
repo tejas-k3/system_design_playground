@@ -32,6 +32,44 @@ func (s *Server) getQuestion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, q)
 }
 
+type runCandidateReq struct {
+	Candidate *int `json:"candidate"`
+}
+
+// runCandidate simulates one candidate design of a trade-off question (fixed seed, so everyone sees the same
+// numbers) under the question's own traffic and failures. It shares the headless run slots.
+func (s *Server) runCandidate(w http.ResponseWriter, r *http.Request) {
+	q := scenarios.Q(r.PathValue("id"))
+	if q == nil {
+		writeErr(w, 404, "no such question")
+		return
+	}
+	var req runCandidateReq
+	if !decode(w, r, &req) {
+		return
+	}
+	if q.Mode != scenarios.ModeTradeoff || req.Candidate == nil {
+		writeErr(w, 400, "name one of the designs to run")
+		return
+	}
+	s.metrics.runs.Add(1)
+	select {
+	case s.runSlots <- struct{}{}:
+		defer func() { <-s.runSlots }()
+	default:
+		s.metrics.runsRefused.Add(1)
+		w.Header().Set("Retry-After", "2")
+		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+		return
+	}
+	res, err := q.RunCandidate(*req.Candidate, 42)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, res)
+}
+
 type answerReq struct {
 	Answers map[string]float64 `json:"answers"` // estimate questions
 	Choice  *int               `json:"choice"`  // multiple-choice questions
@@ -48,7 +86,7 @@ func (s *Server) answerQuestion(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if q.Mode == scenarios.ModeDiagnose {
+	if q.Mode == scenarios.ModeDiagnose || q.Mode == scenarios.ModeTradeoff {
 		if req.Choice == nil {
 			writeErr(w, 400, "choose one of the options")
 			return
