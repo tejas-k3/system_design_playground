@@ -126,6 +126,7 @@ export interface ScenarioSummary {
   difficulty: string
   summary: string
   configOnly?: boolean
+  open?: boolean // a blank canvas with requirements; the load is hidden and there is no solution to show
 }
 
 export interface Scenario extends ScenarioSummary {

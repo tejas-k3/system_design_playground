@@ -47,6 +47,7 @@ export function ScenarioPicker() {
                     <span className="card-top"><b>{s.title}</b><Stars n={progress[s.id] ?? 0} size={14} /></span>
                     <small>{s.summary}</small>
                     {s.configOnly && <em title={CONFIG_ONLY_HELP}>config only</em>}
+                    {s.open && <em title="Blank canvas, hidden traffic, no solution to reveal">open</em>}
                   </button>
                 ))}
               </div>

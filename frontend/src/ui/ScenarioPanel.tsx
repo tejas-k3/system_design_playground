@@ -34,6 +34,7 @@ export function ScenarioPanel() {
         <h2>{def.title}</h2>
         <span className={`badge ${def.difficulty.toLowerCase()}`}>{def.difficulty}</span>
         {def.configOnly && <span className="badge cfg" title={CONFIG_ONLY_HELP}>config only</span>}
+        {def.open && <span className="badge cfg" title="Start from a blank canvas. The traffic is not shown and there is no reference solution; the requirements are the test.">open</span>}
         <button className="x" onClick={() => { reset(); exit() }} aria-label="Leave challenge" title="Leave challenge">×</button>
       </header>
       {open && (
@@ -70,7 +71,7 @@ export function ScenarioPanel() {
               {def.hints.slice(0, sc.hintLevel).map((h, i) => <li key={i}>{h}</li>)}
             </ol>
           )}
-          {sc.result?.pass && !sc.compare && (
+          {sc.result?.pass && !sc.compare && !def.open && (
             <p>
               <button onClick={async () => {
                 try {
@@ -84,7 +85,7 @@ export function ScenarioPanel() {
           {sc.compare && reg && <VsReference mine={sc.compare.mine} reference={sc.compare.reference} />}
           <div className="row-btns">
             <button onClick={revealHint} disabled={sc.hintLevel >= 3}>{sc.hintLevel === 0 ? 'Give me a hint' : sc.hintLevel < 3 ? 'Another hint' : 'No more hints'}</button>
-            <button
+            {!def.open && <button
               disabled={sc.hintLevel < 3}
               title={sc.hintLevel < 3 ? 'Use all three hints first' : 'Replace your design with the reference solution'}
               onClick={async () => {
@@ -97,7 +98,7 @@ export function ScenarioPanel() {
               }}
             >
               Show solution
-            </button>
+            </button>}
           </div>
         </div>
       )}
