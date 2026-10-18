@@ -267,3 +267,13 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .pad .hints { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
 .calc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 13px; } .calc-row input { width: 120px; flex: none; text-align: right; font-family: var(--mono); }
 .rubric-row { display: grid; grid-template-columns: 330px 1fr; gap: 10px; margin-bottom: 6px; align-items: start; } .rubric-name { display: inline-block; width: 110px; font-weight: 600; font-size: 13px; padding: 0 6px; } .evidence { margin: 0; padding-left: 16px; }
+
+/* present mode: the panels give way, the type grows */
+.app.present-mode .library, .app.present-mode .inspector, .app.present-mode .charts, .app.present-mode .scenario, .app.present-mode .toolbar, .app.present-mode .interview-bar { display: none; }
+.present { position: relative; z-index: 6; background: var(--bg); } .present.over-canvas { background: transparent; pointer-events: none; } .present.over-canvas > * { pointer-events: auto; }
+.present-head { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--panel); border-bottom: 2px solid var(--ink); } .present-head h1 { font-size: 30px; flex: 1; font-style: normal; }
+.present-body { padding: 24px 40px; font-size: 26px; max-height: calc(100vh - 80px); overflow: auto; } .present-body h2 { font-size: 30px; margin: 14px 0 8px; } .present-body li { margin-bottom: 6px; }
+.present-body.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; } .present-body.facts dt { color: var(--muted); font-size: 18px; } .present-body.facts dd { margin: 0; font-family: var(--mono); font-size: 34px; font-weight: 600; }
+.present-body table { border-collapse: collapse; font-size: 24px; } .present-body th, .present-body td { border-bottom: 1px solid var(--line); padding: 8px 16px; text-align: left; }
+.app.present-mode .main { position: relative; }
+.present:not(.over-canvas) { position: fixed; inset: 0; z-index: 30; }

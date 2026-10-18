@@ -3,6 +3,7 @@ import { Announcer } from './ui/Announcer'
 import { Board } from './ui/Board'
 import { Charts } from './ui/Charts'
 import { QuestionDialog } from './ui/QuestionDialog'
+import { PresentView } from './ui/interview/PresentView'
 import { InterviewBar } from './ui/interview/InterviewBar'
 import { CompareDialog } from './ui/CompareDialog'
 import { CapacityDialog } from './ui/CapacityDialog'
@@ -52,11 +53,13 @@ export function App() {
     return () => window.removeEventListener('hashchange', open)
   }, [registryReady])
 
+  const present = useStore((s) => s.ui.present && !!s.interview?.session)
   return (
-    <div className="app">
+    <div className={`app ${present ? 'present-mode' : ''}`}>
       <a className="skip" href="#canvas-area" onClick={(e) => { e.preventDefault(); document.getElementById('canvas-area')?.focus() }}>Skip to the canvas</a>
       <Toolbar />
       <InterviewBar />
+      <PresentView />
       <div className="main">
         <Library />
         <div className="center-col">
