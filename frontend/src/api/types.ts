@@ -221,6 +221,9 @@ export interface RunStats {
   mean: number
   errors: Record<string, number>
   conflicts: number
+  lostUpdates?: number // transfers that silently overwrote a concurrent commit (read committed)
+  txAborts?: number // transactions aborted by a write conflict or as a deadlock victim
+  deadlocks?: number
   freshReads: number
   staleReads: number
   duplicates: number
