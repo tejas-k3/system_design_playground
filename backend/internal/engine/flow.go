@@ -32,6 +32,7 @@ const (
 	cmdScore
 	cmdEnqueue
 	cmdExternal
+	cmdPut // upload a body to an object store
 )
 
 type call struct {
@@ -50,6 +51,7 @@ type call struct {
 	ttl     float64
 	token   int
 	job     *job
+	claim   bool    // the body already sits in an object store: what travels on is a pointer
 	tr      *tracer // non-nil for sampled requests
 	sp      *span   // the span of the node currently handling this call
 }
@@ -153,7 +155,7 @@ func (s *Sim) callCmd(from *node, e *edge, c *call, cm cmd, ver int, cb func(Res
 	cc := *c
 	cc.cmd, cc.ver, cc.ticket = cm, ver, nil
 	switch cm {
-	case cmdWrite, cmdCacheInv, cmdCacheSet, cmdScore, cmdEnqueue, cmdUnlock, cmdExternal:
+	case cmdWrite, cmdCacheInv, cmdCacheSet, cmdScore, cmdEnqueue, cmdUnlock, cmdExternal, cmdPut:
 		cc.write = true
 	case cmdRead, cmdCacheGet, cmdGeo, cmdRank:
 		cc.write = false
@@ -473,6 +475,8 @@ func (s *Sim) capacity(n *node) int {
 		return 1
 	case KCache:
 		return 10000
+	case KObjectStore:
+		return int(n.f("maxConcurrent"))
 	}
 	return 1 << 30
 }
@@ -630,6 +634,11 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 			s.failAt(n, RNoRoute, cb)
 			return
 		}
+	case KObjectStore:
+		if c.cmd != cmdPut {
+			s.failAt(n, RNoRoute, cb)
+			return
+		}
 	case KRateLimiter:
 		if !s.takeToken(n) {
 			s.failAt(n, RRateLimited, cb)
@@ -683,6 +692,16 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 		s.procDB(n, c, cb, release)
 	case KRedis:
 		s.procRedis(n, c, cb, release)
+	case KObjectStore:
+		// time to first byte, then the body at the store's per-request throughput
+		ms := n.f("firstByteMs")
+		if req, _ := s.sizes(c); req > 0 {
+			ms += req / (n.f("throughputMBps") * 1000) // bytes / (MB/s x 1000 bytes per ms)
+		}
+		s.hold(n, s.service(n, ms)*n.slow, release, cb, func() {
+			release()
+			s.okAt(n, Result{Ver: -1, Done: true}, cb)
+		})
 	case KExternalAPI:
 		s.hold(n, s.service(n, n.f("latencyMs"))*n.slow, release, cb, func() {
 			release()

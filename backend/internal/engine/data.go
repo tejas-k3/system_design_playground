@@ -117,6 +117,18 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 				s.appRead(n, &cc, done)
 			}
 		}
+		// claim check: a write with a body goes to the object store first; from then on only a pointer travels
+		if oe := s.first(n, KObjectStore); oe != nil && cc.write && cc.lg != nil && cc.lg.client.f("reqKB") > 0 {
+			s.callCmd(n, oe, &cc, cmdPut, 0, func(res Result) {
+				if !res.OK {
+					done(res)
+					return
+				}
+				cc.claim = true
+				run()
+			})
+			return
+		}
 		if ee := s.first(n, KExternalAPI); ee != nil && (cc.write || ee.to.s("calledFor") == "all") {
 			s.callCmd(n, ee, &cc, cmdExternal, 0, func(res Result) {
 				if !res.OK {
@@ -558,7 +570,7 @@ func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
 		s.failAt(n, RNoRoute, cb)
 		return
 	}
-	if c.lg != nil && c.lg.client.f("reqKB") > n.f("maxMessageKB") { // sizes are 0 (not modelled) unless the users set them
+	if c.lg != nil && !c.claim && c.lg.client.f("reqKB") > n.f("maxMessageKB") { // sizes are 0 (not modelled) unless the users set them; a claim check carries a pointer
 		s.failAt(n, RMessageTooLarge, cb)
 		return
 	}

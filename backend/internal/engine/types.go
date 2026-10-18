@@ -15,6 +15,7 @@ const (
 	KShardRouter  = "shardRouter"
 	KExternalAPI  = "externalApi"
 	KRedis        = "redis"
+	KObjectStore  = "objectStore"
 )
 
 // Params holds user-editable settings: numbers, strings (select) and booleans.
