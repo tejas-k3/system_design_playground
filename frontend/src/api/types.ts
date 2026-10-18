@@ -111,6 +111,7 @@ export interface Goals {
   maxStaleReadPct?: number
   maxDuplicates?: number
   maxLostWrites?: number
+  maxLostUpdates?: number
   starCostPerHour?: number
   starP95Ms?: number
 }
