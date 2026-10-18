@@ -3,6 +3,7 @@ import { emptyInterview, type InterviewData } from '../model/interview'
 import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
+import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
 import { isCompact, isNarrow } from '../model/responsive'
 
 export type Tool = 'select' | 'connect'
@@ -72,6 +73,12 @@ export interface State {
   updateNote(id: string, patch: Partial<Note>): void
   deleteIds(ids: string[]): void
   deleteSelection(): void
+  /** Remember the selected components (and the connections between them) for pasting. */
+  copySelection(quiet?: boolean): void
+  /** Add a copy of what was copied, offset a little; the copy becomes the selection. */
+  paste(): void
+  /** Copy and paste in one step. */
+  duplicateSelection(): void
   beginGesture(): void
   endGesture(): void
   undo(): void
@@ -113,6 +120,9 @@ export interface State {
 }
 
 let toastSeq = 1
+
+/** What was last copied; kept outside the saved state because it is only for this tab's session. */
+let clipboard: Clip | null = null
 
 export const useStore = create<State>()((set, get) => {
   /** Apply a diagram change and record undo history. */
@@ -243,6 +253,30 @@ export const useStore = create<State>()((set, get) => {
       set((s) => ({ selection: s.selection.filter((id) => !kill.has(id)) }))
     },
     deleteSelection: () => get().deleteIds(get().selection),
+
+    copySelection: (quiet) => {
+      const clip = copySelection(get().diagram, get().selection)
+      if (clipIsEmpty(clip)) return
+      clipboard = clip
+      if (!quiet) get().toast(`Copied ${clip.nodes.length + clip.notes.length}`, 'info')
+    },
+    paste: () => {
+      if (!clipboard || clipIsEmpty(clipboard)) return
+      if (clipboard.nodes.length > 0 && guardTopology()) return
+      let ids: string[] = []
+      mutate((d) => {
+        const out = pasteClip(d, clipboard!, newId)
+        ids = out.ids
+        return out.diagram
+      })
+      // paste again and the next copy lands a step further along
+      clipboard = { ...clipboard, nodes: clipboard.nodes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), notes: clipboard.notes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })) }
+      set({ selection: ids, ui: { ...get().ui, welcome: false } })
+    },
+    duplicateSelection: () => {
+      get().copySelection(true)
+      get().paste()
+    },
 
     beginGesture: () => {
       if (!get().gesture) set({ gesture: get().diagram })
