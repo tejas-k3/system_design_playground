@@ -148,6 +148,12 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 }
 
 func (s *Sim) appRead(n *node, c *call, done func(Result)) {
+	if n.s("gather") == "all" {
+		if es := s.outOf(n, KIndex); len(es) >= 2 {
+			s.gatherAll(n, c, es, done)
+			return
+		}
+	}
 	if c.wl == wlGeo || c.wl == wlLeader {
 		if re := s.redisEdge(n); re != nil {
 			cm := cmdGeo
@@ -720,4 +726,28 @@ func (s *Sim) runJob(q, w *node, j *job) {
 		}
 		step()
 	})
+}
+
+// gatherAll sends the read to every shard at once and answers when the last one has: the latency of the request is
+// the slowest shard's. If any shard fails the request fails with the first failure in edge order, so one dead shard
+// breaks every query that needs all of them.
+func (s *Sim) gatherAll(n *node, c *call, es []*edge, done func(Result)) {
+	results := make([]Result, len(es))
+	left := len(es)
+	for i, e := range es {
+		i := i
+		s.callCmd(n, e, c, cmdRead, 0, func(r Result) {
+			results[i] = r
+			if left--; left > 0 {
+				return
+			}
+			for _, r := range results {
+				if !r.OK {
+					done(r)
+					return
+				}
+			}
+			done(Result{OK: true, Ver: -1, Done: true, Src: n})
+		})
+	}
 }
