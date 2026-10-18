@@ -174,3 +174,21 @@ describe('edge loss and jitter in the sanitizer', () => {
     expect(bad?.diagram.edges[0].jitterMs).toBeUndefined()
   })
 })
+
+describe('edge protocol and async in the sanitizer', () => {
+  const base = { nodes: [{ id: 'u', kind: 'client', x: 0, y: 0, label: 'U', params: {} }, { id: 'a', kind: 'appServer', x: 1, y: 1, label: 'A', params: {} }], notes: [] }
+  const edge = (extra: Record<string, unknown>) => ({ id: 'u>a', from: 'u', to: 'a', latencyMs: 40, ...extra })
+  it('keeps a known protocol and the async flag', () => {
+    const e = sanitizeDiagram(reg, { ...base, edges: [edge({ protocol: 'grpc', async: true })] })
+    expect(e?.diagram.edges[0].protocol).toBe('grpc')
+    expect(e?.diagram.edges[0].async).toBe(true)
+    expect(e?.adjusted).toBe(false)
+  })
+  it('drops an unknown protocol and a false or non-boolean async, and says it adjusted', () => {
+    const e = sanitizeDiagram(reg, { ...base, edges: [edge({ protocol: 'pigeon', async: 'yes' })] })
+    expect(e?.diagram.edges[0].protocol).toBeUndefined()
+    expect(e?.diagram.edges[0].async).toBeUndefined()
+    expect(e?.adjusted).toBe(true)
+    expect(sanitizeDiagram(reg, { ...base, edges: [edge({ async: false })] })?.diagram.edges[0].async).toBeUndefined()
+  })
+})

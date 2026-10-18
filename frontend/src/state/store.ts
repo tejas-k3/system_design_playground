@@ -74,7 +74,7 @@ export interface State {
   updateNode(id: string, patch: Partial<Pick<Node, 'label'>>): void
   setParam(id: string, key: string, value: number | string | boolean): void
   addEdge(from: string, to: string): string | null
-  updateEdge(id: string, patch: Partial<Pick<Edge, 'latencyMs' | 'bandwidthMbps' | 'lossPct' | 'jitterMs'>>): void
+  updateEdge(id: string, patch: Partial<Pick<Edge, 'latencyMs' | 'bandwidthMbps' | 'lossPct' | 'jitterMs' | 'protocol' | 'async'>>): void
   addNote(x: number, y: number): string
   updateNote(id: string, patch: Partial<Note>): void
   deleteIds(ids: string[]): void

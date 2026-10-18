@@ -3,6 +3,9 @@ import type { Diagram, Edge, Node, NodeSpec, Params, ParamSpec, ParamValue, Regi
 export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 4
 
+/** Labels an edge may carry: how the two components talk. They change nothing in the simulation. */
+export const PROTOCOLS = ['http', 'grpc', 'tcp', 'ws', 'sql', 'custom']
+
 export const emptyDiagram = (): Diagram => ({ nodes: [], edges: [], notes: [] })
 
 let counter = 0
@@ -140,6 +143,14 @@ export function sanitizeDiagram(reg: Reg, raw: unknown): { diagram: Diagram; adj
       if (v === undefined || v === 0) continue
       if (num(v) && v > 0) out[k] = Math.min(max, v)
       if (out[k] !== v) adjusted = true
+    }
+    if (e.protocol !== undefined) {
+      if (typeof e.protocol === 'string' && PROTOCOLS.includes(e.protocol)) out.protocol = e.protocol
+      else adjusted = true
+    }
+    if (e.async !== undefined) {
+      if (e.async === true) out.async = true
+      else if (e.async !== false) adjusted = true
     }
     edges.push(out)
   }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
 import { palettes } from '../draw/theme'
 import type { AlignMode } from '../model/arrange'
-import { connectableTargets, paramVisible } from '../model/diagram'
+import { PROTOCOLS, connectableTargets, paramVisible } from '../model/diagram'
 import { isCompact } from '../model/responsive'
 import { fmtCost, pct, successRate } from '../model/goals'
 import { phaseChip } from '../model/phase'
@@ -417,6 +417,15 @@ function EdgePanel({ id }: { id: string }) {
       <h2>Connection</h2>
       <p className="small"><b>{from?.label}</b> → <b>{to?.label}</b></p>
       <p className="muted small">{reg.spec(from?.kind ?? '')?.name} to {reg.spec(to?.kind ?? '')?.name}</p>
+      <div className="field">
+        <label htmlFor="proto">Protocol <span className="muted small">(a label)</span></label>
+        <select id="proto" value={edge.protocol ?? ''} onChange={(e) => updateEdge(id, { protocol: e.target.value || undefined })}>
+          <option value="">Not set</option>
+          {PROTOCOLS.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <label className="check"><input type="checkbox" checked={!!edge.async} onChange={(e) => updateEdge(id, { async: e.target.checked || undefined })} /> Asynchronous (dashed, open circle)</label>
+        <p className="muted small">Labels for whoever reads the design. The simulation treats every connection the same.</p>
+      </div>
       <div className="field">
         <label htmlFor="loss">Packet loss <span className="muted small">(%)</span></label>
         <div className="num">

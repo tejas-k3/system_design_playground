@@ -20,6 +20,8 @@ export interface Edge {
   bandwidthMbps?: number // 0 / absent = unlimited; only matters once the users set request or response sizes
   lossPct?: number // chance a packet is lost per trip: retransmitted after 200 ms, six in a row abort the connection
   jitterMs?: number // random 0..jitterMs added to each one-way trip
+  protocol?: string // http | grpc | tcp | ws | sql | custom: a label for the reader, ignored by the simulation
+  async?: boolean // drawn dashed with an open arrowhead: a fire-and-forget call, also only a label
 }
 export interface Note {
   id: string
