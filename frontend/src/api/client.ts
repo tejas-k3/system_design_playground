@@ -1,4 +1,4 @@
-import type { Diagram, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { ChoiceResult, Diagram, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -59,5 +59,10 @@ export const fetchQuestions = () => fetch('/api/questions').then((r) => json<Que
 export const fetchQuestion = (id: string) => fetch(`/api/questions/${encodeURIComponent(id)}`).then((r) => json<Question>(r))
 export async function answerEstimate(id: string, answers: Record<string, number>): Promise<EstimateResult> {
   const res = await fetch(`/api/questions/${encodeURIComponent(id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers }) })
+  return json(res)
+}
+
+export async function answerChoice(id: string, choice: number): Promise<ChoiceResult> {
+  const res = await fetch(`/api/questions/${encodeURIComponent(id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ choice }) })
   return json(res)
 }

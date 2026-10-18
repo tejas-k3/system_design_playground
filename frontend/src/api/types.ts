@@ -327,8 +327,22 @@ export interface QuestionField {
   label: string
   unit: string
 }
+export interface Symptoms {
+  durationSec: number
+  series: SeriesPoint[]
+  errors: Record<string, number>
+  trace: Trace | null
+}
+export interface ChoiceResult {
+  correct: boolean
+  answer: number
+  explain: string
+  stars: number
+}
 export interface Question extends QuestionSummary {
   prompt: string
+  options?: string[]
+  symptoms?: Symptoms
   facts?: { label: string; value: string }[]
   fields?: QuestionField[]
 }
