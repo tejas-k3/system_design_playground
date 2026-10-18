@@ -291,3 +291,7 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .modal.search ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow: auto; }
 .modal.search li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; cursor: pointer; }
 .modal.search li.on { background: color-mix(in srgb, var(--accent, #b43a0a) 14%, transparent); outline: 1px solid var(--accent, #b43a0a); }
+
+ul.templates { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+ul.templates button { display: grid; gap: 6px; text-align: left; width: 100%; padding: 12px; font: inherit; cursor: pointer; }
+.linkish { background: none; border: none; padding: 4px 0; font: inherit; text-decoration: underline; cursor: pointer; color: inherit; text-align: left; }

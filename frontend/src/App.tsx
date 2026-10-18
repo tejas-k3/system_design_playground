@@ -8,6 +8,7 @@ import { InterviewBar } from './ui/interview/InterviewBar'
 import { CompareDialog } from './ui/CompareDialog'
 import { CapacityDialog } from './ui/CapacityDialog'
 import { SearchDialog } from './ui/SearchDialog'
+import { TemplatesDialog } from './ui/TemplatesDialog'
 import { Inspector } from './ui/Inspector'
 import { Help } from './ui/Help'
 import { Library } from './ui/Library'
@@ -80,6 +81,7 @@ export function App() {
       <Help />
       <CapacityDialog />
       <SearchDialog />
+      <TemplatesDialog />
       <CompareDialog />
       <QuestionDialog />
       <Toasts />
