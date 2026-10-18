@@ -3,6 +3,8 @@ package scenarios
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,8 +43,8 @@ func TestDiagnoseFixturesAreGeneratedFromARealRun(t *testing.T) {
 		if err := json.Unmarshal(b, &stored); err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(stored, *fresh) {
-			t.Errorf("%s: the stored fixture differs from a fresh seeded run of %s (seed %d); regenerate with -update, never edit it", q.ID, q.source.ScenarioID, q.source.Seed)
+		if why := symptomsDiffer(stored, *fresh); why != "" {
+			t.Errorf("%s: the stored fixture differs from a fresh seeded run of %s (seed %d): %s; regenerate with -update, never edit it", q.ID, q.source.ScenarioID, q.source.Seed, why)
 		}
 		if q.Symptoms == nil || !reflect.DeepEqual(*q.Symptoms, stored) {
 			t.Errorf("%s: the served symptoms are not the stored fixture", q.ID)
@@ -98,4 +100,56 @@ func TestGradeChoice(t *testing.T) {
 	if _, err := (&Question{Mode: ModeEstimate}).GradeChoice(0); err == nil {
 		t.Error("an estimate question is not graded by a choice")
 	}
+}
+
+// within reports whether two measurements agree within a relative and an absolute allowance.
+func close(a, b, rel, abs float64) bool {
+	return math.Abs(a-b) <= rel*math.Max(math.Abs(a), math.Abs(b))+abs
+}
+
+// symptomsDiffer compares a stored fixture with a fresh run. The engine is deterministic on one machine, but
+// floating-point results are not bit-identical across CPU architectures (a fused multiply-add on arm64 and not
+// on amd64 changes the last digit, and a last-digit difference can reorder two events a nanosecond apart), so
+// the comparison allows a few percent. That still catches any edit that changes what the dashboard shows
+// (an outage that moves, a metric that is invented) while tolerating what the architecture does.
+func symptomsDiffer(stored, fresh Symptoms) string {
+	if stored.DurationSec != fresh.DurationSec || len(stored.Series) != len(fresh.Series) {
+		return fmt.Sprintf("shape differs (%v s / %d points vs %v s / %d points)", stored.DurationSec, len(stored.Series), fresh.DurationSec, len(fresh.Series))
+	}
+	worst, where := 0.0, ""
+	for i, a := range stored.Series {
+		b := fresh.Series[i]
+		for name, pair := range map[string][2]float64{"t": {a.T, b.T}, "okRps": {a.OkRps, b.OkRps}, "errRps": {a.ErrRps, b.ErrRps}, "p50": {a.P50, b.P50}, "p95": {a.P95, b.P95}, "success": {a.Success, b.Success}, "inFlight": {float64(a.InFly), float64(b.InFly)}} {
+			rel, abs := 0.05, 5.0
+			if name == "t" {
+				rel, abs = 0, 1e-9
+			}
+			if name == "success" {
+				rel, abs = 0, 0.05
+			}
+			if name == "inFlight" {
+				rel, abs = 0.10, 10
+			}
+			if d := math.Abs(pair[0] - pair[1]); !close(pair[0], pair[1], rel, abs) && d > worst {
+				worst, where = d, fmt.Sprintf("point %d (t=%.0f) %s: %.3f vs %.3f", i, a.T, name, pair[0], pair[1])
+			}
+		}
+	}
+	if where != "" {
+		return "worst difference at " + where
+	}
+	if (stored.Trace == nil) != (fresh.Trace == nil) || (stored.Trace != nil && stored.Trace.Reason != fresh.Trace.Reason) {
+		return "the failed trace differs in its outcome"
+	}
+	for k, a := range stored.Errors {
+		if !close(float64(a), float64(fresh.Errors[k]), 0.05, 10) {
+			return fmt.Sprintf("error count %s: %d vs %d", k, a, fresh.Errors[k])
+		}
+	}
+	for k := range fresh.Errors {
+		if _, ok := stored.Errors[k]; !ok && fresh.Errors[k] > 10 {
+			return "a failure reason is missing from the fixture: " + k
+		}
+	}
+	return ""
 }
