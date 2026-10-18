@@ -1,6 +1,10 @@
 package scenarios
 
-import "fmt"
+import (
+	"fmt"
+
+	"sysdesign/internal/engine"
+)
 
 const (
 	secPerDay   = 86400.0
@@ -100,6 +104,104 @@ func init() {
 		answer:      0,
 		explanation: "Nothing is down: arrivals are steady before and after. What changes is how many requests miss the cache at the same moment. The cache is filled all at once with the same lifetime, so it also expires all at once; every miss goes to the database, which slows to a crawl, requests time out and are retried, and it recovers only when the cache is refilled. Fixes: randomise lifetimes (TTL jitter) and let one request refill an entry while the others wait (request coalescing).",
 	})
+}
+
+func init() {
+	base := func(id string) engine.Diagram { return Get(id).Diagram }
+
+	pay := base("sync-or-async")
+	registerTradeoff("payments-replication", "sync-or-async", &Question{
+		Title: "Payments: sync or async replication?", Difficulty: "Medium",
+		Summary: "Run both and see what the safe choice costs.",
+		Prompt:  "A payment service tells users their payment succeeded, then its primary database dies and the replica takes over. Requirement: no acknowledged payment may be lost, and p95 latency stays under 260 ms. Run each design, then pick the one to ship.",
+		answer:  1, explanation: "Asynchronous replication acknowledges before the replica has the write, so about 250 acknowledged payments vanished with the primary. Synchronous replication waits for the replica, so none were lost; the price was about 35 ms at p95 (185 to 221 ms), which is inside the 260 ms budget. When the requirement is zero loss, the latency is a cost you pay, not a reason to refuse. Sync also makes writes depend on the replica being reachable.",
+		rule: func(r RunSummary) bool { return r.LostWrites == 0 && r.P95 < 260 },
+	},
+		Candidate{Label: "Asynchronous replica", Detail: "The primary acknowledges first; the replica catches up about three seconds later.", diagram: pay},
+		Candidate{Label: "Synchronous replica", Detail: "The primary acknowledges only after the replica has the write.", diagram: tweak(pay, engine.KReplica, P{"replication": "sync"})},
+	)
+
+	stale := base("stale-prices")
+	registerTradeoff("cache-write-policy", "stale-prices", &Question{
+		Title: "What should a write do to the cache?", Difficulty: "Medium",
+		Summary: "Four ways to keep cached prices honest, side by side.",
+		Prompt:  "Prices change often. Requirement: at most 2% of reads may be stale, and p95 stays under 300 ms. Run each policy, then pick the one to ship.",
+		answer:  2, explanation: "Doing nothing left about 47% of reads stale. A one-second lifetime still left about 24%. Invalidating on write barely helped (about 46%): an invalidated entry is refilled from a replica that is itself behind, so the stale value comes straight back. Write-through put the new value into the cache with the write, and stale reads fell to zero at a cost of about 10 ms at p95.",
+		rule: func(r RunSummary) bool { return r.StaleReadPct <= 0.02 && r.P95 < 300 },
+	},
+		Candidate{Label: "Do nothing on a write", Detail: "Entries live until they are evicted.", diagram: stale},
+		Candidate{Label: "Invalidate on write", Detail: "A write removes the cached entry; the next read refills it.", diagram: tweak(stale, engine.KCache, P{"writePolicy": "invalidate"})},
+		Candidate{Label: "Write through", Detail: "A write updates the cached entry as well.", diagram: tweak(stale, engine.KCache, P{"writePolicy": "writeThrough"})},
+		Candidate{Label: "One-second lifetime", Detail: "Entries expire after one second whatever happens.", diagram: tweak(stale, engine.KCache, P{"ttlSec": 1.0})},
+	)
+
+	storm := base("retry-pileup")
+	retried := tweak(storm, engine.KClient, P{"retries": 2.0, "backoff": "exponential"})
+	registerTradeoff("retry-policy", "retry-pileup", &Question{
+		Title: "How should clients retry?", Difficulty: "Hard",
+		Summary: "Retries help against blips and wreck overloaded systems. Which design survives a slow database?",
+		Prompt:  "The database slows down for ten seconds. Requirement: at least 85% of requests succeed over the run, and p95 stays under 1.5 s. Run each design, then pick the one to ship.",
+		answer:  3, explanation: "Four immediate retries produced a storm: about 19% success. Two retries with backoff changed nothing (still about 19%) because the queues were already full of abandoned work. Giving up on the first failure did better (about 75%) simply by adding no load. The design that met the requirement (about 90% success, p95 about 750 ms) fixed the servers: it served the newest requests first and dropped anything that had waited too long, so the queue could never fill with requests whose users had left; backoff alone cannot do that.",
+		rule: func(r RunSummary) bool { return r.Success >= 0.85 && r.P95 < 1500 },
+	},
+		Candidate{Label: "Four immediate retries", Detail: "Every failure is retried at once, up to four times.", diagram: storm},
+		Candidate{Label: "Two retries with backoff", Detail: "Exponential backoff with jitter, at most two retries.", diagram: retried},
+		Candidate{Label: "No retries", Detail: "A failed request is a failed request.", diagram: tweak(storm, engine.KClient, P{"retries": 0.0})},
+		Candidate{Label: "Backoff, newest first, short queue wait", Detail: "Two retries with backoff, and servers serve the newest request first and drop anything that waited more than 400 ms.", diagram: tweak(retried, engine.KAppServer, P{"queueOrder": "lifo", "queueTimeoutMs": 400.0})},
+	)
+
+	cut := base("cut-off")
+	registerTradeoff("dependency-timeout", "cut-off", &Question{
+		Title: "How do you protect against a dependency that goes silent?", Difficulty: "Medium",
+		Summary: "A timeout, a circuit breaker, or both?",
+		Prompt:  "The database becomes unreachable for 25 seconds; requests to it simply never return. Requirement: at least 82% success over the run. If two designs meet it, ship the simpler one. Run each design, then pick.",
+		answer:  1, explanation: "With no call timeout, every thread that touched the database was stuck for the whole outage: about 67% success. A 300 ms call timeout released the threads and cache hits kept flowing: about 87%. Adding a circuit breaker gave no further benefit here (about 87% as well), so the timeout is the simpler design that meets the requirement. A breaker earns its place when a dependency stays down long enough that even failing after 300 ms wastes capacity.",
+		rule:       func(r RunSummary) bool { return r.Success >= 0.82 },
+		alsoPasses: []int{2},
+	},
+		Candidate{Label: "No call timeout", Detail: "Servers wait as long as it takes.", diagram: cut},
+		Candidate{Label: "300 ms call timeout", Detail: "Give up on the database after 300 ms.", diagram: tweak(cut, engine.KAppServer, P{"callTimeoutMs": 300.0})},
+		Candidate{Label: "Timeout and circuit breaker", Detail: "A 300 ms timeout, and stop calling for a few seconds after five failures in a row.", diagram: tweak(cut, engine.KAppServer, P{"callTimeoutMs": 300.0, "circuitBreaker": true})},
+	)
+
+	rush := base("morning-rush")
+	registerTradeoff("scale-for-the-rush", "morning-rush", &Question{
+		Title: "Capacity for a daily rush", Difficulty: "Medium",
+		Summary: "A bigger machine, autoscaling, or autoscaling with a floor?",
+		Prompt:  "Traffic climbs from 80 to 600 requests a second and a new server takes 20 seconds to boot. Requirement: at least 98% success and a total cost under $1.00 an hour. Run each design, then pick the one to ship.",
+		answer:  2, explanation: "One big server (64 threads) coped but cost about $2.48 an hour all day. Autoscaling from a single server was cheap (about $0.66) but the first minutes of the climb outran the 20-second boot time: about 92% success. Keeping at least three servers meant the fleet already had headroom when the ramp began: about 99.2% success for about $0.71, inside both limits. Autoscaling reacts to load; a floor covers what it cannot react to in time.",
+		rule: func(r RunSummary) bool { return r.Success >= 0.98 && r.CostPerHour < 1.0 },
+	},
+		Candidate{Label: "One big server", Detail: "A single app server with 64 threads, no autoscaling.", diagram: tweak(rush, engine.KAppServer, P{"threads": 64.0})},
+		Candidate{Label: "Autoscale from one server", Detail: "Start with one server; add more when threads get busy.", diagram: tweak(rush, engine.KAppServer, P{"autoscale": true})},
+		Candidate{Label: "Autoscale, at least three servers", Detail: "Never fewer than three; add more when threads get busy.", diagram: tweak(rush, engine.KAppServer, P{"autoscale": true, "minInstances": 3.0})},
+	)
+}
+
+// tweak returns a copy of d with params merged onto every component of a kind (or with the given id).
+func tweak(d engine.Diagram, match string, p P) engine.Diagram {
+	out := d
+	out.Nodes = append([]engine.Node(nil), d.Nodes...)
+	for i, n := range out.Nodes {
+		if n.Kind != match && n.ID != match {
+			continue
+		}
+		np := P{}
+		for k, v := range n.Params {
+			np[k] = v
+		}
+		for k, v := range p {
+			np[k] = v
+		}
+		out.Nodes[i].Params = np
+	}
+	d2, _ := engine.Sanitize(out)
+	return d2
+}
+
+func registerTradeoff(id, scenarioID string, q *Question, cands ...Candidate) {
+	q.ID, q.Mode, q.scenarioID, q.Candidates = id, ModeTradeoff, scenarioID, cands
+	registerQuestion(q)
 }
 
 func registerDiagnose(id string, src diagSource, q *Question) {

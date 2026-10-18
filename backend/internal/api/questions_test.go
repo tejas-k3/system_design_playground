@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -113,4 +114,46 @@ func TestAnsweringADiagnosisRevealsTheKeyOnlyAfterwards(t *testing.T) {
 	if c := post(t, ts.URL+"/api/questions/url-shortener-numbers/answer", map[string]any{"choice": 1}, nil); c != 400 {
 		t.Errorf("a choice sent to an estimate question: %d", c)
 	}
+}
+
+func TestRunningATradeoffCandidateReturnsNumbersAndNeverTheKey(t *testing.T) {
+	ts := newTestServer(t)
+	var q scenarios.Question
+	if code := get(t, ts.URL+"/api/questions/payments-replication", &q); code != 200 || len(q.Candidates) != 2 {
+		t.Fatalf("status %d candidates %d", code, len(q.Candidates))
+	}
+	var async, sync scenarios.RunSummary
+	if code := post(t, ts.URL+"/api/questions/payments-replication/run", map[string]any{"candidate": 0}, &async); code != 200 || async.Resolved == 0 || async.LostWrites == 0 {
+		t.Fatalf("async: status %d %+v", code, async)
+	}
+	if code := post(t, ts.URL+"/api/questions/payments-replication/run", map[string]any{"candidate": 1}, &sync); code != 200 || sync.LostWrites != 0 || sync.P95 <= async.P95 {
+		t.Fatalf("sync: status %d %+v", code, sync)
+	}
+	for name, body := range map[string]map[string]any{"negative": {"candidate": -1}, "out of range": {"candidate": 9}, "none given": {}} {
+		if c := post(t, ts.URL+"/api/questions/payments-replication/run", body, nil); c != 400 {
+			t.Errorf("%s: status %d, want 400", name, c)
+		}
+	}
+	if c := post(t, ts.URL+"/api/questions/url-shortener-numbers/run", map[string]any{"candidate": 0}, nil); c != 400 {
+		t.Errorf("an estimate question cannot be run: %d", c)
+	}
+	var res scenarios.ChoiceResult
+	if code := post(t, ts.URL+"/api/questions/payments-replication/answer", map[string]any{"choice": 1}, &res); code != 200 || !res.Correct {
+		t.Fatalf("answering: status %d %+v", code, res)
+	}
+}
+
+func TestQuestionRunsShareTheRunSlots(t *testing.T) {
+	srv := New(Config{MaxRuns: 1})
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	srv.runSlots <- struct{}{}
+	if c := post(t, ts.URL+"/api/questions/payments-replication/run", map[string]any{"candidate": 0}, nil); c != http.StatusServiceUnavailable {
+		t.Fatalf("status %d, want 503 while a run holds the only slot", c)
+	}
+	<-srv.runSlots
+	if c := post(t, ts.URL+"/api/questions/payments-replication/run", map[string]any{"candidate": 0}, nil); c != 200 {
+		t.Fatalf("status %d after the slot freed", c)
+	}
+	waitSlotsFree(t, srv, "the slot was not released after a question run")
 }

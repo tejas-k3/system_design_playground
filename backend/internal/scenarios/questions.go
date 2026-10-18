@@ -16,6 +16,7 @@ import (
 const (
 	ModeEstimate = "estimate"
 	ModeDiagnose = "diagnose"
+	ModeTradeoff = "tradeoff"
 )
 
 // Verdicts for one estimated number.
@@ -49,12 +50,16 @@ type Question struct {
 	Prompt     string          `json:"prompt"`
 	Facts      []Fact          `json:"facts,omitempty"`
 	Fields     []EstimateField `json:"fields,omitempty"`
-	Options    []string        `json:"options,omitempty"`  // diagnose: the candidate explanations
-	Symptoms   *Symptoms       `json:"symptoms,omitempty"` // diagnose: what the learner gets to look at
+	Options    []string        `json:"options,omitempty"`    // diagnose: the candidate explanations
+	Symptoms   *Symptoms       `json:"symptoms,omitempty"`   // diagnose: what the learner gets to look at
+	Candidates []Candidate     `json:"candidates,omitempty"` // tradeoff: designs to run and compare
 
-	source      diagSource // where the symptoms come from, so a test can regenerate them
-	answer      int        // diagnose: index of the right option
-	explanation string     // diagnose: why, shown only after answering
+	rule        func(RunSummary) bool // tradeoff: the stated requirement the right answer meets
+	alsoPasses  []int                 // tradeoff: other candidates that meet it too, but lose on the stated tie-break
+	scenarioID  string                // tradeoff: the challenge whose traffic and failures every candidate faces
+	source      diagSource            // where the symptoms come from, so a test can regenerate them
+	answer      int                   // diagnose: index of the right option
+	explanation string                // diagnose: why, shown only after answering
 }
 
 // Symptoms are what a monitoring page and one trace would show during an incident. They are generated from a
@@ -123,11 +128,15 @@ type ChoiceResult struct {
 
 // GradeChoice grades a multiple-choice diagnosis. The right answer is revealed with the result either way.
 func (q *Question) GradeChoice(choice int) (ChoiceResult, error) {
-	if q.Mode != ModeDiagnose {
+	if q.Mode != ModeDiagnose && q.Mode != ModeTradeoff {
 		return ChoiceResult{}, errors.New("not a multiple-choice question")
 	}
-	if choice < 0 || choice >= len(q.Options) {
-		return ChoiceResult{}, fmt.Errorf("choose one of the %d options", len(q.Options))
+	n := len(q.Options)
+	if q.Mode == ModeTradeoff {
+		n = len(q.Candidates)
+	}
+	if choice < 0 || choice >= n {
+		return ChoiceResult{}, fmt.Errorf("choose one of the %d options", n)
 	}
 	r := ChoiceResult{Correct: choice == q.answer, Answer: q.answer, Explain: q.explanation}
 	if r.Correct {
@@ -234,3 +243,53 @@ func AllQuestions() []*Question { return append([]*Question(nil), allQuestions..
 
 // Q returns a question by id, or nil.
 func Q(id string) *Question { return questionByID[id] }
+
+// Candidate is one design a trade-off question lets the learner run. Only its label and description are served;
+// the diagram stays on the server.
+type Candidate struct {
+	Label   string `json:"label"`
+	Detail  string `json:"detail"`
+	diagram engine.Diagram
+}
+
+// RunSummary is what running a candidate shows: the numbers the choice turns on.
+type RunSummary struct {
+	Resolved     int     `json:"resolved"`
+	Success      float64 `json:"success"` // share of requests that succeeded, 0..1
+	P50          float64 `json:"p50"`
+	P95          float64 `json:"p95"`
+	P99          float64 `json:"p99"`
+	CostPerHour  float64 `json:"costPerHour"`
+	LostWrites   int     `json:"lostWrites"`
+	StaleReadPct float64 `json:"staleReadPct"` // share of reads that were stale, 0..1
+}
+
+// RunCandidate simulates candidate i under the question's scenario (its traffic, failures and length) and
+// summarises the run. The same seed always gives the same numbers.
+func (q *Question) RunCandidate(i int, seed uint32) (RunSummary, error) {
+	if q.Mode != ModeTradeoff {
+		return RunSummary{}, errors.New("not a trade-off question")
+	}
+	if i < 0 || i >= len(q.Candidates) {
+		return RunSummary{}, fmt.Errorf("choose one of the %d designs", len(q.Candidates))
+	}
+	sc := Get(q.scenarioID)
+	if sc == nil {
+		return RunSummary{}, fmt.Errorf("no scenario %q", q.scenarioID)
+	}
+	d := q.Candidates[i].diagram
+	sim := engine.New(d, sc.Options(seed))
+	limit := sc.DurationSec*1000 + 60000
+	for !sim.Finished() && sim.Now() < limit {
+		sim.Advance(100)
+	}
+	run := sim.RunSnapshot()
+	out := RunSummary{Resolved: run.Resolved, P50: run.P50, P95: run.P95, P99: run.P99, CostPerHour: sim.CostPerHour(), LostWrites: run.LostWrites}
+	if run.Resolved > 0 {
+		out.Success = float64(run.OK) / float64(run.Resolved)
+	}
+	if reads := run.Fresh + run.Stale; reads > 0 {
+		out.StaleReadPct = float64(run.Stale) / float64(reads)
+	}
+	return out, nil
+}
