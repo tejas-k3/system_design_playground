@@ -73,14 +73,50 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 	if via != nil {
 		via.fwd++
 	}
-	s.after(oneWay, func() {
+	req, resp := s.sizes(c)
+	fwd := oneWay + s.transmit(e, 0, req)
+	if via != nil {
+		fwd += s.transmit(via, 0, req)
+	}
+	s.after(fwd, func() {
 		s.arrive(target, c, func(res Result) {
-			s.after(oneWay, func() {
+			back := oneWay + s.transmit(e, 1, resp)
+			if via != nil {
+				back += s.transmit(via, 1, resp)
+			}
+			s.after(back, func() {
 				s.emit(e, true, !res.OK)
 				cb(res)
 			})
 		})
 	})
+}
+
+// sizes are the bytes of one request and one response, from the users who sent it. 0 means not modelled.
+func (s *Sim) sizes(c *call) (req, resp float64) {
+	if c.lg == nil {
+		return 0, 0
+	}
+	return c.lg.client.f("reqKB") * 1000, c.lg.client.f("respKB") * 1000
+}
+
+// transmit puts bytes on a link in one direction and returns how long until they have all arrived: the wait for
+// the bytes ahead of them plus their own transmission time. A link with no limit, or no bytes, costs nothing.
+func (s *Sim) transmit(e *edge, dir int, bytes float64) float64 {
+	if e.bw <= 0 || bytes <= 0 {
+		return 0
+	}
+	dur := bytes * 8 / (e.bw * 1000) // bits / (Mbit/s x 1e3 bits per ms)
+	start := math.Max(s.now, e.txFree[dir])
+	e.txFree[dir] = start + dur
+	// the bits count as carried when they start crossing, so a backlog waiting behind a saturated link is not counted early
+	if wait := start - s.now; wait > 0 {
+		bits := bytes * 8
+		s.after(wait, func() { e.bits += bits })
+	} else {
+		e.bits += bytes * 8
+	}
+	return start - s.now + dur
 }
 
 // resolveTarget looks through a shard router to the node that really serves key/cmd.

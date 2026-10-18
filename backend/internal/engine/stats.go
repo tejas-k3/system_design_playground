@@ -31,6 +31,8 @@ type EdgeStats struct {
 	Rps     float64 `json:"rps"`
 	Breaker string  `json:"breaker,omitempty"`
 	Ejected bool    `json:"ejected,omitempty"`
+	Mbps    float64 `json:"mbps,omitempty"` // data carried over the window, both directions (only when sizes are set)
+	Util    float64 `json:"util,omitempty"` // Mbps as a share of the link's bandwidth, if it has a limit
 }
 
 type JobStats struct {
@@ -185,6 +187,16 @@ func (s *Sim) Snapshot() Stats {
 			f += v
 		}
 		es := EdgeStats{ID: e.id, Rps: float64(f) / span, Ejected: e.ejectTill > s.now}
+		var bits float64
+		for _, v := range e.bitsRing {
+			bits += v
+		}
+		if bits > 0 {
+			es.Mbps = bits / span / 1e6
+			if e.bw > 0 {
+				es.Util = math.Min(1, es.Mbps/e.bw)
+			}
+		}
 		if e.from.kind == KAppServer && e.from.b("circuitBreaker") {
 			es.Breaker = [...]string{"closed", "open", "halfOpen"}[s.breakerState(e)]
 		}

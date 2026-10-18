@@ -35,6 +35,9 @@ type Edge struct {
 	From      string  `json:"from"`
 	To        string  `json:"to"`
 	LatencyMs float64 `json:"latencyMs"`
+	// BandwidthMbps limits the link (0 = unlimited). Bytes only exist when the users set reqKB/respKB; with no sizes
+	// there is nothing to carry and the limit changes nothing.
+	BandwidthMbps float64 `json:"bandwidthMbps,omitempty"`
 }
 
 type Note struct {
