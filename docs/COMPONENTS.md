@@ -51,7 +51,7 @@ The defaults (8 threads, 16 database slots, a 50-request queue, and so on) are r
 
 ## What is not modelled yet
 
-Tiered CDNs and purge, byte-based cache capacity, downloads from the object store, and storage or egress cost (a link can have a bandwidth limit and a queue a message limit, once the users set request or response sizes); disk, memory, CPU throttling and clock skew (GC pauses, packet loss and jitter exist); write skew, document and wide-column presets and data volume (secondary indexes and isolation levels exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
+Tiered CDNs and purge, byte-based cache capacity, downloads from the object store, and storage or egress cost (a link can have a bandwidth limit and a queue a message limit, once the users set request or response sizes); disk and clock skew (GC pauses, packet loss, jitter, CPU burst credits and out-of-memory kills exist); write skew, document and wide-column presets and data volume (secondary indexes and isolation levels exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
 
 ## Check it yourself
 
