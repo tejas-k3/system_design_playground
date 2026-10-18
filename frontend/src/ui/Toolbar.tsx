@@ -1,5 +1,6 @@
 import { fmtCost } from '../model/goals'
-import { reset, step, togglePlay } from '../sim/bridge'
+import { scrubTarget } from '../model/scrub'
+import { reset, seek, step, togglePlay } from '../sim/bridge'
 import { shareCurrentDesign } from '../sim/designs'
 import { useStore } from '../state/store'
 
@@ -76,6 +77,27 @@ export function Toolbar() {
           </select>
         </label>
         <span className="clock" title="Simulated time">{formatClock(now)}</span>
+        {status !== 'stopped' && now >= 1 && (
+          <input
+            className="scrub"
+            type="range"
+            min={0}
+            max={Math.floor(now)}
+            step={1}
+            value={Math.floor(now)}
+            aria-label="Rewind"
+            aria-valuetext={formatClock(now)}
+            title="Rewind the run (arrow keys: 1 s, Shift: 10 s)"
+            onChange={(e) => seek(Number(e.target.value))}
+            onKeyDown={(e) => {
+              const t = scrubTarget(Math.floor(now), Math.floor(now), e.key, e.shiftKey)
+              if (t !== null) {
+                e.preventDefault()
+                seek(t)
+              }
+            }}
+          />
+        )}
       </div>
 
       <div className="spacer" />

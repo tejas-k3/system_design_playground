@@ -96,6 +96,7 @@ export interface State {
   revealHint(): void
   showSolution(d: Diagram): void
   compareWithReference(reference: Diagram): void
+  adoptDiagram(d: Diagram): void
   setResult(score: Score): void
   hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport }): void
 }
@@ -331,6 +332,7 @@ export const useStore = create<State>()((set, get) => {
       mutate(() => structuredClone(d))
       set((s) => ({ scenario: s.scenario ? { ...s.scenario, solved: true, compare: { mine, reference: structuredClone(d) } } : null, selection: [] }))
     },
+    adoptDiagram: (d) => set((s) => ({ diagram: d, selection: s.selection.filter((id) => d.nodes.some((n) => n.id === id)) })),
     compareWithReference: (reference) =>
       set((s) => (s.scenario ? { scenario: { ...s.scenario, compare: { mine: structuredClone(s.diagram), reference: structuredClone(reference) } } } : {})),
     setResult: (score) =>
