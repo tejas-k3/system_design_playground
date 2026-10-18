@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { countdown, markText, stageAfterKey, stageInfo } from '../../model/stages'
 import { STAGES, crossedMarks, elapsedMs, remainingMs, stageTimes } from '../../model/timer'
 import { useStore } from '../../state/store'
+import { StagePad } from './Pads'
 
 /** The interview frame: seven stage tabs, a countdown that is computed from timestamps, and what to do in this stage. */
 export function InterviewBar() {
@@ -75,6 +76,7 @@ export function InterviewBar() {
         <button onClick={end} title="End the interview and keep your notes">End</button>
       </div>
       <p className="iv-prompt" role="tabpanel" aria-labelledby={`stage-${session.stage}`}>{info.prompt} <span className="muted small">Tool: {info.tool}.</span></p>
+      {iv && <div className="iv-tool"><StagePad stage={session.stage} data={iv} /></div>}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{spoken}</div>
     </section>
   )

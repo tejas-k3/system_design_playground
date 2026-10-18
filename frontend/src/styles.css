@@ -257,3 +257,11 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .stages button { white-space: nowrap; }
 .iv-clock { font-family: var(--mono); font-weight: 600; font-size: 20px; min-width: 70px; text-align: center; font-variant-numeric: tabular-nums; }
 .iv-prompt { margin: 6px 2px 0; font-size: 13.5px; }
+
+.iv-tool { max-height: 32vh; overflow: auto; margin-top: 6px; }
+.pad .pad-row { display: flex; gap: 6px; margin-bottom: 4px; align-items: center; } .pad .pad-row.wrap input { flex: 1; min-width: 90px; } .pad .pad-row input { flex: 1; }
+.pad .num-in { flex: 0 0 90px; } .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pad input, .pad select, .pad-notes textarea { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; color: var(--ink); }
+.pad-notes { display: block; font-size: 13px; } .pad-notes textarea { display: block; width: 100%; }
+.pad fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; } .pad legend { font-weight: 700; font-size: 13px; padding: 0 4px; }
+.pad .hints { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
