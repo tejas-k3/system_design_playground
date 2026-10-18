@@ -1,7 +1,7 @@
 const GROUPS: { title: string; kinds: string[] }[] = [
   { title: 'Traffic', kinds: ['client', 'loadBalancer', 'cdn', 'rateLimiter'] },
   { title: 'Compute', kinds: ['appServer', 'worker'] },
-  { title: 'Data', kinds: ['database', 'readReplica', 'cache', 'redis', 'shardRouter'] },
+  { title: 'Data', kinds: ['database', 'readReplica', 'cache', 'redis', 'shardRouter', 'index'] },
   { title: 'Async and external', kinds: ['queue', 'objectStore', 'externalApi'] },
 ]
 
