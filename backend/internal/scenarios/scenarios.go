@@ -32,6 +32,7 @@ type Scenario struct {
 	WarmupSec   float64                          `json:"warmupSec"`
 	Speed       float64                          `json:"speed"`
 	ConfigOnly  bool                             `json:"configOnly,omitempty"`
+	Open        bool                             `json:"open,omitempty"` // build from a blank canvas; the traffic and failures are hidden and there is no reference solution to show
 	Hints       [3]string                        `json:"hints"`
 	Predictions []Prediction                     `json:"predictions,omitempty"`
 	Debrief     string                           `json:"debrief"`

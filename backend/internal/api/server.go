@@ -168,12 +168,13 @@ type scenarioSummary struct {
 	Difficulty string `json:"difficulty"`
 	Summary    string `json:"summary"`
 	ConfigOnly bool   `json:"configOnly,omitempty"`
+	Open       bool   `json:"open,omitempty"`
 }
 
 func (s *Server) listScenarios(w http.ResponseWriter, r *http.Request) {
 	out := []scenarioSummary{}
 	for _, sc := range scenarios.All() {
-		out = append(out, scenarioSummary{sc.ID, sc.Title, sc.Difficulty, sc.Summary, sc.ConfigOnly})
+		out = append(out, scenarioSummary{sc.ID, sc.Title, sc.Difficulty, sc.Summary, sc.ConfigOnly, sc.Open})
 	}
 	writeJSON(w, 200, out)
 }
@@ -184,6 +185,11 @@ func (s *Server) getScenario(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "no such scenario")
 		return
 	}
+	if sc.Open { // the load and the failures are part of the test: the server runs them, the client never sees them
+		c := *sc
+		c.Traffic, c.Chaos = nil, nil
+		sc = &c
+	}
 	writeJSON(w, 200, sc)
 }
 
@@ -191,6 +197,10 @@ func (s *Server) getSolution(w http.ResponseWriter, r *http.Request) {
 	sc := scenarios.Get(r.PathValue("id"))
 	if sc == nil {
 		writeErr(w, 404, "no such scenario")
+		return
+	}
+	if sc.Open {
+		writeErr(w, 404, "this challenge has no reference solution")
 		return
 	}
 	writeJSON(w, 200, sc.Solution)

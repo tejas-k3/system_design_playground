@@ -159,8 +159,14 @@ func TestReferenceSolutionsEarnTwoStars(t *testing.T) {
 	for _, sc := range All() {
 		sc := sc
 		t.Run(sc.ID, func(t *testing.T) {
+			// A fix-mode reference solution is an exemplar and must earn two stars. An open challenge's witness only
+			// proves the requirements can be met (it is never shown), so it must pass: one star.
+			need := 2
+			if sc.Open {
+				need = 1
+			}
 			for _, seed := range []uint32{1, 2, 3} {
-				if s := engine.RunToEnd(sc.Solution, sc.Options(seed), sc.Goals); s.Stars < 2 {
+				if s := engine.RunToEnd(sc.Solution, sc.Options(seed), sc.Goals); s.Stars < need {
 					t.Errorf("seed %d: reference solution earns %d star(s), cost $%.2f/hr, p95 %.0f ms", seed, s.Stars, s.CostPerHour, s.Run.P95)
 				}
 			}
@@ -198,4 +204,43 @@ func TestReferenceStarsDoNotDependOnTheSeed(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The open challenges must be a real puzzle: the blank canvas fails, a plausible-but-wrong design fails (too
+// few servers; too many for the budget), and the witness passes, on several seeds.
+func TestOpenChallengesAreWinnableButNotTrivial(t *testing.T) {
+	n := 0
+	for _, sc := range All() {
+		if !sc.Open {
+			continue
+		}
+		n++
+		for _, seed := range []uint32{1, 2, 3} {
+			if engine.RunToEnd(sc.Diagram, sc.Options(seed), sc.Goals).Pass {
+				t.Errorf("%s seed %d: the blank canvas passes", sc.ID, seed)
+			}
+			if r := engine.RunToEnd(sc.Solution, sc.Options(seed), sc.Goals); !r.Pass {
+				t.Errorf("%s seed %d: the witness fails: %+v", sc.ID, seed, r.Checks)
+			}
+		}
+	}
+	if n < 2 {
+		t.Fatalf("%d open challenges, want at least 2", n)
+	}
+	// ten-thousand-students: three servers are too few, six blow the budget
+	ts := Get("ten-thousand-students")
+	for servers, wantPass := range map[int]bool{3: false, 4: true, 6: false} {
+		d := openStudentsWith(ts, servers)
+		if got := engine.RunToEnd(d, ts.Options(1), ts.Goals).Pass; got != wantPass {
+			t.Errorf("ten-thousand-students with %d servers: pass=%v, want %v", servers, got, wantPass)
+		}
+	}
+}
+
+func openStudentsWith(sc *Scenario, servers int) engine.Diagram {
+	b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 80.0}).
+		n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb").
+		n("db", engine.KDatabase, cols[4], rowMid, P{"maxConnections": 500.0}).
+		n("cache", engine.KCache, cols[3], rowTop, P{"ttlSec": 30.0, "ttlJitterPct": 20.0})
+	return b.servers(servers, cols[2], rowTop, 70, P{"threads": 16.0, "callTimeoutMs": 400.0, "circuitBreaker": true, "dbPool": 20.0}, "cache").done()
 }
