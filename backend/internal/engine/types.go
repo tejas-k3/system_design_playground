@@ -16,6 +16,7 @@ const (
 	KExternalAPI  = "externalApi"
 	KRedis        = "redis"
 	KObjectStore  = "objectStore"
+	KIndex        = "index"
 )
 
 // Params holds user-editable settings: numbers, strings (select) and booleans.

@@ -152,7 +152,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				num("cpuMs", "CPU time", "Capacity", 20, 1, 500, 1, "ms", "Compute per request, not counting time waiting on dependencies.").fixed(),
@@ -167,6 +167,8 @@ func init() {
 				sel("queueOrder", "Queue order", "Capacity", "fifo", "Who gets the next free thread. Under overload newest-first serves people still waiting.",
 					opt("fifo", "Oldest first"), opt("lifo", "Newest first")),
 				num("queueTimeoutMs", "Max queue wait", "Capacity", 0, 0, 30000, 50, "ms", "Drop queued requests that waited longer than this (0 = never).").adv(),
+				sel("gather", "Fan-out", "Fan-out", "none", "With two or more search shards behind this server, a read can go to every shard at once and wait for the answers. None: shards are not used.",
+					opt("none", "Off"), opt("all", "Ask every shard, wait for all")).needs(KIndex),
 				num("gcPauseMs", "GC pause", "Failure modes", 0, 0, 5000, 50, "ms", "Stop-the-world garbage-collection pauses: for this long nothing on the server starts or finishes. 0 = off.").adv(),
 				num("gcEverySec", "GC pause every", "Failure modes", 30, 1, 600, 1, "s", "Average time between pauses; the gaps are random (exponential), so pauses are not evenly spaced.").adv(),
 				num("burstBaselinePct", "CPU baseline", "Failure modes", 100, 5, 100, 5, "%", "A burstable instance: the share of its CPU it may use all the time. Above it, it spends credits; with none left it is throttled to this share. 100 = not burstable.").adv(),
@@ -332,6 +334,18 @@ func init() {
 				num("maxConcurrent", "Uploads at once", "Capacity", 1000, 1, 100000, 10, "", "Uploads it handles at the same time; beyond it, new ones are refused.").adv(),
 			},
 			cost: func(Params) float64 { return 0.03 },
+		},
+		{
+			Kind: KIndex, Name: "Search Shard", Description: "One slice of a search index. A query has to ask every slice.",
+			Lesson: "Wait for all of 16 shards and you get the slowest of 16: tail latency at scale.",
+			Accent: "#0b7285", Width: 160, Height: 72, CanConnect: nil,
+			Params: []ParamSpec{
+				num("queryMs", "Query time", "Speed", 30, 1, 2000, 1, "ms", "Average time for this shard to answer one query."),
+				variability("Speed"),
+				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it works on at once."),
+				num("queueCap", "Queue size", "Capacity", 50, 0, 2000, 10, "", "Queries that may wait for a free slot; beyond it they are refused."),
+			},
+			cost: func(Params) float64 { return 0.05 },
 		},
 		{
 			Kind: KRedis, Name: "Redis", Description: "A fast single-threaded store for locks, geo lookups and leaderboards.",

@@ -535,13 +535,15 @@ func (s *Sim) capacity(n *node) int {
 		return 10000
 	case KObjectStore:
 		return int(n.f("maxConcurrent"))
+	case KIndex:
+		return int(n.f("connections"))
 	}
 	return 1 << 30
 }
 
 func (s *Sim) queueCap(n *node) int {
 	switch n.kind {
-	case KAppServer, KDatabase, KReplica, KRedis:
+	case KAppServer, KDatabase, KReplica, KRedis, KIndex:
 		return int(n.f("queueCap"))
 	case KCache:
 		return 2000
@@ -692,6 +694,11 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 			s.failAt(n, RNoRoute, cb)
 			return
 		}
+	case KIndex:
+		if c.cmd != cmdRead {
+			s.failAt(n, RNoRoute, cb)
+			return
+		}
 	case KObjectStore:
 		if c.cmd != cmdPut {
 			s.failAt(n, RNoRoute, cb)
@@ -750,6 +757,11 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 		s.procDB(n, c, cb, release)
 	case KRedis:
 		s.procRedis(n, c, cb, release)
+	case KIndex:
+		s.hold(n, s.service(n, n.f("queryMs"))*n.slow, release, cb, func() {
+			release()
+			s.okAt(n, Result{Ver: -1, Done: true, Src: n}, cb)
+		})
 	case KObjectStore:
 		// time to first byte, then the body at the store's per-request throughput
 		ms := n.f("firstByteMs")
