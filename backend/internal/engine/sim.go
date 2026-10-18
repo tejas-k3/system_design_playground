@@ -159,6 +159,9 @@ func (n *node) b(k string) bool    { v, _ := n.p[k].(bool); return v }
 
 type edge struct {
 	id        string
+	downReq   bool // linkDown: requests on this connection are held until it heals
+	downResp  bool // linkDown: answers are held until it heals
+	held      []func()
 	from, to  *node
 	latency   float64
 	removed   bool

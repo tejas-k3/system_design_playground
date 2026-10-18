@@ -90,6 +90,16 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 		return
 	}
 	s.after(fwd, func() {
+		if e.downReq { // the request is stuck on the link until it heals
+			e.held = append(e.held, func() { s.hopArrive(e, via, target, oneWay, resp, c, cb) })
+			return
+		}
+		s.hopArrive(e, via, target, oneWay, resp, c, cb)
+	})
+}
+
+func (s *Sim) hopArrive(e, via *edge, target *node, oneWay float64, resp float64, c *call, cb func(Result)) {
+	{
 		s.arrive(target, c, func(res Result) {
 			back := oneWay + s.transmit(e, 1, resp)
 			if via != nil {
@@ -101,11 +111,18 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 				res = fail(RConnLost)
 			}
 			s.after(back, func() {
-				s.emit(e, true, !res.OK)
-				cb(res)
+				deliver := func() {
+					s.emit(e, true, !res.OK)
+					cb(res)
+				}
+				if e.downResp { // the answer is stuck on the link until it heals; the caller may long since have given up
+					e.held = append(e.held, deliver)
+					return
+				}
+				deliver()
 			})
 		})
-	})
+	}
 }
 
 // retransmitMs is how long a lost packet waits before it is sent again (a typical minimum retransmission timeout).

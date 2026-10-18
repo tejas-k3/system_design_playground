@@ -396,6 +396,8 @@ func (ss *session) afterAdvance(ctx context.Context) {
 			txt = "Chaos: " + c.Label + " crashed"
 		case "partition":
 			txt = "Chaos: " + c.Label + " was cut off from the network"
+		case "linkDown":
+			txt = "Chaos: the connection " + c.Label + " went down"
 		case "splitbrain":
 			txt = fmt.Sprintf("Split brain: %s came back unfenced and took over again; %d writes made to the new primary were lost", c.Label, c.Lost)
 		case "promotion":
