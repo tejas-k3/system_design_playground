@@ -119,6 +119,7 @@ and the inspector becomes a bottom sheet.
 | Rate limiter | Token bucket |
 | Sharding / geo / leaderboard / booking | Shard routing by key; spatial index; Redis sorted-set style ops; row locks and Redis locks with TTL, double-booking detection |
 | Chaos | Crash (auto-restart), slow-down (steady or pulsing) and network-partition events, scheduled or manual |
+| Question formats | Beyond fixing a broken design: **estimate** (numbers graded within 30% / 2x, then built into a fleet and tested against the real peak), **diagnose** (a dashboard and one failed trace generated from a seeded run, pick the cause), **trade-off** (run each candidate design, then choose against a stated requirement), **review** (tick the flawed components; scored by found, missed and false marks) and **open** challenges (blank canvas, hidden load and failures, no solution to reveal). Every answer key stays on the server until you submit |
 | Investigation | Capacity curve (load sweep with the knee marked), your design versus the reference solution, side-by-side comparison of two designs with overlaid series, and a rewind slider that replays a run exactly (the engine is deterministic, so a seek reproduces the live run, including edits and crashes you made) |
 | Observation | Charts mark crashes, restarts, partitions, failover steps, split brain and autoscaler steps at the time they happened; latency distribution with p50 / p95 / p99; per-component 1 Hz timelines; countdown chips for failover and booting servers; an advisory design review (lint), a live "what is limiting it" coach and an availability error budget with burn rate. Observation only: none of it changes a result |
 
@@ -161,6 +162,8 @@ A 30 s run of a 1,000 rps, 20-node design takes about 90 ms (`make bench`).
 | `POST /api/validate` | Sanitize a diagram, returns `{diagram, adjusted, costPerHour}` |
 | `POST /api/run` | Headless run `{diagram, scenarioId?, seed?, durationSec?}` → stats (+ score for a scenario) |
 | `POST /api/sweep` | Same design at several loads (`loads`: multiples of every client's rate) or one setting at several values (`param`, `values`, clamped to the setting's range); up to 20 points, `durationSec` ≤ 60, one run slot and a 20 s deadline for the whole sweep |
+| `GET /api/questions`, `GET /api/questions/{id}` | The non-fix question formats, without their answer keys |
+| `POST /api/questions/{id}/answer`, `/run`, `/review`, `/build` | Grade an estimate or a choice, run a trade-off candidate, score a review, or build and test an estimate; keys are returned only with the result |
 | `GET /api/sim` (WebSocket) | Live simulation session |
 | `POST /api/designs`, `GET /api/designs/{id}` | Share a design: save returns `{id}` (rate-limited, sanitized); the id opens it |
 | `GET /api/healthz` | Liveness |
