@@ -1,4 +1,4 @@
-import type { Diagram, Finding, Registry, Scenario, ScenarioSummary } from './types'
+import type { Diagram, Finding, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -30,5 +30,10 @@ export async function fetchDesign(id: string): Promise<Diagram> {
 
 export async function validate(diagram: Diagram): Promise<{ diagram: Diagram; adjusted: boolean; costPerHour: number; findings: Finding[] }> {
   const res = await fetch('/api/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram }) })
+  return json(res)
+}
+
+export async function sweepLoad(diagram: Diagram, loads: number[], durationSec = 20): Promise<SweepResponse> {
+  const res = await fetch('/api/sweep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, loads, durationSec }) })
   return json(res)
 }

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Announcer } from './ui/Announcer'
 import { Board } from './ui/Board'
 import { Charts } from './ui/Charts'
+import { CapacityDialog } from './ui/CapacityDialog'
 import { Inspector } from './ui/Inspector'
 import { Help } from './ui/Help'
 import { Library } from './ui/Library'
@@ -69,6 +70,7 @@ export function App() {
       <ScenarioPicker />
       <ResultModal />
       <Help />
+      <CapacityDialog />
       <Toasts />
       <Announcer />
     </div>
