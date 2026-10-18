@@ -17,6 +17,7 @@ const (
 	ModeEstimate = "estimate"
 	ModeDiagnose = "diagnose"
 	ModeTradeoff = "tradeoff"
+	ModeReview   = "review"
 )
 
 // Verdicts for one estimated number.
@@ -53,9 +54,11 @@ type Question struct {
 	Options    []string        `json:"options,omitempty"`    // diagnose: the candidate explanations
 	Symptoms   *Symptoms       `json:"symptoms,omitempty"`   // diagnose: what the learner gets to look at
 	Candidates []Candidate     `json:"candidates,omitempty"` // tradeoff: designs to run and compare
+	Diagram    *engine.Diagram `json:"diagram,omitempty"`    // review: the design to critique
 
 	rule        func(RunSummary) bool // tradeoff: the stated requirement the right answer meets
 	alsoPasses  []int                 // tradeoff: other candidates that meet it too, but lose on the stated tie-break
+	defects     []Defect              // review: what is wrong with Diagram (never served)
 	scenarioID  string                // tradeoff: the challenge whose traffic and failures every candidate faces
 	source      diagSource            // where the symptoms come from, so a test can regenerate them
 	answer      int                   // diagnose: index of the right option
@@ -292,4 +295,100 @@ func (q *Question) RunCandidate(i int, seed uint32) (RunSummary, error) {
 		out.StaleReadPct = float64(run.Stale) / float64(reads)
 	}
 	return out, nil
+}
+
+// Defect is one thing wrong with a review design. Nodes are the components (or connection ids) that carry it;
+// marking any one of them finds it. Rules names the design-lint rules that independently report the same flaw,
+// which a test uses to keep the answer key honest.
+type Defect struct {
+	ID      string
+	Nodes   []string
+	Rules   []string
+	Explain string
+}
+
+type DefectOut struct {
+	ID      string   `json:"id"`
+	Nodes   []string `json:"nodes"`
+	Explain string   `json:"explain"`
+}
+
+type ReviewResult struct {
+	Found      []DefectOut `json:"found"`
+	Missed     []DefectOut `json:"missed"`
+	FalseMarks []string    `json:"falseMarks"` // marked components that carry no defect
+	Precision  float64     `json:"precision"`  // marks on defective components / all marks
+	Recall     float64     `json:"recall"`     // defects found / defects
+	Score      float64     `json:"score"`      // (found - false marks) / defects, not below 0
+	Stars      int         `json:"stars"`      // 3: all found, nothing false; 2: score >= 0.75; 1: >= 0.5
+}
+
+// GradeReview scores the components a learner marked as wrong. Unknown ids are refused; a repeated mark counts once.
+func (q *Question) GradeReview(marked []string) (ReviewResult, error) {
+	if q.Mode != ModeReview || q.Diagram == nil {
+		return ReviewResult{}, errors.New("not a review question")
+	}
+	valid := map[string]bool{}
+	for _, n := range q.Diagram.Nodes {
+		valid[n.ID] = true
+	}
+	for _, e := range q.Diagram.Edges {
+		valid[e.ID] = true
+	}
+	set := map[string]bool{}
+	var order []string
+	for _, m := range marked {
+		if !valid[m] {
+			return ReviewResult{}, fmt.Errorf("%q is not part of this design", m)
+		}
+		if !set[m] {
+			set[m] = true
+			order = append(order, m)
+		}
+	}
+	carries := map[string]bool{}
+	res := ReviewResult{Found: []DefectOut{}, Missed: []DefectOut{}, FalseMarks: []string{}}
+	for _, d := range q.defects {
+		out := DefectOut{ID: d.ID, Nodes: d.Nodes, Explain: d.Explain}
+		hit := false
+		for _, n := range d.Nodes {
+			carries[n] = true
+			if set[n] {
+				hit = true
+			}
+		}
+		if hit {
+			res.Found = append(res.Found, out)
+		} else {
+			res.Missed = append(res.Missed, out)
+		}
+	}
+	onDefect := 0
+	for _, m := range order {
+		if carries[m] {
+			onDefect++
+		} else {
+			res.FalseMarks = append(res.FalseMarks, m)
+		}
+	}
+	if len(order) > 0 {
+		res.Precision = float64(onDefect) / float64(len(order))
+	}
+	total := float64(len(q.defects))
+	if total > 0 {
+		res.Recall = float64(len(res.Found)) / total
+		res.Score = (float64(len(res.Found)) - float64(len(res.FalseMarks))) / total
+		if res.Score < 0 {
+			res.Score = 0
+		}
+	}
+	switch {
+	case len(res.Missed) == 0 && len(res.FalseMarks) == 0:
+		res.Stars = 3
+	case res.Score >= 0.75:
+		res.Stars = 2
+	case res.Score >= 0.5:
+		res.Stars = 1
+	}
+	return res, nil
 }
