@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { answerChoice, answerEstimate, fetchQuestion } from '../api/client'
-import type { ChoiceResult, EstimateResult, Question, SeriesPoint, Symptoms } from '../api/types'
+import { answerChoice, answerEstimate, fetchQuestion, runCandidate } from '../api/client'
+import type { ChoiceResult, EstimateResult, Question, RunSummary, SeriesPoint, Symptoms } from '../api/types'
+import { comparisonColumns } from '../model/tradeoff'
 import { fmtMs } from '../model/trace'
 import { describeSeries } from '../model/symptoms'
 import { formatEstimate, parseNumber, verdictLabel } from '../model/questions'
@@ -19,6 +20,8 @@ export function QuestionDialog() {
   const [busy, setBusy] = useState(false)
   const [choice, setChoice] = useState<number | null>(null)
   const [picked, setPicked] = useState<ChoiceResult | null>(null)
+  const [runs, setRuns] = useState<Record<number, RunSummary>>({})
+  const [running, setRunning] = useState<number | null>(null)
   useEffect(() => {
     setQ(null)
     setText({})
@@ -26,6 +29,8 @@ export function QuestionDialog() {
     setError('')
     setChoice(null)
     setPicked(null)
+    setRuns({})
+    setRunning(null)
     if (id) fetchQuestion(id).then(setQ).catch((e: Error) => setError(e.message))
   }, [id])
   const close = () => setUi({ question: null })
@@ -49,6 +54,19 @@ export function QuestionDialog() {
       setError(e instanceof Error ? e.message : 'Could not grade that.')
     } finally {
       setBusy(false)
+    }
+  }
+  const run = async (i: number) => {
+    if (!q) return
+    setRunning(i)
+    setError('')
+    try {
+      const r = await runCandidate(q.id, i)
+      setRuns((prev) => ({ ...prev, [i]: r }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The run failed.')
+    } finally {
+      setRunning(null)
     }
   }
   const submitChoice = async () => {
@@ -93,6 +111,47 @@ export function QuestionDialog() {
                 {picked && (
                   <section aria-label="Result">
                     <p role="status"><Stars n={picked.stars} size={16} /> {picked.correct ? 'Correct.' : 'Not this time.'}</p>
+                    <p>{picked.explain}</p>
+                    <p className="row-btns"><button onClick={() => { setPicked(null); setChoice(null); setError('') }}>Try again</button><button onClick={close}>Done</button></p>
+                  </section>
+                )}
+              </>
+            )}
+            {q.mode === 'tradeoff' && q.candidates && (
+              <>
+                <form onSubmit={(e) => { e.preventDefault(); void submitChoice() }}>
+                  <fieldset disabled={!!picked}>
+                    <legend>Run each design, then pick the one to ship</legend>
+                    {q.candidates.map((c, i) => (
+                      <div key={i} className={`option candidate ${picked && picked.answer === i ? 'right' : ''}`}>
+                        <label>
+                          <input type="radio" name="design" checked={choice === i} onChange={() => setChoice(i)} /> <b>{c.label}</b>
+                          {picked && picked.answer === i && <b> (the right answer)</b>}
+                          {picked && choice === i && picked.answer !== i && <b> (your answer)</b>}
+                          <span className="muted small"> {c.detail}</span>
+                        </label>
+                        <button type="button" onClick={() => void run(i)} disabled={running !== null} aria-label={`Run: ${c.label}`}>{running === i ? 'Running…' : runs[i] ? 'Run again' : 'Run it'}</button>
+                      </div>
+                    ))}
+                  </fieldset>
+                  {Object.keys(runs).length > 0 && (
+                    <table className="sweep-table">
+                      <caption className="sr">Results of the designs you have run</caption>
+                      <thead><tr><th scope="col">Design</th>{comparisonColumns(Object.values(runs)).map((c) => <th key={c.label} scope="col">{c.label}</th>)}</tr></thead>
+                      <tbody>
+                        {q.candidates.map((c, i) => runs[i] && (
+                          <tr key={i}><th scope="row">{c.label}</th>{comparisonColumns(Object.values(runs)).map((col) => <td key={col.label}>{col.format(runs[i])}</td>)}</tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {Object.keys(runs).length > 0 && Object.keys(runs).length < q.candidates.length && <p className="muted small">{q.candidates.length - Object.keys(runs).length} design(s) not run yet.</p>}
+                  {error && <p className="bad small" role="alert">{error}</p>}
+                  {!picked && <button className="primary" type="submit" disabled={busy}>{busy ? 'Checking…' : 'Ship this one'}</button>}
+                </form>
+                {picked && (
+                  <section aria-label="Result">
+                    <p role="status"><Stars n={picked.stars} size={16} /> {picked.correct ? 'Good call.' : 'Not this time.'}</p>
                     <p>{picked.explain}</p>
                     <p className="row-btns"><button onClick={() => { setPicked(null); setChoice(null); setError('') }}>Try again</button><button onClick={close}>Done</button></p>
                   </section>

@@ -62,7 +62,7 @@ export function ScenarioPicker() {
                 <button key={q.id} className="card" onClick={() => setUi({ picker: false, question: q.id })}>
                   <span className="card-top"><b>{q.title}</b><Stars n={progress[q.id] ?? 0} size={14} /></span>
                   <small>{q.summary}</small>
-                  <em>{q.mode === 'estimate' ? 'estimate' : q.mode}</em>
+                  <em>{q.mode === 'tradeoff' ? 'trade-off' : q.mode}</em>
                 </button>
               ))}
             </div>
