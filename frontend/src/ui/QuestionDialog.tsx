@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { answerChoice, answerEstimate, fetchQuestion, runCandidate, submitReview } from '../api/client'
-import type { ChoiceResult, EstimateResult, Question, ReviewResult, RunSummary, SeriesPoint, Symptoms } from '../api/types'
+import { answerChoice, answerEstimate, buildEstimate, fetchQuestion, runCandidate, submitReview } from '../api/client'
+import type { BuildResult, ChoiceResult, EstimateResult, Question, ReviewResult, RunSummary, SeriesPoint, Symptoms } from '../api/types'
 import { percent, settingRows } from '../model/review'
 import { comparisonColumns } from '../model/tradeoff'
 import { fmtMs } from '../model/trace'
@@ -23,6 +23,7 @@ export function QuestionDialog() {
   const [picked, setPicked] = useState<ChoiceResult | null>(null)
   const [runs, setRuns] = useState<Record<number, RunSummary>>({})
   const [running, setRunning] = useState<number | null>(null)
+  const [built, setBuilt] = useState<BuildResult | null>(null)
   const [marked, setMarked] = useState<string[]>([])
   const [review, setReview] = useState<ReviewResult | null>(null)
   const reg = useStore((s) => s.reg)
@@ -37,6 +38,7 @@ export function QuestionDialog() {
     setRunning(null)
     setMarked([])
     setReview(null)
+    setBuilt(null)
     if (id) fetchQuestion(id).then(setQ).catch((e: Error) => setError(e.message))
   }, [id])
   const close = () => setUi({ question: null })
@@ -73,6 +75,20 @@ export function QuestionDialog() {
       setError(e instanceof Error ? e.message : 'The run failed.')
     } finally {
       setRunning(null)
+    }
+  }
+  const build = async () => {
+    if (!q || !result) return
+    setBusy(true)
+    setError('')
+    try {
+      const answers: Record<string, number> = {}
+      for (const f of result.fields) answers[f.key] = f.given
+      setBuilt(await buildEstimate(q.id, answers))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not build that.')
+    } finally {
+      setBusy(false)
     }
   }
   const submitMarks = async () => {
@@ -244,7 +260,28 @@ export function QuestionDialog() {
                   </tbody>
                 </table>
                 <ul className="workings">{result.fields.map((f) => <li key={f.key}><b>{f.label}.</b> {f.explain}</li>)}</ul>
-                <p className="row-btns"><button onClick={() => { setResult(null); setError('') }}>Try again</button><button onClick={close}>Done</button></p>
+                {q.buildHint && (
+                  <div>
+                    <p className="muted small">{q.buildHint}</p>
+                    {!built && <button onClick={() => void build()} disabled={busy}>{busy ? 'Building…' : 'Build it and test it'}</button>}
+                    {error && <p className="bad small" role="alert">{error}</p>}
+                    {built && (
+                      <section aria-label="Build and test">
+                        <p role="status"><b>{built.verdict === 'under' ? 'Under-provisioned.' : built.verdict === 'over' ? 'Over-provisioned.' : 'About right.'}</b> {built.verdict === 'under' ? `Your numbers gave ${built.servers} server(s); the real peak needs about ${built.rightServers}, and ${Math.round((1 - built.yours.success) * 100)}% of requests failed.` : built.verdict === 'over' ? `Your numbers gave ${built.servers} servers where ${built.rightServers} are enough: it works, but costs $${built.yours.costPerHour.toFixed(2)} an hour against $${built.rightSized.costPerHour.toFixed(2)}.` : `${built.servers} server(s) carried the real peak.`}</p>
+                        <table className="sweep-table">
+                          <caption className="sr">Your fleet against the right-sized fleet, at the real peak load</caption>
+                          <thead><tr><th scope="col">Fleet</th><th scope="col">Servers</th><th scope="col">Success</th><th scope="col">p95</th><th scope="col">Cost per hour</th></tr></thead>
+                          <tbody>
+                            {([['Built from your numbers', built.servers, built.yours], ['Sized from the true value', built.rightServers, built.rightSized]] as const).map(([name, n, r]) => (
+                              <tr key={name}><th scope="row">{name}</th><td>{n}</td><td>{(r.success * 100).toFixed(1)}%</td><td>{Math.round(r.p95)} ms</td><td>${r.costPerHour.toFixed(2)}</td></tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </section>
+                    )}
+                  </div>
+                )}
+                <p className="row-btns"><button onClick={() => { setResult(null); setError(''); setBuilt(null) }}>Try again</button><button onClick={close}>Done</button></p>
               </section>
             )}
           </>
