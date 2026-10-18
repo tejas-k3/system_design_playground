@@ -1,0 +1,474 @@
+[
+ {
+  "id": "three-tier",
+  "title": "Classic three-tier",
+  "summary": "Users, a load balancer, two app servers and one database: the baseline most designs grow from.",
+  "diagram": {
+   "nodes": [
+    {
+     "id": "users",
+     "kind": "client",
+     "x": 0,
+     "y": 150,
+     "label": "Users",
+     "params": {
+      "rps": 100,
+      "readPct": 80
+     }
+    },
+    {
+     "id": "lb",
+     "kind": "loadBalancer",
+     "x": 240,
+     "y": 150,
+     "label": "Load Balancer",
+     "params": {}
+    },
+    {
+     "id": "app1",
+     "kind": "appServer",
+     "x": 480,
+     "y": 60,
+     "label": "App Server",
+     "params": {}
+    },
+    {
+     "id": "app2",
+     "kind": "appServer",
+     "x": 480,
+     "y": 240,
+     "label": "App Server 2",
+     "params": {}
+    },
+    {
+     "id": "db",
+     "kind": "database",
+     "x": 720,
+     "y": 150,
+     "label": "Database",
+     "params": {}
+    }
+   ],
+   "edges": [
+    {
+     "id": "users>lb",
+     "from": "users",
+     "to": "lb",
+     "latencyMs": 40
+    },
+    {
+     "id": "lb>app1",
+     "from": "lb",
+     "to": "app1",
+     "latencyMs": 5
+    },
+    {
+     "id": "lb>app2",
+     "from": "lb",
+     "to": "app2",
+     "latencyMs": 5
+    },
+    {
+     "id": "app1>db",
+     "from": "app1",
+     "to": "db",
+     "latencyMs": 5
+    },
+    {
+     "id": "app2>db",
+     "from": "app2",
+     "to": "db",
+     "latencyMs": 5
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "cache-aside",
+  "title": "Cache in front of the database",
+  "summary": "Reads are served from a cache and only misses reach the database.",
+  "diagram": {
+   "nodes": [
+    {
+     "id": "users",
+     "kind": "client",
+     "x": 0,
+     "y": 100,
+     "label": "Users",
+     "params": {
+      "rps": 200,
+      "readPct": 90
+     }
+    },
+    {
+     "id": "app",
+     "kind": "appServer",
+     "x": 240,
+     "y": 100,
+     "label": "App Server",
+     "params": {
+      "threads": 16
+     }
+    },
+    {
+     "id": "cache",
+     "kind": "cache",
+     "x": 480,
+     "y": 100,
+     "label": "Cache",
+     "params": {}
+    },
+    {
+     "id": "db",
+     "kind": "database",
+     "x": 720,
+     "y": 100,
+     "label": "Database",
+     "params": {}
+    }
+   ],
+   "edges": [
+    {
+     "id": "users>app",
+     "from": "users",
+     "to": "app",
+     "latencyMs": 40
+    },
+    {
+     "id": "app>cache",
+     "from": "app",
+     "to": "cache",
+     "latencyMs": 5
+    },
+    {
+     "id": "cache>db",
+     "from": "cache",
+     "to": "db",
+     "latencyMs": 5
+    },
+    {
+     "id": "app>db",
+     "from": "app",
+     "to": "db",
+     "latencyMs": 5
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "queue-worker",
+  "title": "Queue and worker",
+  "summary": "The app server answers fast and hands slow work to a queue that a worker drains.",
+  "diagram": {
+   "nodes": [
+    {
+     "id": "users",
+     "kind": "client",
+     "x": 0,
+     "y": 100,
+     "label": "Users",
+     "params": {
+      "rps": 50,
+      "readPct": 20
+     }
+    },
+    {
+     "id": "app",
+     "kind": "appServer",
+     "x": 240,
+     "y": 100,
+     "label": "App Server",
+     "params": {}
+    },
+    {
+     "id": "q",
+     "kind": "queue",
+     "x": 480,
+     "y": 100,
+     "label": "Message Queue",
+     "params": {}
+    },
+    {
+     "id": "w",
+     "kind": "worker",
+     "x": 720,
+     "y": 100,
+     "label": "Worker",
+     "params": {}
+    },
+    {
+     "id": "db",
+     "kind": "database",
+     "x": 960,
+     "y": 100,
+     "label": "Database",
+     "params": {}
+    }
+   ],
+   "edges": [
+    {
+     "id": "users>app",
+     "from": "users",
+     "to": "app",
+     "latencyMs": 40
+    },
+    {
+     "id": "app>q",
+     "from": "app",
+     "to": "q",
+     "latencyMs": 5
+    },
+    {
+     "id": "q>w",
+     "from": "q",
+     "to": "w",
+     "latencyMs": 5
+    },
+    {
+     "id": "w>db",
+     "from": "w",
+     "to": "db",
+     "latencyMs": 5
+    },
+    {
+     "id": "app>db",
+     "from": "app",
+     "to": "db",
+     "latencyMs": 5
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "cdn-origin",
+  "title": "CDN in front of the origin",
+  "summary": "Popular reads are answered at the edge; only misses travel to the origin.",
+  "diagram": {
+   "nodes": [
+    {
+     "id": "users",
+     "kind": "client",
+     "x": 0,
+     "y": 100,
+     "label": "Users",
+     "params": {
+      "rps": 300,
+      "readPct": 95
+     }
+    },
+    {
+     "id": "cdn",
+     "kind": "cdn",
+     "x": 240,
+     "y": 100,
+     "label": "CDN",
+     "params": {}
+    },
+    {
+     "id": "app",
+     "kind": "appServer",
+     "x": 480,
+     "y": 100,
+     "label": "App Server",
+     "params": {
+      "threads": 16
+     }
+    },
+    {
+     "id": "db",
+     "kind": "database",
+     "x": 720,
+     "y": 100,
+     "label": "Database",
+     "params": {}
+    }
+   ],
+   "edges": [
+    {
+     "id": "users>cdn",
+     "from": "users",
+     "to": "cdn",
+     "latencyMs": 20
+    },
+    {
+     "id": "cdn>app",
+     "from": "cdn",
+     "to": "app",
+     "latencyMs": 40
+    },
+    {
+     "id": "app>db",
+     "from": "app",
+     "to": "db",
+     "latencyMs": 5
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "sharded-db",
+  "title": "Sharded database",
+  "summary": "A shard router splits the data across several databases by key.",
+  "diagram": {
+   "nodes": [
+    {
+     "id": "users",
+     "kind": "client",
+     "x": 0,
+     "y": 150,
+     "label": "Users",
+     "params": {
+      "rps": 150,
+      "readPct": 70
+     }
+    },
+    {
+     "id": "app",
+     "kind": "appServer",
+     "x": 240,
+     "y": 150,
+     "label": "App Server",
+     "params": {
+      "threads": 16
+     }
+    },
+    {
+     "id": "router",
+     "kind": "shardRouter",
+     "x": 480,
+     "y": 150,
+     "label": "Shard Router",
+     "params": {}
+    },
+    {
+     "id": "db1",
+     "kind": "database",
+     "x": 720,
+     "y": 40,
+     "label": "Database",
+     "params": {}
+    },
+    {
+     "id": "db2",
+     "kind": "database",
+     "x": 720,
+     "y": 150,
+     "label": "Database 2",
+     "params": {}
+    },
+    {
+     "id": "db3",
+     "kind": "database",
+     "x": 720,
+     "y": 260,
+     "label": "Database 3",
+     "params": {}
+    }
+   ],
+   "edges": [
+    {
+     "id": "users>app",
+     "from": "users",
+     "to": "app",
+     "latencyMs": 40
+    },
+    {
+     "id": "app>router",
+     "from": "app",
+     "to": "router",
+     "latencyMs": 5
+    },
+    {
+     "id": "router>db1",
+     "from": "router",
+     "to": "db1",
+     "latencyMs": 5
+    },
+    {
+     "id": "router>db2",
+     "from": "router",
+     "to": "db2",
+     "latencyMs": 5
+    },
+    {
+     "id": "router>db3",
+     "from": "router",
+     "to": "db3",
+     "latencyMs": 5
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "primary-replica",
+  "title": "Primary and read replica",
+  "summary": "Writes go to the primary; reads can be served by a slightly stale replica.",
+  "diagram": {
+   "nodes": [
+    {
+     "id": "users",
+     "kind": "client",
+     "x": 0,
+     "y": 150,
+     "label": "Users",
+     "params": {
+      "rps": 150,
+      "readPct": 90
+     }
+    },
+    {
+     "id": "app",
+     "kind": "appServer",
+     "x": 240,
+     "y": 150,
+     "label": "App Server",
+     "params": {
+      "threads": 16
+     }
+    },
+    {
+     "id": "db",
+     "kind": "database",
+     "x": 480,
+     "y": 60,
+     "label": "Database",
+     "params": {}
+    },
+    {
+     "id": "rep",
+     "kind": "readReplica",
+     "x": 480,
+     "y": 240,
+     "label": "Read Replica",
+     "params": {}
+    }
+   ],
+   "edges": [
+    {
+     "id": "users>app",
+     "from": "users",
+     "to": "app",
+     "latencyMs": 40
+    },
+    {
+     "id": "app>db",
+     "from": "app",
+     "to": "db",
+     "latencyMs": 5
+    },
+    {
+     "id": "app>rep",
+     "from": "app",
+     "to": "rep",
+     "latencyMs": 5
+    }
+   ],
+   "notes": []
+  }
+ }
+]
