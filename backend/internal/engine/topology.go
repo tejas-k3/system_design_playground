@@ -57,7 +57,7 @@ func (s *Sim) addEdge(d Edge) {
 	if from == nil || to == nil {
 		return
 	}
-	e := &edge{id: d.ID, from: from, to: to, latency: d.LatencyMs, bw: d.BandwidthMbps}
+	e := &edge{id: d.ID, from: from, to: to, latency: d.LatencyMs, bw: d.BandwidthMbps, loss: d.LossPct, jitter: d.JitterMs}
 	s.edges[e.id] = e
 	s.eord = append(s.eord, e)
 	from.out = append(from.out, e)
@@ -170,6 +170,7 @@ func (s *Sim) Sync(d Diagram) {
 		if e := s.edges[de.ID]; e != nil {
 			e.latency = de.LatencyMs
 			e.bw = de.BandwidthMbps
+			e.loss, e.jitter = de.LossPct, de.JitterMs
 		} else {
 			s.addEdge(de)
 		}

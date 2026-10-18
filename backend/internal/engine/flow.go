@@ -80,11 +80,25 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 	if via != nil {
 		fwd += s.transmit(via, 0, req)
 	}
+	extra, lost := s.linkFault(e)
+	fwd += extra
+	if lost { // six packets in a row: the connection is aborted and the caller hears nothing from the far end
+		s.after(fwd, func() {
+			s.emit(e, true, true)
+			cb(fail(RConnLost))
+		})
+		return
+	}
 	s.after(fwd, func() {
 		s.arrive(target, c, func(res Result) {
 			back := oneWay + s.transmit(e, 1, resp)
 			if via != nil {
 				back += s.transmit(via, 1, resp)
+			}
+			extra, lost := s.linkFault(e)
+			back += extra
+			if lost { // the response never makes it back
+				res = fail(RConnLost)
 			}
 			s.after(back, func() {
 				s.emit(e, true, !res.OK)
@@ -92,6 +106,29 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 			})
 		})
 	})
+}
+
+// retransmitMs is how long a lost packet waits before it is sent again (a typical minimum retransmission timeout).
+const retransmitMs = 200
+
+// linkFault draws the extra delay of one trip over e: a random jitter, and a retransmission for every packet lost
+// before one gets through; six losses in a row abort the connection. A perfect link (the default) draws nothing.
+func (s *Sim) linkFault(e *edge) (extra float64, lost bool) {
+	if e.loss <= 0 && e.jitter <= 0 {
+		return 0, false
+	}
+	if e.jitter > 0 {
+		extra += s.chaosRng.Next() * e.jitter
+	}
+	if e.loss > 0 {
+		for k := 0; s.chaosRng.Next()*100 < e.loss; k++ {
+			if k == 5 {
+				return extra, true
+			}
+			extra += retransmitMs
+		}
+	}
+	return extra, false
 }
 
 // sizes are the bytes of one request and one response, from the users who sent it. 0 means not modelled.
