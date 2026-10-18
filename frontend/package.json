@@ -14,7 +14,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource/kalam": "^5.3.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/patrick-hand": "^5.3.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "roughjs": "^4.6.6",

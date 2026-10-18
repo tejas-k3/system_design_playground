@@ -36,7 +36,7 @@ export function Toolbar() {
           <circle cx="16" cy="22" r="3" fill="#2f9e44" />
           <path d="M12 12.5 15 19M20 12.5 17 19M13 11h6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
         </svg>
-        <span className="brand-name">Playground</span>
+        <span className="brand-name">Playground</span><span className="brand-by" aria-label="by Tejas">by Tejas</span>
       </div>
 
       <div className="group" role="group" aria-label="Tools">
