@@ -33,6 +33,7 @@ type clientMsg struct {
 	Seed       *uint32         `json:"seed,omitempty"`
 	Speed      float64         `json:"speed,omitempty"`
 	NodeID     string          `json:"nodeId,omitempty"`
+	T          float64         `json:"t,omitempty"` // seek: seconds of simulated time
 }
 
 type notice struct {
@@ -47,6 +48,7 @@ type frameMsg struct {
 	Stats     *engine.Stats     `json:"stats,omitempty"`
 	Particles []engine.Particle `json:"particles,omitempty"`
 	Notices   []notice          `json:"notices,omitempty"`
+	Diagram   *engine.Diagram   `json:"diagram,omitempty"` // only in the answer to a seek: the design as it was at that moment
 }
 
 type resultMsg struct {
@@ -82,6 +84,9 @@ type session struct {
 	status     string // stopped | running | paused
 	sim        *engine.Sim
 	finished   bool
+	base       engine.Diagram // the design the current run started with
+	edits      []edit         // what was done to it since, for replay
+	replayLost bool           // the edit log overflowed: seeking is refused
 	chaosSeen  int
 	slowWarned bool
 	pending    []notice
@@ -229,6 +234,7 @@ func (ss *session) build() {
 	if ss.sc != nil {
 		opts = ss.sc.Options(ss.seed)
 	}
+	ss.base, ss.edits, ss.replayLost = ss.diagram, nil, false
 	ss.sim = engine.New(ss.diagram, opts)
 	ss.sim.EnableParticles(true)
 	ss.sim.EnableTraces(true)
@@ -281,10 +287,7 @@ func (ss *session) handle(ctx context.Context, m clientMsg) bool {
 		if ss.sc != nil && ss.sc.ConfigOnly && !sameTopology(ss.diagram, d) {
 			return ss.fail(ctx, "Incident mode: fix it with configuration, the architecture is fixed")
 		}
-		ss.diagram = d
-		if ss.sim != nil {
-			ss.sim.Sync(d)
-		}
+		ss.applyDiagram(d)
 	case "play":
 		if ss.sim != nil && ss.finished {
 			ss.sim = nil
@@ -307,6 +310,14 @@ func (ss *session) handle(ctx context.Context, m clientMsg) bool {
 		ss.sim.Advance(100)
 		ss.afterAdvance(ctx)
 		return ss.send(ctx, ss.frame(true))
+	case "seek":
+		if err := ss.seek(m.T * 1000); err != nil {
+			return ss.fail(ctx, err.Error())
+		}
+		f := ss.frame(true)
+		d := ss.diagram
+		f.Diagram = &d
+		return ss.send(ctx, f)
 	case "reset":
 		ss.sim, ss.status = nil, "stopped"
 		return ss.send(ctx, ss.frame(true))
@@ -326,13 +337,9 @@ func (ss *session) handle(ctx context.Context, m clientMsg) bool {
 		}
 		return ss.send(ctx, nodeSeriesMsg{Type: "nodeSeries", NodeID: m.NodeID, Points: pts})
 	case "crash":
-		if ss.sim != nil {
-			ss.sim.CrashNode(m.NodeID, 0)
-		}
+		ss.applyCrash(m.NodeID)
 	case "restart":
-		if ss.sim != nil {
-			ss.sim.RestartNode(m.NodeID)
-		}
+		ss.applyRestart(m.NodeID)
 	}
 	return true
 }
