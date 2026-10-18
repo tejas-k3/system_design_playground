@@ -28,6 +28,8 @@ export interface LinkInfo {
   mbps?: number // data carried over the last seconds
   util?: number // share of the limit, if there is one
   limit?: number // the bandwidth limit, if there is one
+  protocol?: string // a label on the connection
+  async?: boolean // a fire-and-forget connection
 }
 
 const FULL = 0.95
@@ -35,6 +37,8 @@ const fmtMbps = (m: number) => (m >= 1000 ? `${Math.round(m / 100) / 10} Gbit/s`
 
 export function edgeLabel(latencyMs: number, rps: number, detailed: boolean, running: boolean, link?: LinkInfo): string {
   const parts: string[] = []
+  if (link?.protocol) parts.push(link.protocol)
+  if (link?.async) parts.push('async')
   if (running && rps >= 0.5) parts.push(`${fmtRate(rps)}/s`)
   if (running && link?.mbps && link.mbps >= 0.5) parts.push(fmtMbps(link.mbps) + (link.util !== undefined && link.util >= FULL ? ' FULL' : ''))
   if (detailed) parts.push(`${latencyMs} ms`)

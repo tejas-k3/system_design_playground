@@ -105,6 +105,7 @@ function drawEdge(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, nod
       color = p.warn
       dash = [6, 6]
     } else if (selected) color = p.accent
+    if (e.async && !dash) dash = [4, 6] // fire-and-forget: dashed (a status colour or breaker dash takes precedence)
     const width = 1.6 + (st && st.rps > 0 ? Math.min(3.5, Math.log10(1 + st.rps) * 0.9) : 0) + (hot ? 0.6 : 0)
     const line = cached(`l:${e.id}:${Math.round(g.a.x)}:${Math.round(g.a.y)}:${Math.round(g.b.x)}:${Math.round(g.b.y)}`, () =>
       rc.generator.line(g.a.x, g.a.y, g.b.x, g.b.y, { roughness: 0.9, bowing: 1.2, seed: hash(e.id) }),
@@ -116,6 +117,14 @@ function drawEdge(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, nod
     ctx.lineWidth = Math.max(1.6, width)
     ctx.lineCap = 'round'
     ctx.beginPath()
+    if (e.async) {
+      // an open circle instead of an arrowhead
+      ctx.fillStyle = p.card
+      ctx.arc(g.b.x - 6 * Math.cos(ang), g.b.y - 6 * Math.sin(ang), 5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      continue
+    }
     ctx.moveTo(g.b.x - 11 * Math.cos(ang - 0.45), g.b.y - 11 * Math.sin(ang - 0.45))
     ctx.lineTo(g.b.x, g.b.y)
     ctx.lineTo(g.b.x - 11 * Math.cos(ang + 0.45), g.b.y - 11 * Math.sin(ang + 0.45))
@@ -172,7 +181,7 @@ function drawEdgeLabels(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<str
     const prev = shownRate.get(e.id)
     const rps = smoothRate(prev?.v, st?.rps ?? 0, prev ? Math.min(1000, sc.now - prev.at) : 0)
     shownRate.set(e.id, { v: rps, at: sc.now })
-    const label = edgeLabel(e.latencyMs, rps, sc.selection.has(e.id) || sc.hover === e.id, sc.running, { mbps: sc.stats.edges[e.id]?.mbps, util: sc.stats.edges[e.id]?.util, limit: e.bandwidthMbps })
+    const label = edgeLabel(e.latencyMs, rps, sc.selection.has(e.id) || sc.hover === e.id, sc.running, { mbps: sc.stats.edges[e.id]?.mbps, util: sc.stats.edges[e.id]?.util, limit: e.bandwidthMbps, protocol: e.protocol, async: e.async })
     if (!label) continue
     const open = st?.breaker === 'open'
     const text = open ? `open · ${label}` : label

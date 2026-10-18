@@ -100,3 +100,14 @@ describe('serverSubtitle', () => {
     expect(serverSubtitle(8, 3)).toBe('8 threads × 3')
   })
 })
+
+describe('edgeLabel with a protocol', () => {
+  it('names the protocol, first', () => {
+    expect(edgeLabel(5, 100, false, true, { protocol: 'grpc' })).toBe('grpc · 100/s')
+    expect(edgeLabel(5, 0, false, false, { protocol: 'sql' })).toBe('sql')
+  })
+  it('says async so the dashed line is not the only cue', () => {
+    expect(edgeLabel(5, 0, false, false, { protocol: 'http', async: true })).toBe('http · async')
+    expect(edgeLabel(5, 0, false, false, { async: true })).toBe('async')
+  })
+})
