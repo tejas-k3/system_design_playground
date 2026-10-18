@@ -1,4 +1,4 @@
-import type { Diagram, Finding, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { Diagram, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -52,5 +52,12 @@ export async function runDiagram(diagram: Diagram, scenarioId?: string, duration
 
 export async function sweepParam(diagram: Diagram, nodeId: string, key: string, values: number[], durationSec = 20): Promise<SweepResponse> {
   const res = await fetch('/api/sweep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, param: { nodeId, key }, values, durationSec }) })
+  return json(res)
+}
+
+export const fetchQuestions = () => fetch('/api/questions').then((r) => json<QuestionSummary[]>(r))
+export const fetchQuestion = (id: string) => fetch(`/api/questions/${encodeURIComponent(id)}`).then((r) => json<Question>(r))
+export async function answerEstimate(id: string, answers: Record<string, number>): Promise<EstimateResult> {
+  const res = await fetch(`/api/questions/${encodeURIComponent(id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers }) })
   return json(res)
 }
