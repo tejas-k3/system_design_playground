@@ -1,4 +1,4 @@
-import type { Diagram, Finding, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { Diagram, Finding, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -35,5 +35,17 @@ export async function validate(diagram: Diagram): Promise<{ diagram: Diagram; ad
 
 export async function sweepLoad(diagram: Diagram, loads: number[], durationSec = 20): Promise<SweepResponse> {
   const res = await fetch('/api/sweep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, loads, durationSec }) })
+  return json(res)
+}
+
+export interface RunResult {
+  stats: Stats
+  costPerHour: number
+  truncated?: boolean
+}
+
+/** A headless run of a design (the scenario's own traffic and chaos if a scenario id is given). */
+export async function runDiagram(diagram: Diagram, scenarioId?: string, durationSec = 30, seed = 42): Promise<RunResult> {
+  const res = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, scenarioId, durationSec, seed }) })
   return json(res)
 }
