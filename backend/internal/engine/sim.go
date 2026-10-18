@@ -90,6 +90,9 @@ type node struct {
 	slow            float64
 	slowUntil       float64
 	pausedUntil     float64     // a stop-the-world pause (GC) lasts until then; 0 = none
+	cpuWork         float64     // CPU-ms of work started since the last burst-credit step
+	credits         float64     // banked full-speed CPU-ms of a burstable server
+	throttled       bool        // a burstable server with no credits left runs at its baseline
 	stallUntil      float64     // an LSM database's compaction holds writes until then; 0 = none
 	cut             bool        // partitioned: calls to it get no answer
 	promoted        bool        // replica that took over as the primary after a failover
@@ -283,6 +286,10 @@ func New(d Diagram, opts Options) *Sim {
 	for _, n := range s.order {
 		if n.kind == KAppServer && n.f("gcPauseMs") > 0 {
 			s.scheduleGC(n)
+		}
+		if n.kind == KAppServer && n.f("burstBaselinePct") < 100 {
+			n.credits = n.f("burstCreditSec") * 1000 * float64(s.capacity(n))
+			s.scheduleBurst(n)
 		}
 		if n.kind == KDatabase && n.s("engine") == "lsm" {
 			s.scheduleCompaction(n)

@@ -169,6 +169,8 @@ func init() {
 				num("queueTimeoutMs", "Max queue wait", "Capacity", 0, 0, 30000, 50, "ms", "Drop queued requests that waited longer than this (0 = never).").adv(),
 				num("gcPauseMs", "GC pause", "Failure modes", 0, 0, 5000, 50, "ms", "Stop-the-world garbage-collection pauses: for this long nothing on the server starts or finishes. 0 = off.").adv(),
 				num("gcEverySec", "GC pause every", "Failure modes", 30, 1, 600, 1, "s", "Average time between pauses; the gaps are random (exponential), so pauses are not evenly spaced.").adv(),
+				num("burstBaselinePct", "CPU baseline", "Failure modes", 100, 5, 100, 5, "%", "A burstable instance: the share of its CPU it may use all the time. Above it, it spends credits; with none left it is throttled to this share. 100 = not burstable.").adv(),
+				num("burstCreditSec", "CPU credits", "Failure modes", 60, 1, 3600, 1, "s", "How many seconds of full-speed CPU the server can bank. It starts full and earns credits whenever it uses less than its baseline.").adv(),
 				num("callTimeoutMs", "Call timeout", "Calls to dependencies", 0, 0, 10000, 50, "ms", "Give up on a dependency call after this long (0 = wait forever)."),
 				num("dbPool", "DB pool size", "Calls to dependencies", 20, 1, 200, 1, "", "Max connections this server opens to each database.").needs(KDatabase, KReplica, KShardRouter),
 				flag("circuitBreaker", "Circuit breaker", "Calls to dependencies", false, "After 5 failures in a row to a dependency, fail fast for 5 s, then try once."),

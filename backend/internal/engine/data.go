@@ -103,6 +103,10 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		cb(res)
 	}
 	cpu := s.service(n, n.f("cpuMs")) * n.slow
+	n.cpuWork += cpu
+	if n.throttled {
+		cpu *= 100 / n.f("burstBaselinePct")
+	}
 	s.after(cpu, func() {
 		if n.epoch != ep || n.removed {
 			done(fail(RNodeDown)) // crashed while computing: do not start downstream work
