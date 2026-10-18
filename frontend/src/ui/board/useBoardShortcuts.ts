@@ -26,7 +26,10 @@ export function useBoardShortcuts({ fit, zoomBy, cancel }: Actions): void {
       const st = useStore.getState()
       const mod = e.metaKey || e.ctrlKey
       const key = e.key.toLowerCase()
-      if (mod && key === 'z') {
+      if (mod && key === 'k') {
+        e.preventDefault()
+        st.setUi({ search: true })
+      } else if (mod && key === 'z') {
         e.preventDefault()
         if (e.shiftKey) st.redo()
         else st.undo()

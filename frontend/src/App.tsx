@@ -7,6 +7,7 @@ import { PresentView } from './ui/interview/PresentView'
 import { InterviewBar } from './ui/interview/InterviewBar'
 import { CompareDialog } from './ui/CompareDialog'
 import { CapacityDialog } from './ui/CapacityDialog'
+import { SearchDialog } from './ui/SearchDialog'
 import { Inspector } from './ui/Inspector'
 import { Help } from './ui/Help'
 import { Library } from './ui/Library'
@@ -78,6 +79,7 @@ export function App() {
       <ResultModal />
       <Help />
       <CapacityDialog />
+      <SearchDialog />
       <CompareDialog />
       <QuestionDialog />
       <Toasts />

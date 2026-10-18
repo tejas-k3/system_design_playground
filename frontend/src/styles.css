@@ -285,3 +285,9 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .arrange button { font: inherit; padding: 6px 10px; cursor: pointer; }
 .arrange-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .arrange-row button { min-width: 36px; min-height: 36px; }
+
+.modal.search { width: min(520px, 92vw); padding: 14px; }
+.modal.search input { width: 100%; font: inherit; padding: 10px 12px; box-sizing: border-box; }
+.modal.search ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow: auto; }
+.modal.search li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; cursor: pointer; }
+.modal.search li.on { background: color-mix(in srgb, var(--accent, #b43a0a) 14%, transparent); outline: 1px solid var(--accent, #b43a0a); }

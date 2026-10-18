@@ -54,16 +54,20 @@ export interface State {
   cost: number | null // null until the server has priced the current diagram
   scenario: ScenarioState | null
   sandbox: Diagram | null // sandbox saved while a scenario is open
-  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; compare: boolean; question: string | null; present: boolean }
+  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; search: boolean; compare: boolean; question: string | null; present: boolean }
   toasts: Toast[]
   connection: Connection
   past: Diagram[]
   future: Diagram[]
   gesture: Diagram | null
   fitRequest: number
+  /** Ask the canvas to bring this component to the middle of the view (the n changes on every request). */
+  centerRequest: { id: string; n: number } | null
 
   setReg(reg: Reg): void
   requestFit(): void
+  /** Select a component and bring it to the middle of the view. */
+  focusNode(id: string): void
   clearRun(): void
   addNode(kind: string, x: number, y: number): string | null
   moveNodes(ids: string[], dx: number, dy: number): void
@@ -172,16 +176,18 @@ export const useStore = create<State>()((set, get) => {
     cost: null,
     scenario: null,
     sandbox: null,
-    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, compare: false, question: null, present: false },
+    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, search: false, compare: false, question: null, present: false },
     toasts: [],
     connection: 'connecting',
     past: [],
     future: [],
     gesture: null,
     fitRequest: 0,
+    centerRequest: null,
 
     setReg: (reg) => set({ reg }),
     requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
+    focusNode: (id) => set((s) => ({ selection: [id], centerRequest: { id, n: (s.centerRequest?.n ?? 0) + 1 } })),
     clearRun: () =>
       set((s) => ({
         stats: emptyStats(),

@@ -14,6 +14,8 @@ export function Help() {
     ['Tab, then Enter', 'Pick a component without a mouse; connect it from the inspector'],
     ['Pinch', 'Zoom and pan on a touch screen'],
     ['Ctrl/⌘ Z · Shift+Z', 'Undo · Redo'],
+    ['Ctrl/⌘ C · V · D', 'Copy · Paste · Duplicate the selection'],
+    ['Ctrl/⌘ K', 'Find a component by name or type'],
     ['F', 'Fit the design on screen'],
     ['+ / −  ·  scroll', 'Zoom'],
     ['Drag empty space', 'Pan the canvas'],
