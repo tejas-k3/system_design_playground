@@ -551,9 +551,7 @@ func TestRunCapReturns503WhileAllSlotsAreBusy(t *testing.T) {
 	if code := post(t, ts.URL+"/api/run", map[string]any{"diagram": sc.Solution, "scenarioId": "hello-world"}, nil); code != 200 {
 		t.Fatalf("run after the slot freed up: %d", code)
 	}
-	if len(srv.runSlots) != 0 {
-		t.Fatal("the slot was not released after the run")
-	}
+	waitSlotsFree(t, srv, "the slot was not released after the run")
 }
 
 func TestEventLogIsSentOnlyWhenItChanges(t *testing.T) {
@@ -606,5 +604,18 @@ func TestValidateReturnsLintFindingsAndNeverNull(t *testing.T) {
 	raw, _ := io.ReadAll(resp.Body)
 	if bytes.Contains(raw, []byte(`"findings":null`)) {
 		t.Fatalf("an empty design must give [], not null: %s", raw)
+	}
+}
+
+// waitSlotsFree waits for a handler's deferred slot release: it runs just after the response is written,
+// so a test that looks the instant the client has the reply can see the slot still held.
+func waitSlotsFree(t *testing.T, srv *Server, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for len(srv.runSlots) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal(msg)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }

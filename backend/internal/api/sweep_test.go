@@ -83,9 +83,7 @@ func TestSweepShareOneRunSlotAndReturns503WhenFull(t *testing.T) {
 	if code := post(t, ts.URL+"/api/sweep", map[string]any{"diagram": d, "durationSec": 5, "loads": []float64{1, 2, 3}}, &r); code != 200 || len(r.Points) != 3 {
 		t.Fatalf("status %d points %d", code, len(r.Points))
 	}
-	if len(srv.runSlots) != 0 {
-		t.Fatal("slot not released: a sweep must hold exactly one slot for all its points")
-	}
+	waitSlotsFree(t, srv, "slot not released: a sweep must hold exactly one slot for all its points")
 }
 
 func TestWhatIfSweepClampsToTheSettingsRange(t *testing.T) {
