@@ -27,7 +27,8 @@ func TestNoReferenceSolutionHasALintError(t *testing.T) {
 
 func TestLintFindsTheFaultEachChallengeTeaches(t *testing.T) {
 	want := map[string][]string{
-		"retry-pileup":          {"retries-without-backoff", "retry-amplification", "no-call-timeout"},
+		"retry-pileup":          {"retries-without-backoff", "retry-amplification", "queue-longer-than-patience", "no-call-timeout"},
+		"sync-or-async":         {"async-replica-failover"},
 		"cut-off":               {"no-call-timeout"},
 		"connection-crunch":     {"pool-exceeds-db"},
 		"fence-the-old-primary": {"unfenced-failover"},
