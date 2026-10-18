@@ -193,6 +193,7 @@ func init() {
 			Accent: "#c2255c", Width: 160, Height: 72, CanConnect: []string{KDatabase, KReplica, KShardRouter},
 			Params: []ParamSpec{
 				num("capacityItems", "Capacity", "Memory", 2000, 0, 100000, 100, "items", "How many items fit."),
+				num("capacityMB", "Capacity in bytes", "Memory", 0, 0, 1000000, 10, "MB", "Memory for cached bodies. Items are as large as the users' response size, so big objects fit fewer; the smaller of this and the item count applies. 0 = only count items.").adv(),
 				sel("eviction", "Eviction", "Memory", "lru", "Which item to drop when full.",
 					opt("lru", "LRU: least recently used"), opt("lfu", "LFU: least frequently used"), opt("fifo", "FIFO: oldest inserted"), opt("random", "Random")),
 				sel("writePolicy", "On writes", "Freshness", "none", "What happens to cached copies when data is written.",
@@ -284,6 +285,7 @@ func init() {
 			Accent: "#087f5b", Width: 160, Height: 72, CanConnect: []string{KLoadBalancer, KAppServer, KRateLimiter},
 			Params: []ParamSpec{
 				num("capacityItems", "Capacity", "Memory", 5000, 0, 200000, 100, "items", "How many items it can hold."),
+				num("capacityMB", "Capacity in bytes", "Memory", 0, 0, 1000000, 10, "MB", "Disk or memory for cached bodies. Items are as large as the users' response size, so big objects fit fewer; the smaller of this and the item count applies. 0 = only count items.").adv(),
 				num("ttlSec", "Time to live", "Freshness", 60, 0, 3600, 1, "s", "Entries expire after this long."),
 				ttlJitter(),
 				flag("startWarm", "Start warm", "Memory", true, "Begin with popular items cached."),
