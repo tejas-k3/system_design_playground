@@ -118,6 +118,8 @@ func init() {
 				num("retries", "Retries", "Patience & retries", 0, 0, 5, 1, "", "Extra attempts after a failure or timeout. Retries add load exactly when the system is struggling."),
 				sel("backoff", "Retry backoff", "Patience & retries", "exponential", "Immediate retries can turn a blip into a retry storm.",
 					opt("exponential", "Exponential + jitter"), opt("none", "Immediate")),
+				num("reqKB", "Request size", "Payload", 0, 0, 102400, 10, "KB", "How big each request is (what an upload sends). 0 = not modelled. A message queue refuses anything above its own size limit.").adv(),
+				num("respKB", "Response size", "Payload", 0, 0, 102400, 10, "KB", "How big each response is. 0 = not modelled. Recorded for the bandwidth model that builds on this.").adv(),
 				sel("workload", "Workload", "What they do", "kv", "What kind of requests users make.",
 					opt("kv", "General: read & write items"), opt("geo", "Location: nearby search & pings"),
 					opt("leaderboard", "Leaderboard: rank reads & score updates"), opt("booking", "Booking: reserve scarce seats")),
@@ -234,8 +236,11 @@ func init() {
 			Kind: KQueue, Name: "Message Queue", Description: "Buffers work so servers can answer fast and workers catch up later.",
 			Lesson: "A queue turns a spike into a delay, as long as it does not fill up.",
 			Accent: "#7048e8", Width: 160, Height: 72, CanConnect: []string{KWorker},
-			Params: []ParamSpec{num("capacity", "Capacity", "Buffer", 5000, 10, 100000, 100, "jobs", "Jobs it can hold before rejecting.")},
-			cost:   func(Params) float64 { return 0.04 },
+			Params: []ParamSpec{
+				num("capacity", "Capacity", "Buffer", 5000, 10, 100000, 100, "jobs", "Jobs it can hold before rejecting."),
+				num("maxMessageKB", "Largest message", "Buffer", 256, 1, 10240, 1, "KB", "Messages above this size are refused (managed queues commonly allow 256 KB; a log, 1 MB). Only applies when the users' request size is set. Store big bodies elsewhere and queue a pointer.").adv(),
+			},
+			cost: func(Params) float64 { return 0.04 },
 		},
 		{
 			Kind: KWorker, Name: "Worker", Description: "Pulls jobs from a queue and does the slow work.",

@@ -544,6 +544,10 @@ func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
 		s.failAt(n, RNoRoute, cb)
 		return
 	}
+	if c.lg != nil && c.lg.client.f("reqKB") > n.f("maxMessageKB") { // sizes are 0 (not modelled) unless the users set them
+		s.failAt(n, RMessageTooLarge, cb)
+		return
+	}
 	if len(n.jobs)-n.jh >= int(n.f("capacity")) {
 		s.failAt(n, RQueueFull, cb)
 		return
