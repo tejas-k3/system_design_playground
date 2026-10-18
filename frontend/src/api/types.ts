@@ -349,7 +349,22 @@ export interface RunSummary {
   lostWrites: number
   staleReadPct: number
 }
+export interface DefectOut {
+  id: string
+  nodes: string[]
+  explain: string
+}
+export interface ReviewResult {
+  found: DefectOut[]
+  missed: DefectOut[]
+  falseMarks: string[]
+  precision: number
+  recall: number
+  score: number
+  stars: number
+}
 export interface Question extends QuestionSummary {
+  diagram?: Diagram
   candidates?: { label: string; detail: string }[]
   prompt: string
   options?: string[]

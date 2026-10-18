@@ -249,3 +249,5 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .seg button, .charts-head button { white-space: nowrap; }
 .credit { font-family: var(--hand); font-size: 15px; border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 12px; }
 .candidate { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; } .candidate label { flex: 1; }
+.review-node.found { border-left-color: #2f9e44; } .review-node.missed { border-left-color: var(--bad); border-left-style: dashed; } .review-node.false { border-left-color: var(--warn); border-left-style: dotted; }
+.review-node details { margin: 2px 0 2px 24px; }
