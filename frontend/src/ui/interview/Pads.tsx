@@ -5,6 +5,9 @@ import { MAX_ROWS } from '../../model/interview'
 import { addRow, apiHints, blankEndpoint, blankTable, dataHints, removeRow, setRow } from '../../model/pads'
 import type { StageId } from '../../model/timer'
 import { useState } from 'react'
+import { runDiagram } from '../../api/client'
+import { checkTargets, rubricEvidence, type TargetRow } from '../../model/rubric'
+import { RUBRIC_AREAS } from '../../model/interview'
 import { buildMarkdown, fileStamp } from '../../model/exportDoc'
 import { diagramPng, download, slug } from './exportFiles'
 import { useStore } from '../../state/store'
@@ -26,6 +29,8 @@ export function StagePad({ stage, data }: { stage: StageId; data: InterviewData 
         <label className="pad-notes">Notes <span className="muted small">(kept in this browser only)</span>
           <textarea value={data.notes} maxLength={5000} rows={3} onChange={(e) => update({ notes: e.target.value })} />
         </label>
+        {(stage === 'design' || stage === 'deepdive') && <TargetsCheck data={data} />}
+        {stage === 'tradeoffs' && <RubricPanel data={data} update={update} />}
         {stage === 'tradeoffs' && <ExportPanel data={data} />}
       </div>
     )
@@ -192,6 +197,73 @@ function ExportPanel({ data }: { data: InterviewData }) {
       <label>Picture <select value={theme} onChange={(e) => setTheme(e.target.value as 'light' | 'dark')} aria-label="Background of the picture"><option value="light">Light background</option><option value="dark">Dark background</option></select></label>{' '}
       <button onClick={() => void png()}>Download the diagram (PNG)</button>
       <button onClick={md}>Download the write-up (Markdown)</button>
+    </fieldset>
+  )
+}
+
+/** Runs the design for 30 simulated seconds and compares what it measured with the numbers the learner wrote down. */
+function TargetsCheck({ data }: { data: InterviewData }) {
+  const diagram = useStore((s) => s.diagram)
+  const [rows, setRows] = useState<TargetRow[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const testable = data.nonFunctional.length > 0
+  const go = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const r = await runDiagram(diagram)
+      const run = r.stats.global.run
+      setRows(checkTargets(data.nonFunctional, { success: run.resolved ? run.ok / run.resolved : 0, p95: run.p95 }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The test failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <fieldset className="pad">
+      <legend>Does my design meet my own requirements?</legend>
+      <button onClick={() => void go()} disabled={busy || !testable || diagram.nodes.length === 0}>{busy ? 'Running…' : 'Test it against my requirements'}</button>
+      {!testable && <span className="muted small"> Write non-functional requirements first.</span>}
+      {diagram.nodes.length === 0 && testable && <span className="muted small"> The canvas is empty.</span>}
+      {error && <p className="bad small" role="alert">{error}</p>}
+      {rows && (
+        <table className="sweep-table">
+          <caption className="sr">Your requirements against a 30-second run of your design</caption>
+          <thead><tr><th scope="col">Requirement</th><th scope="col">Target</th><th scope="col">Measured</th><th scope="col">Result</th></tr></thead>
+          <tbody>{rows.map((r, i) => <tr key={i}><th scope="row">{r.label || '(unnamed)'}</th><td>{r.target}</td><td>{r.actual}</td><td>{r.ok === null ? 'Not tested' : r.ok ? 'Met' : 'Missed'}</td></tr>)}</tbody>
+        </table>
+      )}
+    </fieldset>
+  )
+}
+
+const AREA_LABEL: Record<string, string> = { scalability: 'Scalability', availability: 'Availability', consistency: 'Consistency', cost: 'Cost', communication: 'Communication' }
+
+/** A 1-5 self-rating per area, each next to facts from the design, the lint and the last run. */
+function RubricPanel({ data, update }: Props) {
+  const diagram = useStore((s) => s.diagram)
+  const findings = useStore((s) => s.findings)
+  const stats = useStore((s) => s.stats.global)
+  const run = stats.run.resolved > 0 ? { success: stats.run.ok / stats.run.resolved, p95: stats.run.p95, costPerHour: stats.avgCost || stats.cost } : null
+  const facts = rubricEvidence(diagram, { data, findings, run })
+  return (
+    <fieldset className="pad rubric">
+      <legend>Rate your design (1 to 5), with the evidence beside it</legend>
+      {RUBRIC_AREAS.map((a) => (
+        <div className="rubric-row" key={a}>
+          <div role="group" aria-label={`${AREA_LABEL[a]} rating`} className="seg">
+            <span className="rubric-name">{AREA_LABEL[a]}</span>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} aria-pressed={data.rubric[a] === n} className={data.rubric[a] === n ? 'on' : ''} aria-label={`${AREA_LABEL[a]}: ${n} out of 5`} onClick={() => update({ rubric: { ...data.rubric, [a]: data.rubric[a] === n ? 0 : n } })}>{n}</button>
+            ))}
+          </div>
+          <ul className="small evidence">
+            {facts.filter((f) => f.area === a).map((f) => <li key={f.text}><b>{f.ok === null ? 'Measured:' : f.ok ? 'Good:' : 'Gap:'}</b> {f.text}</li>)}
+          </ul>
+        </div>
+      ))}
     </fieldset>
   )
 }
