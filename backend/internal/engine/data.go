@@ -350,8 +350,17 @@ func (s *Sim) readMult(n *node, c *call) float64 {
 	case wlLeader:
 		return 10
 	}
+	// a lookup by another field: free with an index, a scan without (chosen from the request id, so no random draw)
+	if c.lg != nil && n.f("indexes") < 1 {
+		if pct := c.lg.client.f("secondaryPct"); pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+97)%100) < pct {
+			return n.f("scanMult")
+		}
+	}
 	return 1
 }
+
+// writeMult is the cost of keeping secondary indexes up to date: 30% more per index.
+func (s *Sim) writeMult(n *node) float64 { return 1 + 0.3*n.f("indexes") }
 
 func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 	write := c.cmd == cmdWrite
@@ -361,7 +370,7 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 	}
 	ms := n.f("readMs") * s.readMult(n, c)
 	if write {
-		ms = n.f("writeMs")
+		ms = n.f("writeMs") * s.writeMult(n)
 		if c.idem {
 			ms++
 		}
@@ -444,7 +453,7 @@ func (s *Sim) dbBooking(n *node, c *call, cb func(Result), release func()) {
 				return
 			}
 			// step 2: the write; anyone who checked in the meantime may also be writing
-			ms := s.service(n, n.f("writeMs")) * n.slow
+			ms := s.service(n, n.f("writeMs")*s.writeMult(n)) * n.slow
 			if c.idem {
 				ms++
 			}
