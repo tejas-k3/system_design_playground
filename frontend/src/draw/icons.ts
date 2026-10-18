@@ -137,6 +137,18 @@ const ICONS: Record<string, Draw> = {
       c.quadraticCurveTo(0, 3.5, 8.6, 0)
     })
   },
+  index: (c) => {
+    // a magnifier over a slice of lines
+    stroke(c, () => c.arc(-2, -2, 7, 0, Math.PI * 2))
+    stroke(c, () => {
+      c.moveTo(3, 3)
+      c.lineTo(9, 9)
+    })
+    stroke(c, () => {
+      c.moveTo(-6, -2)
+      c.lineTo(2, -2)
+    })
+  },
   externalApi: (c) => {
     stroke(c, () => {
       c.arc(-4, 2, 5, Math.PI * 0.5, Math.PI * 1.5)

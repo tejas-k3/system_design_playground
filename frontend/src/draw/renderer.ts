@@ -231,6 +231,8 @@ function nodeSubtitle(n: Node, sc: Scene): string {
       return `cap ${rp.capacity}`
     case 'rateLimiter':
       return `${rp.limitRps}/s`
+    case 'index':
+      return `${rp.queryMs} ms query`
     default:
       return spec.name
   }
