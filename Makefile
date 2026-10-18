@@ -4,7 +4,7 @@
 PORT ?= 8090
 export ADDR := :$(PORT)
 
-.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench browser-check docker-build docker-run up down logs
+.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench perf-guard browser-check docker-build docker-run up down logs
 
 help:
 	@echo "make install   install frontend dependencies"
@@ -34,6 +34,9 @@ dev:
 build:
 	cd backend && go build -o bin/server ./cmd/server
 	cd frontend && npm run build
+
+perf-guard: ## Fail if the large-design benchmark regressed (allocations, bytes, time)
+	cd backend && PERF_GUARD=1 go test -run TestPerfGuard -v ./internal/engine/
 
 browser-check: build ## Browser regression checks (layout, drag, fit, accessibility) in headless Chrome
 	bash docs/review/tools/browser-check.sh

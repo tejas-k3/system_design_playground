@@ -17,5 +17,6 @@ run bash "$HERE/check-layout.sh"
 run bash "$HERE/check-drag.sh"
 run bash "$HERE/check-fit.sh" 1440 900
 run node "$HERE/ax-audit.mjs" "$URL/"
+[ -n "${SKIP_STRESS:-}" ] || run node "$HERE/stress-frames.mjs"
 [ $fail -eq 0 ] && echo "ALL BROWSER CHECKS PASSED" || echo "BROWSER CHECKS FAILED"
 exit $fail
