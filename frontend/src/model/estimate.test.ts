@@ -109,3 +109,29 @@ describe('estimateNotes', () => {
     expect(t.split('\n').length).toBeGreaterThanOrEqual(6)
   })
 })
+
+import { payloadWarnings } from './estimate'
+
+describe('payloadWarnings', () => {
+  it('says nothing about small payloads', () => {
+    expect(payloadWarnings(10e3)).toEqual([])
+    expect(payloadWarnings(200e3)).toEqual([])
+  })
+  it('warns above 256 KB that most message queues will refuse it, and what to do instead', () => {
+    const w = payloadWarnings(500e3)
+    expect(w).toHaveLength(1)
+    expect(w[0]).toMatch(/500 KB/)
+    expect(w[0]).toMatch(/256 KB/)
+    expect(w[0]).toMatch(/pointer|object store/i)
+  })
+  it('warns separately above 1 MB, where even Kafka-style logs refuse by default', () => {
+    const w = payloadWarnings(5e6)
+    expect(w).toHaveLength(2)
+    expect(w[1]).toMatch(/1 MB/)
+    expect(w[0]).toMatch(/5 MB/)
+  })
+  it('does not warn about nonsense', () => {
+    expect(payloadWarnings(NaN)).toEqual([])
+    expect(payloadWarnings(-1)).toEqual([])
+  })
+})

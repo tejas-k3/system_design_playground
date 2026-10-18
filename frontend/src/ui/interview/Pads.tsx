@@ -1,4 +1,4 @@
-import { calculate, estimateNotes, humanBytes, humanCount, humanRate } from '../../model/estimate'
+import { calculate, estimateNotes, humanBytes, humanCount, humanRate, payloadWarnings } from '../../model/estimate'
 import type { EstimateInputs, InterviewData, Requirement } from '../../model/interview'
 import { starterDiagram } from '../../model/starter'
 import { MAX_ROWS } from '../../model/interview'
@@ -169,6 +169,7 @@ function Calculator({ data, update }: Props) {
           <button onClick={() => { update({ notes: data.notes ? `${data.notes}\n\n${estimateNotes(r)}` : estimateNotes(r) }); toast('Copied into your notes', 'info', 2500) }}>Copy into notes</button>
           <button className="primary" disabled={!Number.isFinite(r.servers)} onClick={() => { importDiagram(starterDiagram({ peakQps: r.peakQps, readPct: est.readPct, servers: r.servers })); requestFit(); stage('design') }}>Build a starter from my numbers</button>
         </div>
+        {payloadWarnings(est.payloadBytes).map((w) => <p key={w} className="small warn-note" role="note"><b>Payload size.</b> {w}</p>)}
         <p className="muted small">A starter is users, a balancer, {Number.isFinite(r.servers) ? Math.min(12, r.servers) : 'N'} app server(s) and a database. Your previous canvas stays one undo away.</p>
       </fieldset>
     </div>
