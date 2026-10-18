@@ -6,15 +6,14 @@ import { spawn } from 'node:child_process'
 import { writeFileSync, mkdtempSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { chromeArgs, chromePath } from './chrome.mjs'
+import { chromeArgs, chromePath, waitForPage } from './chrome.mjs'
 const [w, h, outDir, stepsJson] = process.argv.slice(2)
 mkdirSync(outDir, { recursive: true })
 const port = 9400 + Math.floor(Math.random() * 400)
 const chrome = spawn(chromePath(), chromeArgs(port, mkdtempSync(join(tmpdir(), 'cdp-'))), { stdio: 'ignore' })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-let targets
-for (let i = 0; i < 50; i++) { try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (targets.some((t) => t.type === 'page')) break } catch {} await sleep(150) }
-const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl)
+const page = await waitForPage(port)
+const ws = new WebSocket(page.webSocketDebuggerUrl)
 await new Promise((r) => (ws.onopen = r))
 let id = 0; const pending = new Map()
 ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } }

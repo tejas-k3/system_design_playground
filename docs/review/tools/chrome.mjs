@@ -24,3 +24,20 @@ export function chromeArgs(port, userDataDir) {
   args.push('about:blank')
   return args
 }
+
+/** Wait (up to 30 s) for the browser's debugging endpoint to list a page; a clear error if it never does. */
+export async function waitForPage(port) {
+  let last = ''
+  for (let i = 0; i < 120; i++) {
+    try {
+      const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json()
+      const page = targets.find((t) => t.type === 'page')
+      if (page) return page
+      last = 'the browser is up but has no page yet'
+    } catch (e) {
+      last = String(e?.message ?? e)
+    }
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  throw new Error(`Chrome did not expose a debuggable page on port ${port} within 30 s (${last})`)
+}
