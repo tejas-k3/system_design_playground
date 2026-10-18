@@ -212,6 +212,7 @@ func init() {
 				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it can work on at once."),
 				num("readMs", "Read time", "Speed", 10, 1, 500, 1, "ms", "Time for one read."),
 				num("writeMs", "Write time", "Speed", 30, 1, 1000, 1, "ms", "Time for one write."),
+				num("diskIops", "Disk IOPS", "Speed", 0, 0, 100000, 50, "/s", "Disk operations per second. Each write needs one (plus one per secondary index) and they queue one after another, so writes slow down when the disk cannot keep up. 0 = not modelled.").adv(),
 				variability("Speed"),
 				sel("onFailure", "If it fails", "Failover", "stayDown", "What happens when this database crashes. Promoting a replica needs a read replica; writes acknowledged but not yet copied to it are lost.",
 					opt("stayDown", "Stay down until it restarts"), opt("promote", "Promote a replica")),

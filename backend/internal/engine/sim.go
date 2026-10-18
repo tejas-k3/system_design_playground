@@ -93,6 +93,7 @@ type node struct {
 	cpuWork         float64     // CPU-ms of work started since the last burst-credit step
 	credits         float64     // banked full-speed CPU-ms of a burstable server
 	throttled       bool        // a burstable server with no credits left runs at its baseline
+	diskFree        float64     // when the disk finishes the IO already queued on it
 	stallUntil      float64     // an LSM database's compaction holds writes until then; 0 = none
 	cut             bool        // partitioned: calls to it get no answer
 	promoted        bool        // replica that took over as the primary after a failover

@@ -422,6 +422,12 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 	if write && n.stallUntil > s.now { // an LSM database is compacting: the write waits for it to finish
 		took += n.stallUntil - s.now
 	}
+	if write && n.kind == KDatabase && n.f("diskIops") > 0 {
+		per := 1000 / n.f("diskIops")
+		start := math.Max(s.now, n.diskFree)
+		n.diskFree = start + per*(1+n.f("indexes"))
+		took += n.diskFree - s.now
+	}
 	s.hold(n, took, release, cb, func() {
 		release()
 		res := Result{Ver: -1, Done: true, Src: n}
