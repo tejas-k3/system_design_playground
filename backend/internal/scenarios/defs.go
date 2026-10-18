@@ -790,6 +790,37 @@ func init() {
 		Debrief: "Eviction policy is a bet about the future. LRU assumes recent means useful, which a scan breaks; FIFO ignores use altogether; LFU assumes frequent means useful, which resists scans (but can hold stale favourites). Real systems often add scan-resistant variants or keep crawler traffic out of the cache.",
 	})
 
+	// Search over 16 shards: the slowest shard sets the latency. Config only: ask for fewer answers, or ask again.
+	searchTail := func(fixed bool) engine.Diagram {
+		app := P{"threads": 32.0, "gather": "all"}
+		if fixed {
+			app = P{"threads": 32.0, "gather": "firstK", "k": 12.0}
+		}
+		b := (&bld{}).n("users", engine.KClient, cols[0], 200, P{"rps": 60.0, "readPct": 100.0, "timeoutMs": 2000.0}).
+			n("app", engine.KAppServer, cols[1], 200, app).e("users", "app")
+		for k := 0; k < 16; k++ {
+			id := fmt.Sprintf("shard%d", k+1)
+			b.n(id, engine.KIndex, cols[2], float64(k)*80, P{"queryMs": 30.0, "variability": "heavy", "connections": 16.0}).label(id, fmt.Sprintf("Search Shard %d", k+1)).e("app", id)
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "search-tail", Title: "Search at 16 shards", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Every search waits for the slowest of 16 shards.",
+		Story:   "Search is split over 16 shards and the app server asks all of them and waits for every answer. Each shard answers in about 30 ms, but some answers take far longer, and with 16 shards nearly every search meets one of them. The architecture is fixed; tune the fan-out.",
+		Diagram: searchTail(false), Solution: searchTail(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.7), StarCostPerHour: f(1.65), StarP95Ms: f(200)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the latency distribution: the median is fine for one shard, so why is the p95 so far from it?",
+			"A request that waits for all 16 answers is as slow as the slowest of 16. Do you really need all of them?",
+			"Set the app server's fan-out to answer on the first K shards (try 12 of 16), or hedge: ask a slow shard again. More threads will not help.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Adding more app-server threads will…", Options: []string{"Cut the p95 a lot", "Barely change it: the wait is on the shards, not on threads", "Make the shards faster"}, Answer: 1,
+			Explain: "The threads are not the bottleneck: each request is waiting for the slowest of 16 shards. Fewer required answers or a second try attacks that wait."}},
+		Debrief: "Waiting for all N answers makes latency the maximum of N draws, so tail latency grows with fan-out. Answering on the first K, hedging slow calls, or allowing partial results trade completeness or extra load for a much shorter tail.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
