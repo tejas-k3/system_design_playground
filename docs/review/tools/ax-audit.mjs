@@ -60,9 +60,25 @@ await tree('help dialog open')
 const focusIn = await ev(`!!document.activeElement.closest('[role=dialog]')`)
 console.log('focus is inside the dialog after opening:', focusIn)
 if (!focusIn) failures.push('help dialog: focus did not move inside the dialog')
+// Interview mode: every stage, reached with the keyboard (arrow keys on the stage tabs), then present mode
+await send('Page.navigate', { url }); await sleep(2500)
+await ev(`document.querySelector('button[aria-label="Interview mode"]').click()`); await sleep(800)
+await ev(`document.querySelector('.stages [role=tab][aria-selected=true]').focus()`)
+for (let i = 0; i < 7; i++) {
+  const label = await ev(`document.querySelector('.stages [role=tab][aria-selected=true]').innerText`)
+  const focused = await ev(`document.activeElement===document.querySelector('.stages [role=tab][aria-selected=true]')`)
+  if (!focused) failures.push(`interview stage "${label}": focus is not on the selected stage tab`)
+  await ev(`[...document.querySelectorAll('.iv-tool button')].filter(b=>/^Add an? /.test(b.textContent.trim())).forEach(b=>b.click())`); await sleep(200) // give every pad a row, so its inputs are audited too
+  await tree(`interview stage ${i + 1}: ${label}`)
+  if (i < 6) { await key('ArrowRight', 'ArrowRight', 39); await sleep(350) }
+}
+await ev(`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Present').click()`); await sleep(500)
+await tree('present mode')
+const presentLabel = await ev(`document.querySelector('[aria-label=Presentation]')?.getAttribute('aria-label')||''`)
+if (!presentLabel) failures.push('present mode: no labelled Presentation region')
 ws.close(); chrome.kill()
 if (failures.length) {
   console.log('\nFAIL:\n  ' + failures.join('\n  '))
   process.exit(1)
 }
-console.log('\nPASS: no unnamed controls, a live region while running, focus moves into dialogs')
+console.log('\nPASS: no unnamed controls (also on all 7 interview stages and in present mode), a live region while running, focus moves into dialogs')
