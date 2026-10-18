@@ -4,9 +4,10 @@ import { spawn } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { chromeArgs, chromePath } from './chrome.mjs'
 const url = process.argv[2] ?? 'http://localhost:8091/'
 const port = 9800 + Math.floor(Math.random() * 100)
-const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', '--disable-gpu', `--remote-debugging-port=${port}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'ax-'))}`, '--no-first-run', 'about:blank'], { stdio: 'ignore' })
+const chrome = spawn(chromePath(), chromeArgs(port, mkdtempSync(join(tmpdir(), 'ax-'))), { stdio: 'ignore' })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let targets
 for (let i = 0; i < 50; i++) { try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (targets.some((t) => t.type === 'page')) break } catch {} await sleep(150) }
@@ -19,6 +20,7 @@ const ev = async (expression) => (await send('Runtime.evaluate', { expression, a
 const key = (k, code, vk) => send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk }).then(() => send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }))
 await send('Page.enable'); await send('Accessibility.enable'); await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
 
+const failures = []
 async function tree(label) {
   const { result } = await send('Accessibility.getFullAXTree')
   const nodes = result.nodes.filter((n) => !n.ignored)
@@ -29,6 +31,7 @@ async function tree(label) {
   console.log(`\n== ${label}: ${rows.length} exposed nodes`)
   console.log('landmarks/headings:', rows.filter((x) => ['banner', 'main', 'navigation', 'complementary', 'region', 'heading', 'dialog'].includes(x.role)).map((x) => `${x.role}${x.props.level ? x.props.level : ''}:"${x.name}"`).join('  '))
   console.log('unnamed interactive controls:', interactive.filter((x) => !x.name).map((x) => x.role).join(', ') || 'none')
+  for (const x of interactive.filter((y) => !y.name)) failures.push(`${label}: an interactive ${x.role} has no accessible name`)
   console.log('live regions (status/alert/log):', count('status') + count('alert') + count('log'), ' canvas/img nodes:', rows.filter((x) => ['image', 'img', 'Canvas', 'canvas'].includes(x.role)).map((x) => `${x.role}:"${x.name}"`).join(', ') || 'none')
   return rows
 }
@@ -50,9 +53,17 @@ await tree('example loaded')
 await ev(`document.querySelector('button.play').click()`); await sleep(11500)
 console.log('live region text after 11 s of running:', JSON.stringify(await ev(`document.querySelector('[role=status][aria-live=polite].sr-only')?.textContent`)))
 const run = await tree('example running')
-console.log('announced while running? status/alert/log roles present:', run.filter((x) => ['status', 'alert', 'log'].includes(x.role)).map((x) => `${x.role}:"${x.name}"`).join(' | ') || 'none')
+const live = run.filter((x) => ['status', 'alert', 'log'].includes(x.role))
+console.log('announced while running? status/alert/log roles present:', live.map((x) => `${x.role}:"${x.name}"`).join(' | ') || 'none')
+if (live.length === 0) failures.push('while running: no live region (status/alert/log) is exposed')
 await ev(`[...document.querySelectorAll('button')].find(b=>/Help|How it works/.test(b.getAttribute('aria-label')||b.title||''))?.click()`); await sleep(500)
 await tree('help dialog open')
 const focusIn = await ev(`!!document.activeElement.closest('[role=dialog]')`)
 console.log('focus is inside the dialog after opening:', focusIn)
+if (!focusIn) failures.push('help dialog: focus did not move inside the dialog')
 ws.close(); chrome.kill()
+if (failures.length) {
+  console.log('\nFAIL:\n  ' + failures.join('\n  '))
+  process.exit(1)
+}
+console.log('\nPASS: no unnamed controls, a live region while running, focus moves into dialogs')

@@ -4,7 +4,7 @@
 PORT ?= 8090
 export ADDR := :$(PORT)
 
-.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench docker-build docker-run up down logs
+.PHONY: help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench browser-check docker-build docker-run up down logs
 
 help:
 	@echo "make install   install frontend dependencies"
@@ -34,6 +34,9 @@ dev:
 build:
 	cd backend && go build -o bin/server ./cmd/server
 	cd frontend && npm run build
+
+browser-check: build ## Browser regression checks (layout, drag, fit, accessibility) in headless Chrome
+	bash docs/review/tools/browser-check.sh
 
 run: build
 	./backend/bin/server -static frontend/dist
