@@ -33,6 +33,15 @@ export function useBoardShortcuts({ fit, zoomBy, cancel }: Actions): void {
       } else if (mod && key === 'y') {
         e.preventDefault()
         st.redo()
+      } else if (mod && key === 'c') {
+        e.preventDefault()
+        st.copySelection()
+      } else if (mod && key === 'v') {
+        e.preventDefault()
+        st.paste()
+      } else if (mod && key === 'd') {
+        e.preventDefault() // the browser would bookmark the page
+        st.duplicateSelection()
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         st.deleteSelection()
