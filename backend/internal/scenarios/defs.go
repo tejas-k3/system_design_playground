@@ -245,6 +245,35 @@ func init() {
 		Debrief: "Retries are only safe for idempotent operations. Make writes idempotent with a client-supplied key, then retry freely.",
 	})
 
+	// 8b ─ Medium, config only: concurrent transfers silently overwrite each other ───────
+	transfers := func(fixed bool) engine.Diagram {
+		iso := "readCommitted"
+		if fixed {
+			iso = "serializable"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 60.0, "workload": "transfer", "keySpace": 60.0, "keyDist": "uniform", "timeoutMs": 3000.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "isolation": iso}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "disappearing-money", Title: "The disappearing money", Difficulty: "Medium",
+		Summary: "Two transfers touch the same account at once and one of them vanishes.",
+		Story:   "A payments team moves money between 60 accounts. Every transfer succeeds, yet the books are short: transfers that overlap on an account read the same balance and the second write overwrites the first.",
+		Diagram: transfers(false), Solution: transfers(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxLostUpdates: i(0), MaxP95Ms: f(600), MaxCostPerHour: f(1.2)},
+		DurationSec: 30, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Nothing is failing, so look at what the database promises about overlapping transactions.",
+			"The database has an isolation level. The default lets overlapping read-modify-write transfers overwrite each other.",
+			"Raise the isolation level on the database to serializable and watch what it costs under contention.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Moving to a stronger isolation level will…", Options: []string{"Never change throughput", "Make overlapping transfers wait for each other or abort", "Make every read slower"}, Answer: 1,
+			Explain: "Stronger isolation turns silent overwrites into waiting (locks) or errors (aborts and deadlocks): correctness is paid for with latency under contention."}},
+		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how hot the shared rows are.",
+	})
+
 	// 9 ─ Hard ────────────────────────────────────────────────────────────────────────
 	vendor := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
