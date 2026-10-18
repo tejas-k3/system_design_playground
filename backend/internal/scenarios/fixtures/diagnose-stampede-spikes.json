@@ -1,0 +1,290 @@
+{
+ "durationSec": 60,
+ "series": [
+  {
+   "t": 0.5,
+   "okRps": 153,
+   "errRps": 0,
+   "p50": 119.53460499208845,
+   "p95": 147.28980348700907,
+   "successRate": 1,
+   "inFlight": 45
+  },
+  {
+   "t": 2.5,
+   "okRps": 407,
+   "errRps": 0,
+   "p50": 118.81582955999602,
+   "p95": 141.92420106890904,
+   "successRate": 1,
+   "inFlight": 53
+  },
+  {
+   "t": 4.5,
+   "okRps": 419,
+   "errRps": 0,
+   "p50": 118.47374862395509,
+   "p95": 145.3928578019718,
+   "successRate": 1,
+   "inFlight": 56
+  },
+  {
+   "t": 6.5,
+   "okRps": 407,
+   "errRps": 0,
+   "p50": 118.82045066210958,
+   "p95": 143.3165305814391,
+   "successRate": 1,
+   "inFlight": 50
+  },
+  {
+   "t": 8.5,
+   "okRps": 445,
+   "errRps": 0,
+   "p50": 118.10562641767683,
+   "p95": 147.2452086511039,
+   "successRate": 1,
+   "inFlight": 45
+  },
+  {
+   "t": 10.5,
+   "okRps": 267,
+   "errRps": 0,
+   "p50": 119.85099354940576,
+   "p95": 328.2274201832133,
+   "successRate": 1,
+   "inFlight": 198
+  },
+  {
+   "t": 12.5,
+   "okRps": 165,
+   "errRps": 0,
+   "p50": 1430.4381909165186,
+   "p95": 1766.8767784619413,
+   "successRate": 1,
+   "inFlight": 693
+  },
+  {
+   "t": 14.5,
+   "okRps": 0,
+   "errRps": 397,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 836
+  },
+  {
+   "t": 16.5,
+   "okRps": 0,
+   "errRps": 409,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 778
+  },
+  {
+   "t": 18.5,
+   "okRps": 239,
+   "errRps": 236,
+   "p50": 1882.0589357283716,
+   "p95": 1994.1294074187026,
+   "successRate": 0.5031578947368421,
+   "inFlight": 687
+  },
+  {
+   "t": 20.5,
+   "okRps": 609,
+   "errRps": 0,
+   "p50": 232.06419658606683,
+   "p95": 1029.9916017182331,
+   "successRate": 1,
+   "inFlight": 48
+  },
+  {
+   "t": 22.5,
+   "okRps": 389,
+   "errRps": 0,
+   "p50": 120.04025792825632,
+   "p95": 400.6022556533935,
+   "successRate": 1,
+   "inFlight": 75
+  },
+  {
+   "t": 24.5,
+   "okRps": 366,
+   "errRps": 0,
+   "p50": 120.5314458898356,
+   "p95": 215.05662749989278,
+   "successRate": 1,
+   "inFlight": 61
+  },
+  {
+   "t": 26.5,
+   "okRps": 404,
+   "errRps": 0,
+   "p50": 121.86398033066871,
+   "p95": 275.2280950687491,
+   "successRate": 1,
+   "inFlight": 57
+  },
+  {
+   "t": 28.5,
+   "okRps": 391,
+   "errRps": 0,
+   "p50": 121.31399031913679,
+   "p95": 264.2365874702846,
+   "successRate": 1,
+   "inFlight": 83
+  },
+  {
+   "t": 30.5,
+   "okRps": 384,
+   "errRps": 0,
+   "p50": 120.32361420180314,
+   "p95": 215.99221398770533,
+   "successRate": 1,
+   "inFlight": 55
+  },
+  {
+   "t": 32.5,
+   "okRps": 412,
+   "errRps": 0,
+   "p50": 121.43160744897614,
+   "p95": 344.56682823290976,
+   "successRate": 1,
+   "inFlight": 44
+  },
+  {
+   "t": 34.5,
+   "okRps": 379,
+   "errRps": 0,
+   "p50": 120.37612697387522,
+   "p95": 260.51703244687815,
+   "successRate": 1,
+   "inFlight": 62
+  },
+  {
+   "t": 36.5,
+   "okRps": 428,
+   "errRps": 0,
+   "p50": 120.02833251436823,
+   "p95": 223.28809927146358,
+   "successRate": 1,
+   "inFlight": 47
+  },
+  {
+   "t": 38.5,
+   "okRps": 394,
+   "errRps": 0,
+   "p50": 122.31270448372379,
+   "p95": 240.23484013780399,
+   "successRate": 1,
+   "inFlight": 55
+  },
+  {
+   "t": 40.5,
+   "okRps": 392,
+   "errRps": 0,
+   "p50": 119.69122612892534,
+   "p95": 250.22409719498683,
+   "successRate": 1,
+   "inFlight": 60
+  },
+  {
+   "t": 42.5,
+   "okRps": 399,
+   "errRps": 0,
+   "p50": 120.02590585195139,
+   "p95": 292.5996437572976,
+   "successRate": 1,
+   "inFlight": 66
+  },
+  {
+   "t": 44.5,
+   "okRps": 423,
+   "errRps": 0,
+   "p50": 120.39203079941217,
+   "p95": 475.94334322743816,
+   "successRate": 1,
+   "inFlight": 60
+  },
+  {
+   "t": 46.5,
+   "okRps": 426,
+   "errRps": 0,
+   "p50": 120.30541304146755,
+   "p95": 232.38687870209833,
+   "successRate": 1,
+   "inFlight": 42
+  },
+  {
+   "t": 48.5,
+   "okRps": 391,
+   "errRps": 0,
+   "p50": 120.59629177500028,
+   "p95": 258.79290964136453,
+   "successRate": 1,
+   "inFlight": 62
+  }
+ ],
+ "errors": {
+  "queueFull": 5,
+  "timeout": 2044
+ },
+ "trace": {
+  "id": 7055,
+  "client": "Users",
+  "write": false,
+  "key": 824,
+  "ok": false,
+  "reason": "timeout",
+  "latencyMs": 2000,
+  "attempts": 1,
+  "spans": [
+   {
+    "node": "lb",
+    "label": "Load Balancer",
+    "kind": "loadBalancer",
+    "depth": 0,
+    "attempt": 1,
+    "at": 40,
+    "start": 40,
+    "end": 1961.4031452800664,
+    "ok": true
+   },
+   {
+    "node": "app1",
+    "label": "App Server",
+    "kind": "appServer",
+    "depth": 1,
+    "attempt": 1,
+    "at": 45.20000000000073,
+    "start": 1451.7626297982024,
+    "end": 1956.4031452800664,
+    "ok": true
+   },
+   {
+    "node": "cache",
+    "label": "Cache",
+    "kind": "cache",
+    "depth": 2,
+    "attempt": 1,
+    "at": 1491.442849368068,
+    "start": 1491.442849368068,
+    "end": 1951.4031452800664,
+    "ok": true
+   },
+   {
+    "node": "db",
+    "label": "Database",
+    "kind": "database",
+    "depth": 3,
+    "attempt": 1,
+    "at": 1497.6853369613418,
+    "start": 1778.766506908949,
+    "end": 1946.4031452800664,
+    "ok": true
+   }
+  ]
+ }
+}

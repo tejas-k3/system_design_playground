@@ -1,0 +1,420 @@
+{
+ "durationSec": 60,
+ "series": [
+  {
+   "t": 0.5,
+   "okRps": 138,
+   "errRps": 0,
+   "p50": 125.63441259757846,
+   "p95": 147.2501498238189,
+   "successRate": 1,
+   "inFlight": 37
+  },
+  {
+   "t": 2.5,
+   "okRps": 366,
+   "errRps": 0,
+   "p50": 126.40633861443212,
+   "p95": 151.34982767160636,
+   "successRate": 1,
+   "inFlight": 50
+  },
+  {
+   "t": 4.5,
+   "okRps": 384,
+   "errRps": 0,
+   "p50": 128.60746391980638,
+   "p95": 151.32054464260455,
+   "successRate": 1,
+   "inFlight": 54
+  },
+  {
+   "t": 6.5,
+   "okRps": 365,
+   "errRps": 0,
+   "p50": 127.06089748243267,
+   "p95": 152.326646644402,
+   "successRate": 1,
+   "inFlight": 53
+  },
+  {
+   "t": 8.5,
+   "okRps": 373,
+   "errRps": 0,
+   "p50": 127.06192106031267,
+   "p95": 151.15610505482255,
+   "successRate": 1,
+   "inFlight": 50
+  },
+  {
+   "t": 10.5,
+   "okRps": 380,
+   "errRps": 0,
+   "p50": 126.87904496535157,
+   "p95": 151.89570128810374,
+   "successRate": 1,
+   "inFlight": 50
+  },
+  {
+   "t": 12.5,
+   "okRps": 367,
+   "errRps": 0,
+   "p50": 127.83402093079167,
+   "p95": 154.21757716260436,
+   "successRate": 1,
+   "inFlight": 49
+  },
+  {
+   "t": 14.5,
+   "okRps": 385,
+   "errRps": 0,
+   "p50": 127.05361489598181,
+   "p95": 150.80665004266302,
+   "successRate": 1,
+   "inFlight": 50
+  },
+  {
+   "t": 16.5,
+   "okRps": 69,
+   "errRps": 0,
+   "p50": 630.0418323222348,
+   "p95": 791.2864594593739,
+   "successRate": 1,
+   "inFlight": 480
+  },
+  {
+   "t": 18.5,
+   "okRps": 0,
+   "errRps": 985,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 291
+  },
+  {
+   "t": 20.5,
+   "okRps": 0,
+   "errRps": 414,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 258
+  },
+  {
+   "t": 22.5,
+   "okRps": 0,
+   "errRps": 385,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 261
+  },
+  {
+   "t": 24.5,
+   "okRps": 0,
+   "errRps": 405,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 243
+  },
+  {
+   "t": 26.5,
+   "okRps": 0,
+   "errRps": 103,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 623
+  },
+  {
+   "t": 28.5,
+   "okRps": 0,
+   "errRps": 405,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 590
+  },
+  {
+   "t": 30.5,
+   "okRps": 0,
+   "errRps": 369,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 586
+  },
+  {
+   "t": 32.5,
+   "okRps": 0,
+   "errRps": 349,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 623
+  },
+  {
+   "t": 34.5,
+   "okRps": 0,
+   "errRps": 371,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 600
+  },
+  {
+   "t": 36.5,
+   "okRps": 0,
+   "errRps": 391,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 606
+  },
+  {
+   "t": 38.5,
+   "okRps": 0,
+   "errRps": 390,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 583
+  },
+  {
+   "t": 40.5,
+   "okRps": 0,
+   "errRps": 371,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 592
+  },
+  {
+   "t": 42.5,
+   "okRps": 0,
+   "errRps": 393,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 593
+  },
+  {
+   "t": 44.5,
+   "okRps": 0,
+   "errRps": 370,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 592
+  },
+  {
+   "t": 46.5,
+   "okRps": 0,
+   "errRps": 375,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 605
+  },
+  {
+   "t": 48.5,
+   "okRps": 0,
+   "errRps": 363,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 585
+  },
+  {
+   "t": 50.5,
+   "okRps": 0,
+   "errRps": 387,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 617
+  },
+  {
+   "t": 52.5,
+   "okRps": 0,
+   "errRps": 347,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 599
+  },
+  {
+   "t": 54.5,
+   "okRps": 0,
+   "errRps": 354,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 590
+  },
+  {
+   "t": 56.5,
+   "okRps": 0,
+   "errRps": 355,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 601
+  },
+  {
+   "t": 58.5,
+   "okRps": 0,
+   "errRps": 381,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 585
+  }
+ ],
+ "errors": {
+  "queueFull": 12174,
+  "timeout": 4092
+ },
+ "trace": {
+  "id": 21684,
+  "client": "Users",
+  "write": false,
+  "key": 39,
+  "ok": false,
+  "reason": "queueFull",
+  "latencyMs": 2580.399999999994,
+  "attempts": 5,
+  "spans": [
+   {
+    "node": "lb",
+    "label": "Load Balancer",
+    "kind": "loadBalancer",
+    "depth": 0,
+    "attempt": 1,
+    "at": 40,
+    "start": 40,
+    "end": 50.19999999999709,
+    "ok": false,
+    "reason": "queueFull"
+   },
+   {
+    "node": "app3",
+    "label": "App Server",
+    "kind": "appServer",
+    "depth": 1,
+    "attempt": 1,
+    "at": 45.19999999999709,
+    "start": 45.19999999999709,
+    "end": 45.19999999999709,
+    "ok": false,
+    "reason": "queueFull"
+   },
+   {
+    "node": "lb",
+    "label": "Load Balancer",
+    "kind": "loadBalancer",
+    "depth": 0,
+    "attempt": 2,
+    "at": 130.1999999999971,
+    "start": 130.1999999999971,
+    "end": 2178.4381230499785,
+    "ok": true
+   },
+   {
+    "node": "app3",
+    "label": "App Server",
+    "kind": "appServer",
+    "depth": 1,
+    "attempt": 2,
+    "at": 135.39999999999418,
+    "start": 2140.2623542120273,
+    "end": 2173.4381230499785,
+    "ok": true
+   },
+   {
+    "node": "lb",
+    "label": "Load Balancer",
+    "kind": "loadBalancer",
+    "depth": 0,
+    "attempt": 3,
+    "at": 930.1999999999971,
+    "start": 930.1999999999971,
+    "end": 2586.620059761546,
+    "ok": false,
+    "open": true
+   },
+   {
+    "node": "app3",
+    "label": "App Server",
+    "kind": "appServer",
+    "depth": 1,
+    "attempt": 3,
+    "at": 935.3999999999942,
+    "start": 935.3999999999942,
+    "end": 2586.620059761546,
+    "ok": false,
+    "open": true
+   },
+   {
+    "node": "lb",
+    "label": "Load Balancer",
+    "kind": "loadBalancer",
+    "depth": 0,
+    "attempt": 4,
+    "at": 1730.199999999997,
+    "start": 1730.199999999997,
+    "end": 2586.620059761546,
+    "ok": false,
+    "open": true
+   },
+   {
+    "node": "app1",
+    "label": "App Server",
+    "kind": "appServer",
+    "depth": 1,
+    "attempt": 4,
+    "at": 1735.3999999999942,
+    "start": 1735.3999999999942,
+    "end": 2586.620059761546,
+    "ok": false,
+    "open": true
+   },
+   {
+    "node": "db",
+    "label": "Database",
+    "kind": "database",
+    "depth": 2,
+    "attempt": 2,
+    "at": 2160.928100461133,
+    "start": 2160.928100461133,
+    "end": 2168.4381230499785,
+    "ok": true
+   },
+   {
+    "node": "lb",
+    "label": "Load Balancer",
+    "kind": "loadBalancer",
+    "depth": 0,
+    "attempt": 5,
+    "at": 2530.199999999997,
+    "start": 2530.199999999997,
+    "end": 2540.399999999994,
+    "ok": false,
+    "reason": "queueFull"
+   },
+   {
+    "node": "app3",
+    "label": "App Server",
+    "kind": "appServer",
+    "depth": 1,
+    "attempt": 5,
+    "at": 2535.399999999994,
+    "start": 2535.399999999994,
+    "end": 2535.399999999994,
+    "ok": false,
+    "reason": "queueFull"
+   }
+  ]
+ }
+}

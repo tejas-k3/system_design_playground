@@ -1,0 +1,315 @@
+{
+ "durationSec": 60,
+ "series": [
+  {
+   "t": 0.5,
+   "okRps": 43,
+   "errRps": 0,
+   "p50": 129.68750069215938,
+   "p95": 163.85735318367924,
+   "successRate": 1,
+   "inFlight": 15
+  },
+  {
+   "t": 2.5,
+   "okRps": 100,
+   "errRps": 0,
+   "p50": 128.56940546132955,
+   "p95": 162.25445185803096,
+   "successRate": 1,
+   "inFlight": 20
+  },
+  {
+   "t": 4.5,
+   "okRps": 117,
+   "errRps": 0,
+   "p50": 125.86113399258193,
+   "p95": 164.48987952505558,
+   "successRate": 1,
+   "inFlight": 13
+  },
+  {
+   "t": 6.5,
+   "okRps": 110,
+   "errRps": 0,
+   "p50": 130.60288366046188,
+   "p95": 174.5114362892018,
+   "successRate": 1,
+   "inFlight": 19
+  },
+  {
+   "t": 8.5,
+   "okRps": 120,
+   "errRps": 0,
+   "p50": 127.36387552675478,
+   "p95": 167.7857603902703,
+   "successRate": 1,
+   "inFlight": 16
+  },
+  {
+   "t": 10.5,
+   "okRps": 112,
+   "errRps": 0,
+   "p50": 125.78565485036233,
+   "p95": 172.09550415094964,
+   "successRate": 1,
+   "inFlight": 12
+  },
+  {
+   "t": 12.5,
+   "okRps": 121,
+   "errRps": 0,
+   "p50": 130.65010576325767,
+   "p95": 161.40088219613244,
+   "successRate": 1,
+   "inFlight": 20
+  },
+  {
+   "t": 14.5,
+   "okRps": 143,
+   "errRps": 0,
+   "p50": 123.79811873838844,
+   "p95": 175.13457329634184,
+   "successRate": 1,
+   "inFlight": 20
+  },
+  {
+   "t": 16.5,
+   "okRps": 113,
+   "errRps": 0,
+   "p50": 126.77877488286504,
+   "p95": 187.86608984093982,
+   "successRate": 1,
+   "inFlight": 18
+  },
+  {
+   "t": 18.5,
+   "okRps": 139,
+   "errRps": 0,
+   "p50": 129.5879179344156,
+   "p95": 175.71202383888885,
+   "successRate": 1,
+   "inFlight": 13
+  },
+  {
+   "t": 20.5,
+   "okRps": 84,
+   "errRps": 0,
+   "p50": 121.17209943359921,
+   "p95": 158.68743603111216,
+   "successRate": 1,
+   "inFlight": 31
+  },
+  {
+   "t": 22.5,
+   "okRps": 0,
+   "errRps": 122,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 115
+  },
+  {
+   "t": 24.5,
+   "okRps": 0,
+   "errRps": 114,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 11
+  },
+  {
+   "t": 26.5,
+   "okRps": 0,
+   "errRps": 127,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 7
+  },
+  {
+   "t": 28.5,
+   "okRps": 0,
+   "errRps": 110,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 17
+  },
+  {
+   "t": 30.5,
+   "okRps": 0,
+   "errRps": 124,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 13
+  },
+  {
+   "t": 32.5,
+   "okRps": 0,
+   "errRps": 119,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 14
+  },
+  {
+   "t": 34.5,
+   "okRps": 0,
+   "errRps": 105,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 13
+  },
+  {
+   "t": 36.5,
+   "okRps": 0,
+   "errRps": 112,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 13
+  },
+  {
+   "t": 38.5,
+   "okRps": 0,
+   "errRps": 122,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 9
+  },
+  {
+   "t": 40.5,
+   "okRps": 0,
+   "errRps": 119,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 14
+  },
+  {
+   "t": 42.5,
+   "okRps": 0,
+   "errRps": 119,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 10
+  },
+  {
+   "t": 44.5,
+   "okRps": 0,
+   "errRps": 123,
+   "p50": 0,
+   "p95": 0,
+   "successRate": 0,
+   "inFlight": 10
+  },
+  {
+   "t": 46.5,
+   "okRps": 122,
+   "errRps": 0,
+   "p50": 130.5953937946324,
+   "p95": 161.202637449358,
+   "successRate": 1,
+   "inFlight": 11
+  },
+  {
+   "t": 48.5,
+   "okRps": 137,
+   "errRps": 0,
+   "p50": 130.79296248383616,
+   "p95": 179.29050940299203,
+   "successRate": 1,
+   "inFlight": 25
+  },
+  {
+   "t": 50.5,
+   "okRps": 121,
+   "errRps": 0,
+   "p50": 132.40490926802158,
+   "p95": 167.08537544542196,
+   "successRate": 1,
+   "inFlight": 16
+  },
+  {
+   "t": 52.5,
+   "okRps": 133,
+   "errRps": 0,
+   "p50": 126.71647955046501,
+   "p95": 164.19754683825158,
+   "successRate": 1,
+   "inFlight": 11
+  },
+  {
+   "t": 54.5,
+   "okRps": 95,
+   "errRps": 0,
+   "p50": 131.49274128561956,
+   "p95": 172.81444954486506,
+   "successRate": 1,
+   "inFlight": 18
+  },
+  {
+   "t": 56.5,
+   "okRps": 137,
+   "errRps": 0,
+   "p50": 126.15090311852691,
+   "p95": 164.92403250109783,
+   "successRate": 1,
+   "inFlight": 9
+  },
+  {
+   "t": 58.5,
+   "okRps": 114,
+   "errRps": 0,
+   "p50": 125.97081095229805,
+   "p95": 178.79867868198198,
+   "successRate": 1,
+   "inFlight": 21
+  }
+ ],
+ "errors": {
+  "queueFull": 2795,
+  "timeout": 132
+ },
+ "trace": {
+  "id": 5332,
+  "client": "Users",
+  "write": false,
+  "key": 64,
+  "ok": false,
+  "reason": "queueFull",
+  "latencyMs": 90.19999999999709,
+  "attempts": 1,
+  "spans": [
+   {
+    "node": "lb",
+    "label": "Load Balancer",
+    "kind": "loadBalancer",
+    "depth": 0,
+    "attempt": 1,
+    "at": 40,
+    "start": 40,
+    "end": 50.19999999999709,
+    "ok": false,
+    "reason": "queueFull"
+   },
+   {
+    "node": "app2",
+    "label": "App Server",
+    "kind": "appServer",
+    "depth": 1,
+    "attempt": 1,
+    "at": 45.19999999999709,
+    "start": 45.19999999999709,
+    "end": 45.19999999999709,
+    "ok": false,
+    "reason": "queueFull"
+   }
+  ]
+ }
+}

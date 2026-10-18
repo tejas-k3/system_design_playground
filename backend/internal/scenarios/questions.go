@@ -1,16 +1,21 @@
 package scenarios
 
 import (
+	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"sort"
+
+	"sysdesign/internal/engine"
 )
 
 // Question modes beyond fixing a broken design. Each question is graded on the server and its answer key is
 // never serialised, so nothing the client can fetch reveals it before the learner commits.
 const (
 	ModeEstimate = "estimate"
+	ModeDiagnose = "diagnose"
 )
 
 // Verdicts for one estimated number.
@@ -44,6 +49,91 @@ type Question struct {
 	Prompt     string          `json:"prompt"`
 	Facts      []Fact          `json:"facts,omitempty"`
 	Fields     []EstimateField `json:"fields,omitempty"`
+	Options    []string        `json:"options,omitempty"`  // diagnose: the candidate explanations
+	Symptoms   *Symptoms       `json:"symptoms,omitempty"` // diagnose: what the learner gets to look at
+
+	source      diagSource // where the symptoms come from, so a test can regenerate them
+	answer      int        // diagnose: index of the right option
+	explanation string     // diagnose: why, shown only after answering
+}
+
+// Symptoms are what a monitoring page and one trace would show during an incident. They are generated from a
+// seeded run of a real challenge's starting design (see GenerateSymptoms), never typed in.
+type Symptoms struct {
+	DurationSec float64              `json:"durationSec"`
+	Series      []engine.SeriesPoint `json:"series"` // one point every 2 simulated seconds
+	Errors      map[string]int       `json:"errors"` // failure counts by reason id
+	Trace       *engine.TraceOut     `json:"trace"`  // the first failed request
+}
+
+type diagSource struct {
+	ScenarioID  string
+	Seed        uint32
+	DurationSec float64
+}
+
+//go:embed fixtures/*.json
+var fixtureFS embed.FS
+
+func loadSymptoms(id string) *Symptoms {
+	b, err := fixtureFS.ReadFile("fixtures/diagnose-" + id + ".json")
+	if err != nil {
+		return nil
+	}
+	var s Symptoms
+	if json.Unmarshal(b, &s) != nil {
+		return nil
+	}
+	return &s
+}
+
+// GenerateSymptoms runs a challenge's starting design with a seed and records what an operator would see.
+func GenerateSymptoms(src diagSource) (*Symptoms, error) {
+	sc := Get(src.ScenarioID)
+	if sc == nil {
+		return nil, fmt.Errorf("no scenario %q", src.ScenarioID)
+	}
+	sim := engine.New(sc.Diagram, sc.Options(src.Seed))
+	sim.EnableTraces(true)
+	for sim.Now() < src.DurationSec*1000 && !sim.Finished() {
+		sim.Advance(100)
+	}
+	st := sim.Snapshot()
+	out := &Symptoms{DurationSec: src.DurationSec, Errors: st.Global.Run.Errors}
+	for i, p := range st.Series {
+		if i%4 == 0 {
+			out.Series = append(out.Series, p)
+		}
+	}
+	if f := sim.Traces().Failed; len(f) > 0 {
+		out.Trace = &f[0]
+	}
+	if out.Errors == nil {
+		out.Errors = map[string]int{}
+	}
+	return out, nil
+}
+
+type ChoiceResult struct {
+	Correct bool   `json:"correct"`
+	Answer  int    `json:"answer"`
+	Explain string `json:"explain"`
+	Stars   int    `json:"stars"`
+}
+
+// GradeChoice grades a multiple-choice diagnosis. The right answer is revealed with the result either way.
+func (q *Question) GradeChoice(choice int) (ChoiceResult, error) {
+	if q.Mode != ModeDiagnose {
+		return ChoiceResult{}, errors.New("not a multiple-choice question")
+	}
+	if choice < 0 || choice >= len(q.Options) {
+		return ChoiceResult{}, fmt.Errorf("choose one of the %d options", len(q.Options))
+	}
+	r := ChoiceResult{Correct: choice == q.answer, Answer: q.answer, Explain: q.explanation}
+	if r.Correct {
+		r.Stars = 3
+	}
+	return r, nil
 }
 
 type FieldResult struct {

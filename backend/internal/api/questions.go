@@ -33,7 +33,8 @@ func (s *Server) getQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 type answerReq struct {
-	Answers map[string]float64 `json:"answers"`
+	Answers map[string]float64 `json:"answers"` // estimate questions
+	Choice  *int               `json:"choice"`  // multiple-choice questions
 }
 
 // answerQuestion grades a submission. Only now do the expected values and workings leave the server.
@@ -47,8 +48,21 @@ func (s *Server) answerQuestion(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if q.Mode != scenarios.ModeEstimate {
-		writeErr(w, 400, "this kind of question is not answered with numbers")
+	if q.Mode == scenarios.ModeDiagnose {
+		if req.Choice == nil {
+			writeErr(w, 400, "choose one of the options")
+			return
+		}
+		res, err := q.GradeChoice(*req.Choice)
+		if err != nil {
+			writeErr(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, res)
+		return
+	}
+	if q.Mode != scenarios.ModeEstimate || req.Choice != nil {
+		writeErr(w, 400, "this kind of question is not answered that way")
 		return
 	}
 	res, err := q.GradeEstimate(req.Answers)
