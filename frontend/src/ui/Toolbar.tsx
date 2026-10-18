@@ -117,6 +117,9 @@ export function Toolbar() {
       <button onClick={() => setUi({ capacity: true })} title="Capacity curve: how much more traffic can this take?" aria-label="Capacity curve">
         <Icon d="M4 20V4M4 20h16M7 16l4-5 3 3 5-8" />
       </button>
+      <button onClick={() => (useStore.getState().interview?.session ? document.getElementById(`stage-${useStore.getState().interview!.session!.stage}`)?.focus() : useStore.getState().startInterview(45))} title="Interview mode: a 45-minute mock interview in seven stages" aria-label="Interview mode">
+        <Icon d="M12 3a4 4 0 100 8 4 4 0 000-8zM5 21a7 7 0 0114 0" />
+      </button>
       <button onClick={() => setUi({ compare: true })} title="Compare two designs side by side" aria-label="Compare designs">
         <Icon d="M9 4v16M15 4v16M4 8h5M15 16h5" />
       </button>

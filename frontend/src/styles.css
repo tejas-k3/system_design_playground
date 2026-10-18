@@ -251,3 +251,9 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .candidate { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; } .candidate label { flex: 1; }
 .review-node.found { border-left-color: #2f9e44; } .review-node.missed { border-left-color: var(--bad); border-left-style: dashed; } .review-node.false { border-left-color: var(--warn); border-left-style: dotted; }
 .review-node details { margin: 2px 0 2px 24px; }
+
+.interview-bar { background: var(--panel2); border-bottom: 1px solid var(--line); padding: 6px 10px 8px; }
+.iv-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .stages { flex: 1; overflow-x: auto; }
+.stages button { white-space: nowrap; }
+.iv-clock { font-family: var(--mono); font-weight: 600; font-size: 20px; min-width: 70px; text-align: center; font-variant-numeric: tabular-nums; }
+.iv-prompt { margin: 6px 2px 0; font-size: 13.5px; }
