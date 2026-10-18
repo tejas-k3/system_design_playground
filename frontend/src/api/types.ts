@@ -314,3 +314,32 @@ export type ClientMsg =
   | { type: 'traces' }
   | { type: 'nodeSeries'; nodeId: string }
   | { type: 'crash' | 'restart'; nodeId: string }
+
+export interface QuestionSummary {
+  id: string
+  title: string
+  mode: string
+  difficulty: string
+  summary: string
+}
+export interface QuestionField {
+  key: string
+  label: string
+  unit: string
+}
+export interface Question extends QuestionSummary {
+  prompt: string
+  facts?: { label: string; value: string }[]
+  fields?: QuestionField[]
+}
+export interface EstimateFieldResult extends QuestionField {
+  given: number
+  expected: number
+  verdict: 'good' | 'close' | 'off'
+  explain: string
+}
+export interface EstimateResult {
+  fields: EstimateFieldResult[]
+  score: number
+  stars: number
+}

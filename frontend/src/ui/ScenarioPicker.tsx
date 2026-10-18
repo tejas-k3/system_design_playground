@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { fetchScenarios } from '../api/client'
-import type { ScenarioSummary } from '../api/types'
+import { fetchQuestions, fetchScenarios } from '../api/client'
+import type { QuestionSummary, ScenarioSummary } from '../api/types'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
@@ -15,10 +15,12 @@ export function ScenarioPicker() {
   const active = useStore((s) => s.scenario?.def.id)
   const exit = useStore((s) => s.exitScenario)
   const [list, setList] = useState<ScenarioSummary[] | null>(null)
+  const [questions, setQuestions] = useState<QuestionSummary[]>([])
   const [err, setErr] = useState('')
   useEffect(() => {
     if (!open) return
     fetchScenarios().then(setList).catch((e: Error) => setErr(e.message))
+    fetchQuestions().then(setQuestions).catch(() => setQuestions([]))
   }, [open])
   useEscapeKey(open, () => setUi({ picker: false }))
   if (!open) return null
@@ -51,6 +53,21 @@ export function ScenarioPicker() {
             </section>
           )
         })}
+        {questions.length > 0 && (
+          <section aria-label="Questions">
+            <h3>Questions</h3>
+            <p className="muted small">No design to fix: answer, then see how the numbers work out.</p>
+            <div className="cards">
+              {questions.map((q) => (
+                <button key={q.id} className="card" onClick={() => setUi({ picker: false, question: q.id })}>
+                  <span className="card-top"><b>{q.title}</b><Stars n={progress[q.id] ?? 0} size={14} /></span>
+                  <small>{q.summary}</small>
+                  <em>{q.mode === 'estimate' ? 'estimate' : q.mode}</em>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="row-btns end">
           <button onClick={() => { reset(); exit(); setUi({ picker: false }) }}>{active ? 'Back to sandbox' : 'Close'}</button>
         </div>

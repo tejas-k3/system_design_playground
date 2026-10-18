@@ -48,7 +48,7 @@ export interface State {
   cost: number | null // null until the server has priced the current diagram
   scenario: ScenarioState | null
   sandbox: Diagram | null // sandbox saved while a scenario is open
-  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; compare: boolean }
+  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; compare: boolean; question: string | null }
   toasts: Toast[]
   connection: Connection
   past: Diagram[]
@@ -89,6 +89,7 @@ export interface State {
   setCost(c: number): void
   setFindings(f: Finding[]): void
   setPinned(d: Diagram | null): void
+  recordStars(id: string, stars: number): void
   setConnection(c: Connection): void
   toast(text: string, kind?: Toast['kind'], ms?: number): void
   dismissToast(id: number): void
@@ -144,7 +145,7 @@ export const useStore = create<State>()((set, get) => {
     cost: null,
     scenario: null,
     sandbox: null,
-    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, compare: false },
+    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, compare: false, question: null },
     toasts: [],
     connection: 'connecting',
     past: [],
@@ -287,6 +288,7 @@ export const useStore = create<State>()((set, get) => {
     setNodeSeries: (nodeSeries) => set({ nodeSeries }),
     setCost: (cost) => set({ cost }),
     setFindings: (findings) => set({ findings }),
+    recordStars: (id, stars) => set((s) => ((s.progress[id] ?? 0) >= stars ? {} : { progress: { ...s.progress, [id]: stars } })),
     setPinned: (pinned) => set({ pinned: pinned ? structuredClone(pinned) : null }),
     setConnection: (connection) => set({ connection }),
 

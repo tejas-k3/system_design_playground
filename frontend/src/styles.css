@@ -222,3 +222,5 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .compare-charts { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; } .overlay { width: 270px; color: var(--text, inherit); }
 .compare-table td { text-align: right; }
 .overlay-fig { margin: 0; }
+
+.workings { font-size: 13px; padding-left: 18px; } .workings li { margin-bottom: 4px; }
