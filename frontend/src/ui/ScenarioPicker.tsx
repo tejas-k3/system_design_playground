@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchQuestions, fetchScenarios } from '../api/client'
 import type { QuestionSummary, ScenarioSummary } from '../api/types'
+import { MODE_FILTERS, modeOfQuestion, modeOfScenario, showsMode, type ModeFilter } from '../model/questions'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
@@ -17,6 +18,7 @@ export function ScenarioPicker() {
   const [list, setList] = useState<ScenarioSummary[] | null>(null)
   const [questions, setQuestions] = useState<QuestionSummary[]>([])
   const [err, setErr] = useState('')
+  const [filter, setFilter] = useState<ModeFilter>('all')
   useEffect(() => {
     if (!open) return
     fetchScenarios().then(setList).catch((e: Error) => setErr(e.message))
@@ -33,10 +35,13 @@ export function ScenarioPicker() {
           <button className="x" autoFocus onClick={() => setUi({ picker: false })} aria-label="Close">×</button>
         </header>
         <p className="muted small">Each challenge starts with a broken system. Change it until it meets the goals. Earn up to three stars. <em>config only</em> means {CONFIG_ONLY_HELP.charAt(0).toLowerCase() + CONFIG_ONLY_HELP.slice(1)}</p>
+        <div className="seg" role="group" aria-label="Kind of exercise">
+          {MODE_FILTERS.map((f) => <button key={f.id} aria-pressed={filter === f.id} className={filter === f.id ? 'on' : ''} onClick={() => setFilter(f.id)}>{f.label}</button>)}
+        </div>
         {err && <p className="bad">{err}</p>}
         {!list && !err && <p className="muted">Loading…</p>}
         {groups.map((g) => {
-          const items = list?.filter((s) => s.difficulty === g) ?? []
+          const items = list?.filter((s) => s.difficulty === g && showsMode(filter, modeOfScenario(s))) ?? []
           if (!items.length) return null
           return (
             <section key={g}>
@@ -54,12 +59,12 @@ export function ScenarioPicker() {
             </section>
           )
         })}
-        {questions.length > 0 && (
+        {questions.filter((q) => showsMode(filter, modeOfQuestion(q))).length > 0 && (
           <section aria-label="Questions">
             <h3>Questions</h3>
             <p className="muted small">No design to fix: answer, then see how the numbers work out.</p>
             <div className="cards">
-              {questions.map((q) => (
+              {questions.filter((q) => showsMode(filter, modeOfQuestion(q))).map((q) => (
                 <button key={q.id} className="card" onClick={() => setUi({ picker: false, question: q.id })}>
                   <span className="card-top"><b>{q.title}</b><Stars n={progress[q.id] ?? 0} size={14} /></span>
                   <small>{q.summary}</small>

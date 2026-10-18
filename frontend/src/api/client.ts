@@ -1,4 +1,4 @@
-import type { ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { BuildResult, ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -74,5 +74,10 @@ export async function runCandidate(id: string, candidate: number): Promise<RunSu
 
 export async function submitReview(id: string, marked: string[]): Promise<ReviewResult> {
   const res = await fetch(`/api/questions/${encodeURIComponent(id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marked }) })
+  return json(res)
+}
+
+export async function buildEstimate(id: string, answers: Record<string, number>): Promise<BuildResult> {
+  const res = await fetch(`/api/questions/${encodeURIComponent(id)}/build`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers }) })
   return json(res)
 }

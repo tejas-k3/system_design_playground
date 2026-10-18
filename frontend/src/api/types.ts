@@ -364,7 +364,15 @@ export interface ReviewResult {
   score: number
   stars: number
 }
+export interface BuildResult {
+  servers: number
+  rightServers: number
+  yours: RunSummary
+  rightSized: RunSummary
+  verdict: 'under' | 'right' | 'over'
+}
 export interface Question extends QuestionSummary {
+  buildHint?: string
   diagram?: Diagram
   candidates?: { label: string; detail: string }[]
   prompt: string

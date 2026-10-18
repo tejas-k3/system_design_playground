@@ -37,3 +37,21 @@ describe('verdictLabel', () => {
     expect(verdictLabel('off')).toBe('Off by more than 2×')
   })
 })
+
+import { MODE_FILTERS, modeOfQuestion, modeOfScenario, showsMode } from './questions'
+
+describe('mode filter', () => {
+  it('knows the mode of a challenge and of a question', () => {
+    expect(modeOfScenario({ open: true })).toBe('open')
+    expect(modeOfScenario({})).toBe('fix')
+    expect(modeOfQuestion({ mode: 'tradeoff' })).toBe('tradeoff')
+  })
+  it('shows everything under All and only the chosen mode otherwise', () => {
+    expect(showsMode('all', 'review')).toBe(true)
+    expect(showsMode('review', 'review')).toBe(true)
+    expect(showsMode('review', 'fix')).toBe(false)
+  })
+  it('names every filter in words', () => {
+    expect(MODE_FILTERS.map((f) => f.label)).toEqual(['All', 'Fix a design', 'Build from scratch', 'Estimate', 'Diagnose', 'Trade-off', 'Review'])
+  })
+})
