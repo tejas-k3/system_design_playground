@@ -152,3 +152,25 @@ describe('edge bandwidth in the sanitizer', () => {
     expect(sanitizeDiagram(reg, { ...base, edges: [edge(1e9)] })?.diagram.edges[0].bandwidthMbps).toBe(100000)
   })
 })
+
+describe('edge loss and jitter in the sanitizer', () => {
+  const base = { nodes: [{ id: 'u', kind: 'client', x: 0, y: 0, label: 'U', params: {} }, { id: 'a', kind: 'appServer', x: 1, y: 1, label: 'A', params: {} }], notes: [] }
+  const edge = (extra: Record<string, unknown>) => ({ id: 'u>a', from: 'u', to: 'a', latencyMs: 40, ...extra })
+  it('keeps valid values and omits zeros', () => {
+    const e = sanitizeDiagram(reg, { ...base, edges: [edge({ lossPct: 5, jitterMs: 30 })] })?.diagram.edges[0]
+    expect(e?.lossPct).toBe(5)
+    expect(e?.jitterMs).toBe(30)
+    const z = sanitizeDiagram(reg, { ...base, edges: [edge({ lossPct: 0, jitterMs: 0 })] })?.diagram.edges[0]
+    expect(z?.lossPct).toBeUndefined()
+    expect(z?.jitterMs).toBeUndefined()
+  })
+  it('clamps loss to 0-100 and jitter to 1,000 ms, and drops nonsense', () => {
+    const e = sanitizeDiagram(reg, { ...base, edges: [edge({ lossPct: 400, jitterMs: 1e9 })] })
+    expect(e?.diagram.edges[0].lossPct).toBe(100)
+    expect(e?.diagram.edges[0].jitterMs).toBe(1000)
+    expect(e?.adjusted).toBe(true)
+    const bad = sanitizeDiagram(reg, { ...base, edges: [edge({ lossPct: -2, jitterMs: 'x' })] })
+    expect(bad?.diagram.edges[0].lossPct).toBeUndefined()
+    expect(bad?.diagram.edges[0].jitterMs).toBeUndefined()
+  })
+})

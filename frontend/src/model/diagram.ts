@@ -135,6 +135,12 @@ export function sanitizeDiagram(reg: Reg, raw: unknown): { diagram: Diagram; adj
       if (num(e.bandwidthMbps) && e.bandwidthMbps > 0) out.bandwidthMbps = Math.min(100000, e.bandwidthMbps)
       if (out.bandwidthMbps !== e.bandwidthMbps) adjusted = true
     }
+    for (const [k, max] of [['lossPct', 100], ['jitterMs', 1000]] as const) {
+      const v = e[k]
+      if (v === undefined || v === 0) continue
+      if (num(v) && v > 0) out[k] = Math.min(max, v)
+      if (out[k] !== v) adjusted = true
+    }
     edges.push(out)
   }
   const notes = []
