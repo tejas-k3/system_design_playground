@@ -761,6 +761,36 @@ func init() {
 		Debrief: "Eviction policy is a bet about the future. LRU assumes recent means useful, which a scan breaks; FIFO ignores use altogether; LFU assumes frequent means useful, which resists scans (but can hold stale favourites). Real systems often add scan-resistant variants or keep crawler traffic out of the cache.",
 	})
 
+	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
+	uploads := func(fixed bool) engine.Diagram {
+		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
+			n("app1", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("q", engine.KQueue, cols[2], rowTop, nil).
+			n("w", engine.KWorker, cols[3], rowTop, P{"concurrency": 8.0, "processMs": 40.0}).
+			n("db", engine.KDatabase, cols[4], rowTop, nil).
+			e("users", "app1").e("app1", "q").e("q", "w").e("w", "db")
+		if fixed {
+			b.n("files", engine.KObjectStore, cols[2], rowBot, nil).e("app1", "files")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "upload-500kb", Title: "The 500 KB upload", Difficulty: "Medium",
+		Summary: "Every upload is refused by the queue. Why?",
+		Story:   "Users upload photos of about 500 KB. The app server hands each upload to a message queue, and workers store it. Since the launch, nearly every upload fails and the queue is nearly empty. The queue's limit on message size is set by your provider and cannot be changed.",
+		Diagram: uploads(false), Solution: uploads(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(800), MaxCostPerHour: f(0.9)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Open the failure breakdown. What is the reason, and what does the queue's own setting say about message size?",
+			"A queue is for small messages (managed queues commonly stop at 256 KB). Where should a 500 KB body live instead?",
+			"Add an Object Store and connect the app server to it. The app uploads the body there and queues only a pointer (the claim-check pattern).",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A queue accepts messages up to 256 KB. Users upload 500 KB files. What is the standard fix?", Options: []string{"Raise the queue's size limit", "Retry the failed uploads", "Store the file elsewhere and queue a pointer to it"}, Answer: 2,
+			Explain: "Queues and databases are built for small records. Large bodies go to an object store; what travels through the queue is a reference to it."}},
+		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes retries cheap, because a retry re-sends a pointer, not 500 KB.",
+	})
+
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).

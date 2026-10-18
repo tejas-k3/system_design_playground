@@ -151,7 +151,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				num("cpuMs", "CPU time", "Capacity", 20, 1, 500, 1, "ms", "Compute per request, not counting time waiting on dependencies.").fixed(),
@@ -245,7 +245,7 @@ func init() {
 			Accent: "#7048e8", Width: 160, Height: 72, CanConnect: []string{KWorker},
 			Params: []ParamSpec{
 				num("capacity", "Capacity", "Buffer", 5000, 10, 100000, 100, "jobs", "Jobs it can hold before rejecting."),
-				num("maxMessageKB", "Largest message", "Buffer", 256, 1, 10240, 1, "KB", "Messages above this size are refused (managed queues commonly allow 256 KB; a log, 1 MB). Only applies when the users' request size is set. Store big bodies elsewhere and queue a pointer.").adv(),
+				num("maxMessageKB", "Largest message", "Buffer", 256, 1, 10240, 1, "KB", "Messages above this size are refused (managed queues commonly allow 256 KB; a log, 1 MB). Only applies when the users' request size is set. Store big bodies elsewhere and queue a pointer.").adv().fixed(),
 			},
 			cost: func(Params) float64 { return 0.04 },
 		},
@@ -302,6 +302,17 @@ func init() {
 					opt("writes", "Writes"), opt("all", "Everything")),
 			},
 			cost: func(Params) float64 { return 0 },
+		},
+		{
+			Kind: KObjectStore, Name: "Object Store", Description: "Cheap, huge, durable storage for big bodies: uploads, images, video.",
+			Lesson: "Put the bytes here and pass a pointer: queues and databases are not made for large files.",
+			Accent: "#2b8a3e", Width: 160, Height: 72, CanConnect: nil,
+			Params: []ParamSpec{
+				num("firstByteMs", "Time to first byte", "Speed", 30, 1, 2000, 5, "ms", "How long before an upload starts being accepted."),
+				num("throughputMBps", "Throughput per upload", "Speed", 50, 1, 2000, 5, "MB/s", "How fast one upload's body is written once it has started."),
+				num("maxConcurrent", "Uploads at once", "Capacity", 1000, 1, 100000, 10, "", "Uploads it handles at the same time; beyond it, new ones are refused.").adv(),
+			},
+			cost: func(Params) float64 { return 0.03 },
 		},
 		{
 			Kind: KRedis, Name: "Redis", Description: "A fast single-threaded store for locks, geo lookups and leaderboards.",
@@ -397,6 +408,7 @@ var latencyRules = []LatencyRule{
 	{From: KClient, Ms: 40},
 	{From: KCDN, Ms: 40},
 	{To: KExternalAPI, Ms: 20},
+	{To: KObjectStore, Ms: 20},
 	{Ms: 5},
 }
 

@@ -188,7 +188,7 @@ func Lint(d Diagram) []Finding {
 	if biggest > 0 {
 		var small []string
 		for _, n := range d.Nodes {
-			if n.Kind == KQueue && pf(res[n.ID], "maxMessageKB", 256) < biggest {
+			if n.Kind == KQueue && pf(res[n.ID], "maxMessageKB", 256) < biggest && !claimChecked(d, kind, n.ID) {
 				small = append(small, n.ID)
 			}
 		}
@@ -237,4 +237,26 @@ func Lint(d Diagram) []Finding {
 		add("unreachable-store", "error", "This component never reaches a data store, so it cannot serve a real request.", "Connect it to a database, cache or queue.", n.ID)
 	}
 	return fs
+}
+
+// claimChecked reports whether every app server that feeds this queue also uploads to an object store, which makes
+// what it queues a pointer instead of the body (the claim-check pattern).
+func claimChecked(d Diagram, kind map[string]string, queue string) bool {
+	feeders := 0
+	for _, e := range d.Edges {
+		if e.To != queue || kind[e.From] != KAppServer {
+			continue
+		}
+		feeders++
+		hasStore := false
+		for _, x := range d.Edges {
+			if x.From == e.From && kind[x.To] == KObjectStore {
+				hasStore = true
+			}
+		}
+		if !hasStore {
+			return false
+		}
+	}
+	return feeders > 0
 }

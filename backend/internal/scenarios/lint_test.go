@@ -36,6 +36,7 @@ func TestLintFindsTheFaultEachChallengeTeaches(t *testing.T) {
 		"cache-stampede":        {"synchronised-expiry"},
 		"charged-twice":         {"retries-without-backoff"},
 		"opening-night":         {"spof-database"},
+		"upload-500kb":          {"large-payload-into-queue"},
 	}
 	for id, rules := range want {
 		got := lintRules(Get(id).Diagram)
@@ -46,7 +47,7 @@ func TestLintFindsTheFaultEachChallengeTeaches(t *testing.T) {
 		}
 	}
 	// and the fix removes the finding that names it
-	gone := map[string]string{"retry-pileup": "retries-without-backoff", "connection-crunch": "pool-exceeds-db", "fence-the-old-primary": "unfenced-failover", "cut-off": "no-call-timeout", "cache-stampede": "synchronised-expiry"}
+	gone := map[string]string{"retry-pileup": "retries-without-backoff", "connection-crunch": "pool-exceeds-db", "fence-the-old-primary": "unfenced-failover", "cut-off": "no-call-timeout", "cache-stampede": "synchronised-expiry", "upload-500kb": "large-payload-into-queue"}
 	for id, r := range gone {
 		if _, ok := lintRules(Get(id).Solution)[r]; ok {
 			t.Errorf("%s solution still triggers %s", id, r)
