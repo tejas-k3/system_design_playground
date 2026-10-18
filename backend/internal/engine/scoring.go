@@ -17,6 +17,7 @@ type Goals struct {
 	MaxStaleReadPct  *float64 `json:"maxStaleReadPct,omitempty"` // fraction 0..1
 	MaxDuplicates    *int     `json:"maxDuplicates,omitempty"`
 	MaxLostWrites    *int     `json:"maxLostWrites,omitempty"`
+	MaxLostUpdates   *int     `json:"maxLostUpdates,omitempty"` // transfers that silently overwrote each other
 	StarCostPerHour  *float64 `json:"starCostPerHour,omitempty"`
 	StarP95Ms        *float64 `json:"starP95Ms,omitempty"`
 }
@@ -165,6 +166,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxLostWrites != nil {
 		checks = append(checks, Check{"Writes lost in a crash", fmt.Sprintf("≤ %d", *g.MaxLostWrites), fmt.Sprint(run.LostWrites), run.LostWrites <= *g.MaxLostWrites})
+	}
+	if g.MaxLostUpdates != nil {
+		checks = append(checks, Check{"Lost updates", fmt.Sprintf("≤ %d", *g.MaxLostUpdates), fmt.Sprint(run.LostUpdates), run.LostUpdates <= *g.MaxLostUpdates})
 	}
 	if g.MinJobsCompleted != nil {
 		enq, frac := 0, 1.0
