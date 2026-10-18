@@ -87,6 +87,8 @@ func SanitizeParams(kind string, in Params) (Params, bool) {
 
 // Sanitize validates a diagram: unknown kinds, bad coordinates, duplicate ids and illegal
 // edges are dropped; parameters and latencies are clamped. The result is always safe to run.
+var knownProtocol = map[string]bool{"http": true, "grpc": true, "tcp": true, "ws": true, "sql": true, "custom": true}
+
 func Sanitize(in Diagram) (Diagram, bool) {
 	adjusted := false
 	seen := map[string]bool{}
@@ -154,7 +156,11 @@ func Sanitize(in Diagram) (Diagram, bool) {
 		} else if jit > MaxJitterMs {
 			jit, adjusted = MaxJitterMs, true
 		}
-		out.Edges = append(out.Edges, Edge{ID: e.ID, From: e.From, To: e.To, LatencyMs: lat, BandwidthMbps: bw, LossPct: loss, JitterMs: jit})
+		proto := e.Protocol
+		if proto != "" && !knownProtocol[proto] {
+			proto, adjusted = "", true
+		}
+		out.Edges = append(out.Edges, Edge{ID: e.ID, From: e.From, To: e.To, LatencyMs: lat, BandwidthMbps: bw, LossPct: loss, JitterMs: jit, Protocol: proto, Async: e.Async})
 	}
 	for _, n := range in.Notes {
 		if !finite(n.X) || !finite(n.Y) || !claim(n.ID) {

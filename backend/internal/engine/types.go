@@ -43,6 +43,10 @@ type Edge struct {
 	// row abort the connection). JitterMs adds a random 0..JitterMs to each one-way trip. Both 0 = a perfect link.
 	LossPct  float64 `json:"lossPct,omitempty"`
 	JitterMs float64 `json:"jitterMs,omitempty"`
+	// Protocol and Async are labels for the reader (http, grpc, tcp, ws, sql, custom; a dashed arrow for fire-and-forget
+	// calls). The simulation ignores both.
+	Protocol string `json:"protocol,omitempty"`
+	Async    bool   `json:"async,omitempty"`
 }
 
 type Note struct {
