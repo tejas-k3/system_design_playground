@@ -111,3 +111,15 @@ export function estimateNotes(e: Estimate): string {
     `Servers: ${Number.isFinite(e.servers) ? e.servers : '—'}`,
   ].join('\n')
 }
+
+const QUEUE_LIMIT = 256e3 // SQS-style queues
+const LOG_LIMIT = 1e6 // Kafka-style logs, by default
+
+/** Reminders for a payload that will not fit through a message queue. The numbers are the usual defaults of managed queues and logs. */
+export function payloadWarnings(payloadBytes: number): string[] {
+  if (!Number.isFinite(payloadBytes) || payloadBytes <= QUEUE_LIMIT) return []
+  const size = humanBytes(payloadBytes).replace(/(\d) (KB|MB)/, '$1 $2')
+  const out = [`A ${size} payload is over the 256 KB most managed message queues accept. Put the data in an object store and send a pointer (the claim-check pattern), or the queue will refuse it.`]
+  if (payloadBytes > LOG_LIMIT) out.push('It is also over the 1 MB a Kafka-style log accepts by default; large messages there slow every consumer too.')
+  return out
+}
