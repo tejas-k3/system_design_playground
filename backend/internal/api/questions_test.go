@@ -247,3 +247,42 @@ func TestOpenChallengeHidesItsLoadAndHasNoSolutionToServe(t *testing.T) {
 		t.Fatalf("the witness should pass when scored server-side: status %d %+v", code, run.Score)
 	}
 }
+
+func TestBuildAndTestEndpoint(t *testing.T) {
+	ts := newTestServer(t)
+	var q scenarios.Question
+	get(t, ts.URL+"/api/questions/url-shortener-numbers", &q)
+	if q.BuildHint == "" {
+		t.Fatal("the question should say it can be built and tested")
+	}
+	var r scenarios.BuildResult
+	body := map[string]any{"answers": map[string]float64{"writeQps": 40, "readQps": 400, "peakReadQps": 200, "storageTB": 3}}
+	if code := post(t, ts.URL+"/api/questions/url-shortener-numbers/build", body, &r); code != 200 || r.Verdict != scenarios.BuildUnder || r.Servers != 1 || r.RightServers != 3 {
+		t.Fatalf("a 200 rps estimate should build one server and fail the load: status %d %+v", code, r)
+	}
+	if c := post(t, ts.URL+"/api/questions/url-shortener-numbers/build", map[string]any{"answers": map[string]float64{}}, nil); c != 400 {
+		t.Errorf("no sizing number: %d", c)
+	}
+	if c := post(t, ts.URL+"/api/questions/chat-numbers/build", body, nil); c != 400 {
+		t.Errorf("a question with no build step: %d", c)
+	}
+	if c := post(t, ts.URL+"/api/questions/nope/build", body, nil); c != 404 {
+		t.Errorf("unknown question: %d", c)
+	}
+}
+
+func TestBuildRunsShareTheRunSlots(t *testing.T) {
+	srv := New(Config{MaxRuns: 1})
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	body := map[string]any{"answers": map[string]float64{"writeQps": 40, "readQps": 400, "peakReadQps": 1200, "storageTB": 3}}
+	srv.runSlots <- struct{}{}
+	if c := post(t, ts.URL+"/api/questions/url-shortener-numbers/build", body, nil); c != http.StatusServiceUnavailable {
+		t.Fatalf("status %d, want 503 while a run holds the slot", c)
+	}
+	<-srv.runSlots
+	if c := post(t, ts.URL+"/api/questions/url-shortener-numbers/build", body, nil); c != 200 {
+		t.Fatalf("status %d after the slot freed", c)
+	}
+	waitSlotsFree(t, srv, "the slot was not released after a build")
+}
