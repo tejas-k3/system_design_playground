@@ -4,15 +4,15 @@ import "testing"
 
 func linkDownDesign(mode string) (Diagram, Options) {
 	b := &builder{}
-	b.node("u", KClient, Params{"rps": 40.0, "readPct": 0.0, "timeoutMs": 2000.0}).
-		node("a", KAppServer, Params{"threads": 64.0, "callTimeoutMs": 500.0}).
+	b.node("u", KClient, Params{"rps": 15.0, "readPct": 0.0, "timeoutMs": 2000.0}).
+		node("a", KAppServer, Params{"threads": 64.0, "callTimeoutMs": 500.0, "dbPool": 200.0}).
 		node("db", KDatabase, Params{"connections": 64.0})
 	b.edge("u", "a").edge("a", "db")
 	d, _ := Sanitize(b.d)
 	return d, Options{Seed: 6, Chaos: []ChaosEvent{{Type: "linkDown", NodeID: "a", ToID: "db", Mode: mode, AtSec: 10, DurationSec: 10}}}
 }
 
-func dbDone(s *Sim) int { return s.nodes["db"].c.ok }
+func dbDone(s *Sim) int { return len(s.committed) } // distinct writes the database committed
 
 func TestRepliesLostMeansWorkDoneAndCallerStillFails(t *testing.T) {
 	d, o := linkDownDesign("replies")
@@ -59,7 +59,7 @@ func TestLinkDownWithoutAnEventChangesNothingAndHeals(t *testing.T) {
 			n++
 		}
 	}
-	if late/float64(n) < 30 {
+	if late/float64(n) < 10 {
 		t.Fatalf("after the link heals the service recovers, got %.0f rps", late/float64(n))
 	}
 }
