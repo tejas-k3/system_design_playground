@@ -13,6 +13,7 @@ import { useCanvasSize } from './board/useCanvasSize'
 import { useFitView } from './board/useFitView'
 import { useWheelZoom } from './board/useWheelZoom'
 import { ZoomBadge } from './board/ZoomBadge'
+import { Minimap } from './board/Minimap'
 
 type Mode =
   | { k: 'idle' }
@@ -381,6 +382,7 @@ export function Board() {
       )}
       <NodeOutline />
       <ZoomBadge fit={fitView} by={zoomBy} />
+      <Minimap wrap={wrap} />
     </div>
   )
 }
