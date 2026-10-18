@@ -20,4 +20,10 @@ describe('groupKinds', () => {
   it('omits empty groups', () => {
     expect(groupKinds([])).toEqual([])
   })
+
+  it('puts the object store with the async and external components rather than in Other', () => {
+    const g = groupKinds(['queue', 'objectStore', 'externalApi'])
+    expect(g.find((x) => x.title === 'Async and external')?.kinds).toEqual(['queue', 'objectStore', 'externalApi'])
+    expect(g.find((x) => x.title === 'Other')?.kinds ?? []).toEqual([])
+  })
 })

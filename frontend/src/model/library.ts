@@ -2,7 +2,7 @@ const GROUPS: { title: string; kinds: string[] }[] = [
   { title: 'Traffic', kinds: ['client', 'loadBalancer', 'cdn', 'rateLimiter'] },
   { title: 'Compute', kinds: ['appServer', 'worker'] },
   { title: 'Data', kinds: ['database', 'readReplica', 'cache', 'redis', 'shardRouter'] },
-  { title: 'Async and external', kinds: ['queue', 'externalApi'] },
+  { title: 'Async and external', kinds: ['queue', 'objectStore', 'externalApi'] },
 ]
 
 /** Component kinds grouped for the library panel; the order of `kinds` is kept inside a group and unknown kinds go in 'Other'. */
