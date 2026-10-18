@@ -236,8 +236,8 @@ export function Charts() {
     { label: 'errors', color: p.bad, dash: [5, 3], value: (s) => s.errRps },
   ]
   const latLines: Line[] = [
-    { label: 'p50', color: p.accent, value: (s) => s.p50 },
-    { label: 'p95', color: p.warn, value: (s) => s.p95 },
+    { label: 'p50', color: p.ink, value: (s) => s.p50 },
+    { label: 'p95', color: p.warn, dash: [5, 3], value: (s) => s.p95 },
   ]
   const succLines: Line[] = [{ label: 'success', color: p.accent, value: (s) => s.successRate * 100 }]
 

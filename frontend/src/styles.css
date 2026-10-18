@@ -1,21 +1,26 @@
 :root {
-  --bg: #fbfaf6; --panel: #ffffff; --panel2: #f4f2ea; --ink: #1f1f1f; --muted: #6c6a63; --line: #dedad0;
-  --accent: #3b5bdb; --accent-ink: #fff; --ok: #237a37; --warn: #a85a00; --bad: #c92a2a;
-  --shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
-  --hand: 'Kalam', 'Segoe Print', 'Comic Sans MS', cursive;
-  --ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* paper and ink: a warm sheet, navy ink, one persimmon accent */
+  --bg: #f6f1e7; --panel: #fffdf8; --panel2: #f2ebdb; --ink: #1d2433; --muted: #645f52; --line: #d9cfb8;
+  --accent: #b43a0a; --accent-ink: #fff; --ok: #1f6e31; --warn: #8f4c00; --bad: #b72424;
+  --shadow: 0 6px 24px rgba(29, 36, 51, 0.14); --stamp: 3px 3px 0 rgba(29, 36, 51, 0.16);
+  --display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --ui: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --hand: 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive;
   color-scheme: light;
 }
+/* the same sheet at night: a blueprint */
 :root[data-theme='dark'] {
-  --bg: #15161a; --panel: #1d1f24; --panel2: #25272d; --ink: #ececec; --muted: #9a9ca3; --line: #34363d;
-  --accent: #748ffc; --accent-ink: #11131a; --ok: #51cf66; --warn: #fcc419; --bad: #ff6b6b;
-  --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  --bg: #0e1a2b; --panel: #132238; --panel2: #1a2f4b; --ink: #e8eefc; --muted: #9fb0cc; --line: #2a4264;
+  --accent: #ffa94d; --accent-ink: #1b1205; --ok: #69db7c; --warn: #ffd43b; --bad: #ff8787;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.55); --stamp: 3px 3px 0 rgba(0, 0, 0, 0.35);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.4 var(--ui); overflow: hidden; }
-h1, h2, h3, h4 { margin: 0; font-family: var(--hand); font-weight: 700; }
+h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 650; letter-spacing: -0.01em; }
+h1 { font-style: italic; font-weight: 600; }
 h2 { font-size: 20px; } h3 { font-size: 15px; margin: 14px 0 6px; color: var(--muted); text-transform: none; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
@@ -34,7 +39,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 
 .app { height: 100%; display: flex; flex-direction: column; }
 .toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 52px; }
-.brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; } .brand-name { font-family: var(--hand); font-weight: 700; font-size: 20px; }
+.brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; } .brand-name { font-family: var(--display); font-style: italic; font-weight: 650; font-size: 22px; letter-spacing: -0.02em; } .brand-by { font-family: var(--hand); font-size: 15px; color: var(--accent); margin-left: 2px; transform: rotate(-3deg); display: inline-block; }
 .group { display: flex; gap: 4px; align-items: center; padding: 3px; background: var(--panel2); border-radius: 10px; }
 .group button { padding: 6px 8px; border-color: transparent; background: transparent; }
 .group button.on, .group button.play.on { background: var(--accent); color: var(--accent-ink); }
@@ -72,7 +77,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .inspector .collapse { position: absolute; top: 6px; right: 6px; padding: 0 8px; border: none; background: none; font-size: 18px; }
 .inspector-tab { position: absolute; right: 0; top: 70px; z-index: 4; border-radius: 8px 0 0 8px; padding: 10px 6px; }
 .panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-right: 22px; }
-.title-input { font-family: var(--hand); font-weight: 700; font-size: 18px; background: none; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; width: 100%; }
+.title-input { font-family: var(--display); font-weight: 650; font-size: 18px; background: none; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; width: 100%; }
 .title-input:hover, .title-input:focus { border-color: var(--line); background: var(--panel2); }
 .lesson { font-size: 12.5px; background: var(--panel2); padding: 8px; border-radius: 8px; margin: 8px 0; }
 .field { margin: 8px 0 12px; } .field > label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 3px; } .field em { font-weight: 400; color: var(--muted); }
@@ -227,3 +232,19 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 
 .option { display: block; padding: 4px 6px; margin: 4px 0; border-left: 3px solid transparent; } .option.right { border-left-color: #2f9e44; font-weight: 600; }
 fieldset { border: 0; padding: 0; margin: 8px 0; } legend { font-weight: 700; }
+
+/* Tejas's look: stamped corners, ink-navy rules, numbers in a typewriter face */
+button { border-radius: 7px; }
+button.primary, .card { box-shadow: var(--stamp); }
+button.primary:active, .card:active { box-shadow: 1px 1px 0 var(--line); transform: translate(2px, 2px); }
+.modal { border-radius: 10px; border-color: var(--ink); box-shadow: 6px 6px 0 rgba(29, 36, 51, 0.22), var(--shadow); }
+:root[data-theme='dark'] .modal { border-color: var(--line); box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.4); }
+.toolbar { border-bottom: 2px solid var(--ink); } :root[data-theme='dark'] .toolbar { border-bottom-color: var(--accent); }
+.tile b, .kv dd, .pill, .clock, .sweep-table td, .errors li > :last-child, .badge { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.tile b, .kv dd { font-weight: 600; font-size: 0.94em; }
+.tile small, .kv dt { letter-spacing: 0.02em; }
+.stars { filter: none; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+input[type='range'], .scrub { accent-color: var(--accent); }
+.seg button, .charts-head button { white-space: nowrap; }
+.credit { font-family: var(--hand); font-size: 15px; border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 12px; }
