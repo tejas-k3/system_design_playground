@@ -161,6 +161,25 @@ func Lint(d Diagram) []Finding {
 		}
 	}
 
+	// a payload the queue cannot carry: the users' request size against each queue's message limit
+	biggest := 0.0
+	for _, id := range clients {
+		if v := pf(res[id], "reqKB", 0); v > biggest {
+			biggest = v
+		}
+	}
+	if biggest > 0 {
+		var small []string
+		for _, n := range d.Nodes {
+			if n.Kind == KQueue && pf(res[n.ID], "maxMessageKB", 256) < biggest {
+				small = append(small, n.ID)
+			}
+		}
+		if len(small) > 0 {
+			add("large-payload-into-queue", "warn", fmt.Sprintf("Requests are %.0f KB but this queue refuses messages above its limit, so every one of those writes will fail.", biggest), "Store the body in an object store and queue a pointer to it (the claim-check pattern), or raise the queue's message limit if it really allows it.", small...)
+		}
+	}
+
 	for _, db := range dbs {
 		pool, who := 0.0, []string{}
 		for _, e := range d.Edges {
