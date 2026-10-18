@@ -1,0 +1,105 @@
+import type { InterviewData, Requirement } from '../../model/interview'
+import { MAX_ROWS } from '../../model/interview'
+import { addRow, apiHints, blankEndpoint, blankTable, dataHints, removeRow, setRow } from '../../model/pads'
+import type { StageId } from '../../model/timer'
+import { useStore } from '../../state/store'
+
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+const UNITS = ['%', 'ms', 'req/s', 'GB', 'TB', 'users']
+
+/** The tool for the current stage: a pad of plain lists. Everything typed here is kept in this browser only. */
+export function StagePad({ stage, data }: { stage: StageId; data: InterviewData }) {
+  const set = useStore((s) => s.setInterview)
+  const update = (patch: Partial<InterviewData>) => set({ ...data, ...patch })
+  if (stage === 'requirements') return <Requirements data={data} update={update} />
+  if (stage === 'api') return <ApiPad data={data} update={update} />
+  if (stage === 'data') return <DataPad data={data} update={update} />
+  if (stage === 'design' || stage === 'deepdive' || stage === 'tradeoffs') {
+    return (
+      <label className="pad-notes">Notes <span className="muted small">(kept in this browser only)</span>
+        <textarea value={data.notes} maxLength={5000} rows={3} onChange={(e) => update({ notes: e.target.value })} />
+      </label>
+    )
+  }
+  return null
+}
+
+type Props = { data: InterviewData; update: (p: Partial<InterviewData>) => void }
+
+function Requirements({ data, update }: Props) {
+  const nf = data.nonFunctional
+  const setNf = (i: number, patch: Partial<Requirement>) => update({ nonFunctional: setRow(nf, i, { ...nf[i], ...patch }) })
+  return (
+    <div className="pad two-col">
+      <fieldset>
+        <legend>Functional: what the system does</legend>
+        {data.functional.map((f, i) => (
+          <div className="pad-row" key={i}>
+            <input aria-label={`Functional requirement ${i + 1}`} value={f} maxLength={200} onChange={(e) => update({ functional: setRow(data.functional, i, e.target.value) })} />
+            <button aria-label={`Remove functional requirement ${i + 1}`} className="x" onClick={() => update({ functional: removeRow(data.functional, i) })}>×</button>
+          </div>
+        ))}
+        <button onClick={() => update({ functional: addRow(data.functional, '') })} disabled={data.functional.length >= MAX_ROWS}>Add a functional requirement</button>
+        {data.functional.length < 3 && <p className="muted small">Aim for three.</p>}
+      </fieldset>
+      <fieldset>
+        <legend>Non-functional: how well, with numbers</legend>
+        {nf.map((r, i) => (
+          <div className="pad-row" key={i}>
+            <input aria-label={`Non-functional requirement ${i + 1}`} value={r.label} maxLength={200} placeholder="e.g. availability" onChange={(e) => setNf(i, { label: e.target.value })} />
+            <input aria-label={`Target number for requirement ${i + 1}`} className="num-in" inputMode="decimal" value={r.target ?? ''} onChange={(e) => setNf(i, { target: e.target.value === '' ? null : Number(e.target.value) || 0 })} />
+            <select aria-label={`Unit for requirement ${i + 1}`} value={r.unit} onChange={(e) => setNf(i, { unit: e.target.value })}>
+              <option value="">unit</option>
+              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+            <button aria-label={`Remove non-functional requirement ${i + 1}`} className="x" onClick={() => update({ nonFunctional: removeRow(nf, i) })}>×</button>
+          </div>
+        ))}
+        <button onClick={() => update({ nonFunctional: addRow(nf, { label: '', target: null, unit: '' }) })} disabled={nf.length >= MAX_ROWS}>Add a non-functional requirement</button>
+        {nf.filter((r) => r.target === null).length > 0 && <p className="muted small">A requirement without a number cannot be tested.</p>}
+      </fieldset>
+    </div>
+  )
+}
+
+function ApiPad({ data, update }: Props) {
+  const rows = data.api
+  const hints = apiHints(rows)
+  return (
+    <div className="pad">
+      {rows.map((e, i) => (
+        <div className="pad-row wrap" key={i}>
+          <select aria-label={`Method of endpoint ${i + 1}`} value={e.method} onChange={(ev) => update({ api: setRow(rows, i, { ...e, method: ev.target.value }) })}>{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
+          <input aria-label={`Path of endpoint ${i + 1}`} value={e.path} maxLength={200} placeholder="/photos/{id}" onChange={(ev) => update({ api: setRow(rows, i, { ...e, path: ev.target.value }) })} />
+          <input aria-label={`Request of endpoint ${i + 1}`} value={e.request} placeholder="in" onChange={(ev) => update({ api: setRow(rows, i, { ...e, request: ev.target.value }) })} />
+          <input aria-label={`Response of endpoint ${i + 1}`} value={e.response} placeholder="out" onChange={(ev) => update({ api: setRow(rows, i, { ...e, response: ev.target.value }) })} />
+          <input aria-label={`Notes of endpoint ${i + 1}`} value={e.notes} placeholder="notes" onChange={(ev) => update({ api: setRow(rows, i, { ...e, notes: ev.target.value }) })} />
+          <button aria-label={`Remove endpoint ${i + 1}`} className="x" onClick={() => update({ api: removeRow(rows, i) })}>×</button>
+        </div>
+      ))}
+      <button onClick={() => update({ api: addRow(rows, blankEndpoint()) })} disabled={rows.length >= MAX_ROWS}>Add an endpoint</button>
+      {hints.length > 0 && <ul className="hints small" aria-label="Questions to answer">{hints.map((h) => <li key={h}>{h}</li>)}</ul>}
+    </div>
+  )
+}
+
+function DataPad({ data, update }: Props) {
+  const rows = data.tables
+  const hints = dataHints(rows)
+  return (
+    <div className="pad">
+      {rows.map((t, i) => (
+        <div className="pad-row wrap" key={i}>
+          <input aria-label={`Name of table ${i + 1}`} value={t.name} maxLength={100} placeholder="table" onChange={(ev) => update({ tables: setRow(rows, i, { ...t, name: ev.target.value }) })} />
+          <input aria-label={`Fields of table ${i + 1}`} value={t.fields} placeholder="fields" onChange={(ev) => update({ tables: setRow(rows, i, { ...t, fields: ev.target.value }) })} />
+          <input aria-label={`Key of table ${i + 1}`} value={t.key} maxLength={200} placeholder="key" onChange={(ev) => update({ tables: setRow(rows, i, { ...t, key: ev.target.value }) })} />
+          <input aria-label={`Indexes of table ${i + 1}`} value={t.indexes} placeholder="indexes" onChange={(ev) => update({ tables: setRow(rows, i, { ...t, indexes: ev.target.value }) })} />
+          <input aria-label={`Access patterns of table ${i + 1}`} value={t.access} placeholder="queries" onChange={(ev) => update({ tables: setRow(rows, i, { ...t, access: ev.target.value }) })} />
+          <button aria-label={`Remove table ${i + 1}`} className="x" onClick={() => update({ tables: removeRow(rows, i) })}>×</button>
+        </div>
+      ))}
+      <button onClick={() => update({ tables: addRow(rows, blankTable()) })} disabled={rows.length >= MAX_ROWS}>Add a table</button>
+      {hints.length > 0 && <ul className="hints small" aria-label="Questions to answer">{hints.map((h) => <li key={h}>{h}</li>)}</ul>}
+    </div>
+  )
+}
