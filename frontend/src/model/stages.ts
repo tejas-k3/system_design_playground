@@ -18,9 +18,9 @@ const INFO: Record<StageId, StageInfo> = {
 
 export const stageInfo = (id: StageId): StageInfo => INFO[id]
 
-/** Minutes and seconds left (hours when long). Rounded up, so it never reads 0:00 while time remains. */
+/** Minutes and seconds left (hours when long), to the nearest second but never 0:00 while time remains. */
 export function countdown(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000))
+  const total = ms <= 0 ? 0 : Math.max(1, Math.round(ms / 1000))
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
