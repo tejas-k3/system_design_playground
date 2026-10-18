@@ -39,6 +39,10 @@ type Edge struct {
 	// BandwidthMbps limits the link (0 = unlimited). Bytes only exist when the users set reqKB/respKB; with no sizes
 	// there is nothing to carry and the limit changes nothing.
 	BandwidthMbps float64 `json:"bandwidthMbps,omitempty"`
+	// LossPct is the chance a packet is lost on each trip (a lost one is retransmitted after 200 ms; six losses in a
+	// row abort the connection). JitterMs adds a random 0..JitterMs to each one-way trip. Both 0 = a perfect link.
+	LossPct  float64 `json:"lossPct,omitempty"`
+	JitterMs float64 `json:"jitterMs,omitempty"`
 }
 
 type Note struct {
@@ -74,19 +78,20 @@ const (
 	RNoPrimary
 	RSyncReplica
 	RMessageTooLarge
+	RConnLost
 	NumReasons
 )
 
 var reasonNames = [NumReasons]string{
 	"timeout", "queueFull", "nodeDown", "noRoute", "noBackend", "rateLimited",
 	"callTimeout", "circuitOpen", "dependencyError", "lockBusy", "queueTimeout", "connRefused",
-	"noPrimary", "syncReplica", "messageTooLarge",
+	"noPrimary", "syncReplica", "messageTooLarge", "connLost",
 }
 
 var reasonLabels = [NumReasons]string{
 	"Timeouts", "Queue full (503)", "Node down", "No route", "No healthy backend", "Rate limited (429)",
 	"Call timeouts (504)", "Circuit open", "Vendor errors", "Lock busy", "Waited too long in queue", "DB connections refused",
-	"No primary: failing over", "Sync replica unreachable", "Message too large",
+	"No primary: failing over", "Sync replica unreachable", "Message too large", "Connection lost",
 }
 
 // ReasonInfo names a failure reason for clients: a stable id and a human label.

@@ -9,6 +9,7 @@ const (
 	MinLatencyMs     = 1
 	MaxLatencyMs     = 200
 	MaxBandwidthMbps = 100000.0
+	MaxJitterMs      = 1000.0
 )
 
 func finite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
@@ -142,7 +143,18 @@ func Sanitize(in Diagram) (Diagram, bool) {
 			bw = MaxBandwidthMbps
 			adjusted = true
 		}
-		out.Edges = append(out.Edges, Edge{ID: e.ID, From: e.From, To: e.To, LatencyMs: lat, BandwidthMbps: bw})
+		loss, jit := e.LossPct, e.JitterMs
+		if !finite(loss) || loss < 0 {
+			loss, adjusted = 0, true
+		} else if loss > 100 {
+			loss, adjusted = 100, true
+		}
+		if !finite(jit) || jit < 0 {
+			jit, adjusted = 0, true
+		} else if jit > MaxJitterMs {
+			jit, adjusted = MaxJitterMs, true
+		}
+		out.Edges = append(out.Edges, Edge{ID: e.ID, From: e.From, To: e.To, LatencyMs: lat, BandwidthMbps: bw, LossPct: loss, JitterMs: jit})
 	}
 	for _, n := range in.Notes {
 		if !finite(n.X) || !finite(n.Y) || !claim(n.ID) {
