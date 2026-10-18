@@ -360,6 +360,13 @@ func (s *Sim) tick() {
 		}
 		s.markBusy(n)
 		s.autoscale(n)
+		if n.kind == KAppServer && !n.down && n.f("memLimitMB") > 0 {
+			held := float64(n.busy+len(n.q)-n.qh) / float64(s.instancesOf(n))
+			if n.f("memBaseMB")+n.f("memPerReqMB")*held > n.f("memLimitMB") {
+				s.logEvent("oom", n, 0)
+				s.CrashNode(n.id, n.f("memRestartSec"))
+			}
+		}
 		capN := float64(s.capacity(n))
 		switch {
 		case n.kind == KQueue:
