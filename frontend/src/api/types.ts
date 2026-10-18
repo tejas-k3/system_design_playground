@@ -25,6 +25,21 @@ export interface Note {
   text: string
   fontSize?: number
 }
+export interface SweepPoint {
+  value: number // load multiple, or the setting's value as used
+  rps: number
+  successRate: number
+  p50: number
+  p95: number
+  p99: number
+  costPerHour: number
+  truncated?: boolean
+}
+export interface SweepResponse {
+  points: SweepPoint[]
+  truncated?: boolean
+}
+
 export interface Finding {
   rule: string
   severity: 'error' | 'warn' | 'info'

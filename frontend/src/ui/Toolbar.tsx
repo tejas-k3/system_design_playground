@@ -92,6 +92,9 @@ export function Toolbar() {
       <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle theme" aria-label="Toggle theme">
         <Icon d={theme === 'dark' ? 'M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4M12 8a4 4 0 100 8 4 4 0 000-8z' : 'M20 14A8 8 0 1110 4a6 6 0 0010 10z'} />
       </button>
+      <button onClick={() => setUi({ capacity: true })} title="Capacity curve: how much more traffic can this take?" aria-label="Capacity curve">
+        <Icon d="M4 20V4M4 20h16M7 16l4-5 3 3 5-8" />
+      </button>
       <button onClick={() => setUi({ help: true })} title="Help & shortcuts" aria-label="Help">
         <Icon d="M9.5 9a2.5 2.5 0 114 2c-1 .7-1.5 1.2-1.5 2.5M12 17.5v.5M12 3a9 9 0 100 18 9 9 0 000-18z" />
       </button>
