@@ -43,6 +43,13 @@ export function humanRate(perSecond: number): string {
   return `${trim(perSecond)} /s`
 }
 
+export function humanCount(n: number): string {
+  if (!Number.isFinite(n)) return '—'
+  if (n >= 1e9) return `${trim(n / 1e9)} B`
+  if (n >= 1e6) return `${trim(n / 1e6)} M`
+  return n >= 100 ? Math.round(n).toLocaleString('en-US') : trim(n)
+}
+
 export function humanBytes(bytes: number): string {
   if (!Number.isFinite(bytes)) return '—'
   const units: [number, string][] = [[1e15, 'PB'], [1e12, 'TB'], [1e9, 'GB'], [1e6, 'MB'], [1e3, 'KB']]
@@ -53,4 +60,54 @@ export function humanBytes(bytes: number): string {
 function trim(n: number): string {
   const r = n >= 100 ? Math.round(n) : Math.round(n * 10) / 10
   return String(r)
+}
+
+import type { EstimateInputs } from './interview'
+
+export interface Estimate {
+  dau: number
+  avgQps: number
+  peakQps: number
+  readQps: number
+  writeQps: number
+  peakReadQps: number
+  records: number // writes kept for the retention period
+  storageBytes: number
+  peakGbps: number
+  servers: number
+}
+
+/** Every number the calculator shows, from the inputs on the pad. NaN where an input makes a number meaningless. */
+export function calculate(i: EstimateInputs): Estimate {
+  const dau = dailyActiveUsers(i.mau, i.dauPct)
+  const avgQps = qpsFromDaily(dau, i.actionsPerDay)
+  const peak = peakQps(avgQps, i.peakFactor)
+  const avg = readWriteSplit(avgQps, i.readPct)
+  const pk = readWriteSplit(peak, i.readPct)
+  const records = avg.write * SECONDS_PER_DAY * 365 * i.retentionYears
+  return {
+    dau,
+    avgQps,
+    peakQps: peak,
+    readQps: avg.read,
+    writeQps: avg.write,
+    peakReadQps: pk.read,
+    records,
+    storageBytes: storageBytes({ records, bytesEach: i.bytesEach, replication: i.replication }),
+    peakGbps: bandwidthGbps(peak, i.payloadBytes),
+    servers: serversNeeded(peak, i.perServerQps, i.headroomPct),
+  }
+}
+
+/** The results as plain lines for the notes. */
+export function estimateNotes(e: Estimate): string {
+  return [
+    'Estimate',
+    `Daily users: ${humanCount(e.dau)}`,
+    `Average load: ${humanRate(e.avgQps)} (reads ${humanRate(e.readQps)}, writes ${humanRate(e.writeQps)})`,
+    `Peak load: ${humanRate(e.peakQps)}`,
+    `Storage kept: ${humanBytes(e.storageBytes)} (${humanCount(e.records)} records)`,
+    `Peak bandwidth: ${Number.isFinite(e.peakGbps) ? e.peakGbps.toFixed(2) : '—'} Gbit/s`,
+    `Servers: ${Number.isFinite(e.servers) ? e.servers : '—'}`,
+  ].join('\n')
 }
