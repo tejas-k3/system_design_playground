@@ -375,6 +375,16 @@ function EdgePanel({ id }: { id: string }) {
       <p className="small"><b>{from?.label}</b> → <b>{to?.label}</b></p>
       <p className="muted small">{reg.spec(from?.kind ?? '')?.name} to {reg.spec(to?.kind ?? '')?.name}</p>
       <div className="field">
+        <label htmlFor="bw">Bandwidth <span className="muted small">(Mbit/s, 0 = unlimited)</span></label>
+        <div className="num">
+          <input id="bw" type="text" inputMode="decimal" defaultValue={edge.bandwidthMbps ?? 0} key={`${id}-${edge.bandwidthMbps ?? 0}`} onFocus={(e) => e.currentTarget.select()}
+            onBlur={(e) => { const n = Number(e.target.value); if (Number.isFinite(n) && n >= 0) updateEdge(id, { bandwidthMbps: Math.min(100000, n) || undefined }) }} />
+          <span className="unit">Mbit/s</span>
+        </div>
+        <p className="muted small">A limited link shares its capacity: requests wait for the bytes ahead of them. It only matters once the users have a request or response size.</p>
+        {st?.mbps !== undefined && <p className="small">Carrying {Math.round(st.mbps)} Mbit/s{st.util !== undefined ? ` (${Math.round(st.util * 100)}% of the limit${st.util >= 0.95 ? ': full' : ''})` : ''}.</p>}
+      </div>
+      <div className="field">
         <label htmlFor="lat">One-way latency</label>
         <div className="num">
           <input type="range" min={reg.raw.latency.min} max={reg.raw.latency.max} value={edge.latencyMs} onChange={(e) => updateEdge(id, { latencyMs: Number(e.target.value) })} aria-label="Latency" />

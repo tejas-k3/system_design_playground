@@ -278,3 +278,5 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .app.present-mode .main { position: relative; }
 .present:not(.over-canvas) { position: fixed; inset: 0; z-index: 30; }
 .warn-note { border-left: 3px dashed var(--warn); padding-left: 8px; margin: 6px 0; }
+.toolbar { gap: 6px; } .scrub { width: 84px; margin-left: 4px; } .toolbar .pill { padding: 4px 8px; }
+@media (max-width: 1500px) { .brand-by { display: none; } }
