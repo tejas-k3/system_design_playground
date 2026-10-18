@@ -1,11 +1,16 @@
 import type { Diagram } from '../api/types'
 import { Reg, sanitizeDiagram, MAX_ZOOM, MIN_ZOOM } from '../model/diagram'
+import { sanitizeInterview, type InterviewData } from '../model/interview'
 import { useStore, type Viewport } from './store'
 
+// The key keeps its v1 name so existing saves are found; the blob inside says which version wrote it. Version 2 adds
+// the optional interview session. A version 1 blob has no such field and loads unchanged.
 export const STORAGE_KEY = 'sdp:v1'
+export const SAVED_VERSION = 2
 
 interface Saved {
-  version: 1
+  version: typeof SAVED_VERSION
+  interview: InterviewData | null
   sandbox: Diagram
   theme: 'light' | 'dark'
   progress: Record<string, number>
@@ -32,7 +37,7 @@ export function parseSaved(raw: string | null, reg: Reg) {
   }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {}
   const o = obj as Record<string, unknown>
-  const out: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport } = {}
+  const out: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport; interview?: InterviewData } = {}
   const sd = sanitizeDiagram(reg, o.sandbox)
   if (sd) out.sandbox = sd.diagram
   if (o.theme === 'light' || o.theme === 'dark') out.theme = o.theme
@@ -41,6 +46,8 @@ export function parseSaved(raw: string | null, reg: Reg) {
     for (const [k, v] of Object.entries(o.progress as Record<string, unknown>)) if (typeof v === 'number' && v >= 0 && v <= 3) p[k] = v
     out.progress = p
   }
+  const iv = sanitizeInterview(o.interview)
+  if (iv) out.interview = iv
   const v = o.viewport as Record<string, unknown> | undefined
   if (v && [v.scrollX, v.scrollY, v.zoom].every((n) => typeof n === 'number' && Number.isFinite(n))) {
     out.viewport = { scrollX: v.scrollX as number, scrollY: v.scrollY as number, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom as number)) }
@@ -62,7 +69,8 @@ export function startPersistence(reg: Reg): void {
     timer = undefined
     const s = useStore.getState()
     const saved: Saved = {
-      version: 1,
+      version: SAVED_VERSION,
+      interview: s.interview,
       sandbox: s.scenario ? (s.sandbox ?? { nodes: [], edges: [], notes: [] }) : s.diagram,
       theme: s.theme,
       progress: s.progress,
@@ -75,7 +83,7 @@ export function startPersistence(reg: Reg): void {
     }
   }
   useStore.subscribe((s, p) => {
-    if (s.diagram !== p.diagram || s.theme !== p.theme || s.progress !== p.progress || s.viewport !== p.viewport || s.sandbox !== p.sandbox) {
+    if (s.diagram !== p.diagram || s.theme !== p.theme || s.progress !== p.progress || s.viewport !== p.viewport || s.sandbox !== p.sandbox || s.interview !== p.interview) {
       if (timer) clearTimeout(timer)
       timer = setTimeout(flush, 300)
     }

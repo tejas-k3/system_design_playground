@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { InterviewData } from '../model/interview'
 import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
 import { isCompact, isNarrow } from '../model/responsive'
@@ -36,6 +37,7 @@ export interface State {
   diagram: Diagram
   selection: string[]
   pinned: Diagram | null // design A for the side-by-side comparison
+  interview: InterviewData | null // the interview session and its pads, kept in this browser only
   findings: Finding[] // advisory design lint for the current diagram
   tool: Tool
   viewport: Viewport
@@ -89,6 +91,7 @@ export interface State {
   setCost(c: number): void
   setFindings(f: Finding[]): void
   setPinned(d: Diagram | null): void
+  setInterview(i: InterviewData | null): void
   recordStars(id: string, stars: number): void
   setConnection(c: Connection): void
   toast(text: string, kind?: Toast['kind'], ms?: number): void
@@ -101,7 +104,7 @@ export interface State {
   compareWithReference(reference: Diagram): void
   adoptDiagram(d: Diagram): void
   setResult(score: Score): void
-  hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport }): void
+  hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport; interview?: InterviewData }): void
 }
 
 let toastSeq = 1
@@ -133,6 +136,7 @@ export const useStore = create<State>()((set, get) => {
     diagram: emptyDiagram(),
     selection: [],
     findings: [],
+    interview: null,
     pinned: null,
     tool: 'select',
     viewport: { scrollX: 0, scrollY: 0, zoom: 1 },
@@ -289,6 +293,7 @@ export const useStore = create<State>()((set, get) => {
     setCost: (cost) => set({ cost }),
     setFindings: (findings) => set({ findings }),
     recordStars: (id, stars) => set((s) => ((s.progress[id] ?? 0) >= stars ? {} : { progress: { ...s.progress, [id]: stars } })),
+    setInterview: (interview) => set({ interview }),
     setPinned: (pinned) => set({ pinned: pinned ? structuredClone(pinned) : null }),
     setConnection: (connection) => set({ connection }),
 
@@ -355,6 +360,7 @@ export const useStore = create<State>()((set, get) => {
         theme: p.theme ?? s.theme,
         progress: p.progress ?? s.progress,
         viewport: p.viewport ?? s.viewport,
+        interview: p.interview ?? s.interview,
         ui: { ...s.ui, welcome: !(p.sandbox?.nodes.length) },
       })),
   }
