@@ -375,6 +375,22 @@ function EdgePanel({ id }: { id: string }) {
       <p className="small"><b>{from?.label}</b> → <b>{to?.label}</b></p>
       <p className="muted small">{reg.spec(from?.kind ?? '')?.name} to {reg.spec(to?.kind ?? '')?.name}</p>
       <div className="field">
+        <label htmlFor="loss">Packet loss <span className="muted small">(%)</span></label>
+        <div className="num">
+          <input id="loss" type="text" inputMode="decimal" defaultValue={edge.lossPct ?? 0} key={`loss-${id}-${edge.lossPct ?? 0}`} onFocus={(e) => e.currentTarget.select()}
+            onBlur={(e) => { const n = Number(e.target.value); if (Number.isFinite(n) && n >= 0) updateEdge(id, { lossPct: Math.min(100, n) || undefined }) }} />
+          <span className="unit">%</span>
+        </div>
+        <p className="muted small">Each lost packet is sent again after 200 ms; six lost in a row abort the connection ("Connection lost").</p>
+        <label htmlFor="jit">Jitter <span className="muted small">(ms)</span></label>
+        <div className="num">
+          <input id="jit" type="text" inputMode="decimal" defaultValue={edge.jitterMs ?? 0} key={`jit-${id}-${edge.jitterMs ?? 0}`} onFocus={(e) => e.currentTarget.select()}
+            onBlur={(e) => { const n = Number(e.target.value); if (Number.isFinite(n) && n >= 0) updateEdge(id, { jitterMs: Math.min(1000, n) || undefined }) }} />
+          <span className="unit">ms</span>
+        </div>
+        <p className="muted small">A random extra 0 to this many ms on each one-way trip.</p>
+      </div>
+      <div className="field">
         <label htmlFor="bw">Bandwidth <span className="muted small">(Mbit/s, 0 = unlimited)</span></label>
         <div className="num">
           <input id="bw" type="text" inputMode="decimal" defaultValue={edge.bandwidthMbps ?? 0} key={`${id}-${edge.bandwidthMbps ?? 0}`} onFocus={(e) => e.currentTarget.select()}

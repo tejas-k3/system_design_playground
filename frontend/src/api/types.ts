@@ -18,6 +18,8 @@ export interface Edge {
   to: string
   latencyMs: number
   bandwidthMbps?: number // 0 / absent = unlimited; only matters once the users set request or response sizes
+  lossPct?: number // chance a packet is lost per trip: retransmitted after 200 ms, six in a row abort the connection
+  jitterMs?: number // random 0..jitterMs added to each one-way trip
 }
 export interface Note {
   id: string
