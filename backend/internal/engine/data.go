@@ -754,9 +754,13 @@ func (s *Sim) gather(n *node, c *call, es []*edge, need int, partial bool, done 
 		}
 		return fail(RDependency)
 	}
+	hedge := n.f("hedgeAfterMs")
 	for i, e := range es {
-		i := i
-		s.callCmd(n, e, c, cmdRead, 0, func(r Result) {
+		i, e := i, e
+		reply := func(r Result) {
+			if got[i] { // the other copy of this query already answered
+				return
+			}
 			results[i], got[i] = r, true
 			if r.OK {
 				okN++
@@ -776,6 +780,19 @@ func (s *Sim) gather(n *node, c *call, es []*edge, need int, partial bool, done 
 			case okN+failN == len(es):
 				finish(firstFailure())
 			}
-		})
+		}
+		s.callCmd(n, e, c, cmdRead, 0, reply)
+		if hedge > 0 {
+			// a slow shard: ask again, the first answer counts and the slower copy still occupies its slot
+			s.after(hedge, func() {
+				if got[i] || finished || n.removed {
+					return
+				}
+				if c.counted {
+					s.runHedged++
+				}
+				s.callCmd(n, e, c, cmdRead, 0, reply)
+			})
+		}
 	}
 }

@@ -170,6 +170,7 @@ func init() {
 				sel("gather", "Fan-out", "Fan-out", "none", "With two or more search shards behind this server, a read can go to every shard at once. Wait for all gives the slowest shard's latency; answering on the first K skips the slowest ones, but they still do the work.",
 					opt("none", "Off"), opt("all", "Ask every shard, wait for all"), opt("firstK", "Ask every shard, answer on the first K")).needs(KIndex),
 				num("k", "Answer after", "Fan-out", 3, 1, 64, 1, "shards", "How many shards must answer. More than there are shards means all of them.").showIf("gather", "firstK"),
+				num("hedgeAfterMs", "Hedge after", "Fan-out", 0, 0, 5000, 5, "ms", "If a shard has not answered after this long, ask it again and take whichever answer comes first. The slow first query keeps running, so hedging adds load. 0 = off.").showIf("gather", "all", "firstK").adv(),
 				flag("partialResults", "Partial results", "Fan-out", false, "If too few shards answered, still reply with what there is (counted as partial) instead of failing, as long as at least one answered.").showIf("gather", "all", "firstK"),
 				num("gcPauseMs", "GC pause", "Failure modes", 0, 0, 5000, 50, "ms", "Stop-the-world garbage-collection pauses: for this long nothing on the server starts or finishes. 0 = off.").adv(),
 				num("gcEverySec", "GC pause every", "Failure modes", 30, 1, 600, 1, "s", "Average time between pauses; the gaps are random (exponential), so pauses are not evenly spaced.").adv(),
