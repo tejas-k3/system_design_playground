@@ -95,6 +95,7 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("POST /api/questions/{id}/answer", s.answerQuestion)
 	s.mux.HandleFunc("POST /api/questions/{id}/run", s.runCandidate)
 	s.mux.HandleFunc("POST /api/questions/{id}/review", s.reviewQuestion)
+	s.mux.HandleFunc("POST /api/questions/{id}/build", s.buildQuestion)
 	s.mux.HandleFunc("POST /api/validate", s.validate)
 	s.mux.HandleFunc("POST /api/run", s.run)
 	s.mux.HandleFunc("POST /api/sweep", s.sweep)

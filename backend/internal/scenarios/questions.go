@@ -51,6 +51,7 @@ type Question struct {
 	Prompt     string          `json:"prompt"`
 	Facts      []Fact          `json:"facts,omitempty"`
 	Fields     []EstimateField `json:"fields,omitempty"`
+	BuildHint  string          `json:"buildHint,omitempty"`  // estimate: how the numbers become a design, if the question can be built and tested
 	Options    []string        `json:"options,omitempty"`    // diagnose: the candidate explanations
 	Symptoms   *Symptoms       `json:"symptoms,omitempty"`   // diagnose: what the learner gets to look at
 	Candidates []Candidate     `json:"candidates,omitempty"` // tradeoff: designs to run and compare
@@ -58,6 +59,7 @@ type Question struct {
 
 	rule        func(RunSummary) bool // tradeoff: the stated requirement the right answer meets
 	alsoPasses  []int                 // tradeoff: other candidates that meet it too, but lose on the stated tie-break
+	build       *buildSpec            // estimate: turns the learner's numbers into a design and runs it
 	defects     []Defect              // review: what is wrong with Diagram (never served)
 	scenarioID  string                // tradeoff: the challenge whose traffic and failures every candidate faces
 	source      diagSource            // where the symptoms come from, so a test can regenerate them
@@ -389,6 +391,93 @@ func (q *Question) GradeReview(marked []string) (ReviewResult, error) {
 		res.Stars = 2
 	case res.Score >= 0.5:
 		res.Stars = 1
+	}
+	return res, nil
+}
+
+// buildSpec says how an estimate becomes a design: the number to size the fleet from, how much one server is assumed
+// to handle, and the real load to test it against.
+type buildSpec struct {
+	field     string  // answer key whose value sizes the fleet
+	perServer float64 // requests a second one app server is assumed to handle
+	rps       float64 // the real peak load applied in the test
+	readPct   float64
+	seconds   float64
+}
+
+const (
+	BuildUnder = "under"
+	BuildRight = "right"
+	BuildOver  = "over"
+)
+
+type BuildResult struct {
+	Servers      int        `json:"servers"`
+	RightServers int        `json:"rightServers"`
+	Yours        RunSummary `json:"yours"`
+	RightSized   RunSummary `json:"rightSized"`
+	Verdict      string     `json:"verdict"` // under: it fails the load; over: it works but costs more than 1.5x the right-sized fleet
+}
+
+func (b *buildSpec) design(servers int) engine.Diagram {
+	pp := P{"rps": b.rps, "readPct": b.readPct}
+	d := (&bld{}).n("users", engine.KClient, cols[0], rowMid, pp).
+		n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb").
+		n("db", engine.KDatabase, cols[4], rowMid, P{"maxConnections": 1000.0, "connections": 48.0}).
+		n("cache", engine.KCache, cols[3], rowTop, P{"ttlSec": 30.0, "ttlJitterPct": 20.0})
+	return d.servers(servers, cols[2], rowTop, 70, P{"threads": 16.0, "callTimeoutMs": 400.0, "dbPool": 20.0}, "cache").done()
+}
+
+func (b *buildSpec) run(servers int, seed uint32) RunSummary {
+	sim := engine.New(b.design(servers), engine.Options{Seed: seed, StopTrafficAtMs: b.seconds * 1000, WarmupMs: 3000})
+	for !sim.Finished() && sim.Now() < b.seconds*1000+60000 {
+		sim.Advance(100)
+	}
+	run := sim.RunSnapshot()
+	out := RunSummary{Resolved: run.Resolved, P50: run.P50, P95: run.P95, P99: run.P99, CostPerHour: sim.CostPerHour()}
+	if run.Resolved > 0 {
+		out.Success = float64(run.OK) / float64(run.Resolved)
+	}
+	return out
+}
+
+// BuildAndTest builds a fleet sized from the learner's number (one server per perServer requests a second, between
+// one and 32), runs it against the real peak load, and runs the fleet sized from the true value next to it.
+func (q *Question) BuildAndTest(answers map[string]float64, seed uint32) (BuildResult, error) {
+	b := q.build
+	if q.Mode != ModeEstimate || b == nil {
+		return BuildResult{}, errors.New("this question has nothing to build")
+	}
+	v, ok := answers[b.field]
+	if !ok || v <= 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+		return BuildResult{}, fmt.Errorf("give a positive number for %q first", b.field)
+	}
+	size := func(x float64) int {
+		n := int(math.Ceil(x / b.perServer))
+		if n < 1 {
+			n = 1
+		}
+		if n > 32 {
+			n = 32
+		}
+		return n
+	}
+	var expected float64
+	for _, f := range q.Fields {
+		if f.Key == b.field {
+			expected = f.Expected
+		}
+	}
+	res := BuildResult{Servers: size(v), RightServers: size(expected)}
+	res.Yours = b.run(res.Servers, seed)
+	res.RightSized = b.run(res.RightServers, seed)
+	switch {
+	case res.Yours.Success < 0.97:
+		res.Verdict = BuildUnder
+	case res.Yours.CostPerHour > 1.5*res.RightSized.CostPerHour:
+		res.Verdict = BuildOver
+	default:
+		res.Verdict = BuildRight
 	}
 	return res, nil
 }

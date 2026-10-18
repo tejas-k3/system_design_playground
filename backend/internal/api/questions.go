@@ -70,6 +70,35 @@ func (s *Server) runCandidate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, res)
 }
 
+// buildQuestion sizes a design from the learner's estimate and tests it against the real load (see BuildAndTest).
+func (s *Server) buildQuestion(w http.ResponseWriter, r *http.Request) {
+	q := scenarios.Q(r.PathValue("id"))
+	if q == nil {
+		writeErr(w, 404, "no such question")
+		return
+	}
+	var req answerReq
+	if !decode(w, r, &req) {
+		return
+	}
+	s.metrics.runs.Add(1)
+	select {
+	case s.runSlots <- struct{}{}:
+		defer func() { <-s.runSlots }()
+	default:
+		s.metrics.runsRefused.Add(1)
+		w.Header().Set("Retry-After", "2")
+		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+		return
+	}
+	res, err := q.BuildAndTest(req.Answers, 42)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, res)
+}
+
 type reviewReq struct {
 	Marked []string `json:"marked"`
 }

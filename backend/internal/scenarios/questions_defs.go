@@ -15,7 +15,9 @@ func init() {
 	// URL shortener: 100 M new URLs a month, 10 reads per write, 3x peak, 500 B a record, kept 5 years.
 	writeQps := 100e6 / secPerMonth
 	registerQuestion(&Question{
-		ID: "url-shortener-numbers", Title: "A URL shortener: how big?", Mode: ModeEstimate, Difficulty: "Easy",
+		build:     &buildSpec{field: "peakReadQps", perServer: 400, rps: 30 * writeQps, readPct: 91, seconds: 30},
+		BuildHint: "Build it: one app server for every 400 requests a second of your peak read estimate (a cache and a database behind a balancer), then test it against the real peak.",
+		ID:        "url-shortener-numbers", Title: "A URL shortener: how big?", Mode: ModeEstimate, Difficulty: "Easy",
 		Summary: "Turn monthly volume into queries per second and terabytes.",
 		Prompt:  "Before drawing anything, size the service. Use 30-day months and 86,400 seconds a day. Peak traffic is three times the average.",
 		Facts: []Fact{
