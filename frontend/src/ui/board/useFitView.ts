@@ -2,6 +2,8 @@ import { type RefObject, useCallback, useEffect } from 'react'
 import { boundsOf } from '../../draw/geometry'
 import { measureText } from '../../draw/renderer'
 import { fitViewport } from '../../model/fit'
+import { centerOn } from '../../model/search'
+import { nodeRect } from '../../draw/geometry'
 import { isNarrow } from '../../model/responsive'
 import { useStore } from '../../state/store'
 
@@ -30,6 +32,16 @@ export function useFitView(wrap: RefObject<HTMLElement | null>): () => void {
   useEffect(() => {
     fit()
   }, [fitRequest, scenarioId, fit])
+
+  const centerRequest = useStore((s) => s.centerRequest)
+  useEffect(() => {
+    const st = useStore.getState()
+    const el = wrap.current
+    const n = centerRequest && st.diagram.nodes.find((x) => x.id === centerRequest.id)
+    if (!n || !st.reg || !el) return
+    const { width, height } = el.getBoundingClientRect()
+    st.setViewport(centerOn(nodeRect(n, st.reg), { w: width, h: height }, st.viewport))
+  }, [centerRequest, wrap])
 
   return fit
 }
