@@ -54,7 +54,7 @@ export interface State {
   cost: number | null // null until the server has priced the current diagram
   scenario: ScenarioState | null
   sandbox: Diagram | null // sandbox saved while a scenario is open
-  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; search: boolean; compare: boolean; question: string | null; present: boolean }
+  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; search: boolean; templates: boolean; compare: boolean; question: string | null; present: boolean }
   toasts: Toast[]
   connection: Connection
   past: Diagram[]
@@ -127,6 +127,8 @@ export interface State {
   showSolution(d: Diagram): void
   compareWithReference(reference: Diagram): void
   adoptDiagram(d: Diagram): void
+  /** Replace the design with a template's, as one step that can be undone. */
+  applyTemplate(d: Diagram): void
   setResult(score: Score): void
   hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport; interview?: InterviewData }): void
 }
@@ -176,7 +178,7 @@ export const useStore = create<State>()((set, get) => {
     cost: null,
     scenario: null,
     sandbox: null,
-    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, search: false, compare: false, question: null, present: false },
+    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, search: false, templates: false, compare: false, question: null, present: false },
     toasts: [],
     connection: 'connecting',
     past: [],
@@ -414,6 +416,12 @@ export const useStore = create<State>()((set, get) => {
       const mine = structuredClone(get().diagram)
       mutate(() => structuredClone(d))
       set((s) => ({ scenario: s.scenario ? { ...s.scenario, solved: true, compare: { mine, reference: structuredClone(d) } } : null, selection: [] }))
+    },
+    applyTemplate: (d) => {
+      if (guardTopology()) return
+      mutate(() => d)
+      set({ selection: [], ui: { ...get().ui, welcome: false, templates: false } })
+      get().requestFit()
     },
     adoptDiagram: (d) => set((s) => ({ diagram: d, selection: s.selection.filter((id) => d.nodes.some((n) => n.id === id)) })),
     compareWithReference: (reference) =>

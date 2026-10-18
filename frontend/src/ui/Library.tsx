@@ -69,6 +69,7 @@ export function Library() {
           </ul>
         </section>
       ))}
+      <button className="linkish" onClick={() => useStore.getState().setUi({ templates: true })} disabled={configOnly}>Starter templates…</button>
       <p className="muted small">Click or drag onto the canvas. Drag from a node's right-hand handle to connect.</p>
     </aside>
   )

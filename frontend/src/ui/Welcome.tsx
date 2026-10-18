@@ -14,6 +14,7 @@ export function Welcome() {
       <p>Drag components from the left onto the canvas, wire them together, then press Play.</p>
       <div className="row-btns center">
         <button className="primary" onClick={() => { loadDiagram(exampleDiagram()); setUi({ welcome: false }); requestFit() }}>Load an example</button>
+        <button onClick={() => setUi({ templates: true })}>Browse templates</button>
         <button onClick={() => setUi({ picker: true })}>Start a challenge</button>
         <button onClick={() => setUi({ welcome: false })}>Start blank</button>
       </div>
