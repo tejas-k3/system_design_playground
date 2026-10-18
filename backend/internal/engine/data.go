@@ -354,6 +354,14 @@ func (s *Sim) readThroughEdge(n *node) *edge {
 // ---- database -----------------------------------------------------------------------
 
 func (s *Sim) readMult(n *node, c *call) float64 {
+	m := s.readMultBase(n, c)
+	if n.s("engine") == "lsm" {
+		m *= 1.5 // a read may have to look in several levels
+	}
+	return m
+}
+
+func (s *Sim) readMultBase(n *node, c *call) float64 {
 	switch c.wl {
 	case wlGeo:
 		if !n.b("spatialIndex") {
@@ -372,7 +380,13 @@ func (s *Sim) readMult(n *node, c *call) float64 {
 }
 
 // writeMult is the cost of keeping secondary indexes up to date: 30% more per index.
-func (s *Sim) writeMult(n *node) float64 { return 1 + 0.3*n.f("indexes") }
+func (s *Sim) writeMult(n *node) float64 {
+	m := 1 + 0.3*n.f("indexes")
+	if n.s("engine") == "lsm" {
+		m *= 0.5 // sequential appends instead of in-place page updates
+	}
+	return m
+}
 
 func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 	write := c.cmd == cmdWrite
@@ -400,7 +414,11 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 			ms += wait
 		}
 	}
-	s.hold(n, s.service(n, ms)*n.slow, release, cb, func() {
+	took := s.service(n, ms) * n.slow
+	if write && n.stallUntil > s.now { // an LSM database is compacting: the write waits for it to finish
+		took += n.stallUntil - s.now
+	}
+	s.hold(n, took, release, cb, func() {
 		release()
 		res := Result{Ver: -1, Done: true, Src: n}
 		switch {

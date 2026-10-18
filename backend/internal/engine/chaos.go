@@ -233,3 +233,17 @@ func (s *Sim) scheduleGC(n *node) {
 		s.scheduleGC(n)
 	})
 }
+
+// scheduleCompaction makes an LSM database stall its writes for compactionStallMs every compactionEverySec. The
+// period is fixed (no random draw): a compaction schedule is a policy, not a failure.
+func (s *Sim) scheduleCompaction(n *node) {
+	every := n.f("compactionEverySec") * 1000
+	s.after(every, func() {
+		if n.removed {
+			return
+		}
+		n.stallUntil = s.now + n.f("compactionStallMs")
+		s.logEvent("compaction", n, 0)
+		s.scheduleCompaction(n)
+	})
+}

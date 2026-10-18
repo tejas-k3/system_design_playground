@@ -90,6 +90,7 @@ type node struct {
 	slow            float64
 	slowUntil       float64
 	pausedUntil     float64     // a stop-the-world pause (GC) lasts until then; 0 = none
+	stallUntil      float64     // an LSM database's compaction holds writes until then; 0 = none
 	cut             bool        // partitioned: calls to it get no answer
 	promoted        bool        // replica that took over as the primary after a failover
 	as              scaler      // app server autoscaling state
@@ -282,6 +283,9 @@ func New(d Diagram, opts Options) *Sim {
 	for _, n := range s.order {
 		if n.kind == KAppServer && n.f("gcPauseMs") > 0 {
 			s.scheduleGC(n)
+		}
+		if n.kind == KDatabase && n.s("engine") == "lsm" {
+			s.scheduleCompaction(n)
 		}
 	}
 	for _, ev := range opts.Chaos {
