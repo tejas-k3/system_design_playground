@@ -48,6 +48,11 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 	case "partition":
 		s.partition(t, ev.DurationSec)
 		return
+	case "purge": // invalidate everything a cache or CDN holds: the next requests all miss
+		if t.store != nil {
+			s.logEvent("purge", t, t.store.Clear())
+		}
+		return
 	}
 	factor := math.Max(1, ev.Factor)
 	s.logEvent("slow", t, 0)

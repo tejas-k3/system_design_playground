@@ -198,3 +198,10 @@ func (s *Store) remove(e *entry) {
 		s.keys = s.keys[:last]
 	}
 }
+
+// Clear drops every entry (a purge) and returns how many there were.
+func (s *Store) Clear() int {
+	n := len(s.m)
+	s.m, s.ll, s.freq, s.minF, s.keys = map[int]*entry{}, list.New(), map[int]*list.List{}, 1, nil
+	return n
+}
