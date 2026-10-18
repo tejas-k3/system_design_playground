@@ -26,6 +26,7 @@ Defaults are the values a component starts with; every number is a setting you c
 | **Rate Limiter** | token bucket: `limitRps` (200) and `burst` (50) | none | Above the rate it rejects on purpose: **Rate limited (429)**. |
 | **Shard Router** | n/a: it routes by key | none | It does not fail by itself. A hot key saturates one database while the others idle; a dead shard fails only its keys. |
 | **External API** | unlimited (only latency: 80 ms, and an error rate: 1%) | none | Errors are **Vendor errors**. A slow vendor ties up the threads of the servers that wait on it. |
+| **Object Store** | `maxConcurrent` (1,000) uploads | none | An app server connected to one uploads the body of each write there first (time to first byte 30 ms plus the body at 50 MB/s per upload, over the link's bandwidth); from then on only a pointer travels, so a queue's message limit no longer applies (the claim-check pattern). Reads never touch it. It stops answering if it crashes (**Node down**, which fails the upload). |
 | **Redis** | 1 (single-threaded) | 2,000 | Queue full: **Queue full (503)**. A lock that is held: **Lock busy**. With persistence off, a crash loses what it held. |
 
 ### Failure reasons you will see
@@ -50,7 +51,7 @@ The defaults (8 threads, 16 database slots, a 50-request queue, and so on) are r
 
 ## What is not modelled yet
 
-Object storage, tiered CDNs, byte-based cache capacity and storage or egress cost (a link can have a bandwidth limit and a queue a message limit, once the users set request or response sizes); disk, memory, CPU throttling and clock skew (GC pauses exist); database isolation levels, storage engines and data volume (secondary indexes exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
+Tiered CDNs and purge, byte-based cache capacity, downloads from the object store, and storage or egress cost (a link can have a bandwidth limit and a queue a message limit, once the users set request or response sizes); disk, memory, CPU throttling and clock skew (GC pauses exist); database isolation levels, storage engines and data volume (secondary indexes exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
 
 ## Check it yourself
 
