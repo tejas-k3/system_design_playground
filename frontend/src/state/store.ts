@@ -3,6 +3,8 @@ import { emptyInterview, type InterviewData } from '../model/interview'
 import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
+import { alignNodes, autoLayout, distributeNodes, type AlignMode } from '../model/arrange'
+import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
 import { isCompact, isNarrow } from '../model/responsive'
 
@@ -74,6 +76,12 @@ export interface State {
   deleteIds(ids: string[]): void
   deleteSelection(): void
   /** Remember the selected components (and the connections between them) for pasting. */
+  /** Line the selected components up on one edge or centre line. */
+  align(mode: AlignMode): void
+  /** Space three or more selected components evenly. */
+  distribute(axis: 'x' | 'y'): void
+  /** Re-lay the whole design left to right from its connections (one undo step). */
+  tidyLayout(): void
   copySelection(quiet?: boolean): void
   /** Add a copy of what was copied, offset a little; the copy becomes the selection. */
   paste(): void
@@ -253,6 +261,21 @@ export const useStore = create<State>()((set, get) => {
       set((s) => ({ selection: s.selection.filter((id) => !kill.has(id)) }))
     },
     deleteSelection: () => get().deleteIds(get().selection),
+
+    align: (mode) => {
+      const reg = get().reg
+      if (reg) mutate((d) => alignNodes(d, get().selection, mode, (n) => nodeRect(n, reg)))
+    },
+    distribute: (axis) => {
+      const reg = get().reg
+      if (reg) mutate((d) => distributeNodes(d, get().selection, axis, (n) => nodeRect(n, reg)))
+    },
+    tidyLayout: () => {
+      const reg = get().reg
+      if (!reg || get().diagram.nodes.length === 0) return
+      mutate((d) => autoLayout(d, (n) => nodeRect(n, reg)))
+      get().requestFit()
+    },
 
     copySelection: (quiet) => {
       const clip = copySelection(get().diagram, get().selection)
