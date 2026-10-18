@@ -73,6 +73,7 @@ export function InterviewBar() {
         </div>
         <span className={`iv-clock ${left === 0 ? 'bad' : ''}`} role="timer" aria-label="Time left">{countdown(left)}</span>
         <button onClick={() => setPaused(session.pausedAt === null)} aria-pressed={session.pausedAt !== null}>{session.pausedAt === null ? 'Pause' : 'Resume'}</button>
+        <button onClick={() => useStore.getState().setUi({ present: true })} title="Hide the panels and walk through the stages with the arrow keys">Present</button>
         <button onClick={end} title="End the interview and keep your notes">End</button>
       </div>
       <p className="iv-prompt" role="tabpanel" aria-labelledby={`stage-${session.stage}`}>{info.prompt} <span className="muted small">Tool: {info.tool}.</span></p>
