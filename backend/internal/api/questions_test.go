@@ -157,3 +157,46 @@ func TestQuestionRunsShareTheRunSlots(t *testing.T) {
 	}
 	waitSlotsFree(t, srv, "the slot was not released after a question run")
 }
+
+func TestReviewQuestionsServeTheDiagramAndGradeMarks(t *testing.T) {
+	ts := newTestServer(t)
+	var q scenarios.Question
+	if code := get(t, ts.URL+"/api/questions/review-web-shop", &q); code != 200 || q.Diagram == nil || len(q.Diagram.Nodes) < 5 {
+		t.Fatalf("status %d diagram %+v", code, q.Diagram)
+	}
+	resp, _ := http.Get(ts.URL + "/api/questions/review-web-shop")
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	for _, banned := range []string{`"defects"`, `"explain"`, `"rules"`, "retry-amplification"} {
+		if strings.Contains(string(body), banned) {
+			t.Fatalf("the served question leaks %s: %s", banned, body)
+		}
+	}
+	var res scenarios.ReviewResult
+	if code := post(t, ts.URL+"/api/questions/review-web-shop/review", map[string]any{"marked": []string{"users", "app1", "cache", "db"}}, &res); code != 200 || res.Stars != 3 || len(res.Found) != 4 || len(res.FalseMarks) != 0 {
+		t.Fatalf("marking the four flawed components: status %d %+v", code, res)
+	}
+	for _, d := range res.Found {
+		if d.Explain == "" {
+			t.Errorf("a found defect must come with its explanation: %+v", d)
+		}
+	}
+	if code := post(t, ts.URL+"/api/questions/review-web-shop/review", map[string]any{"marked": []string{"lb", "rep"}}, &res); code != 200 || res.Score != 0 || len(res.Missed) != 4 || len(res.FalseMarks) != 2 {
+		t.Fatalf("marking only fine components: status %d %+v", code, res)
+	}
+	for name, body := range map[string]map[string]any{"unknown id": {"marked": []string{"nope"}}, "no marks field": {}} {
+		c := post(t, ts.URL+"/api/questions/review-web-shop/review", body, nil)
+		if name == "unknown id" && c != 400 {
+			t.Errorf("%s: status %d, want 400", name, c)
+		}
+		if name == "no marks field" && c != 200 {
+			t.Errorf("an empty review is a valid answer (nothing found): %d", c)
+		}
+	}
+	if c := post(t, ts.URL+"/api/questions/url-shortener-numbers/review", map[string]any{"marked": []string{}}, nil); c != 400 {
+		t.Errorf("an estimate question cannot be reviewed: %d", c)
+	}
+	if c := post(t, ts.URL+"/api/questions/nope/review", map[string]any{"marked": []string{}}, nil); c != 404 {
+		t.Errorf("unknown question: %d", c)
+	}
+}

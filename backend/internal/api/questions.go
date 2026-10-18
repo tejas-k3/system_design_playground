@@ -70,6 +70,30 @@ func (s *Server) runCandidate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, res)
 }
 
+type reviewReq struct {
+	Marked []string `json:"marked"`
+}
+
+// reviewQuestion scores the components a learner marked as wrong. The defects and their explanations leave
+// the server only here, as part of the result.
+func (s *Server) reviewQuestion(w http.ResponseWriter, r *http.Request) {
+	q := scenarios.Q(r.PathValue("id"))
+	if q == nil {
+		writeErr(w, 404, "no such question")
+		return
+	}
+	var req reviewReq
+	if !decode(w, r, &req) {
+		return
+	}
+	res, err := q.GradeReview(req.Marked)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, res)
+}
+
 type answerReq struct {
 	Answers map[string]float64 `json:"answers"` // estimate questions
 	Choice  *int               `json:"choice"`  // multiple-choice questions

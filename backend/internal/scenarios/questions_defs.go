@@ -178,6 +178,80 @@ func init() {
 	)
 }
 
+func registerReview(id string, d engine.Diagram, q *Question, defects ...Defect) {
+	q.ID, q.Mode, q.Diagram, q.defects = id, ModeReview, &d, defects
+	registerQuestion(q)
+}
+
+// reviewShape is the layout the review designs share: users, a balancer, two servers, a cache, a database and a replica.
+func reviewShape(users, app, cache, db P, replica P) engine.Diagram {
+	return (&bld{}).
+		n("users", engine.KClient, cols[0], rowMid, users).
+		n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+		n("app1", engine.KAppServer, cols[2], rowTop, app).
+		n("app2", engine.KAppServer, cols[2], rowBot, app).
+		n("cache", engine.KCache, cols[3], rowTop, cache).
+		n("db", engine.KDatabase, cols[4], rowMid, db).
+		n("rep", engine.KReplica, cols[4], rowBot, replica).
+		e("users", "lb").e("lb", "app1").e("lb", "app2").
+		e("app1", "cache").e("app2", "cache").e("cache", "db").e("app1", "db").e("app2", "db").e("app1", "rep").e("app2", "rep").
+		done()
+}
+
+func init() {
+	// A web shop with four flaws, one on each of four components.
+	registerReview("review-web-shop",
+		reviewShape(
+			P{"rps": 120.0, "timeoutMs": 800.0, "retries": 4.0, "backoff": "none", "readPct": 90.0},
+			P{"threads": 8.0, "queueCap": 400.0, "callTimeoutMs": 400.0, "dbPool": 100.0},
+			P{"ttlSec": 30.0, "ttlJitterPct": 0.0, "startWarm": true},
+			P{"maxConnections": 150.0}, nil),
+		&Question{
+			Title: "Review: a web shop", Difficulty: "Medium",
+			Summary: "Four things will bite this design. Find them.",
+			Prompt:  "A shop expects traffic to spike at its next sale. Mark the components you would change before it ships; mark only what you are sure is wrong. You score a point for each flaw you find and lose one for each component you mark that is fine.",
+		},
+		Defect{ID: "retries", Nodes: []string{"users"}, Rules: []string{"retries-without-backoff"}, Explain: "Clients retry up to four times with no backoff. Retries arrive exactly when the system is struggling, multiplying the load. Use exponential backoff with jitter and fewer retries."},
+		Defect{ID: "queues", Nodes: []string{"app1", "app2"}, Rules: []string{"retry-amplification", "queue-longer-than-patience"}, Explain: "Each server will queue up to 400 requests with eight threads, about a second of work, longer than users wait (800 ms). Queued requests go stale, users retry, and the queue never drains. Shorten the queue or set a maximum queue wait."},
+		Defect{ID: "expiry", Nodes: []string{"cache"}, Rules: []string{"synchronised-expiry"}, Explain: "The cache starts full and every entry lives exactly 30 seconds, so they all expire together and the database takes every miss at once. Add TTL jitter."},
+		Defect{ID: "pools", Nodes: []string{"db"}, Rules: []string{"pool-exceeds-db"}, Explain: "Two servers may each open 100 connections, 200 in total, but the database accepts 150, so under load connections are refused. Shrink the pools or raise the limit."},
+	)
+
+	// A booking service with three flaws.
+	registerReview("review-booking",
+		reviewShape(
+			P{"rps": 60.0, "readPct": 70.0, "consistency": "strong", "retries": 3.0, "backoff": "none"},
+			P{"threads": 16.0, "callTimeoutMs": 400.0},
+			P{"ttlSec": 0.0, "writePolicy": "none"},
+			P{"onFailure": "promote", "fencing": false}, P{"replication": "sync"}),
+		&Question{
+			Title: "Review: a booking service", Difficulty: "Medium",
+			Summary: "Customers need fresh data and no double bookings. What undermines that?",
+			Prompt:  "Customers insist on seeing current availability, and the database is allowed to fail over to its replica. Mark the components you would change; mark only what you are sure is wrong.",
+		},
+		Defect{ID: "retries", Nodes: []string{"users"}, Rules: []string{"retries-without-backoff"}, Explain: "Three immediate retries per failure add load at the worst moment. Back off exponentially with jitter."},
+		Defect{ID: "stale-cache", Nodes: []string{"cache"}, Rules: []string{"cache-no-ttl-with-writes"}, Explain: "Readers demand fresh data and writes happen, but this cache never expires entries and does nothing when a write arrives, so it serves old availability forever. Invalidate or write through on writes, or give entries a lifetime."},
+		Defect{ID: "split-brain", Nodes: []string{"db"}, Rules: []string{"unfenced-failover"}, Explain: "After a failover the old primary can come back and accept writes next to the new one (split brain): two people can book the same seat. Fence the old primary."},
+	)
+
+	// A search service with three flaws.
+	registerReview("review-search",
+		reviewShape(
+			P{"rps": 200.0, "timeoutMs": 1000.0},
+			P{"threads": 16.0, "circuitBreaker": true, "dbPool": 120.0},
+			P{"ttlSec": 20.0, "ttlJitterPct": 0.0, "startWarm": true},
+			P{"maxConnections": 200.0}, nil),
+		&Question{
+			Title: "Review: a search service", Difficulty: "Hard",
+			Summary: "It has a circuit breaker, so it must be safe. Is it?",
+			Prompt:  "This design was reviewed last year and given a tick for resilience. Find what is still wrong; mark only what you are sure of.",
+		},
+		Defect{ID: "dead-breaker", Nodes: []string{"app1", "app2"}, Rules: []string{"breaker-without-timeout", "no-call-timeout"}, Explain: "The servers have a circuit breaker but no call timeout. A breaker trips on failures, and a call that never times out never fails, so it can never trip: threads simply wait forever on a silent dependency."},
+		Defect{ID: "expiry", Nodes: []string{"cache"}, Rules: []string{"synchronised-expiry"}, Explain: "A warm cache with one fixed 20-second lifetime expires all at once; the database gets every miss together. Add jitter."},
+		Defect{ID: "pools", Nodes: []string{"db"}, Rules: []string{"pool-exceeds-db"}, Explain: "Two servers with 120 connections each is 240, but the database accepts 200."},
+	)
+}
+
 // tweak returns a copy of d with params merged onto every component of a kind (or with the given id).
 func tweak(d engine.Diagram, match string, p P) engine.Diagram {
 	out := d
