@@ -20,7 +20,7 @@ Defaults are the values a component starts with; every number is a setting you c
 | **Cache** | 10,000 at once | 2,000 | It rarely fails. A **down** cache is bypassed: every lookup becomes a miss and goes to the data store, so the store takes the whole load. A small or cold cache has a low hit rate; entries that all expire together cause a stampede (see the cache-stampede challenge). |
 | **Database** | `connections` (16 concurrent queries) | `queueCap` (100) | Slots busy and queue full: **Queue full (503)**. More open connections than `maxConnections` (500) across all servers: **DB connections refused**. Crashed: **Node down**, or **No primary: failing over** while a replica is being promoted. Failover has a detection time and a promotion time; writes newer than the replica's lag are lost (counted), and an unfenced old primary that returns causes split brain. |
 | **Read Replica** | 16 | 100 | Same limits as the database. Reads can be **stale** (counted, not failed). Synchronous replication makes every write wait for it (**Sync replica unreachable** if it is down). |
-| **Message Queue** | n/a: it only buffers | `capacity` (5,000 jobs) | A full queue refuses new messages (**Queue full (503)**). It only accepts writes. The backlog grows whenever workers are slower than arrivals. |
+| **Message Queue** | n/a: it only buffers | `capacity` (5,000 jobs) | A full queue refuses new messages (**Queue full (503)**). A message larger than its limit (`maxMessageKB`, 256 KB) is refused as **Message too large**, but only when the users set a request size (`reqKB`; 0 means "not modelled"). It only accepts writes. The backlog grows whenever workers are slower than arrivals. |
 | **Worker** | `concurrency` (4) | the queue it reads from | It does not fail requests; it falls behind. Watch the backlog and job latency. |
 | **CDN** | effectively unlimited | none | It does not fail; misses go to the origin, so a cold start or a short TTL sends a burst there (purging is planned, #11). |
 | **Rate Limiter** | token bucket: `limitRps` (200) and `burst` (50) | none | Above the rate it rejects on purpose: **Rate limited (429)**. |
@@ -30,7 +30,7 @@ Defaults are the values a component starts with; every number is a setting you c
 
 ### Failure reasons you will see
 
-Timeouts, Queue full (503), Node down, No route, No healthy backend, Rate limited (429), Call timeouts (504), Circuit open, Vendor errors, Lock busy, Waited too long in queue, DB connections refused, No primary: failing over, Sync replica unreachable. The chart shows them in "Why requests failed", and the Request traces tab explains one request at a time.
+Timeouts, Queue full (503), Node down, No route, No healthy backend, Rate limited (429), Call timeouts (504), Circuit open, Vendor errors, Lock busy, Waited too long in queue, DB connections refused, No primary: failing over, Sync replica unreachable, Message too large. The chart shows them in "Why requests failed", and the Request traces tab explains one request at a time.
 
 ## Chaos you can inject
 
@@ -50,7 +50,7 @@ The defaults (8 threads, 16 database slots, a 50-request queue, and so on) are r
 
 ## What is not modelled yet
 
-Payload size and bandwidth (every request is the same size, links have only latency, a queue accepts any message); disk, memory, CPU throttling, garbage-collection pauses and clock skew; database indexes, isolation levels and engines; regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
+Bandwidth and most of payload size (the only size rule so far is a queue's message limit; links have only latency, and nothing is charged for bytes); disk, memory, CPU throttling, garbage-collection pauses and clock skew; database indexes, isolation levels and engines; regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
 
 ## Check it yourself
 
