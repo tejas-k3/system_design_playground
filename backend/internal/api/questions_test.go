@@ -200,3 +200,50 @@ func TestReviewQuestionsServeTheDiagramAndGradeMarks(t *testing.T) {
 		t.Errorf("unknown question: %d", c)
 	}
 }
+
+func TestOpenChallengeHidesItsLoadAndHasNoSolutionToServe(t *testing.T) {
+	ts := newTestServer(t)
+	resp, err := http.Get(ts.URL + "/api/scenarios/ten-thousand-students")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	for _, banned := range []string{`"traffic"`, `"chaos"`, `"solution"`, "900"} {
+		if strings.Contains(string(body), banned) {
+			t.Errorf("an open challenge must not reveal %s: %s", banned, body)
+		}
+	}
+	if !strings.Contains(string(body), `"open":true`) {
+		t.Errorf("the client needs to know it is open: %s", body)
+	}
+	if code := get(t, ts.URL+"/api/scenarios/ten-thousand-students/solution", nil); code != 404 {
+		t.Errorf("an open challenge has no solution to serve: status %d", code)
+	}
+	if code := get(t, ts.URL+"/api/scenarios/hello-world/solution", nil); code != 200 {
+		t.Errorf("fix-mode solutions are still served: %d", code)
+	}
+	var list []struct {
+		ID   string `json:"id"`
+		Open bool   `json:"open"`
+	}
+	get(t, ts.URL+"/api/scenarios", &list)
+	open := 0
+	for _, s := range list {
+		if s.Open {
+			open++
+		}
+	}
+	if open != 2 {
+		t.Errorf("the list should flag the two open challenges, flagged %d", open)
+	}
+	// and it still runs with its hidden profile: a session scores it
+	var run runResp
+	sc := scenarios.Get("ten-thousand-students")
+	if code := post(t, ts.URL+"/api/run", map[string]any{"diagram": sc.Solution, "scenarioId": sc.ID}, &run); code != 200 || run.Score == nil || !run.Score.Pass {
+		t.Fatalf("the witness should pass when scored server-side: status %d %+v", code, run.Score)
+	}
+}
