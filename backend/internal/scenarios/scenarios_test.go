@@ -64,6 +64,17 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("search-tail is also solved by hedging, but not by more threads", func(t *testing.T) {
+		sc := Get("search-tail")
+		hedged := withParam(sc.Diagram, "app", "hedgeAfterMs", 100.0)
+		if res := engine.RunToEnd(hedged, sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("hedging should pass: %+v", res.Checks)
+		}
+		threads := withParam(sc.Diagram, "app", "threads", 64.0)
+		if res := engine.RunToEnd(threads, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("more threads alone must not pass (the wait is on the shards): %+v", res.Checks)
+		}
+	})
 	t.Run("double-booked with a redis lock that waits", func(t *testing.T) {
 		sc := Get("double-booked")
 		d := withParam(sc.Diagram, "app", "lockWaitMs", 500.0)
