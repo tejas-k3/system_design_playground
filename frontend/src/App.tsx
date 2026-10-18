@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Announcer } from './ui/Announcer'
 import { Board } from './ui/Board'
 import { Charts } from './ui/Charts'
+import { CompareDialog } from './ui/CompareDialog'
 import { CapacityDialog } from './ui/CapacityDialog'
 import { Inspector } from './ui/Inspector'
 import { Help } from './ui/Help'
@@ -71,6 +72,7 @@ export function App() {
       <ResultModal />
       <Help />
       <CapacityDialog />
+      <CompareDialog />
       <Toasts />
       <Announcer />
     </div>

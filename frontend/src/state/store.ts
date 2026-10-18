@@ -35,6 +35,7 @@ export interface State {
   reg: Reg | null
   diagram: Diagram
   selection: string[]
+  pinned: Diagram | null // design A for the side-by-side comparison
   findings: Finding[] // advisory design lint for the current diagram
   tool: Tool
   viewport: Viewport
@@ -47,7 +48,7 @@ export interface State {
   cost: number | null // null until the server has priced the current diagram
   scenario: ScenarioState | null
   sandbox: Diagram | null // sandbox saved while a scenario is open
-  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean }
+  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; compare: boolean }
   toasts: Toast[]
   connection: Connection
   past: Diagram[]
@@ -87,6 +88,7 @@ export interface State {
   setTraces(t: TraceSet | null): void
   setCost(c: number): void
   setFindings(f: Finding[]): void
+  setPinned(d: Diagram | null): void
   setConnection(c: Connection): void
   toast(text: string, kind?: Toast['kind'], ms?: number): void
   dismissToast(id: number): void
@@ -130,6 +132,7 @@ export const useStore = create<State>()((set, get) => {
     diagram: emptyDiagram(),
     selection: [],
     findings: [],
+    pinned: null,
     tool: 'select',
     viewport: { scrollX: 0, scrollY: 0, zoom: 1 },
     theme: typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
@@ -141,7 +144,7 @@ export const useStore = create<State>()((set, get) => {
     cost: null,
     scenario: null,
     sandbox: null,
-    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false },
+    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, compare: false },
     toasts: [],
     connection: 'connecting',
     past: [],
@@ -284,6 +287,7 @@ export const useStore = create<State>()((set, get) => {
     setNodeSeries: (nodeSeries) => set({ nodeSeries }),
     setCost: (cost) => set({ cost }),
     setFindings: (findings) => set({ findings }),
+    setPinned: (pinned) => set({ pinned: pinned ? structuredClone(pinned) : null }),
     setConnection: (connection) => set({ connection }),
 
     toast: (text, kind = 'info', ms = 3500) => {

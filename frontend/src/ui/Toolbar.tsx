@@ -117,6 +117,9 @@ export function Toolbar() {
       <button onClick={() => setUi({ capacity: true })} title="Capacity curve: how much more traffic can this take?" aria-label="Capacity curve">
         <Icon d="M4 20V4M4 20h16M7 16l4-5 3 3 5-8" />
       </button>
+      <button onClick={() => setUi({ compare: true })} title="Compare two designs side by side" aria-label="Compare designs">
+        <Icon d="M9 4v16M15 4v16M4 8h5M15 16h5" />
+      </button>
       <button onClick={() => setUi({ help: true })} title="Help & shortcuts" aria-label="Help">
         <Icon d="M9.5 9a2.5 2.5 0 114 2c-1 .7-1.5 1.2-1.5 2.5M12 17.5v.5M12 3a9 9 0 100 18 9 9 0 000-18z" />
       </button>
