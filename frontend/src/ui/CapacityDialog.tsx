@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { sweepLoad } from '../api/client'
+import { sweepLoad, sweepParam } from '../api/client'
 import type { SweepPoint } from '../api/types'
+import { paramVisible } from '../model/diagram'
 import { describeCurve, findKnee } from '../model/sweep'
+import { parseValues, suggestValues } from '../model/whatif'
 import { useStore } from '../state/store'
 import { useEscapeKey } from './useEscapeKey'
 
@@ -60,8 +62,73 @@ export function CapacityDialog() {
             </table>
           </>
         )}
+        <WhatIf />
       </div>
     </div>
+  )
+}
+
+/** Run the design with one number setting at several values, at today's load. */
+function WhatIf() {
+  const reg = useStore((s) => s.reg)
+  const diagram = useStore((s) => s.diagram)
+  const configOnlyFixed = useStore((s) => !!s.scenario)
+  const options = diagram.nodes.flatMap((n) => (reg?.params(n.kind) ?? []).filter((p) => p.type === 'number' && !(configOnlyFixed && p.fixedInChallenge) && !!reg && paramVisible(diagram, n, p, reg.resolve(n))).map((p) => ({ node: n, spec: p })))
+  const [pick, setPick] = useState(0)
+  const [text, setText] = useState('')
+  const [points, setPoints] = useState<SweepPoint[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const sel = options[Math.min(pick, options.length - 1)]
+  if (!reg || !sel) return null
+  const current = Number(reg.resolve(sel.node)[sel.spec.key])
+  const choose = (i: number) => {
+    setPick(i)
+    setPoints([])
+    setText('')
+  }
+  const shown = text || suggestValues(sel.spec, current).join(', ')
+  const run = async () => {
+    const { values, error: bad } = parseValues(shown)
+    if (bad) return setError(bad)
+    setBusy(true)
+    setError('')
+    try {
+      setPoints((await sweepParam(diagram, sel.node.id, sel.spec.key, values)).points)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The sweep failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section aria-label="What if">
+      <h3>What if I change one setting?</h3>
+      <p className="muted small">Runs the design for 20 simulated seconds at today's traffic with one setting at each value. Values outside the setting's range are clamped.</p>
+      <p>
+        <label>Setting{' '}
+          <select value={pick} onChange={(e) => choose(Number(e.target.value))} aria-label="Setting to vary">
+            {options.map((o, i) => <option key={o.node.id + o.spec.key} value={i}>{o.node.label} · {o.spec.label}</option>)}
+          </select>
+        </label>{' '}
+        <label>Values{' '}
+          <input value={shown} onChange={(e) => setText(e.target.value)} aria-label="Values to try, separated by commas" size={22} />
+        </label>{' '}
+        <button onClick={run} disabled={busy}>{busy ? 'Running…' : 'Run what-if'}</button>
+      </p>
+      {error && <p className="bad small" role="alert">{error}</p>}
+      {points.length > 0 && (
+        <table className="sweep-table">
+          <caption className="sr">Results by value of {sel.spec.label}</caption>
+          <thead><tr><th scope="col">{sel.spec.label}</th><th scope="col">Success</th><th scope="col">p50</th><th scope="col">p95</th><th scope="col">p99</th><th scope="col">Cost/hr</th></tr></thead>
+          <tbody>
+            {points.map((p) => (
+              <tr key={p.value}><th scope="row">{p.value}{p.value === current ? ' (now)' : ''}</th><td>{(p.successRate * 100).toFixed(1)}%</td><td>{Math.round(p.p50)} ms</td><td>{Math.round(p.p95)} ms</td><td>{Math.round(p.p99)} ms</td><td>${p.costPerHour.toFixed(2)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   )
 }
 

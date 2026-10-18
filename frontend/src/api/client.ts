@@ -49,3 +49,8 @@ export async function runDiagram(diagram: Diagram, scenarioId?: string, duration
   const res = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, scenarioId, durationSec, seed }) })
   return json(res)
 }
+
+export async function sweepParam(diagram: Diagram, nodeId: string, key: string, values: number[], durationSec = 20): Promise<SweepResponse> {
+  const res = await fetch('/api/sweep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, param: { nodeId, key }, values, durationSec }) })
+  return json(res)
+}
