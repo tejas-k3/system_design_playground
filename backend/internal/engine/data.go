@@ -357,10 +357,17 @@ func (s *Sim) readThroughEdge(n *node) *edge {
 
 // ---- database -----------------------------------------------------------------------
 
+// diskReadMult is how much slower a page read from disk is than one found in memory.
+const diskReadMult = 10
+
 func (s *Sim) readMult(n *node, c *call) float64 {
 	m := s.readMultBase(n, c)
 	if n.s("engine") == "lsm" {
 		m *= 1.5 // a read may have to look in several levels
+	}
+	if data := n.f("dataGB"); data > n.f("bufferPoolGB") && n.kind == KDatabase {
+		miss := 1 - n.f("bufferPoolGB")/data // pages not in memory (uniform access)
+		m *= 1 + miss*(diskReadMult-1)
 	}
 	return m
 }
