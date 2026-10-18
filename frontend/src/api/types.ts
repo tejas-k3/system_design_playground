@@ -339,7 +339,18 @@ export interface ChoiceResult {
   explain: string
   stars: number
 }
+export interface RunSummary {
+  resolved: number
+  success: number
+  p50: number
+  p95: number
+  p99: number
+  costPerHour: number
+  lostWrites: number
+  staleReadPct: number
+}
 export interface Question extends QuestionSummary {
+  candidates?: { label: string; detail: string }[]
   prompt: string
   options?: string[]
   symptoms?: Symptoms

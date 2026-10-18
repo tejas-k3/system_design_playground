@@ -248,3 +248,4 @@ button.primary:active, .card:active { box-shadow: 1px 1px 0 var(--line); transfo
 input[type='range'], .scrub { accent-color: var(--accent); }
 .seg button, .charts-head button { white-space: nowrap; }
 .credit { font-family: var(--hand); font-size: 15px; border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 12px; }
+.candidate { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; } .candidate label { flex: 1; }
