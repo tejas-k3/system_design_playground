@@ -74,6 +74,7 @@ For configuration, reverse proxy, metrics and capacity notes see [docs/DEPLOYMEN
 | `go: command not found` or an old Go | Install Go 1.23+ (`brew install go`) or use the Docker route. |
 | `npm install` warns about the Node version | Install Node 22.12+ or use the Docker route. |
 | Status dot is red / "Disconnected after being idle" | Idle sessions close after 10 minutes; press Play and it reconnects. |
+| `make up` / `docker build` sits for minutes at "load metadata" or "pulling" | Docker Hub or gcr.io is unreachable or throttling you. Check `curl -sI https://registry-1.docker.io/v2/` first. The Dockerfile pins every base image by digest, so once the images are cached a rebuild needs no network for them; if the pull keeps stalling, build without Docker (`make run`) or retry later. To refresh the pins deliberately: `bash docs/review/tools/image-digests.sh`. |
 | Want a clean slate | Clear the site's local storage in your browser; for Docker designs also `docker volume rm sdp-data` after `make down`. |
 
 ## How to play
