@@ -50,6 +50,26 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
+  browser:
+    name: browser checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # layout at 5 laptop sizes, ghost-drag, auto-fit and the accessibility tree, in the Chrome the runner ships
+      - run: make browser-check
+
   docker:
     runs-on: ubuntu-latest
     steps:
