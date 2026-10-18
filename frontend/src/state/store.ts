@@ -15,6 +15,7 @@ export interface ScenarioState {
   result: Score | null
   predictions: Record<string, number>
   solved: boolean
+  compare: { mine: Diagram; reference: Diagram } | null // your design next to the reference, once you ask or reveal it
 }
 export interface Toast {
   id: number
@@ -94,6 +95,7 @@ export interface State {
   answerPrediction(p: Prediction, choice: number): void
   revealHint(): void
   showSolution(d: Diagram): void
+  compareWithReference(reference: Diagram): void
   setResult(score: Score): void
   hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport }): void
 }
@@ -300,7 +302,7 @@ export const useStore = create<State>()((set, get) => {
         selection: [],
         stats: emptyStats(),
         traces: null,
-        scenario: { def, hintLevel: 0, result: null, predictions: {}, solved: false },
+        scenario: { def, hintLevel: 0, result: null, predictions: {}, solved: false, compare: null },
         sim: { ...s.sim, status: 'stopped', speed: def.speed || 1 },
         ui: { ...s.ui, picker: false, welcome: false, result: false, library: !def.configOnly && !isNarrow() },
       })
@@ -325,9 +327,12 @@ export const useStore = create<State>()((set, get) => {
     revealHint: () => set((s) => (s.scenario ? { scenario: { ...s.scenario, hintLevel: Math.min(3, s.scenario.hintLevel + 1) } } : {})),
     showSolution: (d) => {
       if (!get().scenario) return
+      const mine = structuredClone(get().diagram)
       mutate(() => structuredClone(d))
-      set((s) => ({ scenario: s.scenario ? { ...s.scenario, solved: true } : null, selection: [] }))
+      set((s) => ({ scenario: s.scenario ? { ...s.scenario, solved: true, compare: { mine, reference: structuredClone(d) } } : null, selection: [] }))
     },
+    compareWithReference: (reference) =>
+      set((s) => (s.scenario ? { scenario: { ...s.scenario, compare: { mine: structuredClone(s.diagram), reference: structuredClone(reference) } } } : {})),
     setResult: (score) =>
       set((s) => {
         if (!s.scenario) return {}

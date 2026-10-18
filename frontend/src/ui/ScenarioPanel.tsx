@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchSolution } from '../api/client'
+import { describeDiff, diffDiagrams } from '../model/diff'
 import { goalCost, goalRows, starTargets } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { reset } from '../sim/bridge'
@@ -15,6 +16,8 @@ export function ScenarioPanel() {
   const answer = useStore((s) => s.answerPrediction)
   const showSolution = useStore((s) => s.showSolution)
   const exit = useStore((s) => s.exitScenario)
+  const compareWith = useStore((s) => s.compareWithReference)
+  const reg = useStore((s) => s.reg)
   const [open, setOpen] = useState(!isNarrow()) // on a phone the story starts folded away so the board is visible
   useEffect(() => setOpen(!isNarrow()), [sc?.def.id])
   if (!sc) return null
@@ -67,6 +70,18 @@ export function ScenarioPanel() {
               {def.hints.slice(0, sc.hintLevel).map((h, i) => <li key={i}>{h}</li>)}
             </ol>
           )}
+          {sc.result?.pass && !sc.compare && (
+            <p>
+              <button onClick={async () => {
+                try {
+                  compareWith(await fetchSolution(def.id))
+                } catch (e) {
+                  useStore.getState().toast((e as Error).message, 'error')
+                }
+              }}>Compare with the reference</button>
+            </p>
+          )}
+          {sc.compare && reg && <VsReference mine={sc.compare.mine} reference={sc.compare.reference} />}
           <div className="row-btns">
             <button onClick={revealHint} disabled={sc.hintLevel >= 3}>{sc.hintLevel === 0 ? 'Give me a hint' : sc.hintLevel < 3 ? 'Another hint' : 'No more hints'}</button>
             <button
@@ -85,6 +100,22 @@ export function ScenarioPanel() {
             </button>
           </div>
         </div>
+      )}
+    </section>
+  )
+}
+
+function VsReference({ mine, reference }: { mine: import('../api/types').Diagram; reference: import('../api/types').Diagram }) {
+  const reg = useStore((s) => s.reg)!
+  const lines = describeDiff(diffDiagrams(mine, reference, reg), reg)
+  return (
+    <section className="vs-reference" aria-label="Your design versus the reference">
+      <h3>Your design vs the reference</h3>
+      {lines.length === 0 ? <p className="muted small">Identical to the reference.</p> : (
+        <>
+          <p className="muted small">{lines.length} {lines.length === 1 ? 'difference' : 'differences'}. Other designs can work too: this is the reference's way.</p>
+          <ul>{lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
+        </>
       )}
     </section>
   )

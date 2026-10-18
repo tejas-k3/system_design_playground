@@ -214,3 +214,5 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .curve { width: 100%; max-width: 560px; color: var(--text, inherit); }
 .sweep-table { border-collapse: collapse; font-size: 13px; margin-top: 8px; } .sweep-table th, .sweep-table td { padding: 2px 10px; text-align: right; } .sweep-table th[scope=row] { text-align: left; }
 .sweep-table tr.knee { font-weight: 700; outline: 1px dashed var(--muted); }
+
+.vs-reference ul { margin: 4px 0 8px; padding-left: 18px; font-size: 13px; } .vs-reference li { margin-bottom: 2px; }
