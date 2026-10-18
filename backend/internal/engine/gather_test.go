@@ -133,3 +133,37 @@ func TestPartialResultsTradeCompletenessForAvailability(t *testing.T) {
 		t.Fatalf("answers missing a shard are counted: partial %d (strict %d) of %d ok", loose.Partial, strict.Partial, loose.OK)
 	}
 }
+
+func hedgeDesign(hedgeMs float64) Diagram {
+	d := gatherDesign(8, "all", "heavy")
+	for i := range d.Nodes {
+		if d.Nodes[i].Kind == KAppServer {
+			d.Nodes[i].Params["hedgeAfterMs"] = hedgeMs
+		}
+	}
+	return d
+}
+
+// Heavy-tailed shards sometimes take far longer than their mean. Asking again after a short wait gives a second,
+// independent draw, so the slow outliers stop dominating the request: the tail shrinks for a little extra load.
+func TestHedgingShrinksTheTailForAnExtraLoad(t *testing.T) {
+	off := stat(hedgeDesign(0))
+	on := stat(hedgeDesign(70))
+	t.Logf("p99 off %.0f on %.0f; hedged %d of %d requests", off.P99, on.P99, on.Hedged, on.OK)
+	if on.P99 > off.P99*0.8 {
+		t.Fatalf("hedging should cut the p99 clearly: %.0f without, %.0f with", off.P99, on.P99)
+	}
+	if off.Hedged != 0 || on.Hedged == 0 {
+		t.Fatalf("hedged requests are counted only when it is on: off %d on %d", off.Hedged, on.Hedged)
+	}
+	// each hedge is one more query on a shard: the load rises by about the number of hedges
+	if on.Hedged > on.OK*8/2 {
+		t.Fatalf("a short hedge delay on well-behaved shards should hedge a minority of the queries: %d of %d", on.Hedged, on.OK*8)
+	}
+}
+
+func TestHedgeOffIsIdenticalToNeverMentioningIt(t *testing.T) {
+	if !reflect.DeepEqual(stat(hedgeDesign(0)), stat(gatherDesign(8, "all", "heavy"))) {
+		t.Fatal("hedgeAfterMs 0 must change nothing")
+	}
+}
