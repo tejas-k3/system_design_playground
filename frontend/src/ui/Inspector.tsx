@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
 import { palettes } from '../draw/theme'
 import type { AlignMode } from '../model/arrange'
-import { PROTOCOLS, connectableTargets, paramVisible } from '../model/diagram'
+import { copySelection } from '../model/clipboard'
+import { addUserTemplate, loadUserTemplates, saveUserTemplates } from '../model/userTemplates'
+import { PROTOCOLS, newId, connectableTargets, paramVisible } from '../model/diagram'
 import { isCompact } from '../model/responsive'
 import { fmtCost, pct, successRate } from '../model/goals'
 import { phaseChip } from '../model/phase'
@@ -95,12 +97,30 @@ function Arrange() {
   const selection = useStore((s) => s.selection)
   const { align, distribute, tidyLayout } = useStore.getState()
   const chosen = diagram.nodes.filter((n) => selection.includes(n.id)).length
+  const reg = useStore((st) => st.reg)
+  const [name, setName] = useState('')
+  const [saved, setSaved] = useState(false)
   if (diagram.nodes.length < 2) return null
+  const saveTemplate = () => {
+    if (!reg || chosen === 0) return
+    const clip = copySelection(diagram, selection)
+    const next = addUserTemplate(loadUserTemplates(reg), name, clip, newId('u'))
+    saveUserTemplates(next)
+    setName('')
+    setSaved(true)
+    useStore.getState().toast(`Saved "${next[0].title}" to your templates`, 'info')
+  }
   return (
     <>
       <h3>Arrange</h3>
       <div className="arrange">
         <button onClick={tidyLayout} title="Lay the components out left to right following their connections (undoable)">Tidy up layout</button>
+        {chosen >= 1 && (
+          <div className="arrange-row" role="group" aria-label="Save the selection as a template">
+            <input type="text" value={name} placeholder="Template name" aria-label="Template name" maxLength={40} onChange={(e) => { setName(e.target.value); setSaved(false) }} />
+            <button onClick={saveTemplate} title="Keep the selected components as a template in this browser">Save as template{saved ? ' ✓' : ''}</button>
+          </div>
+        )}
         {chosen >= 2 && (
           <div role="group" aria-label="Align the selected components" className="arrange-row">
             {ALIGNS.map((a) => (
