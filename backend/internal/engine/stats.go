@@ -68,6 +68,7 @@ type RunStats struct {
 	Fresh          int             `json:"freshReads"`
 	Stale          int             `json:"staleReads"`
 	Dups           int             `json:"duplicates"`
+	Partial        int             `json:"partial,omitempty"` // answers sent with fewer shards than required (partial results)
 	LostWrites     int             `json:"lostWrites"`
 	LostUpdates    int             `json:"lostUpdates,omitempty"` // transfers that silently overwrote a concurrent commit (read committed)
 	TxAborts       int             `json:"txAborts,omitempty"`    // transactions aborted for a write conflict or as a deadlock victim
@@ -217,7 +218,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, Partial: s.runPartial, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {

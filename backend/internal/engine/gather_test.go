@@ -72,3 +72,64 @@ func TestGatherOffLeavesTheAppAloneAndIsDeterministic(t *testing.T) {
 		t.Fatalf("without gather the shards are not a read path: %d ok", a.OK)
 	}
 }
+
+func gatherDesignK(shards int, gather string, k float64, partial bool) Diagram {
+	d := gatherDesign(shards, gather, "exponential")
+	for i := range d.Nodes {
+		if d.Nodes[i].Kind == KAppServer {
+			d.Nodes[i].Params["k"] = k
+			d.Nodes[i].Params["partialResults"] = partial
+		}
+	}
+	return d
+}
+
+// Answering once 12 of 16 shards have replied skips the slowest four: E[12th of 16] = mean x (H16 - H4) = 30 x 1.30.
+func TestFirstKCutsTheTailButStragglersStillCostCapacity(t *testing.T) {
+	all := stat(gatherDesign(16, "all", "exponential"))
+	k12 := stat(gatherDesignK(16, "firstK", 12, false))
+	// all waits for the max: 30 x H16 = 101 ms; the 12th of 16: 30 x (H16 - H4) = 39 ms; difference about 62 ms
+	if d := all.Mean - k12.Mean; d < 45 || d > 80 {
+		t.Fatalf("answering on the first 12 of 16 should save about 62 ms: all %.0f, first-12 %.0f (difference %.0f)", all.Mean, k12.Mean, d)
+	}
+	s := run(gatherDesignK(16, "firstK", 12, false), Options{Seed: 11}, 30)
+	e := s.Snapshot().Edges
+	if e["a>s0"].Rps < 30 || e["a>s15"].Rps < 30 {
+		t.Fatalf("every shard is still asked every time: %.0f and %.0f rps of 40", e["a>s0"].Rps, e["a>s15"].Rps)
+	}
+}
+
+func TestKLargerThanTheShardCountMeansAll(t *testing.T) {
+	all := stat(gatherDesign(4, "all", "exponential"))
+	big := stat(gatherDesignK(4, "firstK", 99, false))
+	if all.Mean != big.Mean {
+		t.Fatalf("k beyond the number of shards must behave like all: %.1f vs %.1f", all.Mean, big.Mean)
+	}
+}
+
+func TestFirstKStillFailsWhenTooFewShardsCanAnswer(t *testing.T) {
+	o := Options{Seed: 11, Chaos: []ChaosEvent{{Type: "crash", NodeID: "s0", AtSec: 3}, {Type: "crash", NodeID: "s1", AtSec: 3}}}
+	r := run(gatherDesignK(4, "firstK", 3, false), o, 30).RunSnapshot()
+	if float64(r.OK) > 0.3*float64(r.OK+r.Failed) {
+		t.Fatalf("2 of 4 shards down cannot give 3 answers: %d ok of %d", r.OK, r.OK+r.Failed)
+	}
+	r2 := run(gatherDesignK(4, "firstK", 2, false), o, 30).RunSnapshot()
+	if float64(r2.OK) < 0.9*float64(r2.OK+r2.Failed) {
+		t.Fatalf("2 of 4 shards down still gives 2 answers: %d ok of %d", r2.OK, r2.OK+r2.Failed)
+	}
+}
+
+func TestPartialResultsTradeCompletenessForAvailability(t *testing.T) {
+	o := Options{Seed: 11, Chaos: []ChaosEvent{{Type: "crash", NodeID: "s2", AtSec: 3}}}
+	strict := run(gatherDesignK(4, "all", 4, false), o, 30).RunSnapshot()
+	loose := run(gatherDesignK(4, "all", 4, true), o, 30).RunSnapshot()
+	if float64(strict.OK) > 0.3*float64(strict.OK+strict.Failed) {
+		t.Fatalf("strict wait-for-all fails when a shard is down: %d ok", strict.OK)
+	}
+	if float64(loose.OK) < 0.9*float64(loose.OK+loose.Failed) {
+		t.Fatalf("partial results keep answering: %d ok of %d", loose.OK, loose.OK+loose.Failed)
+	}
+	if loose.Partial < loose.OK/2 || strict.Partial != 0 {
+		t.Fatalf("answers missing a shard are counted: partial %d (strict %d) of %d ok", loose.Partial, strict.Partial, loose.OK)
+	}
+}
