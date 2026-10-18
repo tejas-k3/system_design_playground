@@ -224,3 +224,6 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .overlay-fig { margin: 0; }
 
 .workings { font-size: 13px; padding-left: 18px; } .workings li { margin-bottom: 4px; }
+
+.option { display: block; padding: 4px 6px; margin: 4px 0; border-left: 3px solid transparent; } .option.right { border-left-color: #2f9e44; font-weight: 600; }
+fieldset { border: 0; padding: 0; margin: 8px 0; } legend { font-weight: 700; }

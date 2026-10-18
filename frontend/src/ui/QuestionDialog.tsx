@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { answerEstimate, fetchQuestion } from '../api/client'
-import type { EstimateResult, Question } from '../api/types'
+import { answerChoice, answerEstimate, fetchQuestion } from '../api/client'
+import type { ChoiceResult, EstimateResult, Question, SeriesPoint, Symptoms } from '../api/types'
+import { fmtMs } from '../model/trace'
+import { describeSeries } from '../model/symptoms'
 import { formatEstimate, parseNumber, verdictLabel } from '../model/questions'
 import { useStore } from '../state/store'
 import { Stars } from './Stars'
@@ -15,11 +17,15 @@ export function QuestionDialog() {
   const [result, setResult] = useState<EstimateResult | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [choice, setChoice] = useState<number | null>(null)
+  const [picked, setPicked] = useState<ChoiceResult | null>(null)
   useEffect(() => {
     setQ(null)
     setText({})
     setResult(null)
     setError('')
+    setChoice(null)
+    setPicked(null)
     if (id) fetchQuestion(id).then(setQ).catch((e: Error) => setError(e.message))
   }, [id])
   const close = () => setUi({ question: null })
@@ -45,6 +51,20 @@ export function QuestionDialog() {
       setBusy(false)
     }
   }
+  const submitChoice = async () => {
+    if (!q || choice === null) return setError('Pick one of the explanations first.')
+    setBusy(true)
+    setError('')
+    try {
+      const r = await answerChoice(q.id, choice)
+      setPicked(r)
+      recordStars(q.id, r.stars)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not grade that.')
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <div className="modal-back" role="dialog" aria-modal aria-label={q?.title ?? 'Question'} onClick={close}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
@@ -53,7 +73,33 @@ export function QuestionDialog() {
           <>
             <p>{q.prompt}</p>
             <dl className="kv">{q.facts?.map((f) => (<><dt key={f.label}>{f.label}</dt><dd key={f.value}>{f.value}</dd></>))}</dl>
-            {!result && (
+            {q.mode === 'diagnose' && q.symptoms && q.options && (
+              <>
+                <Dashboard symptoms={q.symptoms} />
+                <form onSubmit={(e) => { e.preventDefault(); void submitChoice() }}>
+                  <fieldset disabled={!!picked}>
+                    <legend>What is happening?</legend>
+                    {q.options.map((o, i) => (
+                      <label key={i} className={`option ${picked && picked.answer === i ? 'right' : ''}`}>
+                        <input type="radio" name="diagnosis" checked={choice === i} onChange={() => setChoice(i)} /> {o}
+                        {picked && picked.answer === i && <b> (the right answer)</b>}
+                        {picked && choice === i && picked.answer !== i && <b> (your answer)</b>}
+                      </label>
+                    ))}
+                  </fieldset>
+                  {error && <p className="bad small" role="alert">{error}</p>}
+                  {!picked && <button className="primary" type="submit" disabled={busy}>{busy ? 'Checking…' : 'Check my diagnosis'}</button>}
+                </form>
+                {picked && (
+                  <section aria-label="Result">
+                    <p role="status"><Stars n={picked.stars} size={16} /> {picked.correct ? 'Correct.' : 'Not this time.'}</p>
+                    <p>{picked.explain}</p>
+                    <p className="row-btns"><button onClick={() => { setPicked(null); setChoice(null); setError('') }}>Try again</button><button onClick={close}>Done</button></p>
+                  </section>
+                )}
+              </>
+            )}
+            {q.mode === 'estimate' && !result && (
               <form onSubmit={(e) => { e.preventDefault(); void submit() }}>
                 {q.fields?.map((f) => (
                   <p key={f.key}>
@@ -66,7 +112,7 @@ export function QuestionDialog() {
                 <button className="primary" type="submit" disabled={busy}>{busy ? 'Checking…' : 'Check my numbers'}</button>
               </form>
             )}
-            {result && (
+            {q.mode === 'estimate' && result && (
               <section aria-label="Result">
                 <p role="status"><Stars n={result.stars} size={16} /> Score {Math.round(result.score * 100)}%. {result.stars === 3 ? 'Every number is within 30%.' : 'Read the workings below.'}</p>
                 <table className="sweep-table">
@@ -85,5 +131,53 @@ export function QuestionDialog() {
         {!q && error && <p className="bad" role="alert">{error}</p>}
       </div>
     </div>
+  )
+}
+
+const W = 250
+const H = 110
+
+function Line({ title, unit, series, lines }: { title: string; unit: string; series: SeriesPoint[]; lines: { pick: (p: SeriesPoint) => number; dash?: string; color: string }[] }) {
+  const tMax = Math.max(1, ...series.map((p) => p.t))
+  const yMax = Math.max(1, ...lines.flatMap((l) => series.map(l.pick)))
+  const path = (pick: (p: SeriesPoint) => number) => series.map((p, i) => `${i ? 'L' : 'M'}${(30 + (p.t / tMax) * (W - 36)).toFixed(1)} ${(8 + (1 - pick(p) / yMax) * (H - 24)).toFixed(1)}`).join(' ')
+  const label = lines.length > 1 ? `${describeSeries(title, series, lines[0].pick, unit)} ${describeSeries('Errors', series, lines[1].pick, unit)}` : describeSeries(title, series, lines[0].pick, unit)
+  return (
+    <figure className="overlay-fig">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="overlay">
+        <text x="2" y="12" fontSize="10" fill="currentColor">{Math.round(yMax)}</text>
+        <text x="2" y={H - 16} fontSize="10" fill="currentColor">0</text>
+        <line x1="30" y1={H - 16} x2={W - 6} y2={H - 16} stroke="currentColor" opacity=".4" />
+        {lines.map((l, i) => <path key={i} d={path(l.pick)} fill="none" stroke={l.color} strokeWidth="2" strokeDasharray={l.dash} />)}
+      </svg>
+      <figcaption className="muted small">{title} ({unit}){lines.length > 1 ? ', errors dashed' : ''} · 0–{Math.round(tMax)} s</figcaption>
+    </figure>
+  )
+}
+
+/** What the on-call engineer would see: three charts, the failure reasons and one failed request. */
+function Dashboard({ symptoms }: { symptoms: Symptoms }) {
+  const reg = useStore((s) => s.reg)
+  const reason = (id: string) => reg?.reasonLabel(id) ?? id
+  const t = symptoms.trace
+  return (
+    <section aria-label="What the dashboard shows">
+      <div className="compare-charts">
+        <Line title="Requests per second" unit="req/s" series={symptoms.series} lines={[{ pick: (p) => p.okRps, color: '#2f9e44' }, { pick: (p) => p.errRps, color: '#e03131', dash: '5 3' }]} />
+        <Line title="p95 latency" unit="ms" series={symptoms.series} lines={[{ pick: (p) => p.p95, color: '#3b5bdb' }]} />
+        <Line title="Requests in flight" unit="requests" series={symptoms.series} lines={[{ pick: (p) => p.inFlight, color: '#e8590c' }]} />
+      </div>
+      <p className="small"><b>Failures by reason:</b> {Object.entries(symptoms.errors).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${reason(k)} ${v.toLocaleString()}`).join(', ') || 'none'}</p>
+      {t && (
+        <details>
+          <summary>One failed request: {t.write ? 'write' : 'read'}, {fmtMs(t.latencyMs)}, {t.attempts} {t.attempts === 1 ? 'attempt' : 'attempts'}, {t.reason ? reason(t.reason) : 'failed'}</summary>
+          <ol className="workings">
+            {t.spans.filter((sp) => !sp.late).map((sp, i) => (
+              <li key={i} style={{ marginLeft: sp.depth * 14 }}>{sp.label}: {fmtMs(sp.end - sp.at)}{sp.start - sp.at > 1 ? `, waited ${fmtMs(sp.start - sp.at)} for a free thread` : ''} · {sp.ok ? 'ok' : sp.reason ? reason(sp.reason) : 'failed'}</li>
+            ))}
+          </ol>
+        </details>
+      )}
+    </section>
   )
 }
