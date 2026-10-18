@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"reflect"
 
 	"sysdesign/internal/engine"
 )
@@ -32,6 +33,9 @@ func (ss *session) logEdit(e edit) {
 
 // applyDiagram makes d the live design, syncing a running simulation and recording the edit.
 func (ss *session) applyDiagram(d engine.Diagram) {
+	if reflect.DeepEqual(ss.diagram, d) {
+		return // the client echoes the design back after a seek; that is not an edit
+	}
 	ss.diagram = d
 	if ss.sim != nil {
 		ss.sim.Sync(d)
