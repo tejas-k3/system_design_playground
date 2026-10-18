@@ -78,3 +78,39 @@ func get(t *testing.T, url string, out any) int {
 	}
 	return resp.StatusCode
 }
+
+func TestDiagnoseQuestionsServeSymptomsNotTheAnswer(t *testing.T) {
+	ts := newTestServer(t)
+	var q scenarios.Question
+	if code := get(t, ts.URL+"/api/questions/cut-off-threads", &q); code != 200 {
+		t.Fatalf("status %d", code)
+	}
+	if q.Mode != scenarios.ModeDiagnose || len(q.Options) < 3 || q.Symptoms == nil || len(q.Symptoms.Series) == 0 {
+		t.Fatalf("a diagnose question needs options and symptoms: %+v", q)
+	}
+	resp, _ := http.Get(ts.URL + "/api/questions/cut-off-threads")
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if strings.Contains(string(body), `"answer"`) || strings.Contains(string(body), `"explain"`) || strings.Contains(string(body), "no call timeout") {
+		t.Fatalf("the answer or its explanation leaked before answering: %s", body)
+	}
+}
+
+func TestAnsweringADiagnosisRevealsTheKeyOnlyAfterwards(t *testing.T) {
+	ts := newTestServer(t)
+	var wrong, right scenarios.ChoiceResult
+	if code := post(t, ts.URL+"/api/questions/cut-off-threads/answer", map[string]any{"choice": 0}, &wrong); code != 200 || wrong.Correct || wrong.Explain == "" || wrong.Answer != 1 {
+		t.Fatalf("wrong choice: status %d %+v", code, wrong)
+	}
+	if code := post(t, ts.URL+"/api/questions/cut-off-threads/answer", map[string]any{"choice": 1}, &right); code != 200 || !right.Correct || right.Stars != 3 {
+		t.Fatalf("right choice: status %d %+v", code, right)
+	}
+	for name, body := range map[string]map[string]any{"out of range": {"choice": 9}, "negative": {"choice": -1}, "none given": {}, "numbers to a choice question": {"answers": map[string]float64{"a": 1}}} {
+		if c := post(t, ts.URL+"/api/questions/cut-off-threads/answer", body, nil); c != 400 {
+			t.Errorf("%s: status %d, want 400", name, c)
+		}
+	}
+	if c := post(t, ts.URL+"/api/questions/url-shortener-numbers/answer", map[string]any{"choice": 1}, nil); c != 400 {
+		t.Errorf("a choice sent to an estimate question: %d", c)
+	}
+}

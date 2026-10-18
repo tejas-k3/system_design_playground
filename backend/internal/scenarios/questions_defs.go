@@ -58,4 +58,52 @@ func init() {
 			{Key: "storageTB", Label: "Storage after 3 years", Unit: "TB", Expected: 50e6 * 40 * 365 * 3 * 100 / 1e12, Explain: "50 million x 40 = 2 billion messages a day; x 365 x 3 years = about 2.2 trillion; x 100 bytes = about 219 TB. Too big for one machine: sharding is not optional."},
 		},
 	})
+
+	registerDiagnose("cut-off-threads", diagSource{"cut-off", 1, 60}, &Question{
+		Title: "Everything slows, then stops", Difficulty: "Medium",
+		Summary: "Success falls off a cliff and the latency chart goes blank. What is going on?",
+		Prompt:  "This is one minute of a web shop's dashboard and one failed request. Most reads are served by a cache. Pick the explanation that fits all of it.",
+		Options: []string{
+			"The cache was flushed, so every request now hits the database.",
+			"The application servers' threads are stuck waiting on a database that has stopped answering, so they cannot serve even the requests that never needed it.",
+			"Traffic doubled and the servers ran out of CPU.",
+			"The load balancer is sending all requests to one server.",
+		},
+		answer:      1,
+		explanation: "Requests that need the database are not refused, they just never come back. With no call timeout, each one holds a thread for as long as the outage lasts, so all the threads fill up and even cache hits queue behind them. Success falls to near zero at once, and there is no latency to chart because nothing finishes. The fix is a call timeout (so threads are released) and a circuit breaker.",
+	})
+
+	registerDiagnose("retry-storm-recovery", diagSource{"retry-pileup", 1, 60}, &Question{
+		Title: "The trigger is gone but the outage is not", Difficulty: "Medium",
+		Summary: "Something briefly slowed the system at 16 seconds. A minute later it is still down.",
+		Prompt:  "Clients wait up to 800 ms and retry failures. The dashboard shows success collapsing around 16 seconds and never coming back; the failed request below was attempted five times. Which explanation fits?",
+		Options: []string{
+			"The database crashed and never restarted.",
+			"The system is stuck in a retry storm: retries keep the queues full of work whose users have already given up, so the load never drops enough to recover even after the original slowdown ended.",
+			"The traffic grew steadily until it exceeded capacity.",
+			"The cache is cold and will warm up by itself in a few minutes.",
+		},
+		answer:      1,
+		explanation: "Offered load stays flat (about 380 requests a second), yet requests in flight jump from about 50 to about 600 and stay there. A trigger (a slow database) pushed the queues over, every failure was retried immediately, and the servers kept working on the oldest queued requests, whose users had already left. The effort is wasted and the retries keep the queues full: a metastable failure that outlives its cause. The fixes are retry limits with backoff, newest-first queues, a maximum queue wait, and a circuit breaker.",
+	})
+
+	registerDiagnose("stampede-spikes", diagSource{"cache-stampede", 1, 60}, &Question{
+		Title: "A short outage that fixes itself", Difficulty: "Hard",
+		Summary: "Latency climbs for a few seconds, everything fails for a few more, then all is well.",
+		Prompt:  "Around 10 to 18 seconds in, in-flight requests jump to about 700 and nothing succeeds. By 20 seconds the system is back to normal throughput, with no one touching it. A failed request timed out after 2 seconds. Which explanation fits?",
+		Options: []string{
+			"A cache stampede: many popular cache entries expired together, so a wave of identical misses hit the database at once.",
+			"The primary database crashed and failed over to a replica.",
+			"A network partition cut the application servers off from the database.",
+			"The autoscaler removed servers and then added them back.",
+		},
+		answer:      0,
+		explanation: "Nothing is down: arrivals are steady before and after. What changes is how many requests miss the cache at the same moment. The cache is filled all at once with the same lifetime, so it also expires all at once; every miss goes to the database, which slows to a crawl, requests time out and are retried, and it recovers only when the cache is refilled. Fixes: randomise lifetimes (TTL jitter) and let one request refill an entry while the others wait (request coalescing).",
+	})
+}
+
+func registerDiagnose(id string, src diagSource, q *Question) {
+	q.ID, q.Mode, q.source = id, ModeDiagnose, src
+	q.Symptoms = loadSymptoms(id)
+	registerQuestion(q)
 }
