@@ -52,6 +52,18 @@ func TestLintRulesFireOnTheRiskyShapeAndStaySilentOtherwise(t *testing.T) {
 		{"pools bigger than the database allows", lintDiagram(3, nil, Params{"callTimeoutMs": 500.0, "dbPool": 100.0}, Params{"maxConnections": 200.0}), "pool-exceeds-db", true, "error"},
 		{"pools within the limit", lintDiagram(3, nil, Params{"callTimeoutMs": 500.0, "dbPool": 50.0}, Params{"maxConnections": 200.0}), "pool-exceeds-db", false, ""},
 		{"promotion without fencing", lintDiagram(2, nil, good, Params{"onFailure": "promote", "fencing": false}), "unfenced-failover", true, "error"},
+		{"queue deeper than users will wait", lintDiagram(2, Params{"timeoutMs": 800.0}, Params{"callTimeoutMs": 500.0, "queueCap": 400.0}, nil), "queue-longer-than-patience", true, "warn"},
+		{"a wait limit inside their patience fixes it", lintDiagram(2, Params{"timeoutMs": 800.0}, Params{"callTimeoutMs": 500.0, "queueCap": 400.0, "queueTimeoutMs": 300.0}, nil), "queue-longer-than-patience", false, ""},
+		{"a short queue is fine", lintDiagram(2, Params{"timeoutMs": 800.0}, good, nil), "queue-longer-than-patience", false, ""},
+		{"strong reads, writes, cache that never expires", withCache(Params{}, Params{"readPct": 80.0, "consistency": "strong"}), "cache-no-ttl-with-writes", true, "warn"},
+		{"invalidation on write is fine", withCache(Params{"writePolicy": "invalidate"}, Params{"readPct": 80.0, "consistency": "strong"}), "cache-no-ttl-with-writes", false, ""},
+		{"eventual readers tolerate it", withCache(Params{}, Params{"readPct": 80.0}), "cache-no-ttl-with-writes", false, ""},
+		{"read-only traffic cannot go stale", withCache(Params{}, Params{"readPct": 100.0, "consistency": "strong"}), "cache-no-ttl-with-writes", false, ""},
+		{"autoscaler ceiling below what the traffic needs", scaled(Params{"maxInstances": 2.0, "threads": 8.0, "cpuMs": 20.0}, 1500.0), "autoscale-max-low", true, "warn"},
+		{"ceiling above need", scaled(Params{"maxInstances": 8.0, "threads": 8.0, "cpuMs": 20.0}, 1500.0), "autoscale-max-low", false, ""},
+		{"failover that loses the async lag", withReplica(Params{"onFailure": "promote"}, "async"), "async-replica-failover", true, "info"},
+		{"synchronous replica does not", withReplica(Params{"onFailure": "promote"}, "sync"), "async-replica-failover", false, ""},
+		{"no failover, no finding", withReplica(Params{}, "async"), "async-replica-failover", false, ""},
 		{"promotion with fencing", lintDiagram(2, nil, good, Params{"onFailure": "promote"}), "unfenced-failover", false, ""},
 	}
 	for _, c := range cases {
@@ -109,4 +121,24 @@ func TestLintIsFastOnABigDesign(t *testing.T) {
 	if best > 20*time.Millisecond {
 		t.Fatalf("lint must stay under 20 ms for a 94-node design, took %v", best)
 	}
+}
+
+func withCache(cache, client Params) Diagram {
+	d := lintDiagram(2, client, Params{"callTimeoutMs": 500.0}, nil)
+	d.Nodes = append(d.Nodes, Node{ID: "c", Kind: KCache, Params: cache})
+	d.Edges = append(d.Edges, Edge{ID: "app1>c", From: "app1", To: "c"})
+	return d
+}
+
+func scaled(app Params, rps float64) Diagram {
+	app["autoscale"] = true
+	app["callTimeoutMs"] = 500.0
+	return lintDiagram(1, Params{"rps": rps}, app, nil)
+}
+
+func withReplica(db Params, mode string) Diagram {
+	d := lintDiagram(2, nil, Params{"callTimeoutMs": 500.0}, db)
+	d.Nodes = append(d.Nodes, Node{ID: "r", Kind: KReplica, Params: Params{"replication": mode}})
+	d.Edges = append(d.Edges, Edge{ID: "app1>r", From: "app1", To: "r"})
+	return d
 }
