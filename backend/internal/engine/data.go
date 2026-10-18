@@ -380,6 +380,10 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		s.dbBooking(n, c, cb, release)
 		return
 	}
+	if write && c.wl == wlTransfer && n.kind == KDatabase {
+		s.dbTransfer(n, c, cb, release)
+		return
+	}
 	ms := n.f("readMs") * s.readMult(n, c)
 	if write {
 		ms = n.f("writeMs") * s.writeMult(n)

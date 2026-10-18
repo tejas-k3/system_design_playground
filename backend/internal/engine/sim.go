@@ -125,6 +125,9 @@ type node struct {
 	openConns int
 	booked    map[int]int
 	klocks    map[int]*keyLock
+	tver      map[int]int // transfers: version of each account, bumped by every commit
+	txl       map[int]*txLock
+	txWaits   map[int]int // transaction -> the account it is waiting for (for deadlock detection)
 
 	// app / worker
 	pools map[*node]*pool
@@ -204,6 +207,8 @@ type Sim struct {
 	runResolved, runOK, runFailed, runPending int
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
+	runLostUpdates, runTxAborts, runDeadlocks int
+	txnSeq                                    int
 	runLost                                   int // writes lost when an in-memory store crashed
 
 	jobEnqueued, jobCompleted, jobLost, jobRetried int

@@ -9,7 +9,7 @@ func (s *Sim) addNode(d Node) *node {
 		id: d.ID, kind: d.Kind, label: d.Label, x: d.X, y: d.Y,
 		p: Resolve(d.Kind, d.Params), slow: 1,
 		pools: map[*node]*pool{}, locks: map[int]redisLock{},
-		booked: map[int]int{}, klocks: map[int]*keyLock{}, rr: map[string]int{},
+		booked: map[int]int{}, klocks: map[int]*keyLock{}, tver: map[int]int{}, txl: map[int]*txLock{}, txWaits: map[int]int{}, rr: map[string]int{},
 		lastBusy: s.now,
 	}
 	n.tokens = n.f("burst")
