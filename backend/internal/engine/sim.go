@@ -164,6 +164,11 @@ type edge struct {
 	oSum      [20]float64
 	oErr      [20]float64
 	ejectTill float64
+	// link bandwidth: 0 = unlimited. Each direction is a first-in-first-out transmitter that is busy until txFree.
+	bw       float64
+	txFree   [2]float64
+	bits     float64
+	bitsRing [ringSize]float64
 }
 
 // Particle is a visual hint that a request crossed an edge.
@@ -350,6 +355,8 @@ func (s *Sim) tick() {
 	for _, e := range s.eord {
 		e.fwdRing[i] = e.fwd
 		e.fwd = 0
+		e.bitsRing[i] = e.bits
+		e.bits = 0
 	}
 	s.bi = (i + 1) % ringSize
 	s.tickCount++
