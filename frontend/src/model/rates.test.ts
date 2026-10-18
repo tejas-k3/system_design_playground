@@ -31,6 +31,24 @@ describe('clientRateLabel', () => {
   })
 })
 
+describe('edgeLabel with a bandwidth-limited link', () => {
+  it('adds the data rate while running, and says FULL (not only a colour) when the link is saturated', () => {
+    expect(edgeLabel(5, 100, false, true, { mbps: 40, util: 0.5 })).toBe('100/s · 40 Mbit/s')
+    expect(edgeLabel(5, 100, false, true, { mbps: 79, util: 0.99 })).toBe('100/s · 79 Mbit/s FULL')
+  })
+  it('shows the limit when selected', () => {
+    expect(edgeLabel(5, 100, true, true, { mbps: 40, util: 0.5, limit: 80 })).toBe('100/s · 40 Mbit/s · 5 ms · limit 80 Mbit/s')
+    expect(edgeLabel(5, 0, true, false, { limit: 80 })).toBe('5 ms · limit 80 Mbit/s')
+  })
+  it('leaves links without sizes exactly as before', () => {
+    expect(edgeLabel(5, 100, true, true, {})).toBe('100/s · 5 ms')
+    expect(edgeLabel(5, 100, true, true, undefined)).toBe('100/s · 5 ms')
+  })
+  it('formats large rates in Gbit/s', () => {
+    expect(edgeLabel(5, 0, false, true, { mbps: 2500, util: 0.2 })).toBe('2.5 Gbit/s')
+  })
+})
+
 describe('edgeLabel', () => {
   it('shows the live rate while running', () => {
     expect(edgeLabel(5, 580, false, true)).toBe('580/s')

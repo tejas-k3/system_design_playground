@@ -24,10 +24,21 @@ export function clientRateLabel(
 }
 
 /** Label on a connection: the live rate while running, plus the latency when it is selected or hovered. */
-export function edgeLabel(latencyMs: number, rps: number, detailed: boolean, running: boolean): string {
+export interface LinkInfo {
+  mbps?: number // data carried over the last seconds
+  util?: number // share of the limit, if there is one
+  limit?: number // the bandwidth limit, if there is one
+}
+
+const FULL = 0.95
+const fmtMbps = (m: number) => (m >= 1000 ? `${Math.round(m / 100) / 10} Gbit/s` : `${Math.round(m)} Mbit/s`)
+
+export function edgeLabel(latencyMs: number, rps: number, detailed: boolean, running: boolean, link?: LinkInfo): string {
   const parts: string[] = []
   if (running && rps >= 0.5) parts.push(`${fmtRate(rps)}/s`)
+  if (running && link?.mbps && link.mbps >= 0.5) parts.push(fmtMbps(link.mbps) + (link.util !== undefined && link.util >= FULL ? ' FULL' : ''))
   if (detailed) parts.push(`${latencyMs} ms`)
+  if (detailed && link?.limit) parts.push(`limit ${fmtMbps(link.limit)}`)
   return parts.join(' · ')
 }
 

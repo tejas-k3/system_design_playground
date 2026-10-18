@@ -130,7 +130,12 @@ export function sanitizeDiagram(reg: Reg, raw: unknown): { diagram: Diagram; adj
     const c = clamp(lat, reg.raw.latency.min, reg.raw.latency.max)
     if (c !== e.latencyMs) adjusted = true
     lat = c
-    edges.push({ id: e.id as string, from: e.from, to: e.to, latencyMs: lat })
+    const out: Edge = { id: e.id as string, from: e.from, to: e.to, latencyMs: lat }
+    if (e.bandwidthMbps !== undefined && e.bandwidthMbps !== 0) {
+      if (num(e.bandwidthMbps) && e.bandwidthMbps > 0) out.bandwidthMbps = Math.min(100000, e.bandwidthMbps)
+      if (out.bandwidthMbps !== e.bandwidthMbps) adjusted = true
+    }
+    edges.push(out)
   }
   const notes = []
   for (const n of Array.isArray(raw.notes) ? raw.notes : []) {

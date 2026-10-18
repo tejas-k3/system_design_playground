@@ -172,7 +172,7 @@ function drawEdgeLabels(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<str
     const prev = shownRate.get(e.id)
     const rps = smoothRate(prev?.v, st?.rps ?? 0, prev ? Math.min(1000, sc.now - prev.at) : 0)
     shownRate.set(e.id, { v: rps, at: sc.now })
-    const label = edgeLabel(e.latencyMs, rps, sc.selection.has(e.id) || sc.hover === e.id, sc.running)
+    const label = edgeLabel(e.latencyMs, rps, sc.selection.has(e.id) || sc.hover === e.id, sc.running, { mbps: sc.stats.edges[e.id]?.mbps, util: sc.stats.edges[e.id]?.util, limit: e.bandwidthMbps })
     if (!label) continue
     const open = st?.breaker === 'open'
     const text = open ? `open · ${label}` : label

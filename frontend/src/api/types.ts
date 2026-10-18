@@ -17,6 +17,7 @@ export interface Edge {
   from: string
   to: string
   latencyMs: number
+  bandwidthMbps?: number // 0 / absent = unlimited; only matters once the users set request or response sizes
 }
 export interface Note {
   id: string
@@ -184,6 +185,8 @@ export interface EdgeStats {
   rps: number
   breaker?: string
   ejected?: boolean
+  mbps?: number
+  util?: number
 }
 export interface SeriesPoint {
   t: number

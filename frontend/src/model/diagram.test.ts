@@ -136,3 +136,19 @@ describe('optionLabel', () => {
     expect(reg.optionLabel('ghost', 'order', 'lifo')).toBeUndefined()
   })
 })
+
+describe('edge bandwidth in the sanitizer', () => {
+  const base = { nodes: [{ id: 'u', kind: 'client', x: 0, y: 0, label: 'U', params: {} }, { id: 'a', kind: 'appServer', x: 1, y: 1, label: 'A', params: {} }], notes: [] }
+  const edge = (bw: unknown) => ({ id: 'u>a', from: 'u', to: 'a', latencyMs: 40, bandwidthMbps: bw })
+  it('keeps a valid limit and drops 0 and nonsense', () => {
+    expect(sanitizeDiagram(reg, { ...base, edges: [edge(80)] })?.diagram.edges[0].bandwidthMbps).toBe(80)
+    expect(sanitizeDiagram(reg, { ...base, edges: [edge(0)] })?.diagram.edges[0].bandwidthMbps).toBeUndefined()
+    const bad = sanitizeDiagram(reg, { ...base, edges: [edge(-4)] })
+    expect(bad?.diagram.edges[0].bandwidthMbps).toBeUndefined()
+    expect(bad?.adjusted).toBe(true)
+    expect(sanitizeDiagram(reg, { ...base, edges: [edge('fast')] })?.diagram.edges[0].bandwidthMbps).toBeUndefined()
+  })
+  it('clamps an absurd limit to 100,000 Mbit/s', () => {
+    expect(sanitizeDiagram(reg, { ...base, edges: [edge(1e9)] })?.diagram.edges[0].bandwidthMbps).toBe(100000)
+  })
+})
