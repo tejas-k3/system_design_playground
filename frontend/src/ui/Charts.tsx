@@ -3,6 +3,7 @@ import type { LatencyBucket, SeriesPoint, SimEvent } from '../api/types'
 import { palettes } from '../draw/theme'
 import { describeChart } from '../model/announce'
 import { type EventMark, eventLabel, eventMarks } from '../model/events'
+import { errorBudget } from '../model/slo'
 import { bucketLabel, cdf, describeHistogram, quantileBucket } from '../model/histogram'
 import { failedAfter, pct, successRate } from '../model/goals'
 import { isNarrow } from '../model/responsive'
@@ -257,6 +258,7 @@ export function Charts() {
           <Tile label="p99" value={run.ok ? `${Math.round(run.p99)} ms` : '—'} />
           <Tile label="Failures took" value={failedAfter(run)} hint="Median time a failed request took, from the user's first attempt. p50 and p95 count successes only." />
           <Tile label="In flight" value={String(inFlight)} />
+          <BudgetTile run={run} series={series} />
         </span>
       </div>
       {open && tab === 'traces' && <Traces />}
@@ -288,6 +290,30 @@ function Tile({ label, value, bad, hint }: { label: string; value: string; bad?:
     <span className={`tile ${bad ? 'bad' : ''}`} title={hint}>
       <small>{label}</small>
       <b>{value}</b>
+    </span>
+  )
+}
+
+const SLOS = [99, 99.9, 99.99]
+
+/** Remaining error budget for an availability SLO the learner picks, with a fast-window burn rate. */
+function BudgetTile({ run, series }: { run: { resolved: number; failed: number }; series: SeriesPoint[] }) {
+  const [slo, setSlo] = useState(99.9)
+  const b = errorBudget(run, series, slo)
+  const left = `${Math.round(b.remainingFrac * 100)}% left`
+  const word = b.status === 'exhausted' ? 'SLO missed' : b.status === 'burning' ? `burning ${Math.round(b.burnFast)}×` : left
+  return (
+    <span className={`tile budget ${b.status === 'ok' ? '' : 'bad'}`} title={`Availability SLO ${slo}%: ${b.allowed.toFixed(1)} failures allowed so far, ${b.used} so far. Burn ${b.burnFast.toFixed(1)}× over 10 s, ${b.burnSlow.toFixed(1)}× over 60 s (1× = exactly on pace).`}>
+      <small>
+        Error budget{' '}
+        <select value={slo} onChange={(e) => setSlo(Number(e.target.value))} aria-label="Availability SLO">
+          {SLOS.map((x) => <option key={x} value={x}>{x}%</option>)}
+        </select>
+      </small>
+      <b>{word}</b>
+      <span className="meter" role="meter" aria-label="Error budget remaining" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(b.remainingFrac * 100)}>
+        <i style={{ width: `${b.remainingFrac * 100}%` }} />
+      </span>
     </span>
   )
 }

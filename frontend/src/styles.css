@@ -205,3 +205,8 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .findings .sev { font-weight: 700; }
 .findings.error .sev { color: var(--bad); }
 .findings button.link { text-decoration: underline; padding-left: 0; }
+
+.budget select { font-size: 11px; padding: 0 2px; }
+.budget .meter { display: block; height: 4px; width: 90px; background: var(--border, #ddd); border-radius: 2px; margin-top: 2px; overflow: hidden; }
+.budget .meter i { display: block; height: 100%; background: var(--accent, #3b5bdb); }
+.budget.bad .meter i { background: var(--bad); }
