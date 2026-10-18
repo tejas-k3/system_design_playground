@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { answerChoice, answerEstimate, fetchQuestion, runCandidate } from '../api/client'
-import type { ChoiceResult, EstimateResult, Question, RunSummary, SeriesPoint, Symptoms } from '../api/types'
+import { answerChoice, answerEstimate, fetchQuestion, runCandidate, submitReview } from '../api/client'
+import type { ChoiceResult, EstimateResult, Question, ReviewResult, RunSummary, SeriesPoint, Symptoms } from '../api/types'
+import { percent, settingRows } from '../model/review'
 import { comparisonColumns } from '../model/tradeoff'
 import { fmtMs } from '../model/trace'
 import { describeSeries } from '../model/symptoms'
@@ -22,6 +23,9 @@ export function QuestionDialog() {
   const [picked, setPicked] = useState<ChoiceResult | null>(null)
   const [runs, setRuns] = useState<Record<number, RunSummary>>({})
   const [running, setRunning] = useState<number | null>(null)
+  const [marked, setMarked] = useState<string[]>([])
+  const [review, setReview] = useState<ReviewResult | null>(null)
+  const reg = useStore((s) => s.reg)
   useEffect(() => {
     setQ(null)
     setText({})
@@ -31,6 +35,8 @@ export function QuestionDialog() {
     setPicked(null)
     setRuns({})
     setRunning(null)
+    setMarked([])
+    setReview(null)
     if (id) fetchQuestion(id).then(setQ).catch((e: Error) => setError(e.message))
   }, [id])
   const close = () => setUi({ question: null })
@@ -67,6 +73,20 @@ export function QuestionDialog() {
       setError(e instanceof Error ? e.message : 'The run failed.')
     } finally {
       setRunning(null)
+    }
+  }
+  const submitMarks = async () => {
+    if (!q) return
+    setBusy(true)
+    setError('')
+    try {
+      const r = await submitReview(q.id, marked)
+      setReview(r)
+      recordStars(q.id, r.stars)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not score that.')
+    } finally {
+      setBusy(false)
     }
   }
   const submitChoice = async () => {
@@ -113,6 +133,48 @@ export function QuestionDialog() {
                     <p role="status"><Stars n={picked.stars} size={16} /> {picked.correct ? 'Correct.' : 'Not this time.'}</p>
                     <p>{picked.explain}</p>
                     <p className="row-btns"><button onClick={() => { setPicked(null); setChoice(null); setError('') }}>Try again</button><button onClick={close}>Done</button></p>
+                  </section>
+                )}
+              </>
+            )}
+            {q.mode === 'review' && q.diagram && reg && (
+              <>
+                <form onSubmit={(e) => { e.preventDefault(); void submitMarks() }}>
+                  <fieldset disabled={!!review}>
+                    <legend>Tick every component you would change</legend>
+                    {q.diagram.nodes.map((n) => {
+                      const rows = settingRows(q.diagram!, n, reg)
+                      const was = review ? (review.found.some((d) => d.nodes.includes(n.id)) ? 'found' : review.missed.some((d) => d.nodes.includes(n.id)) ? 'missed' : review.falseMarks.includes(n.id) ? 'false' : '') : ''
+                      return (
+                        <div key={n.id} className={`option review-node ${was}`}>
+                          <label>
+                            <input type="checkbox" checked={marked.includes(n.id)} onChange={(e) => setMarked(e.target.checked ? [...marked, n.id] : marked.filter((x) => x !== n.id))} /> <b>{n.label}</b> <span className="muted small">({reg.spec(n.kind)?.name ?? n.kind})</span>
+                            {was === 'found' && <b> (a real flaw, found)</b>}
+                            {was === 'missed' && <b> (a real flaw, missed)</b>}
+                            {was === 'false' && <b> (nothing wrong here)</b>}
+                          </label>
+                          {rows.length > 0 && (
+                            <details>
+                              <summary className="small">Settings ({rows.length})</summary>
+                              <dl className="kv small">{rows.map((r) => (<><dt key={r.label}>{r.label}</dt><dd key={r.label + r.value}>{r.value}{r.changed ? ' ·set' : ''}</dd></>))}</dl>
+                            </details>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </fieldset>
+                  <p className="muted small">Connections: {q.diagram.edges.map((e) => `${q.diagram!.nodes.find((n) => n.id === e.from)?.label ?? e.from} → ${q.diagram!.nodes.find((n) => n.id === e.to)?.label ?? e.to}`).join(', ')}</p>
+                  {error && <p className="bad small" role="alert">{error}</p>}
+                  {!review && <button className="primary" type="submit" disabled={busy}>{busy ? 'Scoring…' : 'Check my review'}</button>}
+                </form>
+                {review && (
+                  <section aria-label="Result">
+                    <p role="status"><Stars n={review.stars} size={16} /> Found {review.found.length} of {review.found.length + review.missed.length} flaws; {review.falseMarks.length} {review.falseMarks.length === 1 ? 'mark was' : 'marks were'} on components with nothing wrong. Precision {percent(review.precision)}, recall {percent(review.recall)}.</p>
+                    <ul className="workings">
+                      {review.found.map((d) => <li key={d.id}><b>Found.</b> {d.explain}</li>)}
+                      {review.missed.map((d) => <li key={d.id}><b>Missed.</b> {d.explain}</li>)}
+                    </ul>
+                    <p className="row-btns"><button onClick={() => { setReview(null); setMarked([]); setError('') }}>Try again</button><button onClick={close}>Done</button></p>
                   </section>
                 )}
               </>
