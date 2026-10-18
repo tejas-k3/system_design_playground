@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { InterviewData } from '../model/interview'
+import { emptyInterview, type InterviewData } from '../model/interview'
+import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
 import { isCompact, isNarrow } from '../model/responsive'
@@ -92,6 +93,10 @@ export interface State {
   setFindings(f: Finding[]): void
   setPinned(d: Diagram | null): void
   setInterview(i: InterviewData | null): void
+  startInterview(minutes: number): void
+  interviewStage(stage: StageId): void
+  interviewPause(paused: boolean): void
+  endInterview(): void
   recordStars(id: string, stars: number): void
   setConnection(c: Connection): void
   toast(text: string, kind?: Toast['kind'], ms?: number): void
@@ -294,6 +299,10 @@ export const useStore = create<State>()((set, get) => {
     setFindings: (findings) => set({ findings }),
     recordStars: (id, stars) => set((s) => ((s.progress[id] ?? 0) >= stars ? {} : { progress: { ...s.progress, [id]: stars } })),
     setInterview: (interview) => set({ interview }),
+    startInterview: (minutes) => set((s) => ({ interview: { ...(s.interview ?? emptyInterview()), session: newSession(Math.min(360, Math.max(1, minutes)) * 60_000, Date.now()) }, ui: { ...s.ui, welcome: false } })),
+    interviewStage: (stage) => set((s) => (s.interview?.session ? { interview: { ...s.interview, session: switchStage(s.interview.session, stage, Date.now()) } } : {})),
+    interviewPause: (paused) => set((s) => (s.interview?.session ? { interview: { ...s.interview, session: (paused ? pause : resume)(s.interview.session, Date.now()) } } : {})),
+    endInterview: () => set((s) => (s.interview ? { interview: { ...s.interview, session: null } } : {})),
     setPinned: (pinned) => set({ pinned: pinned ? structuredClone(pinned) : null }),
     setConnection: (connection) => set({ connection }),
 

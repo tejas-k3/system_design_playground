@@ -3,6 +3,7 @@ import { Announcer } from './ui/Announcer'
 import { Board } from './ui/Board'
 import { Charts } from './ui/Charts'
 import { QuestionDialog } from './ui/QuestionDialog'
+import { InterviewBar } from './ui/interview/InterviewBar'
 import { CompareDialog } from './ui/CompareDialog'
 import { CapacityDialog } from './ui/CapacityDialog'
 import { Inspector } from './ui/Inspector'
@@ -55,6 +56,7 @@ export function App() {
     <div className="app">
       <a className="skip" href="#canvas-area" onClick={(e) => { e.preventDefault(); document.getElementById('canvas-area')?.focus() }}>Skip to the canvas</a>
       <Toolbar />
+      <InterviewBar />
       <div className="main">
         <Library />
         <div className="center-col">
