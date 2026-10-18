@@ -247,3 +247,26 @@ func (s *Sim) scheduleCompaction(n *node) {
 		s.scheduleCompaction(n)
 	})
 }
+
+// scheduleBurst runs the credit account of a burstable app server every tick: it earns its baseline share of
+// the CPU it has, spends the CPU work it started, and is throttled to the baseline while the balance is empty.
+// Nothing here draws a random number.
+func (s *Sim) scheduleBurst(n *node) {
+	s.after(tickMs, func() {
+		if n.removed {
+			return
+		}
+		base := n.f("burstBaselinePct") / 100
+		full := float64(s.capacity(n)) * 1000
+		n.credits += base*full*tickMs/1000 - n.cpuWork
+		n.cpuWork = 0
+		if max := n.f("burstCreditSec") * full; n.credits > max {
+			n.credits = max
+		}
+		if n.credits < 0 {
+			n.credits = 0
+		}
+		n.throttled = n.credits <= 0
+		s.scheduleBurst(n)
+	})
+}
