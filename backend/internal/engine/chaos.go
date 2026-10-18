@@ -206,3 +206,29 @@ func (s *Sim) rejoinUnfenced(db *node) {
 	s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "splitbrain", NodeID: db.id, Label: db.label, Lost: lost})
 	s.logEvent("splitbrain", db, lost)
 }
+
+// scheduleGC arranges the next stop-the-world pause of an app server: exponentially distributed gaps with a mean of
+// gcEverySec, drawn from the chaos random stream (so servers with no GC setting draw nothing, and the request
+// stream is untouched). While paused nothing on the node starts or finishes; queued work waits and the pause ends
+// by starting it.
+func (s *Sim) scheduleGC(n *node) {
+	gap := -math.Log(1-s.chaosRng.Next()) * n.f("gcEverySec") * 1000
+	s.after(gap, func() {
+		if n.removed {
+			return
+		}
+		pause := n.f("gcPauseMs")
+		if pause <= 0 {
+			return
+		}
+		n.pausedUntil = s.now + pause
+		s.logEvent("gc", n, 0)
+		s.after(pause, func() {
+			if n.pausedUntil <= s.now {
+				n.pausedUntil = 0
+			}
+			s.startNext(n)
+		})
+		s.scheduleGC(n)
+	})
+}

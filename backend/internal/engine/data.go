@@ -83,7 +83,12 @@ func (s *Sim) redisEdge(n *node) *edge {
 
 func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 	ep := n.epoch
-	done := func(res Result) {
+	var done func(res Result)
+	done = func(res Result) {
+		if n.pausedUntil > s.now { // a stop-the-world pause: nothing is sent back until it ends
+			s.at(n.pausedUntil, func() { done(res) })
+			return
+		}
 		release()
 		if n.epoch != ep || n.removed {
 			// the process died or was replaced while this request was waiting: its work is lost

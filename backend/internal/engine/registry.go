@@ -165,6 +165,8 @@ func init() {
 				sel("queueOrder", "Queue order", "Capacity", "fifo", "Who gets the next free thread. Under overload newest-first serves people still waiting.",
 					opt("fifo", "Oldest first"), opt("lifo", "Newest first")),
 				num("queueTimeoutMs", "Max queue wait", "Capacity", 0, 0, 30000, 50, "ms", "Drop queued requests that waited longer than this (0 = never).").adv(),
+				num("gcPauseMs", "GC pause", "Failure modes", 0, 0, 5000, 50, "ms", "Stop-the-world garbage-collection pauses: for this long nothing on the server starts or finishes. 0 = off.").adv(),
+				num("gcEverySec", "GC pause every", "Failure modes", 30, 1, 600, 1, "s", "Average time between pauses; the gaps are random (exponential), so pauses are not evenly spaced.").adv(),
 				num("callTimeoutMs", "Call timeout", "Calls to dependencies", 0, 0, 10000, 50, "ms", "Give up on a dependency call after this long (0 = wait forever)."),
 				num("dbPool", "DB pool size", "Calls to dependencies", 20, 1, 200, 1, "", "Max connections this server opens to each database.").needs(KDatabase, KReplica, KShardRouter),
 				flag("circuitBreaker", "Circuit breaker", "Calls to dependencies", false, "After 5 failures in a row to a dependency, fail fast for 5 s, then try once."),
