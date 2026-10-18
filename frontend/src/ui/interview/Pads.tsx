@@ -1,4 +1,6 @@
-import type { InterviewData, Requirement } from '../../model/interview'
+import { calculate, estimateNotes, humanBytes, humanCount, humanRate } from '../../model/estimate'
+import type { EstimateInputs, InterviewData, Requirement } from '../../model/interview'
+import { starterDiagram } from '../../model/starter'
 import { MAX_ROWS } from '../../model/interview'
 import { addRow, apiHints, blankEndpoint, blankTable, dataHints, removeRow, setRow } from '../../model/pads'
 import type { StageId } from '../../model/timer'
@@ -12,6 +14,7 @@ export function StagePad({ stage, data }: { stage: StageId; data: InterviewData 
   const set = useStore((s) => s.setInterview)
   const update = (patch: Partial<InterviewData>) => set({ ...data, ...patch })
   if (stage === 'requirements') return <Requirements data={data} update={update} />
+  if (stage === 'estimation') return <Calculator data={data} update={update} />
   if (stage === 'api') return <ApiPad data={data} update={update} />
   if (stage === 'data') return <DataPad data={data} update={update} />
   if (stage === 'design' || stage === 'deepdive' || stage === 'tradeoffs') {
@@ -100,6 +103,63 @@ function DataPad({ data, update }: Props) {
       ))}
       <button onClick={() => update({ tables: addRow(rows, blankTable()) })} disabled={rows.length >= MAX_ROWS}>Add a table</button>
       {hints.length > 0 && <ul className="hints small" aria-label="Questions to answer">{hints.map((h) => <li key={h}>{h}</li>)}</ul>}
+    </div>
+  )
+}
+
+const FIELDS: { key: keyof EstimateInputs; label: string; unit: string }[] = [
+  { key: 'mau', label: 'Monthly users', unit: 'users' },
+  { key: 'dauPct', label: 'Active each day', unit: '%' },
+  { key: 'actionsPerDay', label: 'Actions per user per day', unit: '' },
+  { key: 'peakFactor', label: 'Peak is how many times the average', unit: '×' },
+  { key: 'readPct', label: 'Reads', unit: '%' },
+  { key: 'bytesEach', label: 'Size of one stored record', unit: 'bytes' },
+  { key: 'retentionYears', label: 'Kept for', unit: 'years' },
+  { key: 'replication', label: 'Copies of the data', unit: '' },
+  { key: 'payloadBytes', label: 'Size of one response', unit: 'bytes' },
+  { key: 'perServerQps', label: 'One server handles', unit: 'req/s' },
+  { key: 'headroomPct', label: 'Spare capacity to keep', unit: '%' },
+]
+
+function Calculator({ data, update }: Props) {
+  const importDiagram = useStore((s) => s.importDiagram)
+  const requestFit = useStore((s) => s.requestFit)
+  const stage = useStore((s) => s.interviewStage)
+  const toast = useStore((s) => s.toast)
+  const est = data.estimate
+  const r = calculate(est)
+  const set = (k: keyof EstimateInputs, v: string) => {
+    const n = Number(v.replace(/,/g, ''))
+    update({ estimate: { ...est, [k]: Number.isFinite(n) ? n : est[k] } })
+  }
+  const out: [string, string][] = [
+    ['Daily users', humanCount(r.dau)],
+    ['Average load', humanRate(r.avgQps)],
+    ['Peak load', humanRate(r.peakQps)],
+    ['Reads / writes (average)', `${humanRate(r.readQps)} / ${humanRate(r.writeQps)}`],
+    ['Storage kept', humanBytes(r.storageBytes)],
+    ['Peak bandwidth', Number.isFinite(r.peakGbps) ? `${r.peakGbps.toFixed(2)} Gbit/s` : '—'],
+    ['App servers needed', Number.isFinite(r.servers) ? String(r.servers) : '—'],
+  ]
+  return (
+    <div className="pad two-col">
+      <fieldset>
+        <legend>Your numbers (change any)</legend>
+        {FIELDS.map((f) => (
+          <label className="calc-row" key={f.key}>{f.label} {f.unit && <span className="muted small">({f.unit})</span>}
+            <input inputMode="decimal" value={est[f.key]} onChange={(e) => set(f.key, e.target.value)} aria-label={`${f.label}${f.unit ? ', in ' + f.unit : ''}`} />
+          </label>
+        ))}
+      </fieldset>
+      <fieldset aria-live="polite">
+        <legend>Results</legend>
+        <dl className="kv">{out.map(([k, v]) => (<><dt key={k}>{k}</dt><dd key={k + v}>{v}</dd></>))}</dl>
+        <div className="row-btns">
+          <button onClick={() => { update({ notes: data.notes ? `${data.notes}\n\n${estimateNotes(r)}` : estimateNotes(r) }); toast('Copied into your notes', 'info', 2500) }}>Copy into notes</button>
+          <button className="primary" disabled={!Number.isFinite(r.servers)} onClick={() => { importDiagram(starterDiagram({ peakQps: r.peakQps, readPct: est.readPct, servers: r.servers })); requestFit(); stage('design') }}>Build a starter from my numbers</button>
+        </div>
+        <p className="muted small">A starter is users, a balancer, {Number.isFinite(r.servers) ? Math.min(12, r.servers) : 'N'} app server(s) and a database. Your previous canvas stays one undo away.</p>
+      </fieldset>
     </div>
   )
 }

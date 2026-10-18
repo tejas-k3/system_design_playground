@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandwidthGbps, dailyActiveUsers, humanBytes, humanRate, peakQps, qpsFromDaily, readWriteSplit, serversNeeded, storageBytes } from './estimate'
+import { humanCount, bandwidthGbps, dailyActiveUsers, humanBytes, humanRate, peakQps, qpsFromDaily, readWriteSplit, serversNeeded, storageBytes } from './estimate'
 
 const near = (got: number, want: number, rel = 0.01) => expect(Math.abs(got - want) / want).toBeLessThanOrEqual(rel)
 
@@ -44,6 +44,16 @@ describe('estimation formulas (textbook numbers)', () => {
   })
 })
 
+describe('humanCount', () => {
+  it('counts things, without a per-second unit', () => {
+    expect(humanCount(150e6)).toBe('150 M')
+    expect(humanCount(1.2e9)).toBe('1.2 B')
+    expect(humanCount(48_000)).toBe('48,000')
+    expect(humanCount(7.5)).toBe('7.5')
+    expect(humanCount(NaN)).toBe('—')
+  })
+})
+
 describe('human formatting', () => {
   it('rates', () => {
     expect(humanRate(3472.2)).toBe('3,472 /s')
@@ -55,5 +65,47 @@ describe('human formatting', () => {
     expect(humanBytes(219e12)).toBe('219 TB')
     expect(humanBytes(1.5e9)).toBe('1.5 GB')
     expect(humanBytes(900)).toBe('900 B')
+  })
+})
+
+import { calculate, estimateNotes } from './estimate'
+import { defaultEstimate } from './interview'
+
+describe('calculate', () => {
+  const inputs = { ...defaultEstimate(), mau: 300e6, dauPct: 50, actionsPerDay: 2, peakFactor: 3, readPct: 90, bytesEach: 500, retentionYears: 5, replication: 3, payloadBytes: 200e3, perServerQps: 400, headroomPct: 30 }
+  const r = calculate(inputs)
+  it('chains the formulas on the textbook case', () => {
+    near(r.dau, 150e6)
+    near(r.avgQps, 3472.2)
+    near(r.peakQps, 10416.7)
+    near(r.readQps, 3125, 0.001)
+    near(r.writeQps, 347.2, 0.001)
+    near(r.peakReadQps, 9375, 0.001)
+    expect(r.servers).toBe(38)
+  })
+  it('sizes storage from the writes kept for the retention period, times the replicas', () => {
+    const records = 347.2222 * 86_400 * 365 * 5
+    near(r.records, records, 0.001)
+    near(r.storageBytes, records * 500 * 3, 0.001)
+  })
+  it('sizes bandwidth from the peak', () => {
+    near(r.peakGbps, (10416.7 * 200e3 * 8) / 1e9, 0.001)
+  })
+  it('reports NaN for what it cannot compute instead of guessing', () => {
+    const bad = calculate({ ...inputs, perServerQps: 0 })
+    expect(Number.isNaN(bad.servers)).toBe(true)
+    expect(bad.avgQps).toBeCloseTo(r.avgQps, 5)
+  })
+})
+
+describe('estimateNotes', () => {
+  it('writes the results as text a person could paste into notes', () => {
+    const t = estimateNotes(calculate({ ...defaultEstimate(), mau: 300e6, dauPct: 50, actionsPerDay: 2, perServerQps: 400, headroomPct: 30 }))
+    expect(t).toContain('Daily users: 150 M')
+    expect(t).not.toContain('M/s')
+    expect(t).toContain('Average load: 3,472 /s')
+    expect(t).toContain('Peak load: 10,417 /s')
+    expect(t).toMatch(/Servers: 38/)
+    expect(t.split('\n').length).toBeGreaterThanOrEqual(6)
   })
 })

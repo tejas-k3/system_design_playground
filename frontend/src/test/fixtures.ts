@@ -14,8 +14,8 @@ export const registry: Registry = {
   nodes: [
     {
       kind: 'client', name: 'Users', description: '', lesson: '', accent: '#000', width: 160, height: 72,
-      canConnectTo: ['appServer'],
-      params: [{ key: 'rps', label: 'rps', group: 'g', type: 'number', default: 50, min: 1, max: 5000 }],
+      canConnectTo: ['loadBalancer', 'appServer'],
+      params: [{ key: 'rps', label: 'rps', group: 'g', type: 'number', default: 50, min: 1, max: 5000 }, { key: 'readPct', label: 'reads', group: 'g', type: 'number', default: 80, min: 0, max: 100 }],
     },
     {
       kind: 'appServer', name: 'App Server', description: '', lesson: '', accent: '#000', width: 160, height: 72,
@@ -27,6 +27,7 @@ export const registry: Registry = {
         { key: 'cb', label: 'c', group: 'g', type: 'boolean', default: false },
       ],
     },
+    { kind: 'loadBalancer', name: 'Load Balancer', description: '', lesson: '', accent: '#000', width: 160, height: 72, canConnectTo: ['appServer'], params: [] },
     { kind: 'database', name: 'Database', description: '', lesson: '', accent: '#000', width: 160, height: 72, canConnectTo: null, params: [] },
   ],
 }
