@@ -148,9 +148,13 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 }
 
 func (s *Sim) appRead(n *node, c *call, done func(Result)) {
-	if n.s("gather") == "all" {
+	if g := n.s("gather"); g == "all" || g == "firstK" {
 		if es := s.outOf(n, KIndex); len(es) >= 2 {
-			s.gatherAll(n, c, es, done)
+			need := len(es)
+			if g == "firstK" {
+				need = min(need, int(n.f("k")))
+			}
+			s.gather(n, c, es, need, n.b("partialResults"), done)
 			return
 		}
 	}
@@ -728,26 +732,50 @@ func (s *Sim) runJob(q, w *node, j *job) {
 	})
 }
 
-// gatherAll sends the read to every shard at once and answers when the last one has: the latency of the request is
-// the slowest shard's. If any shard fails the request fails with the first failure in edge order, so one dead shard
-// breaks every query that needs all of them.
-func (s *Sim) gatherAll(n *node, c *call, es []*edge, done func(Result)) {
+// gather sends the read to every shard at once and answers as soon as `need` of them have answered successfully
+// (all of them for wait-for-all). The shards still working when it answers keep running: their capacity is spent
+// although nobody is waiting. If success is impossible (too many failed) the request fails with the first failure in
+// edge order, unless partial results are allowed and at least one shard answered, when it succeeds and is counted.
+func (s *Sim) gather(n *node, c *call, es []*edge, need int, partial bool, done func(Result)) {
 	results := make([]Result, len(es))
-	left := len(es)
+	got := make([]bool, len(es))
+	okN, failN, finished := 0, 0, false
+	finish := func(r Result) {
+		if !finished {
+			finished = true
+			done(r)
+		}
+	}
+	firstFailure := func() Result {
+		for i, r := range results {
+			if got[i] && !r.OK {
+				return r
+			}
+		}
+		return fail(RDependency)
+	}
 	for i, e := range es {
 		i := i
 		s.callCmd(n, e, c, cmdRead, 0, func(r Result) {
-			results[i] = r
-			if left--; left > 0 {
-				return
+			results[i], got[i] = r, true
+			if r.OK {
+				okN++
+			} else {
+				failN++
 			}
-			for _, r := range results {
-				if !r.OK {
-					done(r)
-					return
+			switch {
+			case okN >= need:
+				finish(Result{OK: true, Ver: -1, Done: true, Src: n})
+			case partial && okN+failN == len(es) && okN > 0:
+				if c.counted {
+					s.runPartial++
 				}
+				finish(Result{OK: true, Ver: -1, Done: true, Src: n})
+			case !partial && failN > len(es)-need:
+				finish(firstFailure())
+			case okN+failN == len(es):
+				finish(firstFailure())
 			}
-			done(Result{OK: true, Ver: -1, Done: true, Src: n})
 		})
 	}
 }

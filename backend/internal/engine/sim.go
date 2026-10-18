@@ -215,6 +215,7 @@ type Sim struct {
 	runResolved, runOK, runFailed, runPending int
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
+	runPartial                                int
 	runLostUpdates, runTxAborts, runDeadlocks int
 	txnSeq                                    int
 	runLost                                   int // writes lost when an in-memory store crashed
