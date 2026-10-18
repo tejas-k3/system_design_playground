@@ -118,6 +118,7 @@ and the inspector becomes a bottom sheet.
 | Rate limiter | Token bucket |
 | Sharding / geo / leaderboard / booking | Shard routing by key; spatial index; Redis sorted-set style ops; row locks and Redis locks with TTL, double-booking detection |
 | Chaos | Crash (auto-restart), slow-down (steady or pulsing) and network-partition events, scheduled or manual |
+| Investigation | Capacity curve (load sweep with the knee marked), your design versus the reference solution, side-by-side comparison of two designs with overlaid series, and a rewind slider that replays a run exactly (the engine is deterministic, so a seek reproduces the live run, including edits and crashes you made) |
 | Observation | Charts mark crashes, restarts, partitions, failover steps, split brain and autoscaler steps at the time they happened; latency distribution with p50 / p95 / p99; per-component 1 Hz timelines; countdown chips for failover and booting servers; an advisory design review (lint), a live "what is limiting it" coach and an availability error budget with burn rate. Observation only: none of it changes a result |
 
 Runs are **deterministic**: the same diagram and seed always produce the same result.
