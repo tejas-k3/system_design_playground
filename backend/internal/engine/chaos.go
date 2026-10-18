@@ -129,6 +129,7 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	n.down, n.downAt = true, s.now
 	s.logEvent("crash", n, 0)
 	n.epoch++
+	n.txl, n.txWaits = map[int]*txLock{}, map[int]int{} // a crash drops every lock
 	s.failQueued(n, RNodeDown)
 	s.closePools(n)
 	s.dropConns(n)

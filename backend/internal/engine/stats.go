@@ -69,6 +69,9 @@ type RunStats struct {
 	Stale          int             `json:"staleReads"`
 	Dups           int             `json:"duplicates"`
 	LostWrites     int             `json:"lostWrites"`
+	LostUpdates    int             `json:"lostUpdates,omitempty"` // transfers that silently overwrote a concurrent commit (read committed)
+	TxAborts       int             `json:"txAborts,omitempty"`    // transactions aborted for a write conflict or as a deadlock victim
+	Deadlocks      int             `json:"deadlocks,omitempty"`
 	Jobs           *JobStats       `json:"jobs,omitempty"`
 }
 
@@ -214,7 +217,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, LostWrites: s.runLost,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {

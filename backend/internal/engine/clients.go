@@ -150,6 +150,7 @@ const (
 	wlGeo
 	wlLeader
 	wlBooking
+	wlTransfer // every request moves money between two accounts: a two-key read-modify-write transaction
 )
 
 func workloadOf(n *node) int {
@@ -160,6 +161,8 @@ func workloadOf(n *node) int {
 		return wlLeader
 	case "booking":
 		return wlBooking
+	case "transfer":
+		return wlTransfer
 	}
 	return wlKV
 }
@@ -172,6 +175,9 @@ func (s *Sim) createLogical(c *node) *logical {
 		counted: s.now >= s.opts.WarmupMs,
 		hash:    Hash32(uint32(s.logicalSeq)),
 		wl:      workloadOf(c),
+	}
+	if lg.wl == wlTransfer {
+		lg.write = true // a transfer is always a transaction
 	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
 	s.unresolved++
