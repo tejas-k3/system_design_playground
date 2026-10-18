@@ -41,6 +41,16 @@ func (s *Sim) configStore(n *node) {
 		pol = n.s("eviction")
 	}
 	capItems := int(n.f("capacityItems"))
+	if mb := n.f("capacityMB"); mb > 0 {
+		// bodies are as large as the biggest response any client asks for (1 KB when none says)
+		kb := 1.0
+		for _, c := range s.order {
+			if c.kind == KClient && c.f("respKB") > kb {
+				kb = c.f("respKB")
+			}
+		}
+		capItems = min(capItems, int(mb*1000/kb))
+	}
 	if n.store == nil || n.storePol != pol {
 		n.store = NewStore(pol, capItems, n.f("ttlSec")*1000, s.rng)
 		n.store.SetJitter(n.f("ttlJitterPct") / 100)
