@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { NodeStats, ParamSpec } from '../api/types'
 import { palettes } from '../draw/theme'
+import type { AlignMode } from '../model/arrange'
 import { connectableTargets, paramVisible } from '../model/diagram'
 import { isCompact } from '../model/responsive'
 import { fmtCost, pct, successRate } from '../model/goals'
@@ -72,9 +73,49 @@ function Overview({ count }: { count: number }) {
           <Errors errors={run.errors} total={run.failed} />
         </>
       )}
+      <Arrange />
       <ReviewPanel />
       <p className="muted small">Select a component to edit its settings. Shift-click or drag a box to select several. Press Delete to remove.</p>
     </div>
+  )
+}
+
+const ALIGNS: { mode: AlignMode; label: string; glyph: string }[] = [
+  { mode: 'left', label: 'Align left edges', glyph: '⇤' },
+  { mode: 'centerX', label: 'Align horizontal centres', glyph: '↔' },
+  { mode: 'right', label: 'Align right edges', glyph: '⇥' },
+  { mode: 'top', label: 'Align top edges', glyph: '⤒' },
+  { mode: 'centerY', label: 'Align vertical centres', glyph: '↕' },
+  { mode: 'bottom', label: 'Align bottom edges', glyph: '⤓' },
+]
+
+/** Tidy-up for the whole design, and alignment and spacing for a selection. */
+function Arrange() {
+  const diagram = useStore((s) => s.diagram)
+  const selection = useStore((s) => s.selection)
+  const { align, distribute, tidyLayout } = useStore.getState()
+  const chosen = diagram.nodes.filter((n) => selection.includes(n.id)).length
+  if (diagram.nodes.length < 2) return null
+  return (
+    <>
+      <h3>Arrange</h3>
+      <div className="arrange">
+        <button onClick={tidyLayout} title="Lay the components out left to right following their connections (undoable)">Tidy up layout</button>
+        {chosen >= 2 && (
+          <div role="group" aria-label="Align the selected components" className="arrange-row">
+            {ALIGNS.map((a) => (
+              <button key={a.mode} onClick={() => align(a.mode)} title={a.label} aria-label={a.label}>{a.glyph}</button>
+            ))}
+            {chosen >= 3 && (
+              <>
+                <button onClick={() => distribute('x')} title="Space evenly across" aria-label="Space the selected components evenly across">⇔</button>
+                <button onClick={() => distribute('y')} title="Space evenly down" aria-label="Space the selected components evenly down">⇕</button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 

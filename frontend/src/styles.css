@@ -280,3 +280,8 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .warn-note { border-left: 3px dashed var(--warn); padding-left: 8px; margin: 6px 0; }
 .toolbar { gap: 6px; } .scrub { width: 84px; margin-left: 4px; } .toolbar .pill { padding: 4px 8px; }
 @media (max-width: 1500px) { .brand-by { display: none; } }
+
+.arrange { display: grid; gap: 8px; }
+.arrange button { font: inherit; padding: 6px 10px; cursor: pointer; }
+.arrange-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.arrange-row button { min-width: 36px; min-height: 36px; }
