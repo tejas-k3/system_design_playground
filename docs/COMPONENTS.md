@@ -27,6 +27,7 @@ Defaults are the values a component starts with; every number is a setting you c
 | **Shard Router** | n/a: it routes by key | none | It does not fail by itself. A hot key saturates one database while the others idle; a dead shard fails only its keys. |
 | **External API** | unlimited (only latency: 80 ms, and an error rate: 1%) | none | Errors are **Vendor errors**. A slow vendor ties up the threads of the servers that wait on it. |
 | **Object Store** | `maxConcurrent` (1,000) uploads | none | An app server connected to one uploads the body of each write there first (time to first byte 30 ms plus the body at 50 MB/s per upload, over the link's bandwidth); from then on only a pointer travels, so a queue's message limit no longer applies (the claim-check pattern). Reads never touch it. It stops answering if it crashes (**Node down**, which fails the upload). |
+| **Search Shard** | `connections` (16 queries at once) | `queueCap` (50) | One slice of a search index. With the app server's fan-out set to *all*, a read goes to every shard and waits for the last one, so latency is the slowest of N and one dead shard fails every query. *First K* answers once K shards have replied (the others still do the work); *hedging* asks a slow shard again after `hedgeAfterMs` (the same shard, an independent service-time draw, extra load); *partial results* reply with what there is when too few answered, counted as partial. Fan-out is off by default and shards are not used for reads then. |
 | **Redis** | 1 (single-threaded) | 2,000 | Queue full: **Queue full (503)**. A lock that is held: **Lock busy**. With persistence off, a crash loses what it held. |
 
 ### Failure reasons you will see
@@ -51,7 +52,7 @@ The defaults (8 threads, 16 database slots, a 50-request queue, and so on) are r
 
 ## What is not modelled yet
 
-Tiered CDNs and purge, downloads from the object store, and storage or egress cost (a link can have a bandwidth limit, a queue a message limit and a cache or CDN a byte capacity, once the users set request or response sizes); clock skew and fsync loss of unflushed writes (disk IOPS as a queue for writes exists; GC pauses, packet loss, jitter, CPU burst credits and out-of-memory kills exist); write skew, document and wide-column presets and data volume (secondary indexes and isolation levels exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
+Tiered CDNs and purge, downloads from the object store, and storage or egress cost (replicas per search shard and feed fan-out; a link can have a bandwidth limit, a queue a message limit and a cache or CDN a byte capacity, once the users set request or response sizes); clock skew and fsync loss of unflushed writes (disk IOPS as a queue for writes exists; GC pauses, packet loss, jitter, CPU burst credits and out-of-memory kills exist); write skew, document and wide-column presets and data volume (secondary indexes and isolation levels exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
 
 ## Check it yourself
 
