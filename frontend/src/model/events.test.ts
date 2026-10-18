@@ -11,6 +11,7 @@ describe('eventLabel', () => {
     expect(eventLabel(ev(15, 'partition'))).toBe('Database cut off from the network')
     expect(eventLabel(ev(22, 'heal'))).toBe('Database reconnected')
     expect(eventLabel(ev(25, 'failoverDetected'))).toBe('Failure of Database noticed')
+    expect(eventLabel(ev(30, 'gc'))).toBe('Database paused for garbage collection')
     expect(eventLabel(ev(35, 'scaleUp', 'App Server'))).toBe('App Server: another server is booting')
     expect(eventLabel(ev(45, 'serverUp', 'App Server'))).toBe('App Server: another server is running')
   })
@@ -26,7 +27,7 @@ describe('eventLabel', () => {
 
 describe('eventGlyph', () => {
   it('gives every known event a distinct one-character cue so markers do not rely on colour', () => {
-    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'scaleUp', 'serverUp', 'scaleDown']
+    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'scaleUp', 'serverUp', 'scaleDown', 'gc']
     const glyphs = types.map(eventGlyph)
     expect(new Set(glyphs).size).toBe(types.length)
     expect(glyphs.every((g) => g.length === 1)).toBe(true)

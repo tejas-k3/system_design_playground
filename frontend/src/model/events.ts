@@ -2,7 +2,7 @@ import type { SimEvent } from '../api/types'
 
 const GLYPHS: Record<string, string> = {
   crash: 'X', restart: 'R', slow: 'S', slowEnd: 'N', partition: 'P', heal: 'H',
-  failoverDetected: 'D', promotion: 'F', splitbrain: 'B', scaleUp: '+', serverUp: 'U', scaleDown: '-',
+  failoverDetected: 'D', promotion: 'F', splitbrain: 'B', scaleUp: '+', serverUp: 'U', scaleDown: '-', gc: 'G',
 }
 
 /** One-character cue drawn on a chart marker, so events never depend on colour alone. */
@@ -19,6 +19,7 @@ export function eventLabel(e: SimEvent): string {
     case 'slowEnd': return `${e.label} back to normal speed`
     case 'partition': return `${e.label} cut off from the network`
     case 'heal': return `${e.label} reconnected`
+    case 'gc': return `${e.label} paused for garbage collection`
     case 'failoverDetected': return `Failure of ${e.label} noticed`
     case 'promotion': return `${e.label} promoted to primary (${e.lost ? writes(e.lost) : 'no writes lost'})`
     case 'splitbrain': return `${e.label} rejoined as primary: ${writes(e.lost ?? 0)}`
