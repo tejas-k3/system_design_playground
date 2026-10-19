@@ -64,6 +64,27 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
+		sc := Get("gc-storm")
+		retry := sc.Diagram
+		for i := range retry.Nodes {
+			if retry.Nodes[i].Kind == engine.KClient {
+				retry.Nodes[i].Params["retries"] = 2.0
+			}
+		}
+		if res := engine.RunToEnd(retry, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("retries rescue the requests but wreck the p95: %+v", res.Checks)
+		}
+		short := sc.Diagram
+		for i := range short.Nodes {
+			if short.Nodes[i].Kind == engine.KAppServer {
+				short.Nodes[i].Params["gcPauseMs"] = 400.0
+			}
+		}
+		if res := engine.RunToEnd(short, sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("a 400 ms pause is below the clients' patience and should pass: %+v", res.Checks)
+		}
+	})
 	t.Run("video-upload is not fixed by more threads, and 400 Mbit/s is still too little", func(t *testing.T) {
 		sc := Get("video-upload")
 		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "threads", 64.0), sc.Options(42), sc.Goals); res.Pass {
