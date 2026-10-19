@@ -48,6 +48,9 @@ func (s *Sim) CostPerHour() float64 {
 			continue
 		}
 		c += Spec(n.kind).cost(n.p) * s.averageInstances(n)
+		if n.kind == KObjectStore {
+			c += s.storeUsageCost(n)
+		}
 	}
 	return c
 }
@@ -135,4 +138,17 @@ func (s *Sim) autoscale(n *node) {
 		return
 	}
 	a.below = false
+}
+
+// storeUsageCost is what an object store's use costs per hour at the rate seen so far: the bytes served at the egress
+// price, the requests at the per-1,000 price, and the stored data at the monthly storage price (a month is 730 hours).
+// Before anything has run there is no rate, so only the storage (which does not depend on traffic) is counted.
+func (s *Sim) storeUsageCost(n *node) float64 {
+	c := n.f("dataGB") * n.f("storagePerGBMonth") / 730
+	if s.now > 0 {
+		hours := s.now / 3.6e6
+		c += n.egressBytes / 1e9 / hours * n.f("egressPerGB")
+		c += float64(n.osRequests) / hours / 1000 * n.f("requestPer1k")
+	}
+	return c
 }

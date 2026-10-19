@@ -148,6 +148,23 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 }
 
 func (s *Sim) appRead(n *node, c *call, done func(Result)) {
+	// a page with a body: after the lookup, the body is fetched from the object store the app server is wired to
+	if oe := s.first(n, KObjectStore); oe != nil && c.lg != nil && (c.wl == wlKV || c.wl == wlFeed) && c.lg.client.f("respKB") > 0 {
+		inner := done
+		done = func(r Result) {
+			if !r.OK {
+				inner(r)
+				return
+			}
+			s.callCmd(n, oe, c, cmdGet, 0, func(g Result) {
+				if !g.OK {
+					inner(g)
+					return
+				}
+				inner(r)
+			})
+		}
+	}
 	if c.wl == wlFeed {
 		cc := *c
 		cc.fan = s.feedFan(n, c)
