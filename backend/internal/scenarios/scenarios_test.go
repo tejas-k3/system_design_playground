@@ -64,6 +64,13 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("nobody-on-call: snapshot isolation is not enough", func(t *testing.T) {
+		sc := Get("nobody-on-call")
+		res := engine.RunToEnd(withParam(sc.Diagram, "db", "isolation", "repeatableRead"), sc.Options(42), sc.Goals)
+		if res.Pass || res.Run.WriteSkew == 0 {
+			t.Fatalf("repeatable read still lets both doctors leave: %+v skew %d", res.Checks, res.Run.WriteSkew)
+		}
+	})
 	t.Run("disk-writes: a faster disk also passes but earns fewer stars than dropping the waste", func(t *testing.T) {
 		sc := Get("disk-writes")
 		fast := withParam(sc.Diagram, "db", "diskIops", 400.0)

@@ -981,6 +981,35 @@ func init() {
 		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
 	})
 
+	// Write skew: each doctor leaves after checking the other is still on call. Config only: raise the isolation level.
+	onCall := func(fixed bool) engine.Diagram {
+		iso := "readCommitted"
+		if fixed {
+			iso = "serializable"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 30.0, "workload": "oncall", "keySpace": 40.0, "keyDist": "uniform", "timeoutMs": 3000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "isolation": iso}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "nobody-on-call", Title: "Nobody on call", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Every rule is checked, and the rule still breaks.",
+		Story:   "A rota has pairs of doctors and the rule is that at least one of each pair stays on call. A doctor going off call first checks that the partner is still on. Nobody ever writes the partner's row, yet some nights both doctors in a pair are off at once.",
+		Diagram: onCall(false), Solution: onCall(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxWriteSkew: i(0), MaxP95Ms: f(400), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.05), StarP95Ms: f(250)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Two requests for one pair overlap: each reads the pair before the other has written. What does the database promise about that?",
+			"Moving to repeatable read (snapshot isolation) catches two writers of the SAME row, but these write different rows. Look at the numbers after you try it.",
+			"Only serializable makes the two requests take turns on the pair. Set the database's isolation level to serializable and check the aborts it brings.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Will repeatable read (snapshot isolation) stop both doctors leaving?", Options: []string{"Yes: it aborts anything that conflicts", "No: they write different rows, so nothing conflicts", "Only at low load"}, Answer: 1,
+			Explain: "Snapshot isolation only detects two writes to the same row. Write skew is two writes to different rows justified by the same stale read, which only serializable execution rules out."}},
+		Debrief: "Write skew is the anomaly snapshot isolation misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
