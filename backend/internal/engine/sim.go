@@ -77,6 +77,8 @@ type job struct {
 	counted  bool
 	enq      float64
 	attempts int
+	finished bool // a worker has acknowledged it (or given up): a later visibility timeout does nothing
+	ghost    bool // a redelivered copy of a job still being worked on: it does the work again but is not counted again
 }
 
 type node struct {
@@ -225,7 +227,7 @@ type Sim struct {
 	runLost                                   int // writes lost when an in-memory store crashed
 
 	jobEnqueued, jobCompleted, jobLost, jobRetried int
-	jobDead                                        int
+	jobDead, jobRedelivered                        int
 	jobHist                                        Hist
 	hasQueue, hasBooking, hasFresh                 bool
 

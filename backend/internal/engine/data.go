@@ -723,10 +723,36 @@ func (s *Sim) runJob(q, w *node, j *job) {
 	s.markBusy(w)
 	w.busy++
 	j.attempts++
+	j.finished = false
 	ep := w.epoch
+	if vis := q.f("visibilityTimeoutMs"); vis > 0 && !j.ghost {
+		s.after(vis, func() {
+			if j.finished || q.removed {
+				return
+			}
+			// not acknowledged in time: the queue offers the job again; this copy still runs, and so does the new one
+			if j.counted {
+				s.jobRedelivered++
+			}
+			q.jobs = append(q.jobs, &job{rid: j.rid, key: j.key, wl: j.wl, idem: j.idem, counted: j.counted, enq: j.enq, attempts: j.attempts, ghost: true})
+			s.dispatch(q)
+		})
+	}
 	fin := func(res Result) {
 		s.markBusy(w)
 		w.busy--
+		if j.ghost {
+			if res.OK {
+				w.c.ok++
+				w.c.done++
+			} else {
+				w.c.err++
+				w.c.reason[res.Reason]++
+			}
+			s.dispatch(q)
+			return
+		}
+		j.finished = true
 		if res.OK {
 			w.c.ok++
 			w.c.done++

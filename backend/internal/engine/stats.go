@@ -36,14 +36,15 @@ type EdgeStats struct {
 }
 
 type JobStats struct {
-	Enqueued  int     `json:"enqueued"`
-	Completed int     `json:"completed"`
-	Lost      int     `json:"lost"`
-	Retried   int     `json:"retried"`
-	Dead      int     `json:"dead,omitempty"` // jobs parked in the dead-letter queue after their last attempt
-	Backlog   int     `json:"backlog"`
-	P50       float64 `json:"p50"`
-	P95       float64 `json:"p95"`
+	Enqueued    int     `json:"enqueued"`
+	Completed   int     `json:"completed"`
+	Lost        int     `json:"lost"`
+	Retried     int     `json:"retried"`
+	Redelivered int     `json:"redelivered,omitempty"` // jobs handed out again because the first worker did not acknowledge in time
+	Dead        int     `json:"dead,omitempty"`        // jobs parked in the dead-letter queue after their last attempt
+	Backlog     int     `json:"backlog"`
+	P50         float64 `json:"p50"`
+	P95         float64 `json:"p95"`
 }
 
 // RunStats are totals over the counted part of the run.
@@ -237,7 +238,7 @@ func (s *Sim) Snapshot() Stats {
 	}
 	if s.hasQueue {
 		run.Jobs = &JobStats{
-			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead,
+			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead, Redelivered: s.jobRedelivered,
 			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95),
 		}
 	}
