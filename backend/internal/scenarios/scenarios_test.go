@@ -64,6 +64,13 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("image-egress: a CDN that holds a quarter of the pictures is not enough", func(t *testing.T) {
+		sc := Get("image-egress")
+		d := withParam(sc.Solution, "cdn", "capacityItems", 500.0)
+		if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("a small CDN should still miss too often to meet the budget: %+v", res.Checks)
+		}
+	})
 	t.Run("celebrity-post is solved by pulling, not by a bigger database connection pool", func(t *testing.T) {
 		sc := Get("celebrity-post")
 		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "feedStrategy", "pullOnRead"), sc.Options(42), sc.Goals); !res.Pass {
