@@ -69,6 +69,8 @@ function Overview({ count }: { count: number }) {
             <dt>Succeeded</dt><dd>{pct(successRate(run) ?? 0)}</dd>
             <dt>p50 / p95</dt><dd>{Math.round(run.p50)} / {Math.round(run.p95)} ms</dd>
             {(run.lostUpdates ?? 0) > 0 && (<><dt>Updates overwritten</dt><dd className="bad">{run.lostUpdates!.toLocaleString()}</dd></>)}
+            {(run.fanoutWrites ?? 0) > 0 && (<><dt>Timeline inserts</dt><dd>{run.fanoutWrites!.toLocaleString()}</dd></>)}
+            {(run.fanoutReads ?? 0) > 0 && (<><dt>Followed authors read</dt><dd>{run.fanoutReads!.toLocaleString()}</dd></>)}
             {(run.hedged ?? 0) > 0 && (<><dt>Hedged queries</dt><dd>{run.hedged!.toLocaleString()}</dd></>)}
             {(run.partial ?? 0) > 0 && (<><dt>Partial answers</dt><dd className="bad">{run.partial!.toLocaleString()}</dd></>)}
             {(run.txAborts ?? 0) > 0 && (<><dt>Transactions aborted</dt><dd>{run.txAborts!.toLocaleString()}{(run.deadlocks ?? 0) > 0 ? ` (${run.deadlocks!.toLocaleString()} deadlocks)` : ''}</dd></>)}
