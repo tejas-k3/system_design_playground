@@ -883,6 +883,41 @@ func init() {
 		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN sized to the popular set turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest.",
 	})
 
+	// Video uploads of 10 MB at 6 a second need 480 Mbit/s on every hop: the link to the store is sized for far less
+	videoUpload := func(fixed bool) engine.Diagram {
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 6.0, "readPct": 0.0, "reqKB": 10000.0, "timeoutMs": 4000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0}).
+			n("db", engine.KDatabase, cols[2], rowTop, nil).label("db", "Video catalogue").
+			n("files", engine.KObjectStore, cols[2], rowBot, nil).label("files", "Video store").
+			e("users", "app").e("app", "db").e("app", "files")
+		for k := range b.d.Edges {
+			if b.d.Edges[k].ID == "app>files" {
+				b.d.Edges[k].BandwidthMbps = 200
+				if fixed {
+					b.d.Edges[k].BandwidthMbps = 1000
+				}
+			}
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "video-upload", Title: "Video uploads", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Short uploads work, but videos time out.",
+		Story:   "Creators upload clips of about 10 MB, six a second at the evening peak. The app server streams each one to the video store over a 200 Mbit/s link. In testing with tiny files everything was fine; at the peak most uploads time out after 4 seconds.",
+		Diagram: videoUpload(false), Solution: videoUpload(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(1500), MaxCostPerHour: f(1.3), StarCostPerHour: f(1.1), StarP95Ms: f(1000)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Do the arithmetic: 6 uploads a second x 10 MB is how many Mbit/s? Compare it with the link.",
+			"6 x 10 MB x 8 bits = 480 Mbit/s, and the link to the store carries 200. Uploads queue behind each other on it until they time out.",
+			"Select the connection from the app server to the video store and raise its bandwidth above what the peak needs (1,000 Mbit/s leaves room).",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "More app-server threads will…", Options: []string{"Fix it: more uploads in parallel", "Not help: they all share the same saturated link", "Make the uploads smaller"}, Answer: 1,
+			Explain: "Parallel uploads still squeeze through one link. When a link is the limit, adding workers only adds more bytes waiting for it."}},
+		Debrief: "Bandwidth is a capacity like any other: bytes per second in must be less than the link can carry. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).

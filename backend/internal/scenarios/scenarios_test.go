@@ -64,6 +64,21 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("video-upload is not fixed by more threads, and 400 Mbit/s is still too little", func(t *testing.T) {
+		sc := Get("video-upload")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "threads", 64.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("more threads alone must not pass: %+v", res.Checks)
+		}
+		d := sc.Diagram
+		for k := range d.Edges {
+			if d.Edges[k].ID == "app>files" {
+				d.Edges[k].BandwidthMbps = 400
+			}
+		}
+		if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("400 Mbit/s cannot carry the 480 Mbit/s peak: %+v", res.Checks)
+		}
+	})
 	t.Run("image-egress: a CDN that holds a quarter of the pictures is not enough", func(t *testing.T) {
 		sc := Get("image-egress")
 		d := withParam(sc.Solution, "cdn", "capacityItems", 500.0)
