@@ -54,7 +54,7 @@ func TestRegistryAndScenarios(t *testing.T) {
 	}
 	resp, _ := http.Get(ts.URL + "/api/registry")
 	_ = json.NewDecoder(resp.Body).Decode(&reg)
-	if len(reg.Nodes) != 15 {
+	if len(reg.Nodes) != 16 {
 		t.Fatalf("registry has %d kinds", len(reg.Nodes))
 	}
 	var meta struct {

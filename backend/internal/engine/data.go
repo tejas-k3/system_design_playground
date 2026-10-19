@@ -246,7 +246,11 @@ func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
 				return
 			}
 		default:
-			if qe := s.first(n, KQueue); qe != nil {
+			qe := s.first(n, KQueue)
+			if qe == nil {
+				qe = s.first(n, KTopic)
+			}
+			if qe != nil {
 				s.callCmd(n, qe, c, cmdEnqueue, 0, done)
 				return
 			}
@@ -703,10 +707,23 @@ func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
 }
 
 // queued is the number of jobs waiting for a worker.
-func (s *Sim) queued(q *node) int { return len(q.jobs) - q.jh + len(q.hjobs) - q.hh }
+func (s *Sim) queued(q *node) int {
+	if q.kind == KTopic {
+		n := 0
+		for _, e := range q.out {
+			n += len(e.subJobs) - e.subHead
+		}
+		return n
+	}
+	return len(q.jobs) - q.jh + len(q.hjobs) - q.hh
+}
 
 // requeue puts a job at the back of its line: the urgent line of a priority queue, or the ordinary one.
 func (s *Sim) requeue(q *node, j *job) {
+	if j.sub != nil {
+		j.sub.subJobs = append(j.sub.subJobs, j)
+		return
+	}
 	if j.high && q.b("priorityQueue") {
 		q.hjobs = append(q.hjobs, j)
 		return
@@ -715,6 +732,10 @@ func (s *Sim) requeue(q *node, j *job) {
 }
 
 func (s *Sim) dispatch(q *node) {
+	if q.kind == KTopic {
+		s.dispatchTopic(q)
+		return
+	}
 	for s.queued(q) > 0 && !q.down {
 		var w *node
 		for _, e := range q.out {
@@ -917,6 +938,58 @@ func (s *Sim) gather(n *node, c *call, es []*edge, need int, partial bool, done 
 				}
 				s.callCmd(n, e, c, cmdRead, 0, reply)
 			})
+		}
+	}
+}
+
+// ---- topic (publish/subscribe) -------------------------------------------------------
+
+// arriveTopic gives every subscriber (each outgoing edge to a worker) its own copy of the message. The publisher
+// is acknowledged at once: it never waits for, or hears about, a slow subscriber. A subscriber whose backlog is
+// full loses its copy (counted as a lost delivery).
+func (s *Sim) arriveTopic(n *node, c *call, cb func(Result)) {
+	if !c.write {
+		s.failAt(n, RNoRoute, cb)
+		return
+	}
+	for _, e := range n.out {
+		if e.removed || e.to.kind != KWorker || e.to.removed {
+			continue
+		}
+		j := &job{rid: c.rid, key: c.key, wl: c.wl, idem: c.idem, counted: c.counted, enq: s.now, sub: e}
+		if j.counted {
+			s.jobEnqueued++
+		}
+		if len(e.subJobs)-e.subHead >= int(n.f("capacity")) {
+			if j.counted {
+				s.jobLost++
+			}
+			continue
+		}
+		e.subJobs = append(e.subJobs, j)
+	}
+	s.after(0.2, func() {
+		s.okAt(n, Result{Ver: -1, Done: true}, cb)
+		s.dispatch(n)
+	})
+}
+
+// dispatchTopic hands each subscriber's deliveries to its own worker, in order, as the worker has room.
+func (s *Sim) dispatchTopic(q *node) {
+	for _, e := range q.out {
+		w := e.to
+		if e.removed || w.kind != KWorker || w.down || w.removed {
+			continue
+		}
+		for e.subHead < len(e.subJobs) && w.busy < s.capacity(w) && !q.down {
+			j := e.subJobs[e.subHead]
+			e.subJobs[e.subHead] = nil
+			e.subHead++
+			s.runJob(q, w, j)
+		}
+		if e.subHead > 256 && e.subHead*2 > len(e.subJobs) {
+			e.subJobs = append([]*job(nil), e.subJobs[e.subHead:]...)
+			e.subHead = 0
 		}
 	}
 }

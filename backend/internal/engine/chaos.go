@@ -177,7 +177,7 @@ func (s *Sim) RestartNode(id string) {
 		s.startClient(n)
 	}
 	s.startNext(n)
-	if n.kind == KQueue {
+	if n.kind == KQueue || n.kind == KTopic {
 		s.dispatch(n)
 	}
 }

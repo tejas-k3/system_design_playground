@@ -73,7 +73,7 @@ func Unwired(d Diagram) []Node {
 	}
 	isData := func(k string) bool {
 		switch k {
-		case KDatabase, KReplica, KCache, KRedis, KQueue, KShardRouter, KObjectStore, KIndex:
+		case KDatabase, KReplica, KCache, KRedis, KQueue, KShardRouter, KObjectStore, KIndex, KTopic:
 			return true
 		}
 		return false
@@ -106,7 +106,7 @@ func Unwired(d Diagram) []Node {
 		case KWorker:
 			fed, writes := false, false
 			for _, e := range d.Edges {
-				if e.To == n.ID && kind[e.From] == KQueue {
+				if e.To == n.ID && (kind[e.From] == KQueue || kind[e.From] == KTopic) {
 					fed = true
 				}
 				if e.From == n.ID && (kind[e.To] == KDatabase || kind[e.To] == KShardRouter || kind[e.To] == KRedis) {

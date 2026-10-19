@@ -18,7 +18,7 @@ func (s *Sim) addNode(d Node) *node {
 	s.nodes[n.id] = n
 	s.order = append(s.order, n)
 	switch d.Kind {
-	case KQueue:
+	case KQueue, KTopic:
 		s.hasQueue = true
 	}
 	if d.Kind == KClient {

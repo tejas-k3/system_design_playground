@@ -161,7 +161,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				num("cpuMs", "CPU time", "Capacity", 20, 1, 500, 1, "ms", "Compute per request, not counting time waiting on dependencies.").fixed(),
@@ -289,6 +289,17 @@ func init() {
 				num("delayMs", "Delivery delay", "Delivery", 0, 0, 600000, 100, "ms", "Hold every job back this long before workers may take it (delayed or scheduled delivery). Held jobs still count against the queue's capacity.").adv(),
 				flag("deadLetter", "Dead-letter queue", "Delivery", false, "Park jobs that used up their attempts for inspection instead of dropping them. They are counted as dead, not lost.").adv(),
 				num("maxMessageKB", "Largest message", "Buffer", 256, 1, 10240, 1, "KB", "Messages above this size are refused (managed queues commonly allow 256 KB; a log, 1 MB). Only applies when the users' request size is set. Store big bodies elsewhere and queue a pointer.").adv().fixed(),
+			},
+			cost: func(Params) float64 { return 0.04 },
+		},
+		{
+			Kind: KTopic, Name: "Topic", Description: "Publish once, every subscriber gets its own copy.",
+			Lesson: "Each subscriber falls behind on its own: a slow one grows a backlog while the others keep up.",
+			Accent: "#9c36b5", Width: 160, Height: 72, CanConnect: []string{KWorker},
+			Params: []ParamSpec{
+				num("capacity", "Backlog per subscriber", "Buffer", 5000, 10, 100000, 100, "messages", "Messages one subscriber may have waiting; beyond it that subscriber's copies are dropped (the publisher is never told)."),
+				num("maxAttempts", "Attempts per delivery", "Delivery", 3, 1, 10, 1, "", "How many times a failing delivery is tried before it is given up.").adv(),
+				flag("deadLetter", "Dead-letter queue", "Delivery", false, "Park deliveries that used up their attempts instead of dropping them.").adv(),
 			},
 			cost: func(Params) float64 { return 0.04 },
 		},
