@@ -64,6 +64,12 @@ func variability(group string) ParamSpec {
 		opt("steady", "Steady"), opt("exponential", "Exponential"), opt("heavy", "Heavy-tailed")).adv()
 }
 
+// clockSkew: expiry compares a time stamped by the origin with this node's own clock, so a clock that is off
+// shortens or lengthens every lifetime by the same amount.
+func clockSkew() ParamSpec {
+	return num("clockSkewMs", "Clock offset", "Freshness", 0, -60000, 60000, 500, "ms", "How far this node's clock is ahead of the origin's (negative = behind). Entries are stamped with the origin's time, so a clock 8 s ahead makes a 10 s lifetime last 2 s, and one behind makes it last longer.").adv()
+}
+
 // ttlJitter spreads entry lifetimes so a whole cache does not expire in the same instant.
 func ttlJitter() ParamSpec {
 	return num("ttlJitterPct", "TTL jitter", "Freshness", 0, 0, 90, 5, "%", "Each entry lives its TTL plus or minus this much, so entries do not all expire together.").adv()
@@ -209,6 +215,7 @@ func init() {
 				sel("writePolicy", "On writes", "Freshness", "none", "What happens to cached copies when data is written.",
 					opt("none", "Do nothing"), opt("invalidate", "Invalidate"), opt("writeThrough", "Write through")),
 				num("ttlSec", "Time to live", "Freshness", 0, 0, 3600, 1, "s", "Entries expire after this long (0 = never)."),
+				clockSkew(),
 				ttlJitter(),
 				flag("coalesce", "Share concurrent misses", "Freshness", false, "When several requests miss on the same key at once, only one goes to the data store and the rest wait for its answer.").adv(),
 				flag("startWarm", "Start warm", "Memory", true, "Begin the run with popular items already cached."),
@@ -297,6 +304,7 @@ func init() {
 				num("capacityItems", "Capacity", "Memory", 5000, 0, 200000, 100, "items", "How many items it can hold."),
 				num("capacityMB", "Capacity in bytes", "Memory", 0, 0, 1000000, 10, "MB", "Disk or memory for cached bodies. Items are as large as the users' response size, so big objects fit fewer; the smaller of this and the item count applies. 0 = only count items.").adv(),
 				num("ttlSec", "Time to live", "Freshness", 60, 0, 3600, 1, "s", "Entries expire after this long."),
+				clockSkew(),
 				ttlJitter(),
 				flag("startWarm", "Start warm", "Memory", true, "Begin with popular items cached."),
 				flag("coalesce", "Collapse concurrent misses", "Freshness", false, "A shield tier: when several requests miss on the same key at once, only one goes on to the origin and the rest wait for its answer.").adv(),
