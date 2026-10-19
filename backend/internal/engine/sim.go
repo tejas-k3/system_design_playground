@@ -77,9 +77,10 @@ type job struct {
 	counted  bool
 	enq      float64
 	attempts int
-	high     bool // an urgent request: first in line in a priority queue
-	finished bool // a worker has acknowledged it (or given up): a later visibility timeout does nothing
-	ghost    bool // a redelivered copy of a job still being worked on: it does the work again but is not counted again
+	sub      *edge // topic delivery: the subscription (edge to a worker) it belongs to
+	high     bool  // an urgent request: first in line in a priority queue
+	finished bool  // a worker has acknowledged it (or given up): a later visibility timeout does nothing
+	ghost    bool  // a redelivered copy of a job still being worked on: it does the work again but is not counted again
 }
 
 type node struct {
@@ -167,6 +168,8 @@ func (n *node) b(k string) bool    { v, _ := n.p[k].(bool); return v }
 
 type edge struct {
 	id        string
+	subJobs   []*job // topic subscription: deliveries waiting for this edge's worker
+	subHead   int
 	downReq   bool // linkDown: requests on this connection are held until it heals
 	downResp  bool // linkDown: answers are held until it heals
 	held      []func()
@@ -385,7 +388,7 @@ func (s *Sim) tick() {
 		}
 		capN := float64(s.capacity(n))
 		switch {
-		case n.kind == KQueue:
+		case n.kind == KQueue || n.kind == KTopic:
 			n.util[i] = float64(s.queued(n)) / math.Max(1, n.f("capacity"))
 		case n.kind == KRateLimiter:
 			n.util[i] = math.Min(1, float64(n.c.adm)/math.Max(1e-9, n.f("limitRps")*tickMs/1000))
@@ -416,7 +419,7 @@ func (s *Sim) tick() {
 		if n.kind == KLoadBalancer && n.b("outlierEjection") && !n.down {
 			s.ejectOutliers(n)
 		}
-		if n.kind == KQueue && !n.down {
+		if (n.kind == KQueue || n.kind == KTopic) && !n.down {
 			s.dispatch(n)
 		}
 	}

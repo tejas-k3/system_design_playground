@@ -143,9 +143,16 @@ func (s *Sim) Snapshot() Stats {
 		if c := s.capacity(n); c < 1<<20 {
 			ns.Cap = c
 		}
-		if n.kind == KQueue {
-			ns.QLen = len(n.jobs) - n.jh + len(n.hjobs) - n.hh
+		if n.kind == KQueue || n.kind == KTopic {
+			ns.QLen = s.queued(n)
 			ns.Cap = int(n.f("capacity"))
+		}
+		if n.kind == KWorker { // a subscriber's own backlog
+			for _, e := range n.in {
+				if !e.removed && e.from.kind == KTopic {
+					ns.QLen += len(e.subJobs) - e.subHead
+				}
+			}
 		}
 		if n.slow > 1 {
 			ns.Slow = n.slow

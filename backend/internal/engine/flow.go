@@ -684,6 +684,9 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 	case KQueue:
 		s.arriveQueue(n, c, cb)
 		return
+	case KTopic:
+		s.arriveTopic(n, c, cb)
+		return
 	case KClient, KWorker:
 		s.failAt(n, RNoRoute, cb)
 		return

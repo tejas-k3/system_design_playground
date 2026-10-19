@@ -17,6 +17,7 @@ const (
 	KRedis        = "redis"
 	KObjectStore  = "objectStore"
 	KIndex        = "index"
+	KTopic        = "topic"
 )
 
 // Params holds user-editable settings: numbers, strings (select) and booleans.
