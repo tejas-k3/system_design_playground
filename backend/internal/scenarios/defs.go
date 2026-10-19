@@ -1134,6 +1134,78 @@ func init() {
 		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the throughput you will need, since changing it later also changes how keys map to partitions.",
 	})
 
+	// The bad deploy: version 2 is rolled out to half the fleet at once and it serves errors
+	badDeploy := func(fixed bool) engine.Diagram {
+		canary := 0.0
+		if fixed {
+			canary = 5
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 80.0, "readPct": 100.0, "timeoutMs": 3000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, P{"healthCheckSec": 1.0, "canaryPct": canary}).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0}).
+			e("users", "lb")
+		for k := 0; k < 4; k++ {
+			id := fmt.Sprintf("app%d", k+1)
+			v := "v1"
+			if k >= 2 {
+				v = "v2"
+			}
+			b.n(id, engine.KAppServer, cols[2], float64(k)*100+30, P{"threads": 16.0, "version": v}).e("lb", id).e(id, "db")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "bad-deploy", Title: "The bad deploy", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Half the fleet runs the new version, and the new version is broken.",
+		Story:   "Release day: two of the four servers already run version 2. Twelve seconds into the evening peak version 2 starts answering every request with an error, and it stays that way for half a minute before anyone rolls it back. Because the load balancer treats all four servers alike, half of all requests fail.",
+		Diagram: badDeploy(false), Solution: badDeploy(true),
+		Chaos:       []engine.ChaosEvent{{Type: "badDeploy", Kind: engine.KAppServer, Version: "v2", FractionPct: 100, Mode: "errors", AtSec: 12, DurationSec: 30}},
+		Goals:       engine.Goals{MinSuccessRate: 0.92, MaxP95Ms: f(400), MaxCostPerHour: f(2.4), StarCostPerHour: f(2.3)},
+		DurationSec: 50, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"You cannot stop the bug, but you can choose how many people meet it. Who decides how much traffic version 2 receives?",
+			"The load balancer sends each server its fair share. Version 2 holds two servers out of four, so it gets half of the traffic.",
+			"Give the load balancer a canary share (advanced settings): a small percentage of requests goes to version 2 until you trust it.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "With a 5% canary, roughly how many requests meet the bug?", Options: []string{"About half", "About 5% of them, during the bad period", "None"}, Answer: 1,
+			Explain: "A canary sends the new version only its small share, so a broken release hurts only that share until it is rolled back."}},
+		Debrief: "Release safety is about blast radius. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
+	})
+
+	// Zone outage: every component sits in the default zone, so one zone failing is a total outage
+	zoneOutage := func(fixed bool) engine.Diagram {
+		zl, za, zb, zc, zd := "az-a", "az-a", "az-a", "az-a", "az-a"
+		if fixed {
+			zl, za, zb, zc, zd = "az-b", "az-a", "az-b", "az-c", "az-c"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 60.0, "readPct": 100.0, "timeoutMs": 2000.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, P{"healthCheckSec": 1.0, "zone": zl}).
+			n("app1", engine.KAppServer, cols[2], rowTop, P{"threads": 16.0, "zone": za}).
+			n("app2", engine.KAppServer, cols[2], rowMid, P{"threads": 16.0, "zone": zb}).
+			n("app3", engine.KAppServer, cols[2], rowBot, P{"threads": 16.0, "zone": zc}).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "zone": zd}).
+			e("users", "lb").e("lb", "app1").e("lb", "app2").e("lb", "app3").e("app1", "db").e("app2", "db").e("app3", "db").done()
+	}
+	register(&Scenario{
+		ID: "zone-outage", Title: "When a zone goes dark", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Three servers, a balancer and a database, and one data-centre zone fails.",
+		Story:   "Everything runs in zone A of the region. At twelve seconds into the peak the whole zone loses power for twenty seconds: the load balancer, the three app servers and the database go with it. The architecture has plenty of redundancy on paper, but all of it sits in one place.",
+		Diagram: zoneOutage(false), Solution: zoneOutage(true),
+		Chaos:       []engine.ChaosEvent{{Type: "zoneDown", Zone: "az-a", AtSec: 12, DurationSec: 20}},
+		Goals:       engine.Goals{MinSuccessRate: 0.9, MaxP95Ms: f(400), MaxCostPerHour: f(2.1), StarCostPerHour: f(2.0)},
+		DurationSec: 45, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Which components share the failed zone? Select a few and look at their placement setting.",
+			"Redundancy only helps if the copies do not fail together. Spreading the servers is not enough if the balancer or the database stays in the zone that fails.",
+			"Set each component's availability zone (advanced settings): keep the balancer and the database out of zone A and spread the servers over different zones.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Why does the design survive when the balancer is moved to another zone but the servers stay put?", Options: []string{"It does not: all three servers are still in the failed zone", "The balancer caches responses", "The database takes over"}, Answer: 0,
+			Explain: "A balancer in a healthy zone has nothing to send traffic to if every server it knows is in the failed zone. All the pieces a request needs must survive."}},
+		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
