@@ -48,3 +48,22 @@ func TestNoBodyOrNoStoreMeansNoDownload(t *testing.T) {
 		t.Fatalf("an idle store costs only its base price: %.4f", c)
 	}
 }
+
+func TestStorageGrowthIsProjectedOverAYear(t *testing.T) {
+	d := downloadFlow(500, true)
+	for i := range d.Nodes {
+		if d.Nodes[i].Kind == KObjectStore {
+			d.Nodes[i].Params["dataGB"] = 1000.0
+			d.Nodes[i].Params["growthGBPerDay"] = 10.0
+		}
+	}
+	s := run(d, Options{Seed: 2}, 10)
+	ex := s.Snapshot().Nodes["s"].Extra
+	// 1,000 GB growing 10 GB a day averages 1,000 + 10 x 182.5 = 2,825 GB over the year, at $0.023 per GB-month
+	if want := 2825 * 0.023 * 12; math.Abs(ex["yearStorageCost"]-want) > 1 {
+		t.Fatalf("projected year of storage should cost about $%.0f, got %.1f", want, ex["yearStorageCost"])
+	}
+	if ex["storedGB"] != 1000 {
+		t.Fatalf("stored GB: %v", ex)
+	}
+}
