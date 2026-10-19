@@ -837,6 +837,11 @@ func (s *Sim) pickBackend(n *node) *edge {
 	if len(cand) == 0 {
 		return nil
 	}
+	if n.kind == KLoadBalancer {
+		if pct := n.f("canaryPct"); pct > 0 {
+			cand = s.canarySplit(n, cand, pct)
+		}
+	}
 	alg := "roundRobin"
 	if n.kind == KLoadBalancer {
 		alg = n.s("algorithm")
@@ -1030,4 +1035,27 @@ func (s *Sim) procCDN(n *node, c *call, cb func(Result), release func()) {
 			}
 		})
 	})
+}
+
+// canarySplit narrows the candidates to the new version (v2) for the canary share of the requests and to the old one
+// for the rest. The split is an accumulator, not a random draw, so it is exact and costs no random numbers. If one of
+// the versions has no server available, everything goes to the other.
+func (s *Sim) canarySplit(lb *node, cand []*edge, pct float64) []*edge {
+	var v1, v2 []*edge
+	for _, e := range cand {
+		if e.to.s("version") == "v2" {
+			v2 = append(v2, e)
+		} else {
+			v1 = append(v1, e)
+		}
+	}
+	if len(v1) == 0 || len(v2) == 0 {
+		return cand
+	}
+	lb.canaryAcc += pct / 100
+	if lb.canaryAcc >= 1 {
+		lb.canaryAcc--
+		return v2
+	}
+	return v1
 }

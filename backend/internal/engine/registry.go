@@ -154,6 +154,7 @@ func init() {
 				sel("algorithm", "Algorithm", "Routing", "roundRobin", "How the next server is chosen.",
 					opt("roundRobin", "Round robin"), opt("leastConn", "Least connections"), opt("random", "Random")),
 				flag("outlierEjection", "Eject outliers", "Health", false, "Temporarily remove servers that error a lot or are much slower than their peers."),
+				num("canaryPct", "Canary share", "Release", 0, 0, 100, 1, "%", "Send this share of requests to the servers running the new version (v2) and the rest to the old one (v1). 0 = every server gets its fair share.").adv(),
 				num("healthCheckSec", "Health check interval", "Health", 2, 1, 30, 1, "s", "How long a dead server keeps receiving traffic before the balancer notices."),
 			},
 			cost: func(Params) float64 { return 0.02 },
@@ -165,6 +166,7 @@ func init() {
 			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
+				sel("version", "Release version", "Release", "v1", "Which release this server runs. A load balancer with a canary share sends that share of traffic to v2; a bad-release event can be aimed at one version.", opt("v1", "v1 (current)"), opt("v2", "v2 (new)")).adv(),
 				num("cpuMs", "CPU time", "Capacity", 20, 1, 500, 1, "ms", "Compute per request, not counting time waiting on dependencies.").fixed(),
 				variability("Capacity"),
 				flag("autoscale", "Autoscale", "Scaling", false, "Add and remove whole servers (each with these threads) as load changes. New servers take time to boot, and every running server costs money.").adv(),

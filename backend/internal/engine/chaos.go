@@ -344,7 +344,7 @@ func (s *Sim) linkDown(ev ChaosEvent) {
 func (s *Sim) changeEvent(ev ChaosEvent) {
 	var targets []*node
 	for _, n := range s.order {
-		if n.kind == ev.Kind && !n.removed {
+		if n.kind == ev.Kind && !n.removed && (ev.Version == "" || n.s("version") == ev.Version) {
 			targets = append(targets, n)
 		}
 	}
