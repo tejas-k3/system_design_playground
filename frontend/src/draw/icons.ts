@@ -137,6 +137,16 @@ const ICONS: Record<string, Draw> = {
       c.quadraticCurveTo(0, 3.5, 8.6, 0)
     })
   },
+  log: (c) => {
+    // a stack of numbered slots: an append-only line
+    for (const y of [-8, -1, 6]) {
+      stroke(c, () => c.rect(-10, y, 20, 5))
+      stroke(c, () => {
+        c.moveTo(-6, y + 2.5)
+        c.lineTo(2, y + 2.5)
+      })
+    }
+  },
   topic: (c) => {
     // one source fanning out to three copies
     stroke(c, () => c.arc(-8, 0, 3, 0, Math.PI * 2))

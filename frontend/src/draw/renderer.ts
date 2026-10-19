@@ -231,6 +231,8 @@ function nodeSubtitle(n: Node, sc: Scene): string {
       return `cap ${rp.capacity}`
     case 'topic':
       return `per subscriber ${rp.capacity}`
+    case 'log':
+      return `${rp.partitions} partitions`
     case 'rateLimiter':
       return `${rp.limitRps}/s`
     case 'index':
