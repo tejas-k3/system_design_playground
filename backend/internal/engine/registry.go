@@ -344,6 +344,7 @@ func init() {
 				num("egressPerGB", "Download price", "Cost", 0.09, 0, 1, 0.01, "$/GB", "What each GB served to users costs. Charged from the rate seen so far, so it appears in the hourly cost once downloads run.").adv(),
 				num("requestPer1k", "Request price", "Cost", 0.0004, 0, 0.1, 0.0001, "$/1k", "Price per 1,000 requests, uploads and downloads alike.").adv(),
 				num("dataGB", "Data stored", "Cost", 0, 0, 10000000, 100, "GB", "How much is kept in the store; charged per GB per month.").adv(),
+				num("growthGBPerDay", "Growth", "Cost", 0, 0, 1000000, 10, "GB/day", "How much the stored data grows each day. Shown as a projected storage cost for the next year (a run lasts seconds, so growth is projected, not simulated).").adv(),
 				num("storagePerGBMonth", "Storage price", "Cost", 0.023, 0, 1, 0.001, "$/GB-mo", "Price of keeping one GB for a month.").adv(),
 			},
 			cost: func(Params) float64 { return 0.03 },
