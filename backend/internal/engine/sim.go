@@ -225,6 +225,7 @@ type Sim struct {
 	runLost                                   int // writes lost when an in-memory store crashed
 
 	jobEnqueued, jobCompleted, jobLost, jobRetried int
+	jobDead                                        int
 	jobHist                                        Hist
 	hasQueue, hasBooking, hasFresh                 bool
 
@@ -452,7 +453,7 @@ func (s *Sim) Finished() bool {
 	return s.now > s.opts.StopTrafficAtMs+30000
 }
 
-func (s *Sim) backlog() int { return s.jobEnqueued - s.jobCompleted - s.jobLost }
+func (s *Sim) backlog() int { return s.jobEnqueued - s.jobCompleted - s.jobLost - s.jobDead }
 
 // service draws a service time for one unit of work at node n, honouring its "variability" setting.
 func (s *Sim) service(n *node, mean float64) float64 {

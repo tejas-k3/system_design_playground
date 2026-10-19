@@ -282,6 +282,8 @@ func init() {
 			Accent: "#7048e8", Width: 160, Height: 72, CanConnect: []string{KWorker},
 			Params: []ParamSpec{
 				num("capacity", "Capacity", "Buffer", 5000, 10, 100000, 100, "jobs", "Jobs it can hold before rejecting."),
+				num("maxAttempts", "Attempts per job", "Delivery", 3, 1, 10, 1, "", "How many times a failing job is tried (with a growing pause between tries) before it is given up.").adv(),
+				flag("deadLetter", "Dead-letter queue", "Delivery", false, "Park jobs that used up their attempts for inspection instead of dropping them. They are counted as dead, not lost.").adv(),
 				num("maxMessageKB", "Largest message", "Buffer", 256, 1, 10240, 1, "KB", "Messages above this size are refused (managed queues commonly allow 256 KB; a log, 1 MB). Only applies when the users' request size is set. Store big bodies elsewhere and queue a pointer.").adv().fixed(),
 			},
 			cost: func(Params) float64 { return 0.04 },
@@ -295,6 +297,7 @@ func init() {
 				num("concurrency", "Concurrency", "Capacity", 4, 1, 64, 1, "", "Jobs it works on at once."),
 				num("processMs", "Processing time", "Speed", 10, 1, 2000, 1, "ms", "Compute per job."),
 				variability("Speed"),
+				num("poisonPct", "Poison jobs", "Failure modes", 0, 0, 100, 1, "%", "Share of jobs that can never succeed (a malformed message). Each is retried until its attempts run out, using worker time every time.").adv(),
 			},
 			cost: func(p Params) float64 { return 0.05 * pf(p, "concurrency", 4) / 4 },
 		},

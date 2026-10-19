@@ -738,7 +738,7 @@ func (s *Sim) runJob(q, w *node, j *job) {
 		} else {
 			w.c.err++
 			w.c.reason[res.Reason]++
-			if j.attempts < 3 {
+			if j.attempts < int(q.f("maxAttempts")) {
 				if j.counted {
 					s.jobRetried++
 				}
@@ -747,7 +747,11 @@ func (s *Sim) runJob(q, w *node, j *job) {
 					s.dispatch(q)
 				})
 			} else if j.counted {
-				s.jobLost++
+				if q.b("deadLetter") {
+					s.jobDead++
+				} else {
+					s.jobLost++
+				}
 			}
 		}
 		s.dispatch(q)
@@ -756,6 +760,10 @@ func (s *Sim) runJob(q, w *node, j *job) {
 	s.after(s.service(w, w.f("processMs"))*w.slow, func() {
 		if w.epoch != ep || w.removed {
 			fin(fail(RNodeDown))
+			return
+		}
+		if pct := w.f("poisonPct"); pct > 0 && float64(Hash32(uint32(j.rid)*2654435761+211)%100) < pct {
+			fin(fail(RPoisonJob)) // a malformed job fails the same way every time
 			return
 		}
 		c := &call{key: j.key, wl: j.wl, rid: j.rid, idem: j.idem, counted: j.counted, write: true, ver: -1, job: j}
