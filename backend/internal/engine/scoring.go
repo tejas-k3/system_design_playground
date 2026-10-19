@@ -18,6 +18,7 @@ type Goals struct {
 	MaxDuplicates    *int     `json:"maxDuplicates,omitempty"`
 	MaxLostWrites    *int     `json:"maxLostWrites,omitempty"`
 	MaxLostUpdates   *int     `json:"maxLostUpdates,omitempty"` // transfers that silently overwrote each other
+	MaxJobsLost      *int     `json:"maxJobsLost,omitempty"`    // jobs given up with nowhere to go (not dead-lettered)
 	MaxWriteSkew     *int     `json:"maxWriteSkew,omitempty"`   // on-call pairs left with the rule broken
 	StarCostPerHour  *float64 `json:"starCostPerHour,omitempty"`
 	StarP95Ms        *float64 `json:"starP95Ms,omitempty"`
@@ -170,6 +171,13 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxLostUpdates != nil {
 		checks = append(checks, Check{"Lost updates", fmt.Sprintf("≤ %d", *g.MaxLostUpdates), fmt.Sprint(run.LostUpdates), run.LostUpdates <= *g.MaxLostUpdates})
+	}
+	if g.MaxJobsLost != nil {
+		lost := 0
+		if run.Jobs != nil {
+			lost = run.Jobs.Lost
+		}
+		checks = append(checks, Check{"Jobs lost", fmt.Sprintf("≤ %d", *g.MaxJobsLost), fmt.Sprint(lost), lost <= *g.MaxJobsLost})
 	}
 	if g.MaxWriteSkew != nil {
 		checks = append(checks, Check{"Rule broken (write skew)", fmt.Sprintf("≤ %d", *g.MaxWriteSkew), fmt.Sprint(run.WriteSkew), run.WriteSkew <= *g.MaxWriteSkew})

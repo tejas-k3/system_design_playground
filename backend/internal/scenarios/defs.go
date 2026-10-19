@@ -1068,6 +1068,72 @@ func init() {
 		Debrief: "Match the store to the access pattern. Append-heavy, rarely-read data fits an append-optimised layout; paying a general-purpose engine's cost per row for a firehose is how a database becomes the bottleneck.",
 	})
 
+	// Poison pill: a malformed job is retried ten times, burning worker time, and then vanishes
+	poisonPill := func(fixed bool) engine.Diagram {
+		attempts, dlq := 10.0, false
+		if fixed {
+			attempts, dlq = 3, true
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 50.0, "readPct": 0.0, "timeoutMs": 3000.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0}).
+			n("q", engine.KQueue, cols[2], rowMid, P{"capacity": 20000.0, "maxAttempts": attempts, "deadLetter": dlq}).
+			n("w", engine.KWorker, cols[3], rowMid, P{"concurrency": 8.0, "processMs": 100.0, "poisonPct": 12.0}).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "app").e("app", "q").e("q", "w").e("w", "db").done()
+	}
+	register(&Scenario{
+		ID: "poison-pill", Title: "The poison pill", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "One in eight messages can never be processed, and everything else queues behind them.",
+		Story:   "A bad deploy upstream means about 12% of the messages are malformed. The queue tries each one ten times, every try occupying a worker for its full processing time, and then silently drops it. Healthy messages wait behind the retries and nobody can find out what was dropped.",
+		Diagram: poisonPill(false), Solution: poisonPill(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MinJobsCompleted: f(0.85), MaxJobP95Ms: f(1500), MaxJobsLost: i(0), MaxCostPerHour: f(1.3), StarCostPerHour: f(1.2), StarP95Ms: f(500)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Open the job counters: how many retries are there, and how long do healthy jobs wait?",
+			"Retrying something that can never succeed only burns worker time. How many attempts does a job deserve, and where should the failures go instead of vanishing?",
+			"On the queue (advanced settings): lower the attempts per job and turn on the dead-letter queue so the failed jobs are kept for inspection.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Lowering the attempts alone (no dead-letter queue) will…", Options: []string{"Fix everything", "Free the workers but lose the bad messages silently", "Make workers slower"}, Answer: 1,
+			Explain: "Fewer retries stop the waste, but a job that used up its attempts is gone. A dead-letter queue keeps it where someone can look at it."}},
+		Debrief: "Retries help against transient failures and hurt against permanent ones. Bound the attempts, back off, and route what still fails to a dead-letter queue so it is visible and recoverable instead of lost.",
+	})
+
+	// Consumer lag: eight consumers, four partitions
+	consumerLag := func(fixed bool) engine.Diagram {
+		parts := 4.0
+		if fixed {
+			parts = 16
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 60.0, "readPct": 0.0, "keySpace": 200.0, "keyDist": "uniform", "timeoutMs": 3000.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0}).
+			n("log", engine.KLog, cols[2], rowMid, P{"partitions": parts, "capacity": 50000.0}).
+			n("db", engine.KDatabase, cols[4], rowMid, nil).
+			e("users", "app").e("app", "log")
+		for k := 0; k < 8; k++ {
+			id := fmt.Sprintf("c%d", k+1)
+			b.n(id, engine.KWorker, cols[3], float64(k)*60, P{"concurrency": 2.0, "processMs": 100.0}).label(id, fmt.Sprintf("Consumer %d", k+1)).e("log", id).e(id, "db")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "consumer-lag", Title: "Consumer lag", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Eight consumers, and the backlog still grows.",
+		Story:   "Events stream into a partitioned log read by eight consumers, each able to handle several messages at once. Yet the backlog grows all day and processing falls further and further behind. Adding yet more consumers was already tried.",
+		Diagram: consumerLag(false), Solution: consumerLag(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MinJobsCompleted: f(0.97), MaxJobP95Ms: f(2000), MaxCostPerHour: f(1.5), StarCostPerHour: f(1.4), StarP95Ms: f(800)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Look at which consumers are busy. Do all eight have work?",
+			"A partition is read by one member of a group at a time, and one message after another to keep order. How many partitions are there?",
+			"Raise the number of partitions on the log (16 gives every consumer two). More consumers would not help: they would sit idle.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "With 4 partitions, what do consumers 5 to 8 do?", Options: []string{"Share the load equally", "Nothing: a partition has one reader per group", "Take the slowest messages"}, Answer: 1,
+			Explain: "Within a consumer group each partition is assigned to exactly one member, so parallelism is capped by the partition count."}},
+		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the throughput you will need, since changing it later also changes how keys map to partitions.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
