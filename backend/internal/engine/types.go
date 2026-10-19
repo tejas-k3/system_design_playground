@@ -134,6 +134,7 @@ type ChaosEvent struct {
 	DownSec     float64 `json:"downSec,omitempty"`
 	Factor      float64 `json:"factor,omitempty"`
 	DurationSec float64 `json:"durationSec,omitempty"` // slow and partition
+	Version     string  `json:"version,omitempty"`     // badDeploy: only components running this version (v1 | v2) get the bad release
 	Kind        string  `json:"kind,omitempty"`        // badDeploy and rollingRestart: which kind of component
 	FractionPct float64 `json:"fractionPct,omitempty"` // badDeploy: share of that kind that gets the bad release (at least one)
 	IntervalSec float64 `json:"intervalSec,omitempty"` // rollingRestart: gap between one restart and the next
