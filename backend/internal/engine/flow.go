@@ -53,6 +53,7 @@ type call struct {
 	token   int
 	job     *job
 	fan     float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
+	high    bool    // an urgent request
 	claim   bool    // the body already sits in an object store: what travels on is a pointer
 	tr      *tracer // non-nil for sampled requests
 	sp      *span   // the span of the node currently handling this call

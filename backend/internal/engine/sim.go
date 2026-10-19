@@ -77,6 +77,7 @@ type job struct {
 	counted  bool
 	enq      float64
 	attempts int
+	high     bool // an urgent request: first in line in a priority queue
 	finished bool // a worker has acknowledged it (or given up): a later visibility timeout does nothing
 	ghost    bool // a redelivered copy of a job still being worked on: it does the work again but is not counted again
 }
@@ -147,8 +148,11 @@ type node struct {
 	rwRecent    []float64 // times of counted writes in the last second (what an append-only file could still lose)
 
 	// queue
-	jobs []*job
-	jh   int
+	jobs    []*job
+	jh      int
+	hjobs   []*job // urgent jobs of a priority queue, served before jobs
+	hh      int
+	delayed int // jobs held back by the queue's delivery delay
 
 	rr map[string]int
 
@@ -228,7 +232,7 @@ type Sim struct {
 
 	jobEnqueued, jobCompleted, jobLost, jobRetried int
 	jobDead, jobRedelivered                        int
-	jobHist                                        Hist
+	jobHist, jobHistHigh                           Hist
 	hasQueue, hasBooking, hasFresh                 bool
 
 	vers      map[int]*verLog
@@ -382,7 +386,7 @@ func (s *Sim) tick() {
 		capN := float64(s.capacity(n))
 		switch {
 		case n.kind == KQueue:
-			n.util[i] = float64(len(n.jobs)-n.jh) / math.Max(1, n.f("capacity"))
+			n.util[i] = float64(s.queued(n)) / math.Max(1, n.f("capacity"))
 		case n.kind == KRateLimiter:
 			n.util[i] = math.Min(1, float64(n.c.adm)/math.Max(1e-9, n.f("limitRps")*tickMs/1000))
 		case n.kind == KClient || n.kind == KLoadBalancer || capN > 1e6:
