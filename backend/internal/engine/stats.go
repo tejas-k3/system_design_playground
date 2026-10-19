@@ -40,6 +40,7 @@ type JobStats struct {
 	Completed int     `json:"completed"`
 	Lost      int     `json:"lost"`
 	Retried   int     `json:"retried"`
+	Dead      int     `json:"dead,omitempty"` // jobs parked in the dead-letter queue after their last attempt
 	Backlog   int     `json:"backlog"`
 	P50       float64 `json:"p50"`
 	P95       float64 `json:"p95"`
@@ -236,7 +237,7 @@ func (s *Sim) Snapshot() Stats {
 	}
 	if s.hasQueue {
 		run.Jobs = &JobStats{
-			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried,
+			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead,
 			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95),
 		}
 	}
