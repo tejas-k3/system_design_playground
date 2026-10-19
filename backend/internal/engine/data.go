@@ -409,6 +409,15 @@ func (s *Sim) readMult(n *node, c *call) float64 {
 	return m
 }
 
+// secondaryLookup says whether this read looks an item up by something other than its key.
+func (s *Sim) secondaryLookup(c *call) bool {
+	if c.lg == nil {
+		return false
+	}
+	pct := c.lg.client.f("secondaryPct")
+	return pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+97)%100) < pct
+}
+
 func (s *Sim) readMultBase(n *node, c *call) float64 {
 	switch c.wl {
 	case wlGeo:
@@ -419,10 +428,18 @@ func (s *Sim) readMultBase(n *node, c *call) float64 {
 		return 10
 	}
 	// a lookup by another field: free with an index, a scan without (chosen from the request id, so no random draw)
-	if c.lg != nil && n.f("indexes") < 1 {
-		if pct := c.lg.client.f("secondaryPct"); pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+97)%100) < pct {
-			return n.f("scanMult")
+	if s.secondaryLookup(c) && (n.f("indexes") < 1 || n.s("model") == "wideColumn") {
+		m := n.f("scanMult")
+		if n.s("model") == "wideColumn" {
+			m *= 3 // no secondary access path at all: the scan is over every partition
 		}
+		return m
+	}
+	switch n.s("model") { // single-key reads
+	case "document":
+		return 0.8
+	case "timeSeries":
+		return 1.5 // random point reads are what an append-optimised layout is worst at
 	}
 	return 1
 }
@@ -430,6 +447,14 @@ func (s *Sim) readMultBase(n *node, c *call) float64 {
 // writeMult is the cost of keeping secondary indexes up to date: 30% more per index.
 func (s *Sim) writeMult(n *node) float64 {
 	m := 1 + 0.3*n.f("indexes")
+	switch n.s("model") {
+	case "document":
+		m *= 0.8
+	case "wideColumn":
+		m *= 0.4
+	case "timeSeries":
+		m *= 0.3
+	}
 	if n.s("engine") == "lsm" {
 		m *= 0.5 // sequential appends instead of in-place page updates
 	}
