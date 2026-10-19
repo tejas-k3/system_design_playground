@@ -133,6 +133,7 @@ type logical struct {
 	key       int
 	wl        int
 	hash      uint32
+	user      int  // the account sending the request (0 = identities not modelled)
 	high      bool // an urgent request (priorityPct): chosen from the request number, no random draw
 	tr        *tracer
 	after     func() // called once, when the request is resolved (closed-loop users think, then ask again)
@@ -190,6 +191,13 @@ func (s *Sim) createLogical(c *node) *logical {
 		lg.write = true // a transfer is always a transaction
 	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
+	if n := int(c.f("identities")); n > 0 {
+		dist := "uniform"
+		if c.f("identitySkew") > 0 {
+			dist = "zipf"
+		}
+		lg.user = c.idBase + c.userKeys.Sample(dist, n, c.f("identitySkew"), 0, s.keyRng)
+	}
 	if c.b("abuse") { // a scraper: items picked from a huge space, so almost none is cached
 		lg.key = 1 + int(s.keyRng.Next()*abuseKeySpace)
 	}
@@ -216,7 +224,7 @@ func (s *Sim) startAttempt(lg *logical) {
 	lg.attempts++
 	s.attempts.Push(s.now, true, 0)
 	at := &attempt{lg: lg, at: s.now, n: lg.attempts}
-	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high}
+	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high, user: lg.user}
 	s.hop(c, e, call, func(res Result) {
 		if at.done {
 			return

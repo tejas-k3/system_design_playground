@@ -126,6 +126,8 @@ func init() {
 					opt("exponential", "Exponential + jitter"), opt("none", "Immediate")),
 				num("reqKB", "Request size", "Payload", 0, 0, 102400, 10, "KB", "How big each request is (what an upload sends). 0 = not modelled. A message queue refuses anything above its own size limit.").adv(),
 				num("respKB", "Response size", "Payload", 0, 0, 102400, 10, "KB", "How big each response is. 0 = not modelled. Recorded for the bandwidth model that builds on this.").adv(),
+				num("identities", "Distinct users", "Identity", 0, 0, 1000000, 10, "", "How many different accounts the requests come from (0 = not modelled). A rate limiter set to limit per user counts each account separately.").adv(),
+				num("identitySkew", "Account skew", "Identity", 0, 0, 2, 0.1, "", "0 = every account sends equally often; higher means a few accounts send most of the traffic.").adv(),
 				flag("abuse", "Bot traffic", "What they do", false, "These users are a scraper or attacker: they ask for a different item each time from a huge space (so caches rarely help), never retry, and ignore what they are told. Add them alongside real users to see what they do to the system and what a rate limiter protects.").adv(),
 				num("priorityPct", "Urgent requests", "What they do", 0, 0, 100, 5, "%", "Share of requests marked urgent. Only a queue set to serve urgent work first treats them differently.").adv(),
 				num("secondaryPct", "Lookups by another field", "What they do", 0, 0, 100, 5, "%", "Share of reads that look an item up by something other than its key (email, status, date). Without a secondary index on the database each one scans.").adv(),
@@ -356,6 +358,8 @@ func init() {
 			Params: []ParamSpec{
 				num("limitRps", "Sustained rate", "Limit", 200, 1, 10000, 10, "rps", "Requests per second allowed through."),
 				num("burst", "Burst", "Limit", 50, 1, 5000, 10, "", "Extra requests allowed in a short burst."),
+				sel("keyBy", "Limit per", "Limit", "none", "None: one limit for all traffic together. User: each account gets its own allowance (needs the users to have distinct accounts), so a heavy account is throttled without turning others away.",
+					opt("none", "Everyone together"), opt("user", "Each user")).adv(),
 			},
 			cost: func(Params) float64 { return 0.01 },
 		},
