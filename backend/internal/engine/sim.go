@@ -138,9 +138,11 @@ type node struct {
 	pools map[*node]*pool
 
 	// redis
-	locks    map[int]redisLock
-	rwTotal  int       // counted writes since the process last started
-	rwRecent []float64 // times of counted writes in the last second (what an append-only file could still lose)
+	locks       map[int]redisLock
+	egressBytes float64   // object store: bytes served to downloads (billed)
+	osRequests  int       // object store: requests served (billed per 1,000)
+	rwTotal     int       // counted writes since the process last started
+	rwRecent    []float64 // times of counted writes in the last second (what an append-only file could still lose)
 
 	// queue
 	jobs []*job

@@ -33,6 +33,7 @@ const (
 	cmdEnqueue
 	cmdExternal
 	cmdPut // upload a body to an object store
+	cmdGet // download a body from an object store
 )
 
 type call struct {
@@ -212,7 +213,7 @@ func (s *Sim) callCmd(from *node, e *edge, c *call, cm cmd, ver int, cb func(Res
 	switch cm {
 	case cmdWrite, cmdCacheInv, cmdCacheSet, cmdScore, cmdEnqueue, cmdUnlock, cmdExternal, cmdPut:
 		cc.write = true
-	case cmdRead, cmdCacheGet, cmdGeo, cmdRank:
+	case cmdRead, cmdCacheGet, cmdGeo, cmdRank, cmdGet:
 		cc.write = false
 	}
 	s.callDown(from, e, &cc, cm, cb)
@@ -701,7 +702,7 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 			return
 		}
 	case KObjectStore:
-		if c.cmd != cmdPut {
+		if c.cmd != cmdPut && c.cmd != cmdGet {
 			s.failAt(n, RNoRoute, cb)
 			return
 		}
@@ -766,8 +767,15 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 	case KObjectStore:
 		// time to first byte, then the body at the store's per-request throughput
 		ms := n.f("firstByteMs")
-		if req, _ := s.sizes(c); req > 0 {
-			ms += req / (n.f("throughputMBps") * 1000) // bytes / (MB/s x 1000 bytes per ms)
+		req, resp := s.sizes(c)
+		body := req
+		if c.cmd == cmdGet {
+			body = resp
+			n.egressBytes += resp // billed per GB served
+		}
+		n.osRequests++
+		if body > 0 {
+			ms += body / (n.f("throughputMBps") * 1000) // bytes / (MB/s x 1000 bytes per ms)
 		}
 		s.hold(n, s.service(n, ms)*n.slow, release, cb, func() {
 			release()
