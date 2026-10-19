@@ -41,6 +41,10 @@ func (s *Sim) configStore(n *node) {
 		pol = n.s("eviction")
 	}
 	capItems := int(n.f("capacityItems"))
+	ttlMs := n.f("ttlSec") * 1000
+	if ttlMs > 0 {
+		ttlMs = math.Max(1, ttlMs-n.f("clockSkewMs")) // a clock ahead sees the stamped lifetime as shorter
+	}
 	if mb := n.f("capacityMB"); mb > 0 {
 		// bodies are as large as the biggest response any client asks for (1 KB when none says)
 		kb := 1.0
@@ -52,13 +56,13 @@ func (s *Sim) configStore(n *node) {
 		capItems = min(capItems, int(mb*1000/kb))
 	}
 	if n.store == nil || n.storePol != pol {
-		n.store = NewStore(pol, capItems, n.f("ttlSec")*1000, s.rng)
+		n.store = NewStore(pol, capItems, ttlMs, s.rng)
 		n.store.SetJitter(n.f("ttlJitterPct") / 100)
 		n.storePol = pol
 		return
 	}
 	n.c.evict += n.store.SetCapacity(capItems)
-	n.store.SetTTL(n.f("ttlSec") * 1000)
+	n.store.SetTTL(ttlMs)
 	n.store.SetJitter(n.f("ttlJitterPct") / 100)
 }
 
