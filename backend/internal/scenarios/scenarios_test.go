@@ -64,6 +64,19 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("poison-pill: fewer attempts without a dead-letter queue still loses jobs", func(t *testing.T) {
+		sc := Get("poison-pill")
+		d := withParam(sc.Diagram, "q", "maxAttempts", 3.0)
+		if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("dropping the bad jobs silently must fail the 'jobs lost' goal: %+v", res.Checks)
+		}
+	})
+	t.Run("consumer-lag: 8 partitions are still not enough", func(t *testing.T) {
+		sc := Get("consumer-lag")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "log", "partitions", 8.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("8 partitions leave a backlog: %+v", res.Checks)
+		}
+	})
 	t.Run("pick-the-store: wide-column also works, more database connections do not", func(t *testing.T) {
 		sc := Get("pick-the-store")
 		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "model", "wideColumn"), sc.Options(42), sc.Goals); !res.Pass {
