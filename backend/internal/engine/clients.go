@@ -190,6 +190,9 @@ func (s *Sim) createLogical(c *node) *logical {
 		lg.write = true // a transfer is always a transaction
 	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
+	if c.b("abuse") { // a scraper: items picked from a huge space, so almost none is cached
+		lg.key = 1 + int(s.keyRng.Next()*abuseKeySpace)
+	}
 	s.unresolved++
 	if lg.counted {
 		s.runPending++
@@ -233,13 +236,16 @@ func (s *Sim) startAttempt(lg *logical) {
 	})
 }
 
+// abuseKeySpace is how many distinct items a scraper draws from.
+const abuseKeySpace = 1_000_000
+
 func (s *Sim) attemptFailed(at *attempt, r Reason) {
 	lg := at.lg
 	if lg.resolved {
 		return
 	}
 	cp := lg.client.p
-	if lg.attempts < 1+int(pf(cp, "retries", 0)) {
+	if lg.attempts < 1+int(pf(cp, "retries", 0)) && !lg.client.b("abuse") { // bots do not retry
 		delay := 0.0
 		if v, _ := cp["backoff"].(string); v != "none" {
 			delay = 100 * math.Pow(2, float64(lg.attempts-1)) * (0.5 + s.rng.Next())
