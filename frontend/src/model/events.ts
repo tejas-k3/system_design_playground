@@ -2,7 +2,7 @@ import type { SimEvent } from '../api/types'
 
 const GLYPHS: Record<string, string> = {
   crash: 'X', restart: 'R', slow: 'S', slowEnd: 'N', partition: 'P', heal: 'H',
-  failoverDetected: 'D', promotion: 'F', splitbrain: 'B', scaleUp: '+', serverUp: 'U', scaleDown: '-', gc: 'G', compaction: 'C', oom: 'M', purge: 'X',
+  failoverDetected: 'D', promotion: 'F', splitbrain: 'B', scaleUp: '+', serverUp: 'U', scaleDown: '-', gc: 'G', compaction: 'C', oom: 'M', badDeploy: 'R', rollback: 'r', purge: 'X',
 }
 
 /** One-character cue drawn on a chart marker, so events never depend on colour alone. */
@@ -20,6 +20,8 @@ export function eventLabel(e: SimEvent): string {
     case 'partition': return `${e.label} cut off from the network`
     case 'heal': return `${e.label} reconnected`
     case 'purge': return `${e.label} was purged (${e.lost ?? 0} entries dropped)`
+    case 'badDeploy': return `${e.label} got a bad release`
+    case 'rollback': return `${e.label} rolled back`
     case 'oom': return `${e.label} ran out of memory and was killed`
     case 'compaction': return `${e.label} is compacting: writes wait`
     case 'gc': return `${e.label} paused for garbage collection`
