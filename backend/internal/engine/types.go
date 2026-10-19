@@ -88,19 +88,20 @@ const (
 	RConnLost
 	RTxAborted
 	RPoisonJob
+	RBadRelease
 	NumReasons
 )
 
 var reasonNames = [NumReasons]string{
 	"timeout", "queueFull", "nodeDown", "noRoute", "noBackend", "rateLimited",
 	"callTimeout", "circuitOpen", "dependencyError", "lockBusy", "queueTimeout", "connRefused",
-	"noPrimary", "syncReplica", "messageTooLarge", "connLost", "txAborted", "poisonJob",
+	"noPrimary", "syncReplica", "messageTooLarge", "connLost", "txAborted", "poisonJob", "badRelease",
 }
 
 var reasonLabels = [NumReasons]string{
 	"Timeouts", "Queue full (503)", "Node down", "No route", "No healthy backend", "Rate limited (429)",
 	"Call timeouts (504)", "Circuit open", "Vendor errors", "Lock busy", "Waited too long in queue", "DB connections refused",
-	"No primary: failing over", "Sync replica unreachable", "Message too large", "Connection lost", "Transaction aborted", "Poison job",
+	"No primary: failing over", "Sync replica unreachable", "Message too large", "Connection lost", "Transaction aborted", "Poison job", "Bad release (5xx)",
 }
 
 // ReasonInfo names a failure reason for clients: a stable id and a human label.
@@ -127,12 +128,15 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown
+	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`
 	Factor      float64 `json:"factor,omitempty"`
 	DurationSec float64 `json:"durationSec,omitempty"` // slow and partition
+	Kind        string  `json:"kind,omitempty"`        // badDeploy and rollingRestart: which kind of component
+	FractionPct float64 `json:"fractionPct,omitempty"` // badDeploy: share of that kind that gets the bad release (at least one)
+	IntervalSec float64 `json:"intervalSec,omitempty"` // rollingRestart: gap between one restart and the next
 	Zone        string  `json:"zone,omitempty"`        // zoneDown only: every node placed in this zone crashes for DurationSec
 	ToID        string  `json:"toId,omitempty"`        // linkDown only: the connection from NodeID to this node
 	Mode        string  `json:"mode,omitempty"`        // linkDown only: both | replies (requests arrive, answers are lost) | requests

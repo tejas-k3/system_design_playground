@@ -396,6 +396,8 @@ func (ss *session) afterAdvance(ctx context.Context) {
 			txt = "Chaos: " + c.Label + " crashed"
 		case "partition":
 			txt = "Chaos: " + c.Label + " was cut off from the network"
+		case "badDeploy":
+			txt = "Chaos: " + c.Label + " got a bad release"
 		case "purge":
 			txt = "Chaos: " + c.Label + " was purged; every request misses until it refills"
 		case "linkDown":

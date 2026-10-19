@@ -686,6 +686,10 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 		s.failAt(n, reason, cb)
 		return
 	}
+	if n.badUntil > s.now { // a bad release: every request is answered with an error
+		s.failAt(n, RBadRelease, cb)
+		return
+	}
 	switch n.kind {
 	case KQueue:
 		s.arriveQueue(n, c, cb)
