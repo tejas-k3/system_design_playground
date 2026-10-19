@@ -126,6 +126,7 @@ func init() {
 					opt("exponential", "Exponential + jitter"), opt("none", "Immediate")),
 				num("reqKB", "Request size", "Payload", 0, 0, 102400, 10, "KB", "How big each request is (what an upload sends). 0 = not modelled. A message queue refuses anything above its own size limit.").adv(),
 				num("respKB", "Response size", "Payload", 0, 0, 102400, 10, "KB", "How big each response is. 0 = not modelled. Recorded for the bandwidth model that builds on this.").adv(),
+				num("retryBudgetPct", "Retry budget", "Patience & retries", 0, 0, 100, 5, "%", "Retries may add at most this share to the number of first attempts (over the last ten seconds). Past it, a failure is simply reported instead of retried, so a struggling system is not buried under its own retries. 0 = no limit.").adv(),
 				num("identities", "Distinct users", "Identity", 0, 0, 1000000, 10, "", "How many different accounts the requests come from (0 = not modelled). A rate limiter set to limit per user counts each account separately.").adv(),
 				num("identitySkew", "Account skew", "Identity", 0, 0, 2, 0.1, "", "0 = every account sends equally often; higher means a few accounts send most of the traffic.").adv(),
 				flag("abuse", "Bot traffic", "What they do", false, "These users are a scraper or attacker: they ask for a different item each time from a huge space (so caches rarely help), never retry, and ignore what they are told. Add them alongside real users to see what they do to the system and what a rate limiter protects.").adv(),

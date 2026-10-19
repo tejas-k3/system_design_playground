@@ -95,7 +95,10 @@ type node struct {
 	x, y            float64
 	p               Params
 	removed         bool
-	canaryAcc       float64         // load balancer: share of a request owed to the canary so far
+	canaryAcc       float64 // load balancer: share of a request owed to the canary so far
+	retryFirsts     float64 // decayed count of first attempts, for the retry budget
+	retryRetries    float64 // decayed count of retries taken
+	retryAt         float64
 	idBase          int             // users of this client are numbered from here, so two clients never share an account
 	userKeys        KeySampler      // samples which account sends a request
 	buckets         map[int]*bucket // a per-user rate limiter's allowance for each account seen so far

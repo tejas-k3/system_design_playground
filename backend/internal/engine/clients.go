@@ -201,6 +201,10 @@ func (s *Sim) createLogical(c *node) *logical {
 	if c.b("abuse") { // a scraper: items picked from a huge space, so almost none is cached
 		lg.key = 1 + int(s.keyRng.Next()*abuseKeySpace)
 	}
+	if c.f("retryBudgetPct") > 0 {
+		c.decayRetryCounts(s.now)
+		c.retryFirsts++
+	}
 	s.unresolved++
 	if lg.counted {
 		s.runPending++
@@ -244,6 +248,33 @@ func (s *Sim) startAttempt(lg *logical) {
 	})
 }
 
+// retryBudgetWindowMs is the time constant over which first attempts and retries are counted for the retry budget.
+const retryBudgetWindowMs = 10000
+
+// retryAllowed applies a client's retry budget: a retry is taken only while retries stay within retryBudgetPct of
+// first attempts, both counted with an exponential decay over about ten seconds. No budget means always.
+func (s *Sim) retryAllowed(c *node) bool {
+	pct := c.f("retryBudgetPct")
+	if pct <= 0 {
+		return true
+	}
+	c.decayRetryCounts(s.now)
+	if c.retryRetries+1 > pct/100*c.retryFirsts {
+		return false
+	}
+	c.retryRetries++
+	return true
+}
+
+func (n *node) decayRetryCounts(now float64) {
+	if dt := now - n.retryAt; dt > 0 {
+		f := math.Exp(-dt / retryBudgetWindowMs)
+		n.retryFirsts *= f
+		n.retryRetries *= f
+		n.retryAt = now
+	}
+}
+
 // abuseKeySpace is how many distinct items a scraper draws from.
 const abuseKeySpace = 1_000_000
 
@@ -253,7 +284,7 @@ func (s *Sim) attemptFailed(at *attempt, r Reason) {
 		return
 	}
 	cp := lg.client.p
-	if lg.attempts < 1+int(pf(cp, "retries", 0)) && !lg.client.b("abuse") { // bots do not retry
+	if lg.attempts < 1+int(pf(cp, "retries", 0)) && !lg.client.b("abuse") && s.retryAllowed(lg.client) { // bots do not retry
 		delay := 0.0
 		if v, _ := cp["backoff"].(string); v != "none" {
 			delay = 100 * math.Pow(2, float64(lg.attempts-1)) * (0.5 + s.rng.Next())
