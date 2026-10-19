@@ -64,6 +64,32 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("zone-outage: spreading only the servers is not enough", func(t *testing.T) {
+		sc := Get("zone-outage")
+		d := sc.Diagram
+		for i := range d.Nodes {
+			switch d.Nodes[i].ID {
+			case "app2":
+				d.Nodes[i].Params["zone"] = "az-b"
+			case "app3":
+				d.Nodes[i].Params["zone"] = "az-c"
+			}
+		}
+		if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("the balancer and database are still in the failed zone: %+v", res.Checks)
+		}
+	})
+	t.Run("bad-deploy: a 10% canary passes but a 30% one is too much exposure", func(t *testing.T) {
+		sc := Get("bad-deploy")
+		small := withParam(sc.Diagram, "lb", "canaryPct", 10.0)
+		if res := engine.RunToEnd(small, sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("a 10%% canary should pass: %+v", res.Checks)
+		}
+		big := withParam(sc.Diagram, "lb", "canaryPct", 30.0)
+		if res := engine.RunToEnd(big, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("30%% of the traffic on a broken version is too much exposure: %+v", res.Checks)
+		}
+	})
 	t.Run("poison-pill: fewer attempts without a dead-letter queue still loses jobs", func(t *testing.T) {
 		sc := Get("poison-pill")
 		d := withParam(sc.Diagram, "q", "maxAttempts", 3.0)
