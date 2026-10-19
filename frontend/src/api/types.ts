@@ -224,6 +224,8 @@ export interface RunStats {
   mean: number
   errors: Record<string, number>
   conflicts: number
+  fanoutWrites?: number // timeline inserts caused by posts (feed workload)
+  fanoutReads?: number // followed authors read to build timelines
   hedged?: number // second queries sent because a shard was slow
   partial?: number // answers sent with fewer shards than required
   lostUpdates?: number // transfers that silently overwrote a concurrent commit (read committed)
