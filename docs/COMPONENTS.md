@@ -22,7 +22,7 @@ Defaults are the values a component starts with; every number is a setting you c
 | **Read Replica** | 16 | 100 | Same limits as the database. Reads can be **stale** (counted, not failed). Synchronous replication makes every write wait for it (**Sync replica unreachable** if it is down). |
 | **Message Queue** | n/a: it only buffers | `capacity` (5,000 jobs) | A full queue refuses new messages (**Queue full (503)**). A message larger than its limit (`maxMessageKB`, 256 KB) is refused as **Message too large**, but only when the users set a request size (`reqKB`; 0 means "not modelled"). It only accepts writes. The backlog grows whenever workers are slower than arrivals. |
 | **Worker** | `concurrency` (4) | the queue it reads from | It does not fail requests; it falls behind. Watch the backlog and job latency. |
-| **CDN** | effectively unlimited | none | It does not fail; misses go to the origin, so a cold start or a short TTL sends a burst there (purging is planned, #11). |
+| **CDN** | effectively unlimited | none | It does not fail; misses go to the origin, so a cold start or a short TTL sends a burst there (purging is planned, #11). CDNs can be chained (an edge CDN in front of a shield CDN in front of the origin); a tier with *collapse concurrent misses* sends one request to the origin for a key however many edges miss on it at once. A purge chaos event empties one. |
 | **Rate Limiter** | token bucket: `limitRps` (200) and `burst` (50) | none | Above the rate it rejects on purpose: **Rate limited (429)**. |
 | **Shard Router** | n/a: it routes by key | none | It does not fail by itself. A hot key saturates one database while the others idle; a dead shard fails only its keys. |
 | **External API** | unlimited (only latency: 80 ms, and an error rate: 1%) | none | Errors are **Vendor errors**. A slow vendor ties up the threads of the servers that wait on it. |
@@ -52,7 +52,7 @@ The defaults (8 threads, 16 database slots, a 50-request queue, and so on) are r
 
 ## What is not modelled yet
 
-Tiered CDNs and purge, downloads from the object store, and storage or egress cost (replicas per search shard; a link can have a bandwidth limit, a queue a message limit and a cache or CDN a byte capacity, once the users set request or response sizes); clock skew and fsync loss of unflushed writes (disk IOPS as a queue for writes exists; GC pauses, packet loss, jitter, CPU burst credits and out-of-memory kills exist); write skew, document and wide-column presets and data volume (secondary indexes and isolation levels exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
+downloads from the object store, and storage or egress cost (replicas per search shard; a link can have a bandwidth limit, a queue a message limit and a cache or CDN a byte capacity, once the users set request or response sizes); clock skew and fsync loss of unflushed writes (disk IOPS as a queue for writes exists; GC pauses, packet loss, jitter, CPU burst credits and out-of-memory kills exist); write skew, document and wide-column presets and data volume (secondary indexes and isolation levels exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
 
 ## Check it yourself
 
