@@ -126,6 +126,7 @@ func init() {
 					opt("exponential", "Exponential + jitter"), opt("none", "Immediate")),
 				num("reqKB", "Request size", "Payload", 0, 0, 102400, 10, "KB", "How big each request is (what an upload sends). 0 = not modelled. A message queue refuses anything above its own size limit.").adv(),
 				num("respKB", "Response size", "Payload", 0, 0, 102400, 10, "KB", "How big each response is. 0 = not modelled. Recorded for the bandwidth model that builds on this.").adv(),
+				flag("abuse", "Bot traffic", "What they do", false, "These users are a scraper or attacker: they ask for a different item each time from a huge space (so caches rarely help), never retry, and ignore what they are told. Add them alongside real users to see what they do to the system and what a rate limiter protects.").adv(),
 				num("priorityPct", "Urgent requests", "What they do", 0, 0, 100, 5, "%", "Share of requests marked urgent. Only a queue set to serve urgent work first treats them differently.").adv(),
 				num("secondaryPct", "Lookups by another field", "What they do", 0, 0, 100, 5, "%", "Share of reads that look an item up by something other than its key (email, status, date). Without a secondary index on the database each one scans.").adv(),
 				sel("workload", "Workload", "What they do", "kv", "What kind of requests users make.",
