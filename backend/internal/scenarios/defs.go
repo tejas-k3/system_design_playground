@@ -918,6 +918,40 @@ func init() {
 		Debrief: "Bandwidth is a capacity like any other: bytes per second in must be less than the link can carry. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones.",
 	})
 
+	// GC storm: long stop-the-world pauses on every app server. Config only: tune the pauses, do not paper over them.
+	gcStorm := func(fixed bool) engine.Diagram {
+		pause := 1500.0
+		if fixed {
+			pause = 200.0
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 120.0, "readPct": 90.0, "timeoutMs": 800.0, "retries": 0.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[3], rowMid, nil).
+			e("users", "lb")
+		for k := 0; k < 3; k++ {
+			id := fmt.Sprintf("app%d", k+1)
+			b.n(id, engine.KAppServer, cols[2], float64(k)*110+60, P{"threads": 16.0, "gcPauseMs": pause, "gcEverySec": 8.0}).e("lb", id).e(id, "db")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "gc-storm", Title: "The GC storm", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Averages look fine, yet one request in seven fails.",
+		Story:   "Each app server freezes for a second and a half every eight seconds or so (a stop-the-world garbage collection after a heap change). During a pause nothing on that server answers, and the clients give up after 800 ms. The median latency is healthy, which is why nobody noticed.",
+		Diagram: gcStorm(false), Solution: gcStorm(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.1), StarP95Ms: f(200)},
+		DurationSec: 60, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Look at the failures: they are timeouts, in waves, and the latency of the requests that do succeed is fine. What freezes a whole server for a second?",
+			"The failure breakdown and the events on the chart show GC pauses. Retries or more servers hide some of the damage but cost latency or money.",
+			"Open an app server's advanced settings: shorten the GC pause (a smaller heap or a different collector). A pause shorter than the client's patience costs nothing.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Letting clients retry twice will…", Options: []string{"Fix it completely", "Recover most requests but make the slow ones very slow", "Do nothing"}, Answer: 1,
+			Explain: "A retry reaches a healthy server, so more requests succeed, but each rescued request has already waited out its timeout: the tail gets worse."}},
+		Debrief: "A stop-the-world pause is invisible in averages and brutal at the tail. Retries and extra servers mask it at a cost; the real fix is a shorter pause. Watch p99 and the timeouts, not the mean.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
