@@ -821,6 +821,36 @@ func init() {
 		Debrief: "Waiting for all N answers makes latency the maximum of N draws, so tail latency grows with fan-out. Answering on the first K, hedging slow calls, or allowing partial results trade completeness or extra load for a much shorter tail.",
 	})
 
+	// A celebrity's post is pushed into millions of timelines. Config only: stop pushing for the few huge accounts.
+	celebrity := func(fixed bool) engine.Diagram {
+		app := P{"threads": 32.0, "queueCap": 500.0}
+		if fixed {
+			app["feedStrategy"] = "hybrid"
+			app["celebrityThreshold"] = 2000.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 70.0, "workload": "feed", "keySpace": 5000.0, "followersMean": 50.0, "followersSkew": 1.2, "timeoutMs": 3000.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, app).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "queueCap": 500.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "celebrity-post", Title: "The celebrity post", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Most posts are fine, but a few accounts make the whole feed stall.",
+		Story:   "Every post is copied into each follower's timeline when it is written, so reads are fast. Most accounts have a few dozen followers, but a handful have tens of thousands, and every time one of them posts the database is buried under timeline inserts. The architecture is fixed; change how the feed is built.",
+		Diagram: celebrity(false), Solution: celebrity(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.05), StarP95Ms: f(250)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Look at the failures and the p95: they come in bursts. Who is posting when it happens?",
+			"Pushing a post costs one insert per follower. For an account with 30,000 followers that is 30,000 inserts for a single post.",
+			"Set the app server's feed strategy to hybrid: push for ordinary accounts, pull celebrities when a timeline is read. More connections or threads only cost money.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Where does the work go if celebrities are pulled instead of pushed?", Options: []string{"Nowhere, it disappears", "To readers: each timeline read also fetches a few celebrities' posts", "To the author, who waits longer to post"}, Answer: 1,
+			Explain: "Fan-out on write spends effort once per follower; fan-out on read spends it once per reader. A hybrid pays the cheap side for each kind of account."}},
+		Debrief: "Push makes reads cheap and writes proportional to the audience; pull makes writes cheap and reads proportional to who you follow. With heavy skew a hybrid wins: push for the many small accounts and pull the few giants.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
