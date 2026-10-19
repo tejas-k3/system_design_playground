@@ -73,6 +73,7 @@ function Overview({ count }: { count: number }) {
             {(run.fanoutReads ?? 0) > 0 && (<><dt>Followed authors read</dt><dd>{run.fanoutReads!.toLocaleString()}</dd></>)}
             {(run.hedged ?? 0) > 0 && (<><dt>Hedged queries</dt><dd>{run.hedged!.toLocaleString()}</dd></>)}
             {run.jobs && run.jobs.retried > 0 && (<><dt>Jobs retried</dt><dd>{run.jobs.retried.toLocaleString()}</dd></>)}
+            {run.jobs && (run.jobs.orderViolations ?? 0) > 0 && (<><dt>Out-of-order messages</dt><dd className="bad">{run.jobs.orderViolations!.toLocaleString()}</dd></>)}
             {run.jobs && (run.jobs.highP95 ?? 0) > 0 && (<><dt>Urgent jobs p95</dt><dd>{Math.round(run.jobs.highP95!).toLocaleString()} ms</dd></>)}
             {run.jobs && (run.jobs.redelivered ?? 0) > 0 && (<><dt>Jobs delivered again</dt><dd>{run.jobs.redelivered!.toLocaleString()}</dd></>)}
             {run.jobs && run.jobs.lost > 0 && (<><dt>Jobs given up (lost)</dt><dd className="bad">{run.jobs.lost.toLocaleString()}</dd></>)}
