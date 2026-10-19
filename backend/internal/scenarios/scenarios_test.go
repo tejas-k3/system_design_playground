@@ -64,6 +64,15 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("celebrity-post is solved by pulling, not by a bigger database connection pool", func(t *testing.T) {
+		sc := Get("celebrity-post")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "feedStrategy", "pullOnRead"), sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("pull on read should pass: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "connections", 64.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("more connections alone must not pass: %+v", res.Checks)
+		}
+	})
 	t.Run("search-tail is also solved by hedging, but not by more threads", func(t *testing.T) {
 		sc := Get("search-tail")
 		hedged := withParam(sc.Diagram, "app", "hedgeAfterMs", 100.0)
