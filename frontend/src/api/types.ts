@@ -208,6 +208,7 @@ export interface JobStats {
   completed: number
   lost: number
   retried: number
+  dead?: number // parked in the dead-letter queue after their last attempt
   backlog: number
   p50: number
   p95: number
