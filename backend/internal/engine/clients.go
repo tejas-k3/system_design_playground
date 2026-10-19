@@ -151,6 +151,7 @@ const (
 	wlLeader
 	wlBooking
 	wlTransfer // every request moves money between two accounts: a two-key read-modify-write transaction
+	wlFeed     // posts fan out to followers' timelines; reads fetch a timeline (see feed.go)
 )
 
 func workloadOf(n *node) int {
@@ -163,6 +164,8 @@ func workloadOf(n *node) int {
 		return wlBooking
 	case "transfer":
 		return wlTransfer
+	case "feed":
+		return wlFeed
 	}
 	return wlKV
 }

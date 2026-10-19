@@ -148,6 +148,11 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 }
 
 func (s *Sim) appRead(n *node, c *call, done func(Result)) {
+	if c.wl == wlFeed {
+		cc := *c
+		cc.fan = s.feedFan(n, c)
+		c = &cc
+	}
 	if g := n.s("gather"); g == "all" || g == "firstK" {
 		if es := s.outOf(n, KIndex); len(es) >= 2 {
 			need := len(es)
@@ -208,6 +213,11 @@ func (s *Sim) appRead(n *node, c *call, done func(Result)) {
 }
 
 func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
+	if c.wl == wlFeed {
+		cc := *c
+		cc.fan = s.feedFan(n, c)
+		c = &cc
+	}
 	{
 		switch c.wl {
 		case wlBooking:
@@ -434,6 +444,9 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 			}
 			ms += wait
 		}
+	}
+	if c.fan > 0 {
+		ms += c.fan * feedUnitMs
 	}
 	took := s.service(n, ms) * n.slow
 	if write && n.stallUntil > s.now { // an LSM database is compacting: the write waits for it to finish
