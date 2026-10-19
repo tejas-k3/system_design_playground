@@ -72,6 +72,9 @@ function Overview({ count }: { count: number }) {
             {(run.fanoutWrites ?? 0) > 0 && (<><dt>Timeline inserts</dt><dd>{run.fanoutWrites!.toLocaleString()}</dd></>)}
             {(run.fanoutReads ?? 0) > 0 && (<><dt>Followed authors read</dt><dd>{run.fanoutReads!.toLocaleString()}</dd></>)}
             {(run.hedged ?? 0) > 0 && (<><dt>Hedged queries</dt><dd>{run.hedged!.toLocaleString()}</dd></>)}
+            {run.jobs && run.jobs.retried > 0 && (<><dt>Jobs retried</dt><dd>{run.jobs.retried.toLocaleString()}</dd></>)}
+            {run.jobs && run.jobs.lost > 0 && (<><dt>Jobs given up (lost)</dt><dd className="bad">{run.jobs.lost.toLocaleString()}</dd></>)}
+            {run.jobs && (run.jobs.dead ?? 0) > 0 && (<><dt>Jobs in the dead-letter queue</dt><dd>{run.jobs.dead!.toLocaleString()}</dd></>)}
             {(run.partial ?? 0) > 0 && (<><dt>Partial answers</dt><dd className="bad">{run.partial!.toLocaleString()}</dd></>)}
             {(run.writeSkew ?? 0) > 0 && (<><dt>Rule broken (write skew)</dt><dd className="bad">{run.writeSkew!.toLocaleString()}</dd></>)}
             {(run.txAborts ?? 0) > 0 && (<><dt>Transactions aborted</dt><dd>{run.txAborts!.toLocaleString()}{(run.deadlocks ?? 0) > 0 ? ` (${run.deadlocks!.toLocaleString()} deadlocks)` : ''}</dd></>)}
