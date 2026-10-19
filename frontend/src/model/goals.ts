@@ -55,6 +55,7 @@ export function goalRows(g: Goals, stats: Stats, cost: number | null, started: b
   if (g.maxDuplicates !== undefined) rows.push({ label: 'Duplicate writes', target: `≤ ${g.maxDuplicates}`, actual: String(r.duplicates), state: !started ? 'pending' : r.duplicates <= g.maxDuplicates ? 'pass' : 'fail' })
   if (g.maxLostWrites !== undefined) rows.push({ label: 'Writes lost in a crash', target: `≤ ${g.maxLostWrites}`, actual: String(r.lostWrites), state: !started ? 'pending' : r.lostWrites <= g.maxLostWrites ? 'pass' : 'fail' })
   if (g.maxLostUpdates !== undefined) { const lost = r.lostUpdates ?? 0; rows.push({ label: 'Lost updates', target: `≤ ${g.maxLostUpdates}`, actual: String(lost), state: !started ? 'pending' : lost <= g.maxLostUpdates ? 'pass' : 'fail' }) }
+  if (g.maxWriteSkew !== undefined) { const sk = r.writeSkew ?? 0; rows.push({ label: 'Rule broken (write skew)', target: `≤ ${g.maxWriteSkew}`, actual: String(sk), state: !started ? 'pending' : sk <= g.maxWriteSkew ? 'pass' : 'fail' }) }
   if (g.minJobsCompleted !== undefined) {
     const j = r.jobs
     const f = j && j.enqueued ? j.completed / j.enqueued : 0
