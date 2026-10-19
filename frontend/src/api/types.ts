@@ -114,6 +114,7 @@ export interface Goals {
   maxDuplicates?: number
   maxLostWrites?: number
   maxLostUpdates?: number
+  maxWriteSkew?: number
   starCostPerHour?: number
   starP95Ms?: number
 }
