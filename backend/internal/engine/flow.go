@@ -988,11 +988,29 @@ func (s *Sim) procCDN(n *node, c *call, cb func(Result), release func()) {
 			s.failAt(n, RNoBackend, cb)
 			return
 		}
+		collapse := n.b("coalesce") && !c.write
+		if collapse {
+			if waiters, busy := n.fetching[c.key]; busy { // an identical request is already on its way to the origin
+				n.fetching[c.key] = append(waiters, func(res Result) { s.passBack(n, res, cb) })
+				return
+			}
+			if n.fetching == nil {
+				n.fetching = map[int][]func(Result){}
+			}
+			n.fetching[c.key] = nil
+		}
 		s.hop(n, e, c, func(res Result) {
 			if res.OK && !c.write && res.Ver >= 0 {
 				n.c.evict += n.store.Set(s.now, c.key, res.Ver)
 			}
 			s.passBack(n, res, cb)
+			if collapse {
+				waiters := n.fetching[c.key]
+				delete(n.fetching, c.key)
+				for _, w := range waiters {
+					w(res)
+				}
+			}
 		})
 	})
 }

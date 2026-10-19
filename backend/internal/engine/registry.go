@@ -292,13 +292,14 @@ func init() {
 		{
 			Kind: KCDN, Name: "CDN", Description: "Serves popular reads from the edge, close to users.",
 			Lesson: "The cheapest request is the one that never reaches your servers.",
-			Accent: "#087f5b", Width: 160, Height: 72, CanConnect: []string{KLoadBalancer, KAppServer, KRateLimiter},
+			Accent: "#087f5b", Width: 160, Height: 72, CanConnect: []string{KLoadBalancer, KAppServer, KRateLimiter, KCDN},
 			Params: []ParamSpec{
 				num("capacityItems", "Capacity", "Memory", 5000, 0, 200000, 100, "items", "How many items it can hold."),
 				num("capacityMB", "Capacity in bytes", "Memory", 0, 0, 1000000, 10, "MB", "Disk or memory for cached bodies. Items are as large as the users' response size, so big objects fit fewer; the smaller of this and the item count applies. 0 = only count items.").adv(),
 				num("ttlSec", "Time to live", "Freshness", 60, 0, 3600, 1, "s", "Entries expire after this long."),
 				ttlJitter(),
 				flag("startWarm", "Start warm", "Memory", true, "Begin with popular items cached."),
+				flag("coalesce", "Collapse concurrent misses", "Freshness", false, "A shield tier: when several requests miss on the same key at once, only one goes on to the origin and the rest wait for its answer.").adv(),
 			},
 			cost: func(Params) float64 { return 0.1 },
 		},
