@@ -1010,6 +1010,64 @@ func init() {
 		Debrief: "Write skew is the anomaly snapshot isolation misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
 	})
 
+	// The slow query: most reads look an item up by a field other than its key, and there is no index for it
+	slowQuery := func(fixed bool) engine.Diagram {
+		idx := 0.0
+		if fixed {
+			idx = 1
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 150.0, "readPct": 90.0, "secondaryPct": 60.0, "timeoutMs": 2000.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "indexes": idx}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "slow-query", Title: "The slow query", Difficulty: "Easy", ConfigOnly: true,
+		Summary: "Most reads search by email, and the database reads every row to find it.",
+		Story:   "Sixty percent of reads look an account up by its email address, not its id. The table has no index on email, so each of those reads scans the table and takes twenty times as long as a lookup by id. At the lunchtime peak the database queue fills and requests are refused.",
+		Diagram: slowQuery(false), Solution: slowQuery(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.05), StarP95Ms: f(200)},
+		DurationSec: 30, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"The database is busy but not because of how many requests there are: what is each lookup by email doing?",
+			"Without an index on the field being searched, the database reads the whole table (see 'lookups by another field' on the users).",
+			"Give the database a secondary index. It costs a little on every write, but this service is 90% reads.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "An index on email makes writes…", Options: []string{"Faster", "Slightly slower: the index must be updated too", "Unchanged"}, Answer: 1,
+			Explain: "Every write also updates each index, so a read speed-up is paid for with a small write cost. Worth it when reads dominate."}},
+		Debrief: "A lookup on an unindexed field is a full scan. An index trades a little write cost and storage for turning that scan into a seek. Check the access paths your queries really use.",
+	})
+
+	// Pick the store: a sensor firehose. The write path of the relational baseline is the bottleneck
+	pickStore := func(fixed bool) engine.Diagram {
+		model := "relational"
+		if fixed {
+			model = "timeSeries"
+		}
+		return (&bld{}).
+			n("sensors", engine.KClient, cols[0], rowMid, P{"rps": 700.0, "readPct": 0.0, "timeoutMs": 1500.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 64.0, "queueCap": 500.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "model": model, "queueCap": 500.0}).
+			e("sensors", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "pick-the-store", Title: "Pick the store", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Seven hundred sensor readings a second overwhelm a general-purpose database.",
+		Story:   "Sensors send 700 readings a second and nothing ever reads them back in real time. The readings go into a relational database that spends the same effort on each insert as on an order, and a quarter of them are refused when its queue fills.",
+		Diagram: pickStore(false), Solution: pickStore(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.6), StarP95Ms: f(200)},
+		DurationSec: 30, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"The workload is almost all appends and almost no reads. Is a general-purpose relational layout the right shape for it?",
+			"More database connections do not help here: the pool each app server may open to the database is the limit.",
+			"Change the database's data model (advanced settings) to one built for append-heavy writes: time-series, or wide-column.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "What makes a time-series store cheaper per insert?", Options: []string{"It skips durability", "Append-optimised storage avoids updating in place", "It has no queue"}, Answer: 1,
+			Explain: "Appending to the end of a log-structured layout avoids random in-place updates, so each write costs a fraction of a general-purpose engine's."}},
+		Debrief: "Match the store to the access pattern. Append-heavy, rarely-read data fits an append-optimised layout; paying a general-purpose engine's cost per row for a firehose is how a database becomes the bottleneck.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).

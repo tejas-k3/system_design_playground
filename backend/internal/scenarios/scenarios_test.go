@@ -64,6 +64,21 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("pick-the-store: wide-column also works, more database connections do not", func(t *testing.T) {
+		sc := Get("pick-the-store")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "model", "wideColumn"), sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("wide-column should pass: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "connections", 64.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("more connections alone must not pass (the app's pool is the limit): %+v", res.Checks)
+		}
+	})
+	t.Run("slow-query: a bigger database does not fix a scan", func(t *testing.T) {
+		sc := Get("slow-query")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "connections", 64.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("more connections should not fix a scan: %+v", res.Checks)
+		}
+	})
 	t.Run("nobody-on-call: snapshot isolation is not enough", func(t *testing.T) {
 		sc := Get("nobody-on-call")
 		res := engine.RunToEnd(withParam(sc.Diagram, "db", "isolation", "repeatableRead"), sc.Options(42), sc.Goals)
