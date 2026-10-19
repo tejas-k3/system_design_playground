@@ -77,6 +77,8 @@ type job struct {
 	counted  bool
 	enq      float64
 	attempts int
+	lane     *lane // a partitioned-log delivery: the (partition, group) line it is in
+	seq      int   // publish order, for checking that a consumer saw one key's messages in order
 	sub      *edge // topic delivery: the subscription (edge to a worker) it belongs to
 	high     bool  // an urgent request: first in line in a priority queue
 	finished bool  // a worker has acknowledged it (or given up): a later visibility timeout does nothing
@@ -151,7 +153,11 @@ type node struct {
 	// queue
 	jobs    []*job
 	jh      int
-	hjobs   []*job // urgent jobs of a priority queue, served before jobs
+	lanes   []*lane // a log: one line per (partition, consumer group), in creation order
+	laneIdx map[[2]int]*lane
+	rrNext  int            // round-robin partition choice
+	lastSeq map[[2]int]int // per (group, key): the newest message a consumer has finished
+	hjobs   []*job         // urgent jobs of a priority queue, served before jobs
 	hh      int
 	delayed int // jobs held back by the queue's delivery delay
 
@@ -235,6 +241,7 @@ type Sim struct {
 
 	jobEnqueued, jobCompleted, jobLost, jobRetried int
 	jobDead, jobRedelivered                        int
+	jobOrderViolations, logSeq                     int
 	jobHist, jobHistHigh                           Hist
 	hasQueue, hasBooking, hasFresh                 bool
 
@@ -388,7 +395,7 @@ func (s *Sim) tick() {
 		}
 		capN := float64(s.capacity(n))
 		switch {
-		case n.kind == KQueue || n.kind == KTopic:
+		case n.kind == KQueue || n.kind == KTopic || n.kind == KLog:
 			n.util[i] = float64(s.queued(n)) / math.Max(1, n.f("capacity"))
 		case n.kind == KRateLimiter:
 			n.util[i] = math.Min(1, float64(n.c.adm)/math.Max(1e-9, n.f("limitRps")*tickMs/1000))
@@ -419,7 +426,7 @@ func (s *Sim) tick() {
 		if n.kind == KLoadBalancer && n.b("outlierEjection") && !n.down {
 			s.ejectOutliers(n)
 		}
-		if (n.kind == KQueue || n.kind == KTopic) && !n.down {
+		if (n.kind == KQueue || n.kind == KTopic || n.kind == KLog) && !n.down {
 			s.dispatch(n)
 		}
 	}

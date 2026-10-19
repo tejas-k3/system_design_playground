@@ -18,6 +18,7 @@ const (
 	KObjectStore  = "objectStore"
 	KIndex        = "index"
 	KTopic        = "topic"
+	KLog          = "log"
 )
 
 // Params holds user-editable settings: numbers, strings (select) and booleans.
