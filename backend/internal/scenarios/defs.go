@@ -851,6 +851,38 @@ func init() {
 		Debrief: "Push makes reads cheap and writes proportional to the audience; pull makes writes cheap and reads proportional to who you follow. With heavy skew a hybrid wins: push for the many small accounts and pull the few giants.",
 	})
 
+	// Image downloads billed per GB: every view pays egress unless a CDN answers it
+	imageFeed := func(fixed bool) engine.Diagram {
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 100.0, "respKB": 300.0, "keySpace": 2000.0, "timeoutMs": 3000.0}).
+			n("app", engine.KAppServer, cols[2], rowMid, P{"threads": 32.0}).
+			n("db", engine.KDatabase, cols[3], rowTop, nil).
+			n("files", engine.KObjectStore, cols[3], rowBot, nil).label("files", "Image store").
+			e("app", "db").e("app", "files")
+		if fixed {
+			b.n("cdn", engine.KCDN, cols[1], rowMid, P{"capacityItems": 5000.0, "ttlSec": 300.0}).e("users", "cdn").e("cdn", "app")
+		} else {
+			b.e("users", "app")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "image-egress", Title: "The image feed bill", Difficulty: "Medium",
+		Summary: "Everything works, but the cloud bill is shocking.",
+		Story:   "An image feed serves 100 views a second, each a 300 KB picture fetched from the image store, which charges for every GB that leaves it. The pages are fast and nothing fails, but finance wants the hourly bill under $2.50.",
+		Diagram: imageFeed(false), Solution: imageFeed(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(2.5), StarCostPerHour: f(1.5)},
+		DurationSec: 60, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Look at the cost, not the latency: 100 views a second x 300 KB is 30 MB every second.",
+			"Which component can answer a popular picture without going back to the image store?",
+			"Put a CDN in front of the app server and give it room for the popular pictures (there are about 2,000 distinct ones).",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A CDN that can only hold a quarter of the pictures will…", Options: []string{"Cut the bill to nearly nothing", "Cut it somewhat: popular pictures hit, the rest still pay egress", "Make no difference"}, Answer: 1,
+			Explain: "Views are skewed, so a small cache catches the popular ones, but every miss still downloads from the store and pays for it."}},
+		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN sized to the popular set turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
