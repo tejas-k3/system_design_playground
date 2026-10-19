@@ -219,6 +219,7 @@ type Sim struct {
 	runConflicts, runFresh, runStale, runDup  int
 	runPartial, runHedged                     int
 	runFanWrites, runFanReads                 int
+	runWriteSkew                              int
 	runLostUpdates, runTxAborts, runDeadlocks int
 	txnSeq                                    int
 	runLost                                   int // writes lost when an in-memory store crashed

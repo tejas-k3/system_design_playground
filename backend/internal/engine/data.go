@@ -467,7 +467,7 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		s.dbBooking(n, c, cb, release)
 		return
 	}
-	if write && c.wl == wlTransfer && n.kind == KDatabase {
+	if write && (c.wl == wlTransfer || c.wl == wlOnCall) && n.kind == KDatabase {
 		s.dbTransfer(n, c, cb, release)
 		return
 	}
