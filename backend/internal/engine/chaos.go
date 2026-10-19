@@ -21,6 +21,10 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 		s.linkDown(ev)
 		return
 	}
+	if ev.Type == "badDeploy" || ev.Type == "rollingRestart" {
+		s.changeEvent(ev)
+		return
+	}
 	if ev.Type == "zoneDown" { // a correlated failure: everything placed in the zone crashes together
 		for _, n := range s.order {
 			if n.zone == ev.Zone && n.kind != KClient && !n.removed && !n.down {
@@ -178,6 +182,9 @@ func (s *Sim) RestartNode(id string) {
 	}
 	n.down = false
 	n.slow = 1
+	if n.store != nil { // a restarted cache or CDN comes back empty
+		n.store.Clear()
+	}
 	s.logEvent("restart", n, 0)
 	if n.kind == KDatabase && n.successor != nil && n.successor.promoted && !n.b("fencing") {
 		s.rejoinUnfenced(n)
@@ -327,4 +334,63 @@ func (s *Sim) linkDown(ev ChaosEvent) {
 			}
 		}
 	})
+}
+
+// changeEvent handles the two failures a release can cause. badDeploy puts a bad version on a fraction of the
+// components of a kind (at least one, taken in diagram order) for DurationSec, which is how long until someone rolls
+// back: mode errors answers every request with an error, slow makes them Factor (default 5) times slower, crash
+// takes them down. rollingRestart restarts the components of a kind one at a time, IntervalSec apart, each down for
+// DownSec (default 2).
+func (s *Sim) changeEvent(ev ChaosEvent) {
+	var targets []*node
+	for _, n := range s.order {
+		if n.kind == ev.Kind && !n.removed {
+			targets = append(targets, n)
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+	if ev.Type == "rollingRestart" {
+		down := ev.DownSec
+		if down <= 0 {
+			down = 2
+		}
+		for i, n := range targets {
+			id := n.id
+			s.after(float64(i)*ev.IntervalSec*1000, func() { s.CrashNode(id, down) })
+		}
+		return
+	}
+	count := int(math.Ceil(ev.FractionPct / 100 * float64(len(targets))))
+	count = max(1, min(count, len(targets)))
+	until := s.now + ev.DurationSec*1000
+	for _, n := range targets[:count] {
+		n := n
+		s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "badDeploy", NodeID: n.id, Label: n.label})
+		s.logEvent("badDeploy", n, 0)
+		switch ev.Mode {
+		case "slow":
+			n.slow, n.slowUntil = math.Max(2, ev.Factor), until
+			if ev.Factor <= 1 {
+				n.slow = 5
+			}
+			s.at(until, func() {
+				if n.slowUntil == until {
+					n.slow = 1
+					s.logEvent("rollback", n, 0)
+				}
+			})
+		case "crash":
+			s.CrashNode(n.id, ev.DurationSec)
+		default:
+			n.badUntil = until
+			s.at(until, func() {
+				if n.badUntil == until {
+					n.badUntil = 0
+					s.logEvent("rollback", n, 0)
+				}
+			})
+		}
+	}
 }
