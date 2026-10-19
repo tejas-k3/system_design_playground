@@ -45,6 +45,7 @@ type JobStats struct {
 	Backlog     int     `json:"backlog"`
 	P50         float64 `json:"p50"`
 	P95         float64 `json:"p95"`
+	HighP95     float64 `json:"highP95,omitempty"` // p95 of the urgent jobs
 }
 
 // RunStats are totals over the counted part of the run.
@@ -143,7 +144,7 @@ func (s *Sim) Snapshot() Stats {
 			ns.Cap = c
 		}
 		if n.kind == KQueue {
-			ns.QLen = len(n.jobs) - n.jh
+			ns.QLen = len(n.jobs) - n.jh + len(n.hjobs) - n.hh
 			ns.Cap = int(n.f("capacity"))
 		}
 		if n.slow > 1 {
@@ -239,7 +240,7 @@ func (s *Sim) Snapshot() Stats {
 	if s.hasQueue {
 		run.Jobs = &JobStats{
 			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead, Redelivered: s.jobRedelivered,
-			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95),
+			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95), HighP95: s.jobHistHigh.Quantile(0.95),
 		}
 	}
 	var cost float64
@@ -293,7 +294,7 @@ func (s *Sim) recordNodePoints() {
 		sum, u := s.nodeWindow(n)
 		q := len(n.q) - n.qh
 		if n.kind == KQueue {
-			q = len(n.jobs) - n.jh
+			q = len(n.jobs) - n.jh + len(n.hjobs) - n.hh
 		}
 		n.hist = append(n.hist, NodePoint{T: s.now / 1000, Util: math.Min(1, u), QLen: q, Arr: float64(sum.arr) / span, Err: float64(sum.err) / span, Instances: s.scaledInstances(n)})
 		if len(n.hist) > nodeHistory {

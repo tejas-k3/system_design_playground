@@ -133,6 +133,7 @@ type logical struct {
 	key       int
 	wl        int
 	hash      uint32
+	high      bool // an urgent request (priorityPct): chosen from the request number, no random draw
 	tr        *tracer
 	after     func() // called once, when the request is resolved (closed-loop users think, then ask again)
 }
@@ -182,6 +183,9 @@ func (s *Sim) createLogical(c *node) *logical {
 		hash:    Hash32(uint32(s.logicalSeq)),
 		wl:      workloadOf(c),
 	}
+	if pct := c.f("priorityPct"); pct > 0 {
+		lg.high = float64(Hash32(uint32(s.logicalSeq)*374761393+17)%100) < pct
+	}
 	if lg.wl == wlTransfer || lg.wl == wlOnCall {
 		lg.write = true // a transfer is always a transaction
 	}
@@ -209,7 +213,7 @@ func (s *Sim) startAttempt(lg *logical) {
 	lg.attempts++
 	s.attempts.Push(s.now, true, 0)
 	at := &attempt{lg: lg, at: s.now, n: lg.attempts}
-	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr}
+	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high}
 	s.hop(c, e, call, func(res Result) {
 		if at.done {
 			return

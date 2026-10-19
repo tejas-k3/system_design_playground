@@ -678,14 +678,23 @@ func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
 		s.failAt(n, RMessageTooLarge, cb)
 		return
 	}
-	if len(n.jobs)-n.jh >= int(n.f("capacity")) {
+	if s.queued(n)+n.delayed >= int(n.f("capacity")) {
 		s.failAt(n, RQueueFull, cb)
 		return
 	}
-	j := &job{rid: c.rid, key: c.key, wl: c.wl, idem: c.idem, counted: c.counted, enq: s.now}
-	n.jobs = append(n.jobs, j)
+	j := &job{rid: c.rid, key: c.key, wl: c.wl, idem: c.idem, counted: c.counted, enq: s.now, high: c.high}
 	if j.counted {
 		s.jobEnqueued++
+	}
+	if d := n.f("delayMs"); d > 0 {
+		n.delayed++
+		s.after(d, func() {
+			n.delayed--
+			s.requeue(n, j)
+			s.dispatch(n)
+		})
+	} else {
+		s.requeue(n, j)
 	}
 	s.after(0.2, func() {
 		s.okAt(n, Result{Ver: -1, Done: true}, cb)
@@ -693,8 +702,20 @@ func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
 	})
 }
 
+// queued is the number of jobs waiting for a worker.
+func (s *Sim) queued(q *node) int { return len(q.jobs) - q.jh + len(q.hjobs) - q.hh }
+
+// requeue puts a job at the back of its line: the urgent line of a priority queue, or the ordinary one.
+func (s *Sim) requeue(q *node, j *job) {
+	if j.high && q.b("priorityQueue") {
+		q.hjobs = append(q.hjobs, j)
+		return
+	}
+	q.jobs = append(q.jobs, j)
+}
+
 func (s *Sim) dispatch(q *node) {
-	for q.jh < len(q.jobs) && !q.down {
+	for s.queued(q) > 0 && !q.down {
 		var w *node
 		for _, e := range q.out {
 			t := e.to
@@ -708,10 +729,21 @@ func (s *Sim) dispatch(q *node) {
 		if w == nil {
 			break
 		}
-		j := q.jobs[q.jh]
-		q.jobs[q.jh] = nil
-		q.jh++
+		var j *job
+		if q.hh < len(q.hjobs) {
+			j = q.hjobs[q.hh]
+			q.hjobs[q.hh] = nil
+			q.hh++
+		} else {
+			j = q.jobs[q.jh]
+			q.jobs[q.jh] = nil
+			q.jh++
+		}
 		s.runJob(q, w, j)
+	}
+	if q.hh > 256 && q.hh*2 > len(q.hjobs) {
+		q.hjobs = append([]*job(nil), q.hjobs[q.hh:]...)
+		q.hh = 0
 	}
 	if q.jh > 256 && q.jh*2 > len(q.jobs) {
 		q.jobs = append([]*job(nil), q.jobs[q.jh:]...)
@@ -734,7 +766,7 @@ func (s *Sim) runJob(q, w *node, j *job) {
 			if j.counted {
 				s.jobRedelivered++
 			}
-			q.jobs = append(q.jobs, &job{rid: j.rid, key: j.key, wl: j.wl, idem: j.idem, counted: j.counted, enq: j.enq, attempts: j.attempts, ghost: true})
+			s.requeue(q, &job{rid: j.rid, key: j.key, wl: j.wl, idem: j.idem, counted: j.counted, enq: j.enq, attempts: j.attempts, ghost: true, high: j.high})
 			s.dispatch(q)
 		})
 	}
@@ -759,6 +791,9 @@ func (s *Sim) runJob(q, w *node, j *job) {
 			if j.counted {
 				s.jobCompleted++
 				s.jobHist.Add(s.now - j.enq)
+				if j.high {
+					s.jobHistHigh.Add(s.now - j.enq)
+				}
 				s.jobsW.Push(s.now, true, s.now-j.enq)
 			}
 		} else {
@@ -769,7 +804,7 @@ func (s *Sim) runJob(q, w *node, j *job) {
 					s.jobRetried++
 				}
 				s.after(100*math.Pow(2, float64(j.attempts-1)), func() {
-					q.jobs = append(q.jobs, j)
+					s.requeue(q, j)
 					s.dispatch(q)
 				})
 			} else if j.counted {
