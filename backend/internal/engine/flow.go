@@ -54,6 +54,7 @@ type call struct {
 	job     *job
 	fan     float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
 	high    bool    // an urgent request
+	user    int     // the account behind the request (0 = not modelled)
 	claim   bool    // the body already sits in an object store: what travels on is a pointer
 	tr      *tracer // non-nil for sampled requests
 	sp      *span   // the span of the node currently handling this call
@@ -724,13 +725,36 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 			return
 		}
 	case KRateLimiter:
-		if !s.takeToken(n) {
+		if !s.admit(n, c) {
 			s.failAt(n, RRateLimited, cb)
 			return
 		}
 		n.c.adm++
 	}
 	s.submit(n, c, cb, func(release func()) { s.process(n, c, cb, release) })
+}
+
+// admit decides whether a rate limiter lets a request through: one allowance for everything, or (keyBy user) one
+// per account, so that a heavy account runs out without anyone else noticing.
+func (s *Sim) admit(n *node, c *call) bool {
+	if n.s("keyBy") != "user" || c.user == 0 {
+		return s.takeToken(n)
+	}
+	if n.buckets == nil {
+		n.buckets = map[int]*bucket{}
+	}
+	b := n.buckets[c.user]
+	if b == nil {
+		b = &bucket{tokens: n.f("burst"), at: s.now}
+		n.buckets[c.user] = b
+	}
+	b.tokens = math.Min(n.f("burst"), b.tokens+(s.now-b.at)*n.f("limitRps")/1000)
+	b.at = s.now
+	if b.tokens < 1 {
+		return false
+	}
+	b.tokens--
+	return true
 }
 
 func (s *Sim) takeToken(n *node) bool {

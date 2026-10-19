@@ -18,6 +18,7 @@ func (s *Sim) addNode(d Node) *node {
 	s.configStore(n)
 	s.nodes[n.id] = n
 	s.order = append(s.order, n)
+	n.idBase = len(s.order) * 1_000_000
 	switch d.Kind {
 	case KQueue, KTopic, KLog:
 		s.hasQueue = true

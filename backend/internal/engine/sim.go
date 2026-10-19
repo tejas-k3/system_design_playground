@@ -69,6 +69,11 @@ type redisLock struct {
 	exp   float64
 }
 
+// bucket is one account's token bucket in a per-user rate limiter.
+type bucket struct {
+	tokens, at float64
+}
+
 type job struct {
 	rid      int
 	key      int
@@ -90,9 +95,12 @@ type node struct {
 	x, y            float64
 	p               Params
 	removed         bool
-	canaryAcc       float64 // load balancer: share of a request owed to the canary so far
-	badUntil        float64 // a bad release answers every request with an error until then (0 = none)
-	zone            string  // availability zone, kept in step with the 'zone' setting
+	canaryAcc       float64         // load balancer: share of a request owed to the canary so far
+	idBase          int             // users of this client are numbered from here, so two clients never share an account
+	userKeys        KeySampler      // samples which account sends a request
+	buckets         map[int]*bucket // a per-user rate limiter's allowance for each account seen so far
+	badUntil        float64         // a bad release answers every request with an error until then (0 = none)
+	zone            string          // availability zone, kept in step with the 'zone' setting
 	down            bool
 	downAt          float64
 	epoch           int
