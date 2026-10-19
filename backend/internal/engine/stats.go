@@ -36,16 +36,17 @@ type EdgeStats struct {
 }
 
 type JobStats struct {
-	Enqueued    int     `json:"enqueued"`
-	Completed   int     `json:"completed"`
-	Lost        int     `json:"lost"`
-	Retried     int     `json:"retried"`
-	Redelivered int     `json:"redelivered,omitempty"` // jobs handed out again because the first worker did not acknowledge in time
-	Dead        int     `json:"dead,omitempty"`        // jobs parked in the dead-letter queue after their last attempt
-	Backlog     int     `json:"backlog"`
-	P50         float64 `json:"p50"`
-	P95         float64 `json:"p95"`
-	HighP95     float64 `json:"highP95,omitempty"` // p95 of the urgent jobs
+	Enqueued        int     `json:"enqueued"`
+	Completed       int     `json:"completed"`
+	Lost            int     `json:"lost"`
+	Retried         int     `json:"retried"`
+	Redelivered     int     `json:"redelivered,omitempty"` // jobs handed out again because the first worker did not acknowledge in time
+	Dead            int     `json:"dead,omitempty"`        // jobs parked in the dead-letter queue after their last attempt
+	Backlog         int     `json:"backlog"`
+	P50             float64 `json:"p50"`
+	P95             float64 `json:"p95"`
+	OrderViolations int     `json:"orderViolations,omitempty"` // messages a log consumer finished after a newer message of the same key
+	HighP95         float64 `json:"highP95,omitempty"`         // p95 of the urgent jobs
 }
 
 // RunStats are totals over the counted part of the run.
@@ -143,7 +144,7 @@ func (s *Sim) Snapshot() Stats {
 		if c := s.capacity(n); c < 1<<20 {
 			ns.Cap = c
 		}
-		if n.kind == KQueue || n.kind == KTopic {
+		if n.kind == KQueue || n.kind == KTopic || n.kind == KLog {
 			ns.QLen = s.queued(n)
 			ns.Cap = int(n.f("capacity"))
 		}
@@ -151,6 +152,9 @@ func (s *Sim) Snapshot() Stats {
 			for _, e := range n.in {
 				if !e.removed && e.from.kind == KTopic {
 					ns.QLen += len(e.subJobs) - e.subHead
+				}
+				if !e.removed && e.from.kind == KLog {
+					ns.QLen += s.workerLag(e.from, n)
 				}
 			}
 		}
@@ -247,7 +251,7 @@ func (s *Sim) Snapshot() Stats {
 	if s.hasQueue {
 		run.Jobs = &JobStats{
 			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead, Redelivered: s.jobRedelivered,
-			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95), HighP95: s.jobHistHigh.Quantile(0.95),
+			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95), HighP95: s.jobHistHigh.Quantile(0.95), OrderViolations: s.jobOrderViolations,
 		}
 	}
 	var cost float64

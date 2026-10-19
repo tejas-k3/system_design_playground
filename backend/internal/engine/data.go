@@ -250,6 +250,9 @@ func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
 			if qe == nil {
 				qe = s.first(n, KTopic)
 			}
+			if qe == nil {
+				qe = s.first(n, KLog)
+			}
 			if qe != nil {
 				s.callCmd(n, qe, c, cmdEnqueue, 0, done)
 				return
@@ -708,6 +711,13 @@ func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
 
 // queued is the number of jobs waiting for a worker.
 func (s *Sim) queued(q *node) int {
+	if q.kind == KLog {
+		n := 0
+		for _, l := range q.lanes {
+			n += len(l.jobs) - l.head
+		}
+		return n
+	}
 	if q.kind == KTopic {
 		n := 0
 		for _, e := range q.out {
@@ -734,6 +744,10 @@ func (s *Sim) requeue(q *node, j *job) {
 func (s *Sim) dispatch(q *node) {
 	if q.kind == KTopic {
 		s.dispatchTopic(q)
+		return
+	}
+	if q.kind == KLog {
+		s.dispatchLog(q)
 		return
 	}
 	for s.queued(q) > 0 && !q.down {
@@ -806,6 +820,10 @@ func (s *Sim) runJob(q, w *node, j *job) {
 			return
 		}
 		j.finished = true
+		if res.OK && j.lane != nil {
+			j.lane.running = false
+			s.orderCheck(q, j)
+		}
 		if res.OK {
 			w.c.ok++
 			w.c.done++
@@ -825,9 +843,24 @@ func (s *Sim) runJob(q, w *node, j *job) {
 					s.jobRetried++
 				}
 				s.after(100*math.Pow(2, float64(j.attempts-1)), func() {
-					s.requeue(q, j)
+					if j.lane != nil { // retried in place: the partition waited, so later messages did not overtake it
+						j.lane.jobs = append([]*job{j}, j.lane.jobs[j.lane.head:]...)
+						j.lane.head = 0
+						j.lane.running = false
+					} else {
+						s.requeue(q, j)
+					}
 					s.dispatch(q)
 				})
+			} else if j.lane != nil {
+				j.lane.running = false
+				if j.counted {
+					if q.b("deadLetter") {
+						s.jobDead++
+					} else {
+						s.jobLost++
+					}
+				}
 			} else if j.counted {
 				if q.b("deadLetter") {
 					s.jobDead++
@@ -992,4 +1025,141 @@ func (s *Sim) dispatchTopic(q *node) {
 			e.subHead = 0
 		}
 	}
+}
+
+// ---- partitioned log -----------------------------------------------------------------
+
+// lane is one partition as seen by one consumer group: an ordered line of messages that one member works through
+// one at a time.
+type lane struct {
+	part, group int
+	jobs        []*job
+	head        int
+	running     bool
+}
+
+// logGroups lists the consumer groups reading a log (the distinct group numbers of its workers), smallest first.
+func (s *Sim) logGroups(q *node) []int {
+	var gs []int
+	seen := map[int]bool{}
+	for _, e := range q.out {
+		if e.removed || e.to.kind != KWorker || e.to.removed {
+			continue
+		}
+		g := int(e.to.f("group"))
+		if !seen[g] {
+			seen[g] = true
+			gs = append(gs, g)
+		}
+	}
+	for i := 1; i < len(gs); i++ { // tiny insertion sort: determinism without importing sort here
+		for k := i; k > 0 && gs[k] < gs[k-1]; k-- {
+			gs[k], gs[k-1] = gs[k-1], gs[k]
+		}
+	}
+	return gs
+}
+
+// laneOwner is the member of the lane's group that reads its partition: the group's running members take the
+// partitions in turn.
+func (s *Sim) laneOwner(q *node, l *lane) *node {
+	var members []*node
+	for _, e := range q.out {
+		if e.removed || e.to.kind != KWorker || e.to.removed || e.to.down || int(e.to.f("group")) != l.group {
+			continue
+		}
+		members = append(members, e.to)
+	}
+	if len(members) == 0 {
+		return nil
+	}
+	return members[l.part%len(members)]
+}
+
+// workerLag is the number of messages waiting in the partitions a worker reads.
+func (s *Sim) workerLag(q, w *node) int {
+	n := 0
+	for _, l := range q.lanes {
+		if s.laneOwner(q, l) == w {
+			n += len(l.jobs) - l.head
+		}
+	}
+	return n
+}
+
+func (s *Sim) arriveLog(n *node, c *call, cb func(Result)) {
+	if !c.write {
+		s.failAt(n, RNoRoute, cb)
+		return
+	}
+	parts := int(n.f("partitions"))
+	p := int(Hash32(uint32(c.key)*2654435761+7) % uint32(parts))
+	if n.s("partitionBy") == "roundRobin" {
+		p = n.rrNext % parts
+		n.rrNext++
+	}
+	s.logSeq++
+	seq := s.logSeq
+	if n.laneIdx == nil {
+		n.laneIdx = map[[2]int]*lane{}
+	}
+	for _, g := range s.logGroups(n) {
+		l := n.laneIdx[[2]int{p, g}]
+		if l == nil {
+			l = &lane{part: p, group: g}
+			n.laneIdx[[2]int{p, g}] = l
+			n.lanes = append(n.lanes, l)
+		}
+		j := &job{rid: c.rid, key: c.key, wl: c.wl, idem: c.idem, counted: c.counted, enq: s.now, lane: l, seq: seq}
+		if j.counted {
+			s.jobEnqueued++
+		}
+		if len(l.jobs)-l.head >= int(n.f("capacity")) {
+			if j.counted {
+				s.jobLost++
+			}
+			continue
+		}
+		l.jobs = append(l.jobs, j)
+	}
+	s.after(0.2, func() {
+		s.okAt(n, Result{Ver: -1, Done: true}, cb)
+		s.dispatch(n)
+	})
+}
+
+func (s *Sim) dispatchLog(q *node) {
+	for _, l := range q.lanes {
+		if l.running || l.head >= len(l.jobs) || q.down {
+			continue
+		}
+		w := s.laneOwner(q, l)
+		if w == nil || w.busy >= s.capacity(w) {
+			continue
+		}
+		j := l.jobs[l.head]
+		l.jobs[l.head] = nil
+		l.head++
+		l.running = true
+		s.runJob(q, w, j)
+		if l.head > 256 && l.head*2 > len(l.jobs) {
+			l.jobs = append([]*job(nil), l.jobs[l.head:]...)
+			l.head = 0
+		}
+	}
+}
+
+// orderCheck counts a message that a group's consumer finished after a newer message of the same key.
+func (s *Sim) orderCheck(q *node, j *job) {
+	if q.lastSeq == nil {
+		q.lastSeq = map[[2]int]int{}
+	}
+	k := [2]int{j.lane.group, j.key}
+	if j.seq < q.lastSeq[k] {
+		if j.counted {
+			s.jobOrderViolations++
+		}
+		return
+	}
+	q.lastSeq[k] = j.seq
 }

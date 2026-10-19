@@ -161,7 +161,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				num("cpuMs", "CPU time", "Capacity", 20, 1, 500, 1, "ms", "Compute per request, not counting time waiting on dependencies.").fixed(),
@@ -304,6 +304,20 @@ func init() {
 			cost: func(Params) float64 { return 0.04 },
 		},
 		{
+			Kind: KLog, Name: "Log", Description: "A partitioned, ordered log. Consumer groups read it; a partition has one reader per group.",
+			Lesson: "Order is per partition, and parallelism is capped by the number of partitions.",
+			Accent: "#c2255c", Width: 160, Height: 72, CanConnect: []string{KWorker},
+			Params: []ParamSpec{
+				num("partitions", "Partitions", "Layout", 4, 1, 64, 1, "", "A message goes to one partition; one member of a consumer group reads a partition, so more members than partitions sit idle."),
+				sel("partitionBy", "Partition by", "Layout", "key", "Key: all messages of one key share a partition (and so stay in order). Round robin: spread evenly, order across a key is lost.",
+					opt("key", "Key"), opt("roundRobin", "Round robin")),
+				num("capacity", "Backlog per partition", "Buffer", 5000, 10, 100000, 100, "messages", "Messages one partition may hold for a group; beyond it that group's copies are dropped."),
+				num("maxAttempts", "Attempts per message", "Delivery", 3, 1, 10, 1, "", "How many times a failing message is tried in place (the partition waits) before it is given up.").adv(),
+				flag("deadLetter", "Dead-letter queue", "Delivery", false, "Park messages that used up their attempts instead of dropping them.").adv(),
+			},
+			cost: func(p Params) float64 { return 0.03 * pf(p, "partitions", 4) / 4 },
+		},
+		{
 			Kind: KWorker, Name: "Worker", Description: "Pulls jobs from a queue and does the slow work.",
 			Lesson: "Workers set how fast the backlog drains.",
 			Accent: "#0b7285", Width: 160, Height: 72,
@@ -312,6 +326,7 @@ func init() {
 				num("concurrency", "Concurrency", "Capacity", 4, 1, 64, 1, "", "Jobs it works on at once."),
 				num("processMs", "Processing time", "Speed", 10, 1, 2000, 1, "ms", "Compute per job."),
 				variability("Speed"),
+				num("group", "Consumer group", "Log", 1, 1, 8, 1, "", "When fed by a log: workers with the same group number share its partitions (each partition has one reader per group); a different number is a separate group that reads every message.").adv(),
 				num("poisonPct", "Poison jobs", "Failure modes", 0, 0, 100, 1, "%", "Share of jobs that can never succeed (a malformed message). Each is retried until its attempts run out, using worker time every time.").adv(),
 			},
 			cost: func(p Params) float64 { return 0.05 * pf(p, "concurrency", 4) / 4 },
