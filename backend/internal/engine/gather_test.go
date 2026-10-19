@@ -167,3 +167,75 @@ func TestHedgeOffIsIdenticalToNeverMentioningIt(t *testing.T) {
 		t.Fatal("hedgeAfterMs 0 must change nothing")
 	}
 }
+
+// Every shard of a fan-out shows up in the trace as its own span, all of them children of the app server's span and
+// overlapping in time (parallel legs), and the app server's span lasts as long as the slowest leg.
+func TestTraceShowsEveryFanOutLegInParallel(t *testing.T) {
+	d := gatherDesign(4, "all", "exponential")
+	s := New(d, Options{Seed: 11})
+	s.EnableTraces(true)
+	s.Advance(20000)
+	ts := s.Traces()
+	if len(ts.OK) == 0 {
+		t.Fatal("no traces kept")
+	}
+	tr := ts.OK[0]
+	var app SpanOut
+	var legs []SpanOut
+	for _, sp := range tr.Spans {
+		if sp.Kind == KAppServer {
+			app = sp
+		}
+		if sp.Kind == KIndex {
+			legs = append(legs, sp)
+		}
+	}
+	if len(legs) != 4 {
+		t.Fatalf("one span per shard expected, got %d in %+v", len(legs), tr.Spans)
+	}
+	latestEnd := 0.0
+	for _, l := range legs {
+		if l.Depth != app.Depth+1 {
+			t.Errorf("a leg should sit directly under the app server: %+v", l)
+		}
+		if l.Start < app.Start || l.Start > app.Start+60 {
+			t.Errorf("all legs start together, right after the app's own work: leg %.0f, app %.0f", l.Start, app.Start)
+		}
+		latestEnd = max(latestEnd, l.End)
+	}
+	if app.End < latestEnd-1e-6 {
+		t.Errorf("the app server waits for the slowest leg: app ends %.1f, last leg %.1f", app.End, latestEnd)
+	}
+}
+
+func TestTracingDoesNotChangeAFanOutRun(t *testing.T) {
+	plain := New(gatherDesign(6, "firstK", "heavy"), Options{Seed: 11})
+	plain.Advance(30000)
+	withTraces := New(gatherDesign(6, "firstK", "heavy"), Options{Seed: 11})
+	withTraces.EnableTraces(true)
+	withTraces.Advance(30000)
+	if !reflect.DeepEqual(plain.RunSnapshot(), withTraces.RunSnapshot()) {
+		t.Fatal("tracing is observation only")
+	}
+}
+
+// The expected slowest of N exponential service times is mean x H(N). Relative to a 2-shard run (same fixed legs) the
+// extra latency is mean x (H(N) - H(2)); the engine's default service model runs about 5% above its setting.
+func TestWaitForAllFollowsTheHarmonicNumberAt10And100Shards(t *testing.T) {
+	h := func(n int) float64 {
+		s := 0.0
+		for i := 1; i <= n; i++ {
+			s += 1 / float64(i)
+		}
+		return s
+	}
+	base := run(gatherDesign(2, "all", "exponential"), Options{Seed: 11}, 120).RunSnapshot().Mean
+	for _, n := range []int{10, 100} {
+		got := run(gatherDesign(n, "all", "exponential"), Options{Seed: 11}, 120).RunSnapshot().Mean - base
+		want := 30 * 1.05 * (h(n) - h(2))
+		t.Logf("N=%d: measured +%.1f ms, theory +%.1f ms", n, got, want)
+		if got < want*0.9 || got > want*1.1 {
+			t.Fatalf("N=%d: expected +%.1f ms within 10%%, measured +%.1f", n, want, got)
+		}
+	}
+}
