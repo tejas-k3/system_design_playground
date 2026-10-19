@@ -416,6 +416,12 @@ func init() {
 			cost: func(Params) float64 { return 0.08 },
 		},
 	}
+	for i := range specs { // every component except the users can be placed in an availability zone
+		if specs[i].Kind != KClient {
+			specs[i].Params = append(specs[i].Params, sel("zone", "Availability zone", "Placement", "az-a", "Where it runs. A call between two zones pays a hop each way, and a zone outage takes down everything placed in it.",
+				opt("az-a", "Zone A"), opt("az-b", "Zone B"), opt("az-c", "Zone C")).adv())
+		}
+	}
 	specByKind = map[string]*NodeSpec{}
 	for i := range specs {
 		specByKind[specs[i].Kind] = &specs[i]
