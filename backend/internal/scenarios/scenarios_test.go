@@ -64,6 +64,17 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("disk-writes: a faster disk also passes but earns fewer stars than dropping the waste", func(t *testing.T) {
+		sc := Get("disk-writes")
+		fast := withParam(sc.Diagram, "db", "diskIops", 400.0)
+		res := engine.RunToEnd(fast, sc.Options(42), sc.Goals)
+		if !res.Pass {
+			t.Fatalf("400 IOPS should be enough: %+v", res.Checks)
+		}
+		if ref := engine.RunToEnd(sc.Solution, sc.Options(42), sc.Goals); res.Stars >= ref.Stars {
+			t.Fatalf("removing the unused indexes should score at least as well as buying IOPS: %d vs %d stars", res.Stars, ref.Stars)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

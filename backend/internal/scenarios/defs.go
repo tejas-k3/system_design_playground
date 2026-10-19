@@ -952,6 +952,35 @@ func init() {
 		Debrief: "A stop-the-world pause is invisible in averages and brutal at the tail. Retries and extra servers mask it at a cost; the real fix is a shorter pause. Watch p99 and the timeouts, not the mean.",
 	})
 
+	// Disk full of writes: every secondary index is another disk write per row, against a disk with a fixed IOPS budget
+	diskWrites := func(fixed bool) engine.Diagram {
+		idx := 3.0
+		if fixed {
+			idx = 0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 80.0, "readPct": 20.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "diskIops": 200.0, "indexes": idx}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "disk-writes", Title: "The disk full of writes", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The database is mostly idle on paper, yet writes queue and time out.",
+		Story:   "A write-heavy service (80 requests a second, mostly writes) runs on a database whose disk does 200 operations a second. Years ago someone added three secondary indexes for a report nobody opens any more. CPU and connections look fine, but writes pile up and time out.",
+		Diagram: diskWrites(false), Solution: diskWrites(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(1.5), StarCostPerHour: f(1.3), StarP95Ms: f(200)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Count the disk operations: each write needs one for the row and one more for every secondary index. How many writes a second is that, against 200?",
+			"64 writes a second x (1 + 3 indexes) is about 256 operations a second against a disk that does 200, so the queue never drains.",
+			"Nobody queries by those fields (the lookups share is zero), so drop the indexes. A faster disk would also work, but removing the waste is cheaper.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Removing the three unused indexes will…", Options: []string{"Slow reads down a lot", "Cut the disk operations per write from four to one", "Change nothing"}, Answer: 1,
+			Explain: "Each write must update every index as well as the table. With no reads using them, they only cost disk writes."}},
+		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
