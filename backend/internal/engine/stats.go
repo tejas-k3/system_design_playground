@@ -76,6 +76,7 @@ type RunStats struct {
 	LostUpdates    int             `json:"lostUpdates,omitempty"` // transfers that silently overwrote a concurrent commit (read committed)
 	TxAborts       int             `json:"txAborts,omitempty"`    // transactions aborted for a write conflict or as a deadlock victim
 	Deadlocks      int             `json:"deadlocks,omitempty"`
+	WriteSkew      int             `json:"writeSkew,omitempty"` // on-call pairs left with the rule broken (two doctors off at once)
 	Jobs           *JobStats       `json:"jobs,omitempty"`
 }
 
@@ -226,7 +227,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {

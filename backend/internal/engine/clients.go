@@ -151,6 +151,7 @@ const (
 	wlLeader
 	wlBooking
 	wlTransfer // every request moves money between two accounts: a two-key read-modify-write transaction
+	wlOnCall   // read a pair of rows, then write one of them: the write-skew workload (see txn.go)
 	wlFeed     // posts fan out to followers' timelines; reads fetch a timeline (see feed.go)
 )
 
@@ -166,6 +167,8 @@ func workloadOf(n *node) int {
 		return wlTransfer
 	case "feed":
 		return wlFeed
+	case "oncall":
+		return wlOnCall
 	}
 	return wlKV
 }
@@ -179,7 +182,7 @@ func (s *Sim) createLogical(c *node) *logical {
 		hash:    Hash32(uint32(s.logicalSeq)),
 		wl:      workloadOf(c),
 	}
-	if lg.wl == wlTransfer {
+	if lg.wl == wlTransfer || lg.wl == wlOnCall {
 		lg.write = true // a transfer is always a transaction
 	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)

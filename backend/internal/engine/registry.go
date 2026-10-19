@@ -130,7 +130,7 @@ func init() {
 				sel("workload", "Workload", "What they do", "kv", "What kind of requests users make.",
 					opt("kv", "General: read & write items"), opt("geo", "Location: nearby search & pings"),
 					opt("leaderboard", "Leaderboard: rank reads & score updates"), opt("booking", "Booking: reserve scarce seats"),
-					opt("transfer", "Transfers: move money between two accounts"), opt("feed", "Feed: posts reach followers, reads fetch a timeline")),
+					opt("transfer", "Transfers: move money between two accounts"), opt("feed", "Feed: posts reach followers, reads fetch a timeline"), opt("oncall", "On-call pairs: read two rows, write one (write skew)")),
 				num("followersMean", "Followers per author", "What they do", 100, 1, 100000, 10, "", "Average followers of an author. Counts are Zipf-skewed, so a few authors have far more.").showIf("workload", "feed"),
 				num("followersSkew", "Follower skew", "What they do", 1, 0, 2, 0.1, "", "0 = everyone has the same number of followers; higher means a few celebrities hold most of them.").showIf("workload", "feed"),
 				sel("keyDist", "Key popularity", "What they do", "zipf", "How requests spread over items.",

@@ -11,7 +11,11 @@ package engine
 //     waits for any it cannot get. Two transfers that take the same two accounts in opposite order deadlock: the one
 //     that would close the cycle is the victim and aborts. Waiting holds a database connection, so throughput falls.
 //
-// Write skew (two transactions each reading what the other writes) is not modelled.
+// Write skew is the oncall workload: rows come in pairs (1,2), (3,4) ... and a request reads both rows of its pair
+// but writes only its own. Two such requests that overlap read the same state and write different rows, so no row is
+// written twice: read committed lets both through and snapshot isolation (first committer wins on the rows WRITTEN)
+// lets both through too. Each counts as a write skew if the other row of the pair changed under it. Serializable
+// locks both rows of the pair up front and the two take turns.
 
 type txLock struct {
 	holder  int
@@ -84,6 +88,10 @@ func secondAccount(c *call, first int) int {
 func (s *Sim) dbTransfer(n *node, c *call, cb func(Result), release func()) {
 	ep := n.epoch
 	k1, k2 := c.key, secondAccount(c, c.key)
+	oncall := c.wl == wlOnCall
+	if oncall {
+		k2 = partnerRow(c, k1)
+	}
 	level := n.s("isolation")
 	s.txnSeq++
 	id := s.txnSeq
@@ -119,7 +127,11 @@ func (s *Sim) dbTransfer(n *node, c *call, cb func(Result), release func()) {
 			if dead() {
 				return
 			}
-			s.after(s.service(n, 2*n.f("writeMs")*s.writeMult(n))*n.slow, func() {
+			writes := 2.0
+			if oncall {
+				writes = 1 // only its own row
+			}
+			s.after(s.service(n, writes*n.f("writeMs")*s.writeMult(n))*n.slow, func() {
 				if dead() {
 					return
 				}
@@ -127,7 +139,12 @@ func (s *Sim) dbTransfer(n *node, c *call, cb func(Result), release func()) {
 				if n.tver[k1] != v1 {
 					changed++
 				}
-				if n.tver[k2] != v2 {
+				if oncall {
+					// the partner row is only read: a change there is not a conflict, it is the skew
+					if n.tver[k2] != v2 && changed == 0 && c.counted {
+						s.runWriteSkew++
+					}
+				} else if n.tver[k2] != v2 {
 					changed++
 				}
 				if changed > 0 && level == "repeatableRead" {
@@ -138,7 +155,9 @@ func (s *Sim) dbTransfer(n *node, c *call, cb func(Result), release func()) {
 					s.runLostUpdates += changed
 				}
 				n.tver[k1]++
-				n.tver[k2]++
+				if !oncall {
+					n.tver[k2]++
+				}
 				ver := s.commit(n, c)
 				unlockAll()
 				release()
@@ -160,4 +179,18 @@ func (s *Sim) dbTransfer(n *node, c *call, cb func(Result), release func()) {
 		}, func() { abort(true) })
 	}
 	lock(k1, func() { lock(k2, body) })
+}
+
+// partnerRow is the other row of the pair a key belongs to: keys 1 and 2 are a pair, 3 and 4, and so on.
+func partnerRow(c *call, key int) int {
+	p := key + 1
+	if key%2 == 0 {
+		p = key - 1
+	}
+	if c.lg != nil {
+		if ks := int(c.lg.client.f("keySpace")); ks > 1 && p > ks {
+			p = key - 1
+		}
+	}
+	return p
 }
