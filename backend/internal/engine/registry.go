@@ -283,6 +283,7 @@ func init() {
 			Params: []ParamSpec{
 				num("capacity", "Capacity", "Buffer", 5000, 10, 100000, 100, "jobs", "Jobs it can hold before rejecting."),
 				num("maxAttempts", "Attempts per job", "Delivery", 3, 1, 10, 1, "", "How many times a failing job is tried (with a growing pause between tries) before it is given up.").adv(),
+				num("visibilityTimeoutMs", "Visibility timeout", "Delivery", 0, 0, 600000, 100, "ms", "A job a worker has taken but not acknowledged within this time becomes visible again and another worker takes it: delivery is at least once, so slow jobs run twice. 0 = off.").adv(),
 				flag("deadLetter", "Dead-letter queue", "Delivery", false, "Park jobs that used up their attempts for inspection instead of dropping them. They are counted as dead, not lost.").adv(),
 				num("maxMessageKB", "Largest message", "Buffer", 256, 1, 10240, 1, "KB", "Messages above this size are refused (managed queues commonly allow 256 KB; a log, 1 MB). Only applies when the users' request size is set. Store big bodies elsewhere and queue a pointer.").adv().fixed(),
 			},
