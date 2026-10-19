@@ -21,6 +21,15 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 		s.linkDown(ev)
 		return
 	}
+	if ev.Type == "zoneDown" { // a correlated failure: everything placed in the zone crashes together
+		for _, n := range s.order {
+			if n.zone == ev.Zone && n.kind != KClient && !n.removed && !n.down {
+				s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "crash", NodeID: n.id, Label: n.label})
+				s.CrashNode(n.id, ev.DurationSec)
+			}
+		}
+		return
+	}
 	var t *node
 	if len(ev.NodeID) > 7 && ev.NodeID[:7] == "random:" {
 		kind := ev.NodeID[7:]

@@ -78,6 +78,9 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 	if via != nil {
 		via.fwd++
 	}
+	if e.from.zone != e.to.zone && e.from.kind != KClient && e.to.kind != KClient {
+		oneWay += crossZoneMs // a hop between availability zones, each way
+	}
 	req, resp := s.sizes(c)
 	fwd := oneWay + s.transmit(e, 0, req)
 	if via != nil {
@@ -127,6 +130,9 @@ func (s *Sim) hopArrive(e, via *edge, target *node, oneWay float64, resp float64
 		})
 	}
 }
+
+// crossZoneMs is the extra one-way latency of a call between two availability zones of a region.
+const crossZoneMs = 1.5
 
 // retransmitMs is how long a lost packet waits before it is sent again (a typical minimum retransmission timeout).
 const retransmitMs = 200

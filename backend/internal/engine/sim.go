@@ -90,6 +90,7 @@ type node struct {
 	x, y            float64
 	p               Params
 	removed         bool
+	zone            string // availability zone, kept in step with the 'zone' setting
 	down            bool
 	downAt          float64
 	epoch           int

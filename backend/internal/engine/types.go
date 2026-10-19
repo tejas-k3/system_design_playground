@@ -127,12 +127,13 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge
+	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`
 	Factor      float64 `json:"factor,omitempty"`
 	DurationSec float64 `json:"durationSec,omitempty"` // slow and partition
+	Zone        string  `json:"zone,omitempty"`        // zoneDown only: every node placed in this zone crashes for DurationSec
 	ToID        string  `json:"toId,omitempty"`        // linkDown only: the connection from NodeID to this node
 	Mode        string  `json:"mode,omitempty"`        // linkDown only: both | replies (requests arrive, answers are lost) | requests
 	PulseSec    float64 `json:"pulseSec,omitempty"`    // slow only: alternate slow and normal every PulseSec until DurationSec is over
