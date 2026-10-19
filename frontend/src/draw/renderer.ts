@@ -229,6 +229,8 @@ function nodeSubtitle(n: Node, sc: Scene): string {
       return `×${rp.concurrency}`
     case 'queue':
       return `cap ${rp.capacity}`
+    case 'topic':
+      return `per subscriber ${rp.capacity}`
     case 'rateLimiter':
       return `${rp.limitRps}/s`
     case 'index':

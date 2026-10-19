@@ -137,6 +137,17 @@ const ICONS: Record<string, Draw> = {
       c.quadraticCurveTo(0, 3.5, 8.6, 0)
     })
   },
+  topic: (c) => {
+    // one source fanning out to three copies
+    stroke(c, () => c.arc(-8, 0, 3, 0, Math.PI * 2))
+    for (const y of [-8, 0, 8]) {
+      stroke(c, () => {
+        c.moveTo(-5, 0)
+        c.lineTo(4, y)
+      })
+      stroke(c, () => c.arc(7, y, 2.2, 0, Math.PI * 2))
+    }
+  },
   index: (c) => {
     // a magnifier over a slice of lines
     stroke(c, () => c.arc(-2, -2, 7, 0, Math.PI * 2))
