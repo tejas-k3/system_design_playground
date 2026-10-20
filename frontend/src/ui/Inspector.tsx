@@ -12,6 +12,8 @@ import { sparkPoints, sparkSummary } from '../model/spark'
 import { crashNode, requestNodeSeries, restartNode } from '../sim/bridge'
 import { ReviewPanel } from './ReviewPanel'
 import { useStore } from '../state/store'
+import { plain } from '../model/glossary'
+import { Rich } from './Term'
 
 const whole = (v: number) => `${Math.round(v * 100)}%`
 const rate = (v: number) => (v >= 100 ? Math.round(v).toString() : v.toFixed(1))
@@ -383,7 +385,7 @@ function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
 function ParamField({ p, value, onChange, locked }: { p: ParamSpec; value: unknown; onChange: (v: number | string | boolean) => void; locked: boolean }) {
   const id = `p-${p.key}`
   return (
-    <div className="field" title={p.help}>
+    <div className="field" title={p.help ? plain(p.help) : undefined}>
       <label htmlFor={id}>
         {p.label}
         {locked && <em> · fixed</em>}
@@ -400,7 +402,7 @@ function ParamField({ p, value, onChange, locked }: { p: ParamSpec; value: unkno
           <span>{value ? 'On' : 'Off'}</span>
         </label>
       )}
-      {p.help && <small className="help">{p.help}</small>}
+      {p.help && <small className="help"><Rich text={p.help} /></small>}
     </div>
   )
 }

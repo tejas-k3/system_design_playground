@@ -62,3 +62,6 @@ export function splitMarkup(text: string): Piece[] {
   if (last < text.length) out.push(text.slice(last))
   return out
 }
+
+/** The same text without the markup, for places that cannot show a tooltip (a title attribute). */
+export const plain = (text: string): string => splitMarkup(text).map((p) => (typeof p === 'string' ? p : p.text)).join('')
