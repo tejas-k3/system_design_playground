@@ -71,6 +71,7 @@ function Overview({ count }: { count: number }) {
             {(run.lostUpdates ?? 0) > 0 && (<><dt>Updates overwritten</dt><dd className="bad">{run.lostUpdates!.toLocaleString()}</dd></>)}
             {(run.fanoutWrites ?? 0) > 0 && (<><dt>Timeline inserts</dt><dd>{run.fanoutWrites!.toLocaleString()}</dd></>)}
             {(run.fanoutReads ?? 0) > 0 && (<><dt>Followed authors read</dt><dd>{run.fanoutReads!.toLocaleString()}</dd></>)}
+            {(run.heavyP95 ?? 0) > 0 && (<><dt>p95 light / heavy</dt><dd>{Math.round(run.lightP95 ?? 0).toLocaleString()} / {Math.round(run.heavyP95!).toLocaleString()} ms</dd></>)}
             {(run.highTotal ?? 0) > 0 && (<><dt>Urgent requests ok</dt><dd>{pct((run.highOk ?? 0) / run.highTotal!)}</dd></>)}
             {(run.deadlineSkipped ?? 0) > 0 && (<><dt>Skipped (client gone)</dt><dd>{run.deadlineSkipped!.toLocaleString()}</dd></>)}
             {(run.hedged ?? 0) > 0 && (<><dt>Hedged queries</dt><dd>{run.hedged!.toLocaleString()}</dd></>)}

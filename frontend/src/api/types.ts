@@ -235,6 +235,8 @@ export interface RunStats {
   fanoutWrites?: number // timeline inserts caused by posts (feed workload)
   fanoutReads?: number // followed authors read to build timelines
   hedged?: number // second queries sent because a shard was slow
+  lightP95?: number // p95 of the light requests when the users send heavy ones too
+  heavyP95?: number
   customerOk?: number // requests of real customers that succeeded (when the diagram has a bot)
   customerTotal?: number
   highOk?: number // urgent requests that succeeded
