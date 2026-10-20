@@ -129,6 +129,16 @@ export interface Prediction {
   explain: string
 }
 
+export interface Alternative {
+  label: string
+  changes: { node: string; param: string; value: unknown }[]
+  pass: boolean
+  successPct: number
+  p95Ms: number
+  costPerHour: number
+  why: string
+}
+
 export interface ScenarioSummary {
   id: string
   title: string

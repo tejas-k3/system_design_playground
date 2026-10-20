@@ -6,6 +6,7 @@ import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
 import { starTargets } from '../model/goals'
 import { Stars } from './Stars'
+import { Alternatives } from './Alternatives'
 import { Rich } from './Term'
 import { useEscapeKey } from './useEscapeKey'
 
@@ -45,6 +46,7 @@ export function ResultModal() {
           </tbody>
         </table>
         {r.pass && <p className="debrief"><Rich text={sc.def.debrief} /></p>}
+        {r.pass && <Alternatives id={sc.def.id} />}
         <div className="row-btns end">
           <button autoFocus onClick={close}>Keep tweaking</button>
           <button onClick={() => { close(); reset() }}>Try again</button>
