@@ -114,6 +114,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		}
 		cc := *c
 		cc.idem = n.b("idempotencyKeys")
+		cc.honor = cc.honor || n.b("propagateDeadline")
 		run := func() {
 			if cc.write {
 				s.appWrite(n, &cc, done)

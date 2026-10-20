@@ -37,27 +37,29 @@ const (
 )
 
 type call struct {
-	lg      *logical
-	at      *attempt
-	write   bool
-	key     int
-	wl      int
-	hash    uint32
-	rid     int
-	idem    bool
-	counted bool
-	ticket  *ticket
-	cmd     cmd
-	ver     int
-	ttl     float64
-	token   int
-	job     *job
-	fan     float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
-	high    bool    // an urgent request
-	user    int     // the account behind the request (0 = not modelled)
-	claim   bool    // the body already sits in an object store: what travels on is a pointer
-	tr      *tracer // non-nil for sampled requests
-	sp      *span   // the span of the node currently handling this call
+	lg       *logical
+	at       *attempt
+	write    bool
+	key      int
+	wl       int
+	hash     uint32
+	rid      int
+	idem     bool
+	counted  bool
+	ticket   *ticket
+	cmd      cmd
+	ver      int
+	ttl      float64
+	token    int
+	job      *job
+	fan      float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
+	high     bool    // an urgent request
+	deadline float64 // when the client gives up (absolute ms, 0 = unknown)
+	honor    bool    // an app server on the path propagates the deadline: stations skip this call once it has passed
+	user     int     // the account behind the request (0 = not modelled)
+	claim    bool    // the body already sits in an object store: what travels on is a pointer
+	tr       *tracer // non-nil for sampled requests
+	sp       *span   // the span of the node currently handling this call
 }
 
 func fail(r Reason) Result { return Result{Reason: r, Ver: -1} }
@@ -629,6 +631,13 @@ func (s *Sim) startNext(n *node) {
 			s.failAt(n, RQueueTimeout, t.cb)
 			continue
 		}
+		if t.c.deadline > 0 && s.now+deadlineSlack(n, t.c) > t.c.deadline && (t.c.honor || (n.kind == KAppServer && n.b("propagateDeadline"))) {
+			if t.c.counted { // nobody is waiting for this any more: do not spend a slot on it
+				s.runDeadlineSkipped++
+			}
+			s.failAt(n, RDeadline, t.cb)
+			continue
+		}
 		s.markBusy(n)
 		n.busy++
 		if t.c.sp != nil {
@@ -636,6 +645,22 @@ func (s *Sim) startNext(n *node) {
 		}
 		t.run(s.releaser(n))
 	}
+}
+
+// deadlineSlack is how long the work still to do here is likely to take: a request that cannot finish before its
+// deadline is not worth starting. Twice the station's own nominal time (CPU, a read or write, a job) is a cheap
+// estimate and leaves the dependencies' time out of it.
+func deadlineSlack(n *node, c *call) float64 {
+	switch n.kind {
+	case KAppServer:
+		return 2 * n.f("cpuMs")
+	case KDatabase, KReplica:
+		if c.cmd == cmdWrite {
+			return 2 * n.f("writeMs")
+		}
+		return 2 * n.f("readMs")
+	}
+	return 0
 }
 
 func (s *Sim) failQueued(n *node, r Reason) {
