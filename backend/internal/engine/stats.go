@@ -75,12 +75,14 @@ type RunStats struct {
 	FanoutWrites    int             `json:"fanoutWrites,omitempty"`    // timeline inserts caused by posts (feed workload)
 	FanoutReads     int             `json:"fanoutReads,omitempty"`     // followed authors read to build timelines
 	DeadlineSkipped int             `json:"deadlineSkipped,omitempty"` // requests skipped in a queue because their client had already given up
-	CustomerOK      int             `json:"customerOk,omitempty"`      // requests of real customers that succeeded (only when the diagram has a bot)
-	CustomerTotal   int             `json:"customerTotal,omitempty"`   // requests of real customers resolved
-	HighOK          int             `json:"highOk,omitempty"`          // urgent requests that succeeded
-	HighTotal       int             `json:"highTotal,omitempty"`       // urgent requests resolved
-	Hedged          int             `json:"hedged,omitempty"`          // second queries sent because a shard was slow
-	Partial         int             `json:"partial,omitempty"`         // answers sent with fewer shards than required (partial results)
+	LightP95        float64         `json:"lightP95,omitempty"`        // p95 of the light requests when the users send heavy ones too
+	HeavyP95        float64         `json:"heavyP95,omitempty"`
+	CustomerOK      int             `json:"customerOk,omitempty"`    // requests of real customers that succeeded (only when the diagram has a bot)
+	CustomerTotal   int             `json:"customerTotal,omitempty"` // requests of real customers resolved
+	HighOK          int             `json:"highOk,omitempty"`        // urgent requests that succeeded
+	HighTotal       int             `json:"highTotal,omitempty"`     // urgent requests resolved
+	Hedged          int             `json:"hedged,omitempty"`        // second queries sent because a shard was slow
+	Partial         int             `json:"partial,omitempty"`       // answers sent with fewer shards than required (partial results)
 	LostWrites      int             `json:"lostWrites"`
 	LostUpdates     int             `json:"lostUpdates,omitempty"` // transfers that silently overwrote a concurrent commit (read committed)
 	TxAborts        int             `json:"txAborts,omitempty"`    // transactions aborted for a write conflict or as a deadlock victim
@@ -246,7 +248,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {

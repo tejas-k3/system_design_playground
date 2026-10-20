@@ -134,6 +134,7 @@ type logical struct {
 	wl        int
 	hash      uint32
 	user      int  // the account sending the request (0 = identities not modelled)
+	heavy     bool // an expensive request (heavyPct), chosen from the request number
 	high      bool // an urgent request (priorityPct): chosen from the request number, no random draw
 	tr        *tracer
 	after     func() // called once, when the request is resolved (closed-loop users think, then ask again)
@@ -184,6 +185,9 @@ func (s *Sim) createLogical(c *node) *logical {
 		hash:    Hash32(uint32(s.logicalSeq)),
 		wl:      workloadOf(c),
 	}
+	if pct := c.f("heavyPct"); pct > 0 {
+		lg.heavy = float64(Hash32(uint32(s.logicalSeq)*668265263+29)%100) < pct
+	}
 	if pct := c.f("priorityPct"); pct > 0 {
 		lg.high = float64(Hash32(uint32(s.logicalSeq)*374761393+17)%100) < pct
 	}
@@ -228,7 +232,7 @@ func (s *Sim) startAttempt(lg *logical) {
 	lg.attempts++
 	s.attempts.Push(s.now, true, 0)
 	at := &attempt{lg: lg, at: s.now, n: lg.attempts}
-	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high, user: lg.user, deadline: s.now + c.f("timeoutMs") - e.latency}
+	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high, heavy: lg.heavy, user: lg.user, deadline: s.now + c.f("timeoutMs") - e.latency}
 	s.hop(c, e, call, func(res Result) {
 		if at.done {
 			return
@@ -334,6 +338,13 @@ func (s *Sim) resolve(lg *logical, res Result) {
 		if res.OK {
 			s.runOK++
 			s.hist.Add(lat)
+			if cl.f("heavyPct") > 0 {
+				if lg.heavy {
+					s.heavyHist.Add(lat)
+				} else {
+					s.lightHist.Add(lat)
+				}
+			}
 			s.countFreshness(lg, res)
 		} else {
 			s.runFailed++

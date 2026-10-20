@@ -54,6 +54,7 @@ type call struct {
 	job      *job
 	fan      float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
 	high     bool    // an urgent request
+	heavy    bool    // an expensive request: it costs heavyMult times the CPU and database time
 	deadline float64 // when the client gives up (absolute ms, 0 = unknown)
 	honor    bool    // an app server on the path propagates the deadline: stations skip this call once it has passed
 	user     int     // the account behind the request (0 = not modelled)

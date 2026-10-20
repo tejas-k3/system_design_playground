@@ -130,6 +130,8 @@ func init() {
 				num("identities", "Distinct users", "Identity", 0, 0, 1000000, 10, "", "How many different accounts the requests come from (0 = not modelled). A rate limiter set to limit per user counts each account separately.").adv(),
 				num("identitySkew", "Account skew", "Identity", 0, 0, 2, 0.1, "", "0 = every account sends equally often; higher means a few accounts send most of the traffic.").adv(),
 				flag("abuse", "Bot traffic", "What they do", false, "These users are a scraper or attacker: they ask for a different item each time from a huge space (so caches rarely help), never retry, and ignore what they are told. Add them alongside real users to see what they do to the system and what a rate limiter protects.").adv(),
+				num("heavyPct", "Heavy requests", "What they do", 0, 0, 50, 1, "%", "Share of requests that are expensive (a big report, a huge query): they cost heavyMult times the CPU and database time. A few of them can block the many light ones queued behind.").adv(),
+				num("heavyMult", "Heavy cost", "What they do", 20, 2, 200, 1, "x", "How many times more CPU and database time a heavy request costs.").adv(),
 				num("priorityPct", "Urgent requests", "What they do", 0, 0, 100, 5, "%", "Share of requests marked urgent. Only a queue set to serve urgent work first treats them differently.").adv(),
 				num("secondaryPct", "Lookups by another field", "What they do", 0, 0, 100, 5, "%", "Share of reads that look an item up by something other than its key (email, status, date). Without a secondary index on the database each one scans.").adv(),
 				sel("workload", "Workload", "What they do", "kv", "What kind of requests users make.",

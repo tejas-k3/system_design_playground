@@ -102,7 +102,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		}
 		cb(res)
 	}
-	cpu := s.service(n, n.f("cpuMs")) * n.slow
+	cpu := s.service(n, n.f("cpuMs")*s.classMult(c, n)) * n.slow
 	n.cpuWork += cpu
 	if n.throttled {
 		cpu *= 100 / n.f("burstBaselinePct")
@@ -497,6 +497,9 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 	}
 	if c.fan > 0 {
 		ms += c.fan * feedUnitMs
+	}
+	if c.heavy {
+		ms *= s.heavyMult(c)
 	}
 	took := s.service(n, ms) * n.slow
 	if write && n.stallUntil > s.now { // an LSM database is compacting: the write waits for it to finish
@@ -1164,3 +1167,13 @@ func (s *Sim) orderCheck(q *node, j *job) {
 	}
 	q.lastSeq[k] = j.seq
 }
+
+// heavyMult is how many times a heavy request costs what a light one does (1 for a light request).
+func (s *Sim) heavyMult(c *call) float64 {
+	if !c.heavy || c.lg == nil {
+		return 1
+	}
+	return c.lg.client.f("heavyMult")
+}
+
+func (s *Sim) classMult(c *call, n *node) float64 { return s.heavyMult(c) }
