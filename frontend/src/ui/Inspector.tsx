@@ -364,6 +364,8 @@ function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
         {s.extra?.dupRps !== undefined && (<><dt>Duplicate writes</dt><dd className="bad">{rate(s.extra.dupRps)}/s</dd></>)}
         {s.extra?.storedGB !== undefined && (<><dt>Stored</dt><dd>{Math.round(s.extra.storedGB).toLocaleString()} GB</dd></>)}
         {s.extra?.yearStorageCost !== undefined && (<><dt>Storage, next year</dt><dd>${Math.round(s.extra.yearStorageCost).toLocaleString()}</dd></>)}
+        {s.extra?.sessions !== undefined && (<><dt>Open connections</dt><dd>{Math.round(s.extra.sessions)}{s.extra.sessionCap !== undefined ? ` of ${Math.round(s.extra.sessionCap)}` : ''}</dd></>)}
+        {s.extra?.connectRps !== undefined && (<><dt>New connections</dt><dd>{rate(s.extra.connectRps)}/s</dd></>)}
         {s.extra?.localHitRps !== undefined && (<><dt>Local cache hits</dt><dd>{rate(s.extra.localHitRps)}/s</dd></>)}
         {s.extra?.evictRps !== undefined && (<><dt>Evictions</dt><dd>{rate(s.extra.evictRps)}/s</dd></>)}
       </dl>
