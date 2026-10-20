@@ -195,6 +195,13 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.kind == KAppServer && (n.sessConns > 0 || sum.connects > 0) {
+			ex["sessions"] = float64(n.sessConns)
+			ex["connectRps"] = float64(sum.connects) / span
+			if cp := s.connCapacity(n); cp < 1<<30 {
+				ex["sessionCap"] = float64(cp)
+			}
+		}
 		if sum.localHit > 0 {
 			ex["localHitRps"] = float64(sum.localHit) / span
 		}

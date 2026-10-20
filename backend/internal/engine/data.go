@@ -102,6 +102,21 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		}
 		cb(res)
 	}
+	if c.lg != nil && c.lg.connect {
+		n.c.connects++
+		if cp := s.connCapacity(n); n.sessConns >= cp {
+			done(fail(RConnRefused))
+			return
+		}
+		n.sessConns++
+		if n.sessions == nil {
+			n.sessions = map[*session]bool{}
+		}
+		n.sessions[c.lg.sess] = true
+		c.lg.sess.node, c.lg.sess.ep = n, n.epoch
+		s.after(s.service(n, n.f("handshakeMs"))*n.slow, func() { done(Result{OK: true, Ver: -1, Done: true, Src: n}) })
+		return
+	}
 	cpu := s.service(n, n.f("cpuMs")*s.classMult(c, n)) * n.slow
 	n.cpuWork += cpu
 	if n.throttled {
