@@ -136,6 +136,7 @@ export interface ScenarioSummary {
   summary: string
   configOnly?: boolean
   open?: boolean // a blank canvas with requirements; the load is hidden and there is no solution to show
+  concepts?: string[] // the ideas it practises (see model/skills.ts)
 }
 
 export interface Scenario extends ScenarioSummary {

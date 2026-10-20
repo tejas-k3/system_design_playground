@@ -32,6 +32,7 @@ export function ScenarioPicker() {
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <h2>Challenges</h2>
+          <button onClick={() => setUi({ picker: false, skills: true })}>Skill map</button>
           <button className="x" autoFocus onClick={() => setUi({ picker: false })} aria-label="Close">×</button>
         </header>
         <p className="muted small">Each challenge starts with a broken system. Change it until it meets the goals. Earn up to three stars. <em>config only</em> means {CONFIG_ONLY_HELP.charAt(0).toLowerCase() + CONFIG_ONLY_HELP.slice(1)}</p>

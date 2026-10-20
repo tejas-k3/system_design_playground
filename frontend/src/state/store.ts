@@ -54,7 +54,7 @@ export interface State {
   cost: number | null // null until the server has priced the current diagram
   scenario: ScenarioState | null
   sandbox: Diagram | null // sandbox saved while a scenario is open
-  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; search: boolean; templates: boolean; compare: boolean; question: string | null; present: boolean }
+  ui: { library: boolean; help: boolean; welcome: boolean; picker: boolean; inspector: boolean; result: boolean; capacity: boolean; search: boolean; templates: boolean; skills: boolean; compare: boolean; question: string | null; present: boolean }
   toasts: Toast[]
   connection: Connection
   past: Diagram[]
@@ -178,7 +178,7 @@ export const useStore = create<State>()((set, get) => {
     cost: null,
     scenario: null,
     sandbox: null,
-    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, search: false, templates: false, compare: false, question: null, present: false },
+    ui: { library: !isNarrow(), help: false, welcome: true, picker: false, inspector: !isCompact(), result: false, capacity: false, search: false, templates: false, skills: false, compare: false, question: null, present: false },
     toasts: [],
     connection: 'connecting',
     past: [],

@@ -9,6 +9,7 @@ import { CompareDialog } from './ui/CompareDialog'
 import { CapacityDialog } from './ui/CapacityDialog'
 import { SearchDialog } from './ui/SearchDialog'
 import { TemplatesDialog } from './ui/TemplatesDialog'
+import { SkillMap } from './ui/SkillMap'
 import { Inspector } from './ui/Inspector'
 import { Help } from './ui/Help'
 import { Library } from './ui/Library'
@@ -82,6 +83,7 @@ export function App() {
       <CapacityDialog />
       <SearchDialog />
       <TemplatesDialog />
+      <SkillMap />
       <CompareDialog />
       <QuestionDialog />
       <Toasts />
