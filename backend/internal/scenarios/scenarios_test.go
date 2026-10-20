@@ -172,6 +172,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("a 2 s spread is still a spike: %+v", res.Checks)
 		}
 	})
+	t.Run("hot-cell: more servers and retries do not pass, spreading by request does", func(t *testing.T) {
+		sc := Get("hot-cell")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "threads", 64.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("more app threads do not unload the hot shard: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "users", "retries", 2.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("retries add to the hot shard: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

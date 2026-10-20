@@ -207,7 +207,11 @@ func (s *Sim) resolveTarget(e *edge, c *call, cm cmd) (*node, float64, *edge) {
 	if len(cand) == 0 {
 		return nil, 0, nil
 	}
-	x := cand[int(Hash32(uint32(c.key)+0x9e3779b9)%uint32(len(cand)))]
+	h := uint32(c.key) + 0x9e3779b9
+	if t.s("shardBy") == "request" {
+		h = c.hash*2654435761 + 0x9e3779b9 // by whoever sent it: one hot key no longer lands on one shard
+	}
+	x := cand[int(Hash32(h)%uint32(len(cand)))]
 	t.c.arr++
 	t.c.ok++
 	return x.to, e.latency + x.latency + 0.2, x

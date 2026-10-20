@@ -388,8 +388,11 @@ func init() {
 			Kind: KShardRouter, Name: "Shard Router", Description: "Splits data across several databases by key.",
 			Lesson: "Sharding multiplies capacity but makes cross-shard work hard.",
 			Accent: "#5f3dc4", Width: 160, Height: 72, CanConnect: []string{KDatabase, KRedis},
-			Params: nil,
-			cost:   func(Params) float64 { return 0.02 },
+			Params: []ParamSpec{
+				sel("shardBy", "Shard by", "Routing", "key", "What decides which shard gets a request. The key keeps one item (or one map cell) on one shard, so a hot one overloads it. Spreading by the request evens the load, but then a read of one key would have to ask every shard, which is not modelled here.",
+					opt("key", "The item's key (cell, row)"), opt("request", "The request itself (spread evenly)")).adv(),
+			},
+			cost: func(Params) float64 { return 0.02 },
 		},
 		{
 			Kind: KExternalAPI, Name: "External API", Description: "A third-party service you do not control.",
@@ -439,6 +442,7 @@ func init() {
 			Params: []ParamSpec{
 				sel("persistence", "Persistence", "Durability", "none", "What a crash loses. None: every write since it started. Append-only file: at most the last second.", opt("none", "None (memory only)"), opt("aof", "Append-only file")),
 				num("geoSearchMs", "Geo search time", "Speed", 0.4, 0.05, 20, 0.05, "ms", "Time for one nearby search."),
+				num("scoreMs", "Update time", "Speed", 0.1, 0.05, 20, 0.05, "ms", "Time for one write (a score change or a location ping). One thread, so this sets how many writes a second one instance can take.").adv(),
 				num("queueCap", "Queue size", "Capacity", 2000, 0, 20000, 100, "", "Commands that may wait."),
 			},
 			cost: func(Params) float64 { return 0.08 },
