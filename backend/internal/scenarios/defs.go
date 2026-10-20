@@ -1206,6 +1206,36 @@ func init() {
 		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
 	})
 
+	// Retry storm: a five-second slowdown that never ends, because the clients' retries keep the database saturated
+	retryStorm := func(fixed bool) engine.Diagram {
+		budget := 0.0
+		if fixed {
+			budget = 10
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 250.0, "readPct": 0.0, "timeoutMs": 400.0, "retries": 3.0, "backoff": "none", "retryBudgetPct": budget}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 128.0, "queueCap": 2000.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "writeMs": 40.0, "queueCap": 2000.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "retry-storm", Title: "The retry storm", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "A five-second blip, and the site never recovers.",
+		Story:   "The database slows down for five seconds. Each client gives up after 400 ms and tries again, up to three more times, immediately. By the time the database is healthy again it is buried under the retries of requests that timed out, which time out in turn and are retried again. Fifty seconds later it is still down.",
+		Diagram: retryStorm(false), Solution: retryStorm(true),
+		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 10, Factor: 3, DurationSec: 5}},
+		Goals:       engine.Goals{MinSuccessRate: 0.7, MaxP95Ms: f(400), MaxCostPerHour: f(2.7), StarCostPerHour: f(2.5), StarP95Ms: f(300)},
+		DurationSec: 60, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Look at the success rate over time: it drops during the blip and then stays down long after the database is healthy. What is still arriving?",
+			"Every timeout becomes up to three more requests, so the load is several times what the users really send. The database cannot ever catch up.",
+			"Limit the damage retries can do: give the users a retry budget (advanced settings), or reduce the retries. A retry budget keeps retrying cheap failures but stops a storm.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Why does adding exponential backoff to the retries not fix it here?", Options: []string{"It does: backoff always prevents storms", "The load is still several times the real traffic when the backoff delays are short compared with the timeouts", "Backoff makes the database slower"}, Answer: 1,
+			Explain: "Backoff spreads retries out but does not reduce how many there are. A cap on the total (a budget) is what keeps the extra load bounded."}},
+		Debrief: "Retries multiply load exactly when a dependency is weakest. Keep them bounded: a retry budget as a share of normal traffic, backoff with jitter, and a limit on attempts. Without that, a short blip turns into a long outage.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).

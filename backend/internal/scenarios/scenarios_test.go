@@ -64,6 +64,17 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("retry-storm: no retries also recovers, a single retry does not", func(t *testing.T) {
+		sc := Get("retry-storm")
+		none := withParam(sc.Diagram, "users", "retries", 0.0)
+		if res := engine.RunToEnd(none, sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("no retries should recover: %+v", res.Checks)
+		}
+		one := withParam(sc.Diagram, "users", "retries", 1.0)
+		if res := engine.RunToEnd(one, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("one immediate retry is still a storm: %+v", res.Checks)
+		}
+	})
 	t.Run("zone-outage: spreading only the servers is not enough", func(t *testing.T) {
 		sc := Get("zone-outage")
 		d := sc.Diagram
