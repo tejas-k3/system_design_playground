@@ -1,4 +1,4 @@
-import type { BuildResult, ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { Alternative, BuildResult, ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -16,6 +16,7 @@ async function json<T>(res: Response): Promise<T> {
 export const fetchRegistry = () => fetch('/api/registry').then((r) => json<Registry>(r))
 export const fetchScenarios = () => fetch('/api/scenarios').then((r) => json<ScenarioSummary[]>(r))
 export const fetchScenario = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}`).then((r) => json<Scenario>(r))
+export const fetchAlternatives = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/alternatives`).then((r) => json<Alternative[]>(r))
 export const fetchSolution = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/solution`).then((r) => json<Diagram>(r))
 
 /** Store a diagram on the server and return the id that opens it. */
