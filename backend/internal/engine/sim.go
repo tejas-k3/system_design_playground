@@ -188,6 +188,7 @@ func (n *node) b(k string) bool    { v, _ := n.p[k].(bool); return v }
 
 type edge struct {
 	id        string
+	bulk      int    // calls in flight over this connection, for the caller's bulkhead
 	subJobs   []*job // topic subscription: deliveries waiting for this edge's worker
 	subHead   int
 	downReq   bool // linkDown: requests on this connection are held until it heals

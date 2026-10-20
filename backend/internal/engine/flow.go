@@ -234,6 +234,10 @@ func (s *Sim) callDown(from *node, e *edge, c *call, cm cmd, cb func(Result)) {
 		return
 	}
 	app := from.kind == KAppServer
+	bulkLimit := 0
+	if app {
+		bulkLimit = int(from.f("bulkheadThreads"))
+	}
 	useBreaker := app && from.b("circuitBreaker")
 	if useBreaker {
 		switch s.breakerState(e) {
@@ -248,12 +252,22 @@ func (s *Sim) callDown(from *node, e *edge, c *call, cm cmd, cb func(Result)) {
 			e.trial = true
 		}
 	}
+	if bulkLimit > 0 {
+		if e.bulk >= bulkLimit { // this dependency already holds as many threads as it may
+			cb(fail(RBulkheadFull))
+			return
+		}
+		e.bulk++
+	}
 	settled := false
 	finish := func(res Result) {
 		if settled {
 			return
 		}
 		settled = true
+		if bulkLimit > 0 {
+			e.bulk--
+		}
 		if useBreaker {
 			s.breakerResult(e, res.OK || res.Reason == RLockBusy)
 		}
