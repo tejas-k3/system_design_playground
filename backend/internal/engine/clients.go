@@ -55,6 +55,10 @@ func (s *Sim) startClient(n *node) {
 		s.startCrowd(n, n.arrivalGen)
 		return
 	}
+	if n.s("arrival") == "sessions" {
+		s.startSessions(n, n.arrivalGen)
+		return
+	}
 	s.nextArrival(n, n.arrivalGen)
 }
 
@@ -137,6 +141,8 @@ type logical struct {
 	heavy     bool // an expensive request (heavyPct), chosen from the request number
 	high      bool // an urgent request (priorityPct): chosen from the request number, no random draw
 	tr        *tracer
+	connect   bool // opens a long-lived connection (sessions arrival)
+	sess      *session
 	after     func() // called once, when the request is resolved (closed-loop users think, then ask again)
 }
 

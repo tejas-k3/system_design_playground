@@ -28,6 +28,7 @@ const (
 type counters struct {
 	arr, ok, err, qfull, adm             int
 	hit, miss, evict, expired, localHit  int
+	connects                             int
 	lockBusy, conflict, stale, dup, done int
 	reason                               [NumReasons]int
 }
@@ -42,6 +43,7 @@ func (c *counters) add(o *counters) {
 	c.miss += o.miss
 	c.evict += o.evict
 	c.localHit += o.localHit
+	c.connects += o.connects
 	c.expired += o.expired
 	c.lockBusy += o.lockBusy
 	c.conflict += o.conflict
@@ -96,6 +98,8 @@ type job struct {
 }
 
 type node struct {
+	sessConns       int // long-lived connections held open (sessions arrival)
+	sessions        map[*session]bool
 	id, kind, label string
 	x, y            float64
 	p               Params
@@ -416,7 +420,8 @@ func (s *Sim) tick() {
 		s.autoscale(n)
 		if n.kind == KAppServer && !n.down && n.f("memLimitMB") > 0 {
 			held := float64(n.busy+len(n.q)-n.qh) / float64(s.instancesOf(n))
-			if n.f("memBaseMB")+n.f("memPerReqMB")*held > n.f("memLimitMB") {
+			conns := float64(n.sessConns) / float64(s.instancesOf(n)) * n.f("memPerConnKB") / 1024
+			if n.f("memBaseMB")+n.f("memPerReqMB")*held+conns > n.f("memLimitMB") {
 				s.logEvent("oom", n, 0)
 				s.CrashNode(n.id, n.f("memRestartSec"))
 			}
