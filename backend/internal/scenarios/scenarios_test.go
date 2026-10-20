@@ -154,6 +154,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("removing the unused indexes should score at least as well as buying IOPS: %d vs %d stars", res.Stars, ref.Stars)
 		}
 	})
+	t.Run("one-heavy-query: a few more threads are not enough, 64 are, and a retry does not help", func(t *testing.T) {
+		sc := Get("one-heavy-query")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "threads", 20.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("20 threads still leave the light requests queueing: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "users", "retries", 2.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("retries add load to a saturated server: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

@@ -981,6 +981,35 @@ func init() {
 		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
 	})
 
+	// A few expensive requests hold every thread: head-of-line blocking. Config only: give the server more threads.
+	oneHeavy := func(fixed bool) engine.Diagram {
+		threads := 16.0
+		if fixed {
+			threads = 64
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 250.0, "readPct": 100.0, "heavyPct": 5.0, "heavyMult": 40.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": threads, "cpuMs": 20.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 64.0, "readMs": 2.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "one-heavy-query", Title: "One heavy query", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "One request in twenty is expensive, and everyone suffers.",
+		Story:   "A search page answers in 20 ms, except that one request in twenty runs a report that takes 800 ms of server time. The server has 16 threads. Most requests are light, yet the whole site goes slow in waves and some time out.",
+		Diagram: oneHeavy(false), Solution: oneHeavy(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(4), StarCostPerHour: f(3.5), StarP95Ms: f(200)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Work out the threads' budget: the heavy requests are 5% of 250 a second, each holding a thread for 800 ms. How many threads is that on average?",
+			"12 requests a second x 0.8 s is about 10 threads busy with heavy work alone, out of 16, so the 238 light requests a second have almost nothing left and queue behind them.",
+			"Give the server enough threads that the heavy requests cannot take them all. The inspector shows p95 for light and heavy requests separately.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "The heavy requests are 5% of traffic. Their effect on the light ones is…", Options: []string{"About 5% slower", "Far worse than 5%: they hold threads the light ones need", "None, they are separate requests"}, Answer: 1,
+			Explain: "Every request shares the same threads. A few long requests occupy a large share of thread-time, so the quick ones wait behind them."}},
+		Debrief: "Throughput is not the only budget: a small share of expensive requests can take most of the worker time and make the cheap majority slow. Look at latency by request type, and keep heavy work from sharing the pool the light work needs.",
+	})
+
 	// Write skew: each doctor leaves after checking the other is still on call. Config only: raise the isolation level.
 	onCall := func(fixed bool) engine.Diagram {
 		iso := "readCommitted"
