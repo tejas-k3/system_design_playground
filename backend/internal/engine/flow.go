@@ -780,6 +780,9 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 // admit decides whether a rate limiter lets a request through: one allowance for everything, or (keyBy user) one
 // per account, so that a heavy account runs out without anyone else noticing.
 func (s *Sim) admit(n *node, c *call) bool {
+	if algo := n.s("algorithm"); algo != "tokenBucket" && algo != "" {
+		return s.admitWindow(n, c, algo)
+	}
 	if n.s("keyBy") != "user" || c.user == 0 {
 		return s.takeToken(n)
 	}
@@ -798,6 +801,64 @@ func (s *Sim) admit(n *node, c *call) bool {
 	}
 	b.tokens--
 	return true
+}
+
+// admitWindow is the window-counting family of rate limiters. The limit per window is the sustained rate times the
+// window length. Fixed window resets its count at each edge; the sliding log keeps the time of every admitted request
+// and forgets those older than a window; the sliding counter estimates the last window as the previous window's count
+// weighted by how much of it still overlaps.
+func (s *Sim) admitWindow(n *node, c *call, algo string) bool {
+	win := n.f("windowSec") * 1000
+	aligned := math.Floor(s.now/win) * win // windows are aligned to the clock, as in a real limiter
+	var b *bucket
+	if n.s("keyBy") == "user" && c.user != 0 {
+		if n.buckets == nil {
+			n.buckets = map[int]*bucket{}
+		}
+		if b = n.buckets[c.user]; b == nil {
+			b = &bucket{winStart: aligned}
+			n.buckets[c.user] = b
+		}
+	} else {
+		if n.global == nil {
+			n.global = &bucket{winStart: aligned}
+		}
+		b = n.global
+	}
+	limit := n.f("limitRps") * n.f("windowSec")
+	switch algo {
+	case "slidingWindowLog":
+		cut := s.now - win
+		i := 0
+		for i < len(b.log) && b.log[i] <= cut {
+			i++
+		}
+		b.log = b.log[i:]
+		if float64(len(b.log)) >= limit {
+			return false
+		}
+		b.log = append(b.log, s.now)
+		return true
+	default: // fixedWindow and slidingWindowCounter share the window bookkeeping
+		for s.now-b.winStart >= win {
+			if s.now-b.winStart >= 2*win {
+				b.prev, b.count = 0, 0 // idle for a whole window: nothing left to weigh
+				b.winStart = s.now - math.Mod(s.now-b.winStart, win)
+				break
+			}
+			b.prev, b.count = b.count, 0
+			b.winStart += win
+		}
+		used := b.count
+		if algo == "slidingWindowCounter" {
+			used += b.prev * (1 - (s.now-b.winStart)/win)
+		}
+		if used >= limit {
+			return false
+		}
+		b.count++
+		return true
+	}
 }
 
 func (s *Sim) takeToken(n *node) bool {
