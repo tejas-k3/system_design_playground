@@ -4,6 +4,8 @@ import (
 	"os"
 	"regexp"
 	"testing"
+
+	"sysdesign/internal/engine"
 )
 
 // The challenge texts may mention glossary terms as {{id}}. An id that the frontend glossary does not define would
@@ -36,6 +38,21 @@ func TestGlossaryMarkupNamesRealTerms(t *testing.T) {
 		for _, h := range sc.Hints {
 			check(sc.ID+" hint", h)
 		}
+	}
+	// the setting help shown in the inspector may use the markup too
+	inspector := 0
+	for _, sp := range engine.Specs() {
+		for _, pr := range sp.Params {
+			for _, m := range re.FindAllStringSubmatch(pr.Help, -1) {
+				inspector++
+				if !known[m[1]] {
+					t.Errorf("%s.%s help: {{%s}} is not a glossary term", sp.Kind, pr.Key, m[1])
+				}
+			}
+		}
+	}
+	if inspector < 6 {
+		t.Errorf("only %d glossary terms in the inspector help", inspector)
 	}
 	if used == 0 {
 		t.Errorf("no challenge text uses the glossary markup")
