@@ -267,6 +267,7 @@ type Sim struct {
 	sharedLimit                                    *node // the first limiter that shares its count: its bucket is everyone's
 	runCustOK, runCustTotal                        int   // requests of clients that are not bots (only counted when a bot exists)
 	hasAbuse                                       bool
+	lightHist, heavyHist                           Hist // latencies of light and heavy requests when the users mix both
 	jobHist, jobHistHigh                           Hist
 	hasQueue, hasBooking, hasFresh                 bool
 
