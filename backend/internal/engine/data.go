@@ -660,7 +660,9 @@ func (s *Sim) procRedis(n *node, c *call, cb func(Result), release func()) {
 	switch c.cmd {
 	case cmdGeo:
 		ms = n.f("geoSearchMs")
-	case cmdRank, cmdScore:
+	case cmdScore:
+		ms = n.f("scoreMs")
+	case cmdRank:
 		ms = 0.1
 	default:
 		ms = 0.05

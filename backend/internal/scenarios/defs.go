@@ -1163,6 +1163,40 @@ func init() {
 		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the throughput you will need, since changing it later also changes how keys map to partitions.",
 	})
 
+	// Hot cell: location pings from one busy city all land on the shard that owns that map cell
+	hotCell := func(fixed bool) engine.Diagram {
+		by := "key"
+		if fixed {
+			by = "request"
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 500.0, "workload": "geo", "readPct": 0.0, "keySpace": 400.0, "keyDist": "uniform", "hotKeyPct": 70.0, "timeoutMs": 1000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 2000.0, "dbPool": 200.0}).
+			n("shards", engine.KShardRouter, cols[2], rowMid, P{"shardBy": by}).
+			e("users", "app").e("app", "shards")
+		for k := 0; k < 4; k++ {
+			id := fmt.Sprintf("r%d", k+1)
+			b.n(id, engine.KRedis, cols[3], float64(k)*100+30, P{"scoreMs": 4.0}).e("shards", id)
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "hot-cell", Title: "The hot cell", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Four shards, and one of them is on fire.",
+		Story:   "A ride-sharing app stores driver locations in four shards, split by map cell. Most pings come from the one busy city centre, so the shard that owns that cell takes most of the load while the other three idle. Adding shards was already tried: the hot cell stays on a single one.",
+		Diagram: hotCell(false), Solution: hotCell(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.5), StarCostPerHour: f(1.3), StarP95Ms: f(200)},
+		DurationSec: 30, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Compare the four shards in the inspector: is the load even?",
+			"Each shard can take about 250 updates a second (4 ms each). The shard that owns the busy cell is asked for roughly three quarters of 500 a second.",
+			"Change how the shard router chooses a shard: by the request itself rather than the cell, so the busy cell is spread over all four. (A real system pays for that on reads, which then have to ask every shard.)",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth and sixth shard, still split by cell, will…", Options: []string{"Fix the hot shard", "Leave the hot cell on one shard, so nothing improves", "Make it worse"}, Answer: 1,
+			Explain: "One cell maps to one shard however many shards there are. A hot key cannot be spread by adding more partitions of the same key."}},
+		Debrief: "Partitioning by a key that is itself skewed concentrates the skew. Spread hot keys (by sender, by a suffix, or by splitting the cell), and remember the price: reads of one key must then query every shard.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
