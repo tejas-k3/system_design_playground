@@ -234,6 +234,9 @@ export interface RunStats {
   fanoutWrites?: number // timeline inserts caused by posts (feed workload)
   fanoutReads?: number // followed authors read to build timelines
   hedged?: number // second queries sent because a shard was slow
+  highOk?: number // urgent requests that succeeded
+  highTotal?: number // urgent requests resolved
+  deadlineSkipped?: number // requests skipped in a queue because their client had already given up
   partial?: number // answers sent with fewer shards than required
   lostUpdates?: number // transfers that silently overwrote a concurrent commit (read committed)
   txAborts?: number // transactions aborted by a write conflict or as a deadlock victim
