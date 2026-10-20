@@ -19,6 +19,7 @@ const (
 	KIndex        = "index"
 	KTopic        = "topic"
 	KLog          = "log"
+	KKVStore      = "kvStore"
 )
 
 // Params holds user-editable settings: numbers, strings (select) and booleans.
@@ -92,19 +93,20 @@ const (
 	RBulkheadFull
 	RDeadline
 	RShed
+	RQuorum
 	NumReasons
 )
 
 var reasonNames = [NumReasons]string{
 	"timeout", "queueFull", "nodeDown", "noRoute", "noBackend", "rateLimited",
 	"callTimeout", "circuitOpen", "dependencyError", "lockBusy", "queueTimeout", "connRefused",
-	"noPrimary", "syncReplica", "messageTooLarge", "connLost", "txAborted", "poisonJob", "badRelease", "bulkheadFull", "deadlinePassed", "shed",
+	"noPrimary", "syncReplica", "messageTooLarge", "connLost", "txAborted", "poisonJob", "badRelease", "bulkheadFull", "deadlinePassed", "shed", "quorum",
 }
 
 var reasonLabels = [NumReasons]string{
 	"Timeouts", "Queue full (503)", "Node down", "No route", "No healthy backend", "Rate limited (429)",
 	"Call timeouts (504)", "Circuit open", "Vendor errors", "Lock busy", "Waited too long in queue", "DB connections refused",
-	"No primary: failing over", "Sync replica unreachable", "Message too large", "Connection lost", "Transaction aborted", "Poison job", "Bad release (5xx)", "Bulkhead full", "Deadline passed (skipped)", "Shed (load too high)",
+	"No primary: failing over", "Sync replica unreachable", "Message too large", "Connection lost", "Transaction aborted", "Poison job", "Bad release (5xx)", "Bulkhead full", "Deadline passed (skipped)", "Shed (load too high)", "Not enough copies for a quorum",
 }
 
 // ReasonInfo names a failure reason for clients: a stable id and a human label.
@@ -131,7 +133,7 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart
+	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster)
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`

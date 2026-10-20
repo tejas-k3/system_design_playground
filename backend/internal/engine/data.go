@@ -51,6 +51,9 @@ func (s *Sim) primaryEdge(n *node) *edge {
 			}
 			return e
 		}
+		if e.to.kind == KKVStore {
+			return e
+		}
 		if e.to.kind == KShardRouter && hasChild(e.to, KDatabase) {
 			return e
 		}

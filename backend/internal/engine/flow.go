@@ -915,6 +915,8 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 		s.procDB(n, c, cb, release)
 	case KRedis:
 		s.procRedis(n, c, cb, release)
+	case KKVStore:
+		s.procKV(n, c, cb, release)
 	case KIndex:
 		s.hold(n, s.service(n, n.f("queryMs"))*n.slow, release, cb, func() {
 			release()

@@ -58,6 +58,11 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 	case "crash":
 		s.CrashNode(t.id, ev.DownSec)
 		return
+	case "kvNodeDown":
+		if t.kind == KKVStore {
+			s.kvNodesDown(t, int(ev.Factor), ev.DurationSec*1000)
+		}
+		return
 	case "partition":
 		s.partition(t, ev.DurationSec)
 		return

@@ -98,8 +98,11 @@ type job struct {
 }
 
 type node struct {
-	hashRing        *ring    // consistent-hashing ring of a shard router
-	assign          []string // where a sample of keys goes now (shard router), to measure how many move on a change
+	kvFree          [][]float64   // quorum store: when each slot of each cluster node is next free
+	kvVer           []map[int]int // quorum store: the version of each key each cluster node holds
+	kvDownUntil     []float64     // quorum store: when each cluster node comes back (0 = up)
+	hashRing        *ring         // consistent-hashing ring of a shard router
+	assign          []string      // where a sample of keys goes now (shard router), to measure how many move on a change
 	shardCount      int
 	keysMoved       float64 // share of the sample that moved at the last change of the children
 	reshards        int
