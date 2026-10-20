@@ -11,6 +11,7 @@ import { fetchRegistry } from './api/client'
 import { Reg } from './model/diagram'
 import { startBridge } from './sim/bridge'
 import { startPersistence } from './state/persist'
+import { startDailyWatch } from './state/dailyWatch'
 import { useStore } from './state/store'
 import './styles.css'
 
@@ -20,6 +21,7 @@ async function boot() {
     const reg = new Reg(await fetchRegistry())
     useStore.getState().setReg(reg)
     startPersistence(reg)
+    startDailyWatch()
     startBridge()
     root.render(
       <StrictMode>
