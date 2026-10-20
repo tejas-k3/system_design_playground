@@ -172,7 +172,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog, KKVStore},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				sel("version", "Release version", "Release", "v1", "Which release this server runs. A load balancer with a canary share sends that share of traffic to v2; a bad-release event can be aimed at one version.", opt("v1", "v1 (current)"), opt("v2", "v2 (new)")).adv(),
@@ -425,6 +425,22 @@ func init() {
 				num("storagePerGBMonth", "Storage price", "Cost", 0.023, 0, 1, 0.001, "$/GB-mo", "Price of keeping one GB for a month.").adv(),
 			},
 			cost: func(Params) float64 { return 0.03 },
+		},
+		{
+			Kind: KKVStore, Name: "Key-Value Store", Description: "A cluster of nodes that keeps several copies of every key and answers when enough of them agree.",
+			Lesson: "Writes wait for W copies and reads for R: if R + W is more than the number of copies, a read always meets the latest write.",
+			Accent: "#9c36b5", Width: 160, Height: 72, CanConnect: nil,
+			Params: []ParamSpec{
+				num("nodes", "Nodes", "Cluster", 5, 1, 64, 1, "", "How many machines are in the cluster. Keys are spread over them."),
+				num("replicas", "Copies (N)", "Cluster", 3, 1, 7, 1, "", "How many nodes hold a copy of each key."),
+				num("readQuorum", "Read quorum (R)", "Consistency", 2, 1, 7, 1, "", "A read is answered once this many copies have replied, with the newest version among them."),
+				num("writeQuorum", "Write quorum (W)", "Consistency", 2, 1, 7, 1, "", "A write is acknowledged once this many copies have it. With R + W above N, every read overlaps the latest write."),
+				num("readMs", "Read time", "Speed", 3, 0.1, 500, 0.5, "ms", "Time one node takes to read a key."),
+				num("writeMs", "Write time", "Speed", 5, 0.1, 500, 0.5, "ms", "Time one node takes to store a key."),
+				num("concurrency", "Requests per node", "Capacity", 8, 1, 1024, 1, "", "How many requests one node works on at once; the rest wait.").adv(),
+				variability("Speed"),
+			},
+			cost: func(p Params) float64 { return 0.1 * pf(p, "nodes", 5) },
 		},
 		{
 			Kind: KIndex, Name: "Search Shard", Description: "One slice of a search index. A query has to ask every slice.",

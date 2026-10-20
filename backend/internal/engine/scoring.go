@@ -75,7 +75,7 @@ func Unwired(d Diagram) []Node {
 	}
 	isData := func(k string) bool {
 		switch k {
-		case KDatabase, KReplica, KCache, KRedis, KQueue, KShardRouter, KObjectStore, KIndex, KTopic, KLog:
+		case KDatabase, KReplica, KCache, KRedis, KQueue, KShardRouter, KObjectStore, KIndex, KTopic, KLog, KKVStore:
 			return true
 		}
 		return false
