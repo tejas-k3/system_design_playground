@@ -27,7 +27,7 @@ const (
 
 type counters struct {
 	arr, ok, err, qfull, adm             int
-	hit, miss, evict, expired            int
+	hit, miss, evict, expired, localHit  int
 	lockBusy, conflict, stale, dup, done int
 	reason                               [NumReasons]int
 }
@@ -41,6 +41,7 @@ func (c *counters) add(o *counters) {
 	c.hit += o.hit
 	c.miss += o.miss
 	c.evict += o.evict
+	c.localHit += o.localHit
 	c.expired += o.expired
 	c.lockBusy += o.lockBusy
 	c.conflict += o.conflict
@@ -145,6 +146,7 @@ type node struct {
 	// cache / cdn
 	store    *Store
 	storePol string
+	local    *Store                 // hot-key local cache on an app server
 	fetching map[int][]func(Result) // cache: waiters sharing an in-flight miss fetch, by key (coalescing)
 
 	// rate limiter

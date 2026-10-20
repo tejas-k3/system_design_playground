@@ -195,6 +195,9 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if sum.localHit > 0 {
+			ex["localHitRps"] = float64(sum.localHit) / span
+		}
 		if sum.evict > 0 {
 			ex["evictRps"] = float64(sum.evict) / span
 		}
