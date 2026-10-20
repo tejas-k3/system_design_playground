@@ -605,6 +605,10 @@ func (s *Sim) submit(n *node, c *call, cb func(Result), run func(release func())
 		run(s.releaser(n))
 		return
 	}
+	if shed := n.f("shedAboveQueueMs"); shed > 0 && n.kind == KAppServer && !c.high && n.qh < len(n.q) && s.now-n.q[n.qh].enq > shed {
+		s.failAt(n, RShed, cb) // the oldest request has waited too long: ordinary newcomers are turned away
+		return
+	}
 	if len(n.q)-n.qh < s.queueCap(n) {
 		n.q = append(n.q, &task{c: c, cb: cb, run: run, enq: s.now})
 		return

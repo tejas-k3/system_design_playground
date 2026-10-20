@@ -258,6 +258,7 @@ type Sim struct {
 	jobDead, jobRedelivered                        int
 	jobOrderViolations, logSeq                     int
 	runDeadlineSkipped                             int
+	runHighOK, runHighTotal                        int
 	jobHist, jobHistHigh                           Hist
 	hasQueue, hasBooking, hasFresh                 bool
 
