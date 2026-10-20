@@ -1,0 +1,64 @@
+// Plain-language definitions of the terms the challenges and the metric tiles use. Authoring text can mention a term as
+// {{p95}}; the interface turns that into a focusable word with the definition attached (see ui/Term.tsx).
+
+export interface GlossaryTerm {
+  id: string
+  name: string
+  short: string // one sentence, shown in the tooltip
+  long: string // a fuller explanation
+  challenge?: string // a challenge id where it matters
+}
+
+export const GLOSSARY: GlossaryTerm[] = [
+  { id: 'p50', name: 'p50 (median)', short: 'Half of the requests were faster than this, half slower.', long: 'The typical request. It hides the slow ones: a system can have a fine median and still make one user in twenty wait.' },
+  { id: 'p95', name: 'p95', short: 'Nineteen requests in twenty were faster than this.', long: 'The latency that the slowest five percent of requests exceed. It is where queueing, retries and pauses show up first, which is why goals are usually set on it.', challenge: 'gc-storm' },
+  { id: 'p99', name: 'p99', short: 'Ninety-nine requests in a hundred were faster than this.', long: 'The far tail. A page that makes many calls meets the p99 of each one more often than you would expect, so tails of a dependency become typical for the user.', challenge: 'search-tail' },
+  { id: 'throughput', name: 'Throughput', short: 'How many requests are completed each second.', long: 'Not the same as the offered load: when a system saturates, the load keeps arriving but throughput stops rising, and the difference piles up as waiting.', challenge: 'opening-night' },
+  { id: 'utilisation', name: 'Utilisation', short: 'The share of the time a resource is busy.', long: 'Busy time over total time. Waiting grows slowly at first and then steeply as it nears 100%, so a server at 90% is already in trouble.', challenge: 'opening-night' },
+  { id: 'littles-law', name: "Little's law", short: 'Requests in the system = arrival rate x time each spends there.', long: 'It holds for any stable system. With 200 requests a second that each stay 50 ms, about 10 are in flight, which is how you size thread and connection pools.', challenge: 'connection-crunch' },
+  { id: 'queueing-knee', name: 'Queueing knee', short: 'The load at which latency stops growing gently and shoots up.', long: 'Below it a request rarely waits; beyond it every arrival finds a queue. Plan to run well below the knee, not at it.', challenge: 'opening-night' },
+  { id: 'thread-pool', name: 'Thread pool', short: 'A fixed number of workers that handle requests one each.', long: 'When all threads are busy (often waiting on a slow dependency) new requests queue or are refused, however idle the CPU is.', challenge: 'opening-night' },
+  { id: 'connection-pool', name: 'Connection pool', short: 'A limited set of open connections shared by requests.', long: 'It protects the database from too many connections, but a pool that is too small makes requests wait for one and a pool that is too big can exceed the database limit.', challenge: 'connection-crunch' },
+  { id: 'circuit-breaker', name: 'Circuit breaker', short: 'Stops calling a failing dependency for a while.', long: 'After several failures in a row it fails fast instead of waiting, then lets one trial call through to see whether the dependency has recovered.', challenge: 'cut-off' },
+  { id: 'retry-storm', name: 'Retry storm', short: 'Retries that add load to a system already struggling.', long: 'Each failure makes clients send more requests, which causes more failures. Limits on retries, backoff and jitter keep the extra load bounded.', challenge: 'retry-storm' },
+  { id: 'metastable-failure', name: 'Metastable failure', short: 'A failure that continues after its cause is gone.', long: 'A trigger (a brief slowdown) starts a feedback loop, such as retries or cold caches, that keeps the system overloaded even once the trigger has ended.', challenge: 'retry-pileup' },
+  { id: 'idempotency', name: 'Idempotency', short: 'Doing the same operation twice has the effect of doing it once.', long: 'It makes retries safe. A client sends a key with the request, and the server applies the first one it sees and ignores repeats.', challenge: 'charged-twice' },
+  { id: 'cache-hit-rate', name: 'Cache hit rate', short: 'The share of lookups answered from the cache.', long: 'It depends on how much of the popular data fits and on what is evicted. The database load is the misses, so a few points of hit rate can change it a lot.', challenge: 'slow-reads' },
+  { id: 'ttl', name: 'TTL (time to live)', short: 'How long a cached item is kept before it expires.', long: 'A short TTL keeps data fresh but misses more; a long one is faster but serves older data. Items that all expire together cause a stampede.', challenge: 'cache-stampede' },
+  { id: 'stampede', name: 'Cache stampede', short: 'Many requests miss at once and all hit the database.', long: 'It happens when a popular item (or many items at once) expires. Spreading the expiry times and letting one request refill the cache for the others both help.', challenge: 'cache-stampede' },
+  { id: 'eviction', name: 'Eviction', short: 'Choosing which cached item to drop when the cache is full.', long: 'LRU drops the least recently used, LFU the least often used, FIFO the oldest. A one-pass scan can flush a popular set out of an LRU cache.', challenge: 'scan-pollution' },
+  { id: 'replication-lag', name: 'Replication lag', short: 'How far a replica is behind the primary.', long: 'A read from a replica may miss a recent write. The lag also sets how much could be lost if the primary fails and the replica takes over.', challenge: 'stale-prices' },
+  { id: 'failover', name: 'Failover', short: 'Switching to a standby when the primary fails.', long: 'It takes time to detect the failure and promote a replica, and writes the replica had not yet received are lost.', challenge: 'primary-dies' },
+  { id: 'split-brain', name: 'Split brain', short: 'Two nodes both believe they are the primary.', long: 'It can follow a failover when the old primary comes back or is only cut off. Both accept writes and the data diverges.', challenge: 'fence-the-old-primary' },
+  { id: 'fencing', name: 'Fencing', short: 'Making sure a deposed primary can no longer write.', long: 'Typically a token or generation number that storage checks, so a stale primary is refused even though it still thinks it is in charge.', challenge: 'fence-the-old-primary' },
+  { id: 'quorum', name: 'Quorum', short: 'A majority of the copies that must agree.', long: 'If reads and writes each touch a majority, every read overlaps the latest write. It trades some latency and availability for consistency.' },
+  { id: 'consistency-levels', name: 'Consistency levels', short: 'How up to date a read is promised to be.', long: 'From eventual (may be stale, fastest) to strong (always the latest, slower and less available). Choose per read by what a stale answer would cost.', challenge: 'stale-prices' },
+  { id: 'sharding', name: 'Sharding', short: 'Splitting data across several databases by key.', long: 'It multiplies capacity, but work that spans shards gets harder, and a skewed key can overload one shard while the rest sit idle.', challenge: 'hot-shard' },
+  { id: 'hot-key', name: 'Hot key', short: 'One item that gets a large share of the requests.', long: 'Adding shards does not help, since the item still lives in one place. It needs copies, a local cache or splitting the item.', challenge: 'hot-shard' },
+  { id: 'backpressure', name: 'Backpressure', short: 'Telling callers to slow down instead of piling up work.', long: 'A bounded queue or a refusal pushes the problem back to the source, instead of letting an unbounded backlog grow until everything is late.', challenge: 'write-flood' },
+  { id: 'load-shedding', name: 'Load shedding', short: 'Deliberately dropping some requests to keep serving the rest.', long: 'Under overload it is better to refuse the least important work quickly than to make everything slow. Priority decides what goes first.', challenge: 'retry-storm' },
+  { id: 'autoscaling', name: 'Autoscaling', short: 'Adding and removing servers to follow the load.', long: 'A new server takes time to start, so a scaler that reacts only once things fail is too late. Start early and keep headroom.', challenge: 'morning-rush' },
+  { id: 'slo', name: 'SLO (service level objective)', short: 'A target for how well the service should do.', long: 'For example "99.9% of requests succeed, p95 under 300 ms". The error budget is how much failure the target still allows.', challenge: 'hello-world' },
+]
+
+const byId = new Map(GLOSSARY.map((t) => [t.id, t]))
+
+export const termById = (id: string): GlossaryTerm | undefined => byId.get(id)
+
+export type Piece = string | { term: GlossaryTerm; text: string }
+
+/** Splits authored text at {{id}} (or {{id|shown words}}). An id that is not in the glossary is left as plain words. */
+export function splitMarkup(text: string): Piece[] {
+  const out: Piece[] = []
+  let last = 0
+  for (const m of text.matchAll(/\{\{([a-z0-9-]+)(?:\|([^}]+))?\}\}/g)) {
+    const start = m.index ?? 0
+    if (start > last) out.push(text.slice(last, start))
+    const term = byId.get(m[1])
+    const shown = m[2] ?? term?.name ?? m[1]
+    out.push(term ? { term, text: shown } : shown)
+    last = start + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
