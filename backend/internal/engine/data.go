@@ -214,9 +214,20 @@ func (s *Sim) appRead(n *node, c *call, done func(Result)) {
 		fetch(done)
 		return
 	}
+	local := s.localStore(n)
+	if local != nil {
+		if ver, hit, _ := local.Get(s.now, c.key); hit {
+			n.c.localHit++
+			done(Result{OK: true, Ver: ver, Hit: true, Done: true, Src: n})
+			return
+		}
+	}
 	ce := s.pickCyclic(n, "cache", caches, nil)
 	s.callCmd(n, ce, c, cmdCacheGet, 0, func(res Result) {
 		if res.OK && res.Done {
+			if local != nil && res.Ver >= 0 {
+				local.Set(s.now, c.key, res.Ver)
+			}
 			done(res)
 			return
 		}
@@ -279,7 +290,24 @@ func (s *Sim) dbWrite(n *node, c *call, done func(Result)) {
 }
 
 // invalidate applies each connected cache's write policy, one after another.
+// localStore is the app server's own small cache for hot items, or nil when the lever is off.
+func (s *Sim) localStore(n *node) *Store {
+	if n.s("hotKeyMode") != "localCache" {
+		n.local = nil
+		return nil
+	}
+	if n.local == nil {
+		n.local = NewStore("lru", 0, 0, s.rng)
+	}
+	n.local.SetCapacity(int(n.f("localCacheItems")))
+	n.local.SetTTL(n.f("localCacheTtlSec") * 1000)
+	return n.local
+}
+
 func (s *Sim) invalidate(n *node, c *call, ver int, then func()) {
+	if n.local != nil {
+		n.local.Delete(c.key)
+	}
 	caches := s.outOf(n, KCache)
 	var step func(i int)
 	step = func(i int) {
