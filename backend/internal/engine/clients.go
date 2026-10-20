@@ -316,6 +316,12 @@ func (s *Sim) resolve(lg *logical, res Result) {
 		cl.c.err++
 		cl.c.reason[res.Reason]++
 	}
+	if lg.counted && s.hasAbuse && !lg.client.b("abuse") { // how the real customers fared, apart from the bots
+		s.runCustTotal++
+		if res.OK {
+			s.runCustOK++
+		}
+	}
 	if lg.counted && lg.high {
 		s.runHighTotal++
 		if res.OK {

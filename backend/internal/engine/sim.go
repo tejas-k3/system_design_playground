@@ -264,6 +264,8 @@ type Sim struct {
 	jobOrderViolations, logSeq                     int
 	runDeadlineSkipped                             int
 	runHighOK, runHighTotal                        int
+	runCustOK, runCustTotal                        int // requests of clients that are not bots (only counted when a bot exists)
+	hasAbuse                                       bool
 	jobHist, jobHistHigh                           Hist
 	hasQueue, hasBooking, hasFresh                 bool
 

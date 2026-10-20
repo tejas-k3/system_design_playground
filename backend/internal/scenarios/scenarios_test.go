@@ -64,6 +64,13 @@ func withParam(d engine.Diagram, id, key string, v any) engine.Diagram {
 }
 
 func TestAlternateSolutions(t *testing.T) {
+	t.Run("bot-flood: a higher shared limit trades one problem for another", func(t *testing.T) {
+		sc := Get("bot-flood")
+		high := withParam(sc.Diagram, "rl", "limitRps", 400.0)
+		if res := engine.RunToEnd(high, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("400 shared requests a second still rejects too many customers: %+v", res.Checks)
+		}
+	})
 	t.Run("retry-storm: no retries also recovers, a single retry does not", func(t *testing.T) {
 		sc := Get("retry-storm")
 		none := withParam(sc.Diagram, "users", "retries", 0.0)

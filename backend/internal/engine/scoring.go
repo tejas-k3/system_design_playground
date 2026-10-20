@@ -7,21 +7,22 @@ import (
 
 // Goals are the pass criteria and star thresholds of a challenge. Pointers mean "not required".
 type Goals struct {
-	MinSuccessRate   float64  `json:"minSuccessRate"`
-	MaxP50Ms         *float64 `json:"maxP50Ms,omitempty"`
-	MaxP95Ms         *float64 `json:"maxP95Ms,omitempty"`
-	MaxCostPerHour   *float64 `json:"maxCostPerHour,omitempty"`
-	MinJobsCompleted *float64 `json:"minJobsCompleted,omitempty"` // fraction 0..1
-	MaxJobP95Ms      *float64 `json:"maxJobP95Ms,omitempty"`
-	MaxConflicts     *int     `json:"maxConflicts,omitempty"`
-	MaxStaleReadPct  *float64 `json:"maxStaleReadPct,omitempty"` // fraction 0..1
-	MaxDuplicates    *int     `json:"maxDuplicates,omitempty"`
-	MaxLostWrites    *int     `json:"maxLostWrites,omitempty"`
-	MaxLostUpdates   *int     `json:"maxLostUpdates,omitempty"` // transfers that silently overwrote each other
-	MaxJobsLost      *int     `json:"maxJobsLost,omitempty"`    // jobs given up with nowhere to go (not dead-lettered)
-	MaxWriteSkew     *int     `json:"maxWriteSkew,omitempty"`   // on-call pairs left with the rule broken
-	StarCostPerHour  *float64 `json:"starCostPerHour,omitempty"`
-	StarP95Ms        *float64 `json:"starP95Ms,omitempty"`
+	MinSuccessRate     float64  `json:"minSuccessRate"`
+	MaxP50Ms           *float64 `json:"maxP50Ms,omitempty"`
+	MaxP95Ms           *float64 `json:"maxP95Ms,omitempty"`
+	MaxCostPerHour     *float64 `json:"maxCostPerHour,omitempty"`
+	MinJobsCompleted   *float64 `json:"minJobsCompleted,omitempty"` // fraction 0..1
+	MaxJobP95Ms        *float64 `json:"maxJobP95Ms,omitempty"`
+	MaxConflicts       *int     `json:"maxConflicts,omitempty"`
+	MaxStaleReadPct    *float64 `json:"maxStaleReadPct,omitempty"` // fraction 0..1
+	MaxDuplicates      *int     `json:"maxDuplicates,omitempty"`
+	MaxLostWrites      *int     `json:"maxLostWrites,omitempty"`
+	MaxLostUpdates     *int     `json:"maxLostUpdates,omitempty"`     // transfers that silently overwrote each other
+	MinCustomerSuccess *float64 `json:"minCustomerSuccess,omitempty"` // share of the real customers' requests that must succeed, bots set aside
+	MaxJobsLost        *int     `json:"maxJobsLost,omitempty"`        // jobs given up with nowhere to go (not dead-lettered)
+	MaxWriteSkew       *int     `json:"maxWriteSkew,omitempty"`       // on-call pairs left with the rule broken
+	StarCostPerHour    *float64 `json:"starCostPerHour,omitempty"`
+	StarP95Ms          *float64 `json:"starP95Ms,omitempty"`
 }
 
 type Check struct {
@@ -171,6 +172,14 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxLostUpdates != nil {
 		checks = append(checks, Check{"Lost updates", fmt.Sprintf("≤ %d", *g.MaxLostUpdates), fmt.Sprint(run.LostUpdates), run.LostUpdates <= *g.MaxLostUpdates})
+	}
+	if g.MinCustomerSuccess != nil {
+		frac, a := 0.0, "no customers"
+		if run.CustomerTotal > 0 {
+			frac = float64(run.CustomerOK) / float64(run.CustomerTotal)
+			a = pct(frac)
+		}
+		checks = append(checks, Check{"Customers served", "≥ " + pct(*g.MinCustomerSuccess), a, run.CustomerTotal > 0 && frac+eps >= *g.MinCustomerSuccess})
 	}
 	if g.MaxJobsLost != nil {
 		lost := 0

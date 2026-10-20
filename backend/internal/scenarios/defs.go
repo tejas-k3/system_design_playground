@@ -1236,6 +1236,38 @@ func init() {
 		Debrief: "Retries multiply load exactly when a dependency is weakest. Keep them bounded: a retry budget as a share of normal traffic, backoff with jitter, and a limit on attempts. Without that, a short blip turns into a long outage.",
 	})
 
+	// Bot flood: a scraper on three accounts, and a limiter that cannot tell it from a customer
+	botFlood := func(fixed bool) engine.Diagram {
+		keyBy, limit, burst := "none", 150.0, 50.0
+		if fixed {
+			keyBy, limit, burst = "user", 5.0, 5.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowTop, P{"rps": 100.0, "readPct": 100.0, "keySpace": 200.0, "keyDist": "zipf", "timeoutMs": 3000.0, "identities": 1000.0}).label("users", "Customers").
+			n("bot", engine.KClient, cols[0], rowBot, P{"rps": 600.0, "readPct": 100.0, "keySpace": 200.0, "keyDist": "zipf", "timeoutMs": 3000.0, "abuse": true, "identities": 3.0}).label("bot", "Scraper").
+			n("rl", engine.KRateLimiter, cols[1], rowMid, P{"limitRps": limit, "burst": burst, "keyBy": keyBy}).
+			n("app", engine.KAppServer, cols[2], rowMid, P{"threads": 64.0, "queueCap": 500.0}).
+			n("cache", engine.KCache, cols[3], rowMid, P{"capacityItems": 1000.0, "ttlSec": 0.0, "startWarm": true}).
+			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 16.0, "readMs": 20.0, "queueCap": 500.0}).
+			e("users", "rl").e("bot", "rl").e("rl", "app").e("app", "cache").e("cache", "db").done()
+	}
+	register(&Scenario{
+		ID: "bot-flood", Title: "The bot flood", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "A scraper is burying the database, and the limiter keeps turning customers away.",
+		Story:   "A scraper asks for item after item nobody has cached, at 600 requests a second from just three accounts, on top of 1,000 customers who send 100 a second between them. The database is saturated. Someone put a rate limiter in front of everything, but it counts all traffic together, so customers are rejected right along with the bot. Only the customers' experience counts here.",
+		Diagram: botFlood(false), Solution: botFlood(true),
+		Goals:       engine.Goals{MinCustomerSuccess: f(0.97), MaxCostPerHour: f(2.8), StarCostPerHour: f(2.6), StarP95Ms: f(300)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Compare how the customers fare with how the scraper fares. The limiter sees only a stream of requests: what does it count?",
+			"The scraper sends 600 requests a second from three accounts; a customer sends about one every ten seconds. One shared allowance cannot tell them apart.",
+			"Make the limiter count per user (advanced settings) and set the allowance to what a customer plausibly needs, a few requests a second.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Why does raising the shared limit not fix it?", Options: []string{"It does", "The database is overloaded again, because the scraper's extra requests also get through", "The customers become slower"}, Answer: 1,
+			Explain: "A shared limit that is high enough for the customers lets most of the bot through too. The two have to be told apart by who they are."}},
+		Debrief: "A global limit protects the system but not the people. Limit per identity so a heavy or abusive account runs out of allowance on its own, and size the per-user rate to legitimate use rather than to total capacity.",
+	})
+
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
