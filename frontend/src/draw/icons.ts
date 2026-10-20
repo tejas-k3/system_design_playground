@@ -158,6 +158,16 @@ const ICONS: Record<string, Draw> = {
       stroke(c, () => c.arc(7, y, 2.2, 0, Math.PI * 2))
     }
   },
+  kvStore: (c) => {
+    // three nodes on a ring, linked
+    for (const [x, y] of [[0, -8], [8, 5], [-8, 5]]) stroke(c, () => c.arc(x, y, 3.2, 0, Math.PI * 2))
+    stroke(c, () => {
+      c.moveTo(0, -4.5)
+      c.lineTo(5.5, 3)
+      c.lineTo(-5.5, 3)
+      c.closePath()
+    })
+  },
   index: (c) => {
     // a magnifier over a slice of lines
     stroke(c, () => c.arc(-2, -2, 7, 0, Math.PI * 2))
