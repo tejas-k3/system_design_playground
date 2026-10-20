@@ -197,6 +197,7 @@ func (s *Sim) Sync(d Diagram) {
 	}
 	s.compact()
 	s.afterTopologyChange()
+	s.noteReshard()
 	for _, n := range s.order {
 		s.startNext(n)
 		s.pumpAll(n)
