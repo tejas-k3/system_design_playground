@@ -619,3 +619,30 @@ func waitSlotsFree(t *testing.T, srv *Server, msg string) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+func TestAlternativesEndpoint(t *testing.T) {
+	ts := newTestServer(t)
+	resp, _ := http.Get(ts.URL + "/api/scenarios/retry-storm/alternatives")
+	var alts []scenarios.Alternative
+	_ = json.NewDecoder(resp.Body).Decode(&alts)
+	if resp.StatusCode != 200 || len(alts) != len(scenarios.Alternatives("retry-storm")) || len(alts) == 0 {
+		t.Fatalf("status %d, %d alternatives", resp.StatusCode, len(alts))
+	}
+	// a challenge with none stored answers with an empty list; an unknown one is a 404
+	resp, _ = http.Get(ts.URL + "/api/scenarios/hello-world/alternatives")
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 || strings.TrimSpace(string(body)) != "[]" {
+		t.Fatalf("hello-world: %d %q", resp.StatusCode, body)
+	}
+	resp, _ = http.Get(ts.URL + "/api/scenarios/nope/alternatives")
+	if resp.StatusCode != 404 {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	// they must not ride along with the scenario itself, which is shown before it is solved
+	resp, _ = http.Get(ts.URL + "/api/scenarios/retry-storm")
+	var raw map[string]json.RawMessage
+	_ = json.NewDecoder(resp.Body).Decode(&raw)
+	if _, leaked := raw["alternatives"]; leaked {
+		t.Fatal("scenario payload carries the alternatives")
+	}
+}
