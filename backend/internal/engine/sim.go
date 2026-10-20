@@ -98,6 +98,11 @@ type job struct {
 }
 
 type node struct {
+	hashRing        *ring    // consistent-hashing ring of a shard router
+	assign          []string // where a sample of keys goes now (shard router), to measure how many move on a change
+	shardCount      int
+	keysMoved       float64 // share of the sample that moved at the last change of the children
+	reshards        int
 	sessConns       int // long-lived connections held open (sessions arrival)
 	sessions        map[*session]bool
 	id, kind, label string
@@ -341,6 +346,7 @@ func New(d Diagram, opts Options) *Sim {
 		s.addEdge(e)
 	}
 	s.afterTopologyChange()
+	s.noteReshard()
 	for _, n := range s.order {
 		if n.kind == KAppServer && n.f("gcPauseMs") > 0 {
 			s.scheduleGC(n)
