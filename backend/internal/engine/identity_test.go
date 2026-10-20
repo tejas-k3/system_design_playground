@@ -65,3 +65,28 @@ func TestIdentitiesAndKeyByOffChangeNothing(t *testing.T) {
 		t.Fatal("identities 0 and keyBy none must change nothing")
 	}
 }
+
+// The score for real customers sets the bots aside: a limiter that drowns them both looks fine on the global success
+// rate (the bot's rejections are the failures) and terrible for the customers.
+func TestCustomerSuccessSetsTheBotsAside(t *testing.T) {
+	global := run(identityDesign("none", 150), Options{Seed: 5}, 40).RunSnapshot()
+	perUser := run(identityDesign("user", 5), Options{Seed: 5}, 40).RunSnapshot()
+	rate := func(r RunStats) float64 { return float64(r.CustomerOK) / float64(r.CustomerTotal) }
+	t.Logf("customers served: global limit %.3f, per-user limit %.3f", rate(global), rate(perUser))
+	if global.CustomerTotal == 0 || rate(global) > 0.4 {
+		t.Fatalf("a 150/s global limit turns most customers away too: %.3f", rate(global))
+	}
+	if rate(perUser) < 0.97 {
+		t.Fatalf("per-user limits leave the customers alone: %.3f", rate(perUser))
+	}
+}
+
+func TestCustomerCountsAreAbsentWithoutABot(t *testing.T) {
+	b := &builder{}
+	b.node("u", KClient, Params{"rps": 50.0, "readPct": 100.0}).node("a", KAppServer, nil).node("db", KDatabase, nil)
+	b.edge("u", "a").edge("a", "db")
+	d, _ := Sanitize(b.d)
+	if r := run(d, Options{Seed: 5}, 10).RunSnapshot(); r.CustomerTotal != 0 || r.CustomerOK != 0 {
+		t.Fatalf("no bot, no customer counters (existing results stay as they were): %+v", r)
+	}
+}

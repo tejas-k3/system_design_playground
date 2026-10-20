@@ -24,6 +24,9 @@ func (s *Sim) addNode(d Node) *node {
 		s.hasQueue = true
 	}
 	if d.Kind == KClient {
+		if n.b("abuse") {
+			s.hasAbuse = true
+		}
 		if n.s("workload") == "booking" {
 			s.hasBooking = true
 		}
