@@ -362,6 +362,9 @@ func init() {
 			Params: []ParamSpec{
 				num("limitRps", "Sustained rate", "Limit", 200, 1, 10000, 10, "rps", "Requests per second allowed through."),
 				num("burst", "Burst", "Limit", 50, 1, 5000, 10, "", "Extra requests allowed in a short burst."),
+				sel("algorithm", "Algorithm", "Limit", "tokenBucket", "Token bucket: a steady refill with a burst allowance. Fixed window: a count that resets at each window edge (a burst on either side of the edge can double the limit). Sliding window log: exact, never more than the limit in any window, remembers every request. Sliding window counter: weights the previous window by how much of it still overlaps (cheap and close).",
+					opt("tokenBucket", "Token bucket"), opt("fixedWindow", "Fixed window"), opt("slidingWindowLog", "Sliding window log"), opt("slidingWindowCounter", "Sliding window counter")).adv(),
+				num("windowSec", "Window", "Limit", 1, 1, 60, 1, "s", "Length of the window for the window algorithms; the limit is the sustained rate times this many seconds.").adv().showIf("algorithm", "fixedWindow", "slidingWindowLog", "slidingWindowCounter"),
 				sel("keyBy", "Limit per", "Limit", "none", "None: one limit for all traffic together. User: each account gets its own allowance (needs the users to have distinct accounts), so a heavy account is throttled without turning others away.",
 					opt("none", "Everyone together"), opt("user", "Each user")).adv(),
 			},

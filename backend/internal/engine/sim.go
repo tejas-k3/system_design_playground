@@ -72,6 +72,10 @@ type redisLock struct {
 // bucket is one account's token bucket in a per-user rate limiter.
 type bucket struct {
 	tokens, at float64
+	winStart   float64   // window algorithms: when the current window began
+	count      float64   // requests admitted in the current window
+	prev       float64   // requests admitted in the previous window
+	log        []float64 // sliding log: the times of admitted requests still inside the window
 }
 
 type job struct {
@@ -101,6 +105,7 @@ type node struct {
 	retryAt         float64
 	idBase          int             // users of this client are numbered from here, so two clients never share an account
 	userKeys        KeySampler      // samples which account sends a request
+	global          *bucket         // the single allowance of a window-based limiter that is not per user
 	buckets         map[int]*bucket // a per-user rate limiter's allowance for each account seen so far
 	badUntil        float64         // a bad release answers every request with an error until then (0 = none)
 	zone            string          // availability zone, kept in step with the 'zone' setting
