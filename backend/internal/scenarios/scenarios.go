@@ -36,6 +36,7 @@ type Scenario struct {
 	Hints       [3]string                        `json:"hints"`
 	Predictions []Prediction                     `json:"predictions,omitempty"`
 	Debrief     string                           `json:"debrief"`
+	Concepts    []string                         `json:"concepts,omitempty"` // ideas it practises, from the fixed Concepts list
 }
 
 // Options returns the engine options for a run of this scenario.
@@ -57,6 +58,7 @@ func register(s *Scenario) {
 		s.Speed = 1
 	}
 	s.Goals = s.Goals.WithStarTargets()
+	s.Concepts = conceptTags[s.ID]
 	all = append(all, s)
 	byID[s.ID] = s
 }

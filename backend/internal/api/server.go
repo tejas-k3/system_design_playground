@@ -164,18 +164,19 @@ func (s *Server) registry(w http.ResponseWriter, r *http.Request) {
 }
 
 type scenarioSummary struct {
-	ID         string `json:"id"`
-	Title      string `json:"title"`
-	Difficulty string `json:"difficulty"`
-	Summary    string `json:"summary"`
-	ConfigOnly bool   `json:"configOnly,omitempty"`
-	Open       bool   `json:"open,omitempty"`
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	Difficulty string   `json:"difficulty"`
+	Summary    string   `json:"summary"`
+	ConfigOnly bool     `json:"configOnly,omitempty"`
+	Open       bool     `json:"open,omitempty"`
+	Concepts   []string `json:"concepts,omitempty"`
 }
 
 func (s *Server) listScenarios(w http.ResponseWriter, r *http.Request) {
 	out := []scenarioSummary{}
 	for _, sc := range scenarios.All() {
-		out = append(out, scenarioSummary{sc.ID, sc.Title, sc.Difficulty, sc.Summary, sc.ConfigOnly, sc.Open})
+		out = append(out, scenarioSummary{sc.ID, sc.Title, sc.Difficulty, sc.Summary, sc.ConfigOnly, sc.Open, sc.Concepts})
 	}
 	writeJSON(w, 200, out)
 }
