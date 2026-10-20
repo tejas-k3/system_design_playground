@@ -96,7 +96,7 @@ func init() {
 		},
 		Predictions: []Prediction{{ID: "p1", Question: "A skewed workload with a cache holding the hottest 40% of items will hit roughly...", Options: []string{"40% of the time", "Far more than 40%", "Almost never"}, Answer: 1,
 			Explain: "Popularity is skewed, so a small fraction of items accounts for most requests. A modest cache absorbs most reads."}},
-		Debrief: "Caches work because access is skewed. The hit rate is not the cache size over the data size, it is the share of requests that land on the items you kept.",
+		Debrief: "Caches work because access is skewed. The {{cache-hit-rate|hit rate}} is not the cache size over the data size, it is the share of requests that land on the items you kept.",
 	})
 
 	// 4 ─ Medium, config only ─────────────────────────────────────────────────────────
@@ -153,7 +153,7 @@ func init() {
 		},
 		Predictions: []Prediction{{ID: "p1", Question: "With oldest-first queues under overload, who gets served?", Options: []string{"Users still waiting", "Users who already gave up", "Nobody"}, Answer: 1,
 			Explain: "The oldest requests are the ones whose callers have likely timed out. Serving them wastes capacity; newest-first or a queue timeout avoids it."}},
-		Debrief: "A retry storm is a feedback loop: slowness causes timeouts, timeouts cause retries, retries cause slowness. Break it with backoff and jitter, bounded retries, load shedding and circuit breakers.",
+		Debrief: "A {{retry-storm|retry storm}} is a feedback loop: slowness causes timeouts, timeouts cause retries, retries cause slowness. Break it with backoff and jitter, bounded retries, {{load-shedding|load shedding}} and {{circuit-breaker|circuit breakers}}.",
 	})
 
 	// 6 ─ Medium ──────────────────────────────────────────────────────────────────────
@@ -590,7 +590,7 @@ func init() {
 		},
 		Predictions: []Prediction{{ID: "p1", Question: "The cache is warm and the hit rate is near 100%. Why can the database still be overwhelmed after ten seconds?", Options: []string{"The cache fills up and evicts popular items", "Every entry expires at the same instant, so almost every request misses at once", "The database slows down over time"}, Answer: 1,
 			Explain: "A warm start gives every entry the same creation time, so they share one expiry time. Misses arrive as a wave, not a trickle."}},
-		Debrief: "A cache hides load until the moment it cannot. Synchronised expiry turns a 99% hit rate into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the stampede, but it trades it for stale data, which is why this challenge limits staleness.",
+		Debrief: "A cache hides load until the moment it cannot. Synchronised {{ttl|expiry}} turns a 99% hit rate into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the stampede, but it trades it for stale data, which is why this challenge limits staleness.",
 	})
 
 	// 14g ─ Medium, config only: how much data may a failover lose? ─────────────────────
@@ -938,7 +938,7 @@ func init() {
 	register(&Scenario{
 		ID: "gc-storm", Title: "The GC storm", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Averages look fine, yet one request in seven fails.",
-		Story:   "Each app server freezes for a second and a half every eight seconds or so (a stop-the-world garbage collection after a heap change). During a pause nothing on that server answers, and the clients give up after 800 ms. The median latency is healthy, which is why nobody noticed.",
+		Story:   "Each app server freezes for a second and a half every eight seconds or so (a stop-the-world garbage collection after a heap change). During a pause nothing on that server answers, and the clients give up after 800 ms. The {{p50|median latency}} is healthy, which is why nobody noticed.",
 		Diagram: gcStorm(false), Solution: gcStorm(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.1), StarP95Ms: f(200)},
 		DurationSec: 60, WarmupSec: 0, Speed: 1,
@@ -949,7 +949,7 @@ func init() {
 		},
 		Predictions: []Prediction{{ID: "p1", Question: "Letting clients retry twice will…", Options: []string{"Fix it completely", "Recover most requests but make the slow ones very slow", "Do nothing"}, Answer: 1,
 			Explain: "A retry reaches a healthy server, so more requests succeed, but each rescued request has already waited out its timeout: the tail gets worse."}},
-		Debrief: "A stop-the-world pause is invisible in averages and brutal at the tail. Retries and extra servers mask it at a cost; the real fix is a shorter pause. Watch p99 and the timeouts, not the mean.",
+		Debrief: "A stop-the-world pause is invisible in averages and brutal at the tail. Retries and extra servers mask it at a cost; the real fix is a shorter pause. Watch {{p99}} and the timeouts, not the mean.",
 	})
 
 	// Disk full of writes: every secondary index is another disk write per row, against a disk with a fixed IOPS budget
