@@ -12,12 +12,16 @@ export function Term({ id, children }: { id: string; children?: string }) {
 function TermView({ term, children }: { term: GlossaryTerm; children: string }) {
   const tipId = useId()
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 })
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number }>({ left: 0, top: 0 })
   const btn = useRef<HTMLButtonElement>(null)
   // fixed to the screen, so a panel that scrolls or clips its contents cannot cut the definition off
   const show = () => {
     const r = btn.current?.getBoundingClientRect()
-    if (r) setPos({ left: Math.max(8, Math.min(r.left, window.innerWidth - 320)), top: r.bottom + 6 })
+    if (r) {
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - 320))
+      // near the bottom of the window the definition opens upwards instead
+      setPos(window.innerHeight - r.bottom < 230 && r.top > 230 ? { left, bottom: window.innerHeight - r.top + 6 } : { left, top: r.bottom + 6 })
+    }
     setOpen(true)
   }
   return (

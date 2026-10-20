@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GLOSSARY, splitMarkup, termById } from './glossary'
+import { GLOSSARY, plain, splitMarkup, termById } from './glossary'
 
 const REQUIRED = ['p50', 'p95', 'p99', 'throughput', 'utilisation', 'littles-law', 'queueing-knee', 'thread-pool', 'connection-pool', 'circuit-breaker', 'retry-storm', 'metastable-failure', 'idempotency', 'cache-hit-rate', 'ttl', 'stampede', 'eviction', 'replication-lag', 'failover', 'split-brain', 'fencing', 'quorum', 'consistency-levels', 'sharding', 'hot-key', 'backpressure', 'load-shedding', 'autoscaling', 'slo']
 
@@ -32,4 +32,12 @@ describe('splitMarkup', () => {
     expect(splitMarkup('{{ttl|expiry time}}')[0]).toMatchObject({ term: { id: 'ttl' }, text: 'expiry time' })
   })
   it('shows an unknown id as plain words rather than braces', () => expect(splitMarkup('a {{nope}} b')).toEqual(['a ', 'nope', ' b']))
+})
+
+describe('plain', () => {
+  it('drops the markup, keeping the words a reader sees', () => {
+    expect(plain('Short {{ttl|expiry}} and a {{p95}}.')).toBe('Short expiry and a p95.')
+    expect(plain('no markup')).toBe('no markup')
+    expect(plain('a {{nope}} b')).toBe('a nope b')
+  })
 })

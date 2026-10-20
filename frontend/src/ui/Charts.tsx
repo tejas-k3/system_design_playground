@@ -9,6 +9,7 @@ import { failedAfter, pct, successRate } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { useStore } from '../state/store'
 import { Errors } from './Inspector'
+import { Term } from './Term'
 import { Traces } from './Traces'
 
 interface Line {
@@ -251,11 +252,11 @@ export function Charts() {
           <button role="tab" aria-selected={tab === 'traces'} className={tab === 'traces' ? 'on' : ''} onClick={() => { setTab('traces'); setOpen(true) }}>Request traces</button>
         </div>
         <span className="tiles">
-          <Tile label="Requests" value={run.resolved.toLocaleString()} />
+          <Tile term="throughput" label="Requests" value={run.resolved.toLocaleString()} />
           <Tile label="Success" value={rate === null ? '—' : pct(rate)} bad={total > 20 && (rate ?? 1) < 0.95} />
-          <Tile label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
-          <Tile label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
-          <Tile label="p99" value={run.ok ? `${Math.round(run.p99)} ms` : '—'} />
+          <Tile term="p50" label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
+          <Tile term="p95" label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
+          <Tile term="p99" label="p99" value={run.ok ? `${Math.round(run.p99)} ms` : '—'} />
           <Tile label="Failures took" value={failedAfter(run)} hint="Median time a failed request took, from the user's first attempt. p50 and p95 count successes only." />
           <Tile label="In flight" value={String(inFlight)} />
           <BudgetTile run={run} series={series} />
@@ -285,10 +286,10 @@ export function Charts() {
   )
 }
 
-function Tile({ label, value, bad, hint }: { label: string; value: string; bad?: boolean; hint?: string }) {
+function Tile({ label, value, bad, hint, term }: { label: string; value: string; bad?: boolean; hint?: string; term?: string }) {
   return (
     <span className={`tile ${bad ? 'bad' : ''}`} title={hint}>
-      <small>{label}</small>
+      <small>{term ? <Term id={term}>{label}</Term> : label}</small>
       <b>{value}</b>
     </span>
   )
@@ -305,7 +306,7 @@ function BudgetTile({ run, series }: { run: { resolved: number; failed: number }
   return (
     <span className={`tile budget ${b.status === 'ok' ? '' : 'bad'}`} title={`Availability SLO ${slo}%: ${b.allowed.toFixed(1)} failures allowed so far, ${b.used} so far. Burn ${b.burnFast.toFixed(1)}× over 10 s, ${b.burnSlow.toFixed(1)}× over 60 s (1× = exactly on pace).`}>
       <small>
-        Error budget{' '}
+        <Term id="slo">Error budget</Term>{' '}
         <select value={slo} onChange={(e) => setSlo(Number(e.target.value))} aria-label="Availability SLO">
           {SLOS.map((x) => <option key={x} value={x}>{x}%</option>)}
         </select>
