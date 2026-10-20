@@ -6,6 +6,7 @@ import { isNarrow } from '../model/responsive'
 import { reset } from '../sim/bridge'
 import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
+import { Rich } from './Term'
 
 export function ScenarioPanel() {
   const sc = useStore((s) => s.scenario)
@@ -39,7 +40,7 @@ export function ScenarioPanel() {
       </header>
       {open && (
         <div className="scenario-body">
-          <p>{def.story}</p>
+          <p><Rich text={def.story} /></p>
           <h3>Goals</h3>
           <ul className="goals">
             {rows.map((r) => (
@@ -68,7 +69,7 @@ export function ScenarioPanel() {
           )}
           {sc.hintLevel > 0 && (
             <ol className="hints">
-              {def.hints.slice(0, sc.hintLevel).map((h, i) => <li key={i}>{h}</li>)}
+              {def.hints.slice(0, sc.hintLevel).map((h, i) => <li key={i}><Rich text={h} /></li>)}
             </ol>
           )}
           {sc.result?.pass && !sc.compare && !def.open && (
