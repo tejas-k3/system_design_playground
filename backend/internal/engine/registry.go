@@ -362,6 +362,7 @@ func init() {
 			Params: []ParamSpec{
 				num("limitRps", "Sustained rate", "Limit", 200, 1, 10000, 10, "rps", "Requests per second allowed through."),
 				num("burst", "Burst", "Limit", 50, 1, 5000, 10, "", "Extra requests allowed in a short burst."),
+				flag("shared", "Share the count", "Limit", false, "Several limiter instances normally each keep their own count, so a fleet of N admits N times the limit. With this on, every limiter that has it on counts into one shared allowance (as if the counters lived in a common store), so the fleet keeps to the limit. The store's own latency and races are not modelled.").adv(),
 				sel("algorithm", "Algorithm", "Limit", "tokenBucket", "Token bucket: a steady refill with a burst allowance. Fixed window: a count that resets at each window edge (a burst on either side of the edge can double the limit). Sliding window log: exact, never more than the limit in any window, remembers every request. Sliding window counter: weights the previous window by how much of it still overlaps (cheap and close).",
 					opt("tokenBucket", "Token bucket"), opt("fixedWindow", "Fixed window"), opt("slidingWindowLog", "Sliding window log"), opt("slidingWindowCounter", "Sliding window counter")).adv(),
 				num("windowSec", "Window", "Limit", 1, 1, 60, 1, "s", "Length of the window for the window algorithms; the limit is the sustained rate times this many seconds.").adv().showIf("algorithm", "fixedWindow", "slidingWindowLog", "slidingWindowCounter"),

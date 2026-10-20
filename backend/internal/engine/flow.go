@@ -780,6 +780,12 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 // admit decides whether a rate limiter lets a request through: one allowance for everything, or (keyBy user) one
 // per account, so that a heavy account runs out without anyone else noticing.
 func (s *Sim) admit(n *node, c *call) bool {
+	if n.b("shared") { // every sharing limiter counts into the first one's state
+		if s.sharedLimit == nil || s.sharedLimit.removed {
+			s.sharedLimit = n
+		}
+		n = s.sharedLimit
+	}
 	if algo := n.s("algorithm"); algo != "tokenBucket" && algo != "" {
 		return s.admitWindow(n, c, algo)
 	}
