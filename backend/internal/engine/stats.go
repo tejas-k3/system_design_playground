@@ -57,31 +57,32 @@ type LatencyBucket struct {
 }
 
 type RunStats struct {
-	Resolved       int             `json:"resolved"`
-	Pending        int             `json:"pending"`
-	OK             int             `json:"ok"`
-	Failed         int             `json:"failed"`
-	P50            float64         `json:"p50"`
-	P95            float64         `json:"p95"`
-	P99            float64         `json:"p99"`
-	LatencyBuckets []LatencyBucket `json:"latencyBuckets"` // distribution of successful requests
-	FailP50        float64         `json:"failP50"`        // median time to failure; the latencies above count successes only
-	Mean           float64         `json:"mean"`
-	Errors         map[string]int  `json:"errors"`
-	Conflicts      int             `json:"conflicts"`
-	Fresh          int             `json:"freshReads"`
-	Stale          int             `json:"staleReads"`
-	Dups           int             `json:"duplicates"`
-	FanoutWrites   int             `json:"fanoutWrites,omitempty"` // timeline inserts caused by posts (feed workload)
-	FanoutReads    int             `json:"fanoutReads,omitempty"`  // followed authors read to build timelines
-	Hedged         int             `json:"hedged,omitempty"`       // second queries sent because a shard was slow
-	Partial        int             `json:"partial,omitempty"`      // answers sent with fewer shards than required (partial results)
-	LostWrites     int             `json:"lostWrites"`
-	LostUpdates    int             `json:"lostUpdates,omitempty"` // transfers that silently overwrote a concurrent commit (read committed)
-	TxAborts       int             `json:"txAborts,omitempty"`    // transactions aborted for a write conflict or as a deadlock victim
-	Deadlocks      int             `json:"deadlocks,omitempty"`
-	WriteSkew      int             `json:"writeSkew,omitempty"` // on-call pairs left with the rule broken (two doctors off at once)
-	Jobs           *JobStats       `json:"jobs,omitempty"`
+	Resolved        int             `json:"resolved"`
+	Pending         int             `json:"pending"`
+	OK              int             `json:"ok"`
+	Failed          int             `json:"failed"`
+	P50             float64         `json:"p50"`
+	P95             float64         `json:"p95"`
+	P99             float64         `json:"p99"`
+	LatencyBuckets  []LatencyBucket `json:"latencyBuckets"` // distribution of successful requests
+	FailP50         float64         `json:"failP50"`        // median time to failure; the latencies above count successes only
+	Mean            float64         `json:"mean"`
+	Errors          map[string]int  `json:"errors"`
+	Conflicts       int             `json:"conflicts"`
+	Fresh           int             `json:"freshReads"`
+	Stale           int             `json:"staleReads"`
+	Dups            int             `json:"duplicates"`
+	FanoutWrites    int             `json:"fanoutWrites,omitempty"`    // timeline inserts caused by posts (feed workload)
+	FanoutReads     int             `json:"fanoutReads,omitempty"`     // followed authors read to build timelines
+	DeadlineSkipped int             `json:"deadlineSkipped,omitempty"` // requests skipped in a queue because their client had already given up
+	Hedged          int             `json:"hedged,omitempty"`          // second queries sent because a shard was slow
+	Partial         int             `json:"partial,omitempty"`         // answers sent with fewer shards than required (partial results)
+	LostWrites      int             `json:"lostWrites"`
+	LostUpdates     int             `json:"lostUpdates,omitempty"` // transfers that silently overwrote a concurrent commit (read committed)
+	TxAborts        int             `json:"txAborts,omitempty"`    // transactions aborted for a write conflict or as a deadlock victim
+	Deadlocks       int             `json:"deadlocks,omitempty"`
+	WriteSkew       int             `json:"writeSkew,omitempty"` // on-call pairs left with the rule broken (two doctors off at once)
+	Jobs            *JobStats       `json:"jobs,omitempty"`
 }
 
 // Event is one thing that happened to the system, for placing on the charts: crashes and restarts, slow-downs and
@@ -241,7 +242,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {

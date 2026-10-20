@@ -228,7 +228,7 @@ func (s *Sim) startAttempt(lg *logical) {
 	lg.attempts++
 	s.attempts.Push(s.now, true, 0)
 	at := &attempt{lg: lg, at: s.now, n: lg.attempts}
-	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high, user: lg.user}
+	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high, user: lg.user, deadline: s.now + c.f("timeoutMs") - e.latency}
 	s.hop(c, e, call, func(res Result) {
 		if at.done {
 			return
