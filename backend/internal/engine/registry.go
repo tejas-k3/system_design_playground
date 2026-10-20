@@ -198,6 +198,7 @@ func init() {
 				num("memBaseMB", "Base memory", "Failure modes", 200, 0, 65536, 50, "MB", "What an idle server already uses.").adv(),
 				num("memPerReqMB", "Memory per request", "Failure modes", 1, 0.1, 500, 0.1, "MB", "Memory held by each request that is running or waiting in the queue.").adv(),
 				num("memRestartSec", "Restart time", "Failure modes", 5, 1, 120, 1, "s", "How long the killed server takes to come back.").adv(),
+				num("shedAboveQueueMs", "Shed above", "Capacity", 0, 0, 30000, 50, "ms", "When the oldest request in the queue has waited longer than this, ordinary requests are turned away at the door (the users' urgent ones are still admitted), so the queue stays short and urgent work stays fast. 0 = never.").adv(),
 				flag("propagateDeadline", "Skip expired work", "Calls to dependencies", false, "Requests carry the time their client will give up. A request still waiting in a queue after that is skipped instead of served, so the server's capacity goes to requests somebody is still waiting for.").adv(),
 				num("bulkheadThreads", "Bulkhead", "Calls to dependencies", 0, 0, 64, 1, "", "At most this many of the server's threads may be waiting on any one dependency at once; further calls to it are refused immediately, so one slow dependency cannot hold every thread. 0 = no limit.").adv(),
 				num("callTimeoutMs", "Call timeout", "Calls to dependencies", 0, 0, 10000, 50, "ms", "Give up on a dependency call after this long (0 = wait forever)."),

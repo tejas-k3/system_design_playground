@@ -316,6 +316,12 @@ func (s *Sim) resolve(lg *logical, res Result) {
 		cl.c.err++
 		cl.c.reason[res.Reason]++
 	}
+	if lg.counted && lg.high {
+		s.runHighTotal++
+		if res.OK {
+			s.runHighOK++
+		}
+	}
 	if lg.counted {
 		s.runPending--
 		s.runResolved++
