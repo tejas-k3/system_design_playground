@@ -163,6 +163,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("retries add load to a saturated server: %+v", res.Checks)
 		}
 	})
+	t.Run("reconnect-storm: retries and a 2 s spread do not pass, a 30 s spread does", func(t *testing.T) {
+		sc := Get("reconnect-storm")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "users", "retries", 3.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("retries repeat the herd: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "users", "reconnectJitterSec", 2.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("a 2 s spread is still a spike: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
