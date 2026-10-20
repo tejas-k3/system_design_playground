@@ -90,6 +90,7 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/scenarios", s.listScenarios)
 	s.mux.HandleFunc("GET /api/scenarios/{id}", s.getScenario)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/solution", s.getSolution)
+	s.mux.HandleFunc("GET /api/scenarios/{id}/alternatives", s.getAlternatives)
 	s.mux.HandleFunc("GET /api/questions", s.listQuestions)
 	s.mux.HandleFunc("GET /api/questions/{id}", s.getQuestion)
 	s.mux.HandleFunc("POST /api/questions/{id}/answer", s.answerQuestion)
@@ -193,6 +194,19 @@ func (s *Server) getScenario(w http.ResponseWriter, r *http.Request) {
 		sc = &c
 	}
 	writeJSON(w, 200, sc)
+}
+
+func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {
+	sc := scenarios.Get(r.PathValue("id"))
+	if sc == nil {
+		writeErr(w, 404, "no such scenario")
+		return
+	}
+	alts := scenarios.Alternatives(sc.ID)
+	if alts == nil {
+		alts = []scenarios.Alternative{}
+	}
+	writeJSON(w, 200, alts)
 }
 
 func (s *Server) getSolution(w http.ResponseWriter, r *http.Request) {
