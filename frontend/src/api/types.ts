@@ -116,6 +116,7 @@ export interface Goals {
   maxLostUpdates?: number
   maxWriteSkew?: number
   maxJobsLost?: number
+  minCustomerSuccess?: number
   starCostPerHour?: number
   starP95Ms?: number
 }
@@ -234,6 +235,8 @@ export interface RunStats {
   fanoutWrites?: number // timeline inserts caused by posts (feed workload)
   fanoutReads?: number // followed authors read to build timelines
   hedged?: number // second queries sent because a shard was slow
+  customerOk?: number // requests of real customers that succeeded (when the diagram has a bot)
+  customerTotal?: number
   highOk?: number // urgent requests that succeeded
   highTotal?: number // urgent requests resolved
   deadlineSkipped?: number // requests skipped in a queue because their client had already given up
