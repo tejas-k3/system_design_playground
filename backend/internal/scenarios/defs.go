@@ -1163,6 +1163,36 @@ func init() {
 		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the throughput you will need, since changing it later also changes how keys map to partitions.",
 	})
 
+	// Reconnect storm: a server restarts and every user it held comes back in the same instant
+	reconnect := func(fixed bool) engine.Diagram {
+		jitter := 0.0
+		if fixed {
+			jitter = 30
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"arrival": "sessions", "connections": 1500.0, "sessionSec": 900.0, "msgsPerMin": 6.0, "reconnectJitterSec": jitter, "readPct": 100.0, "timeoutMs": 1000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0, "cpuMs": 5.0, "handshakeMs": 30.0, "queueCap": 2000.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "reconnect-storm", Title: "The reconnect storm", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The server comes back in seconds, and the outage lasts minutes.",
+		Story:   "A chat server holds 1,500 live connections. It restarts for a few seconds, which is fine, but when it returns every client reconnects in the same instant. Setting up a connection costs real work, so the server cannot keep up, the clients give up and try again together, and it never catches its breath.",
+		Diagram: reconnect(false), Solution: reconnect(true),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app", AtSec: 15, DownSec: 3}},
+		Goals:       engine.Goals{MinSuccessRate: 0.95, MaxP95Ms: f(400), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.1), StarP95Ms: f(200)},
+		DurationSec: 60, WarmupSec: 10, Speed: 1,
+		Hints: [3]string{
+			"Watch the new-connections rate on the app server after the restart. How big is the spike, and how many connections can it set up per second?",
+			"16 threads at 30 ms a handshake is about 500 connections a second, and 1,500 clients arrive in one go. Those that time out try again at the same moment.",
+			"Spread the reconnects: give clients a random wait before they come back (the reconnect spread on the client). More servers would also work but cost more.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Spreading reconnects over 30 seconds will…", Options: []string{"Make the outage 30 seconds longer for everyone", "Turn one huge spike into a steady trickle the server can handle", "Do nothing, the same clients reconnect"}, Answer: 1,
+			Explain: "The same number of connections are set up, but the peak rate falls from the whole population at once to about fifty a second."}},
+		Debrief: "A restart is not the end of the incident: every client retrying in lockstep can keep the server down. Add random jitter (and backoff) to reconnects so the herd arrives as a stream.",
+	})
+
 	// The bad deploy: version 2 is rolled out to half the fleet at once and it serves errors
 	badDeploy := func(fixed bool) engine.Diagram {
 		canary := 0.0
