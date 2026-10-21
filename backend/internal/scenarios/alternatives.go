@@ -83,6 +83,11 @@ var alternatives = map[string][]Alternative{
 		alt("Pass writes on in 50 ms instead of 300", false, 100.0, 177, 0.74, "A shorter window means fewer collisions (234 lost instead of 1,038 over the run), but any two writes to one cart inside it still lose one.", Change{"db", "syncLagMs", 50.0}),
 		alt("Use a single leader", true, 100.0, 177, 0.74, "No conflicts at all, because every write goes through one place. It passes here; the price (not modelled in this run) is that the far region pays a cross-region round trip for every write.", Change{"db", "topology", "singleLeader"}),
 	},
+	"quorum-overlap": {
+		alt("Wait for two copies on writes only (R=1, W=2)", false, 100.0, 216, 1.30, "1 + 2 is not more than 3 copies, so a read can still land on the one copy the write has not reached: 9 own-write misses.", Change{"kv", "writeQuorum", 2.0}),
+		alt("Wait for two copies on reads only (R=2, W=1)", false, 100.0, 161, 1.30, "Closer, but 2 + 1 is still not more than 3: one read in the run still missed a write.", Change{"kv", "readQuorum", 2.0}),
+		alt("Write to all three copies (R=1, W=3)", true, 100.0, 321, 1.30, "1 + 3 is more than 3, so it works, but every write waits for the slowest copy (p95 321 ms against 216) and would fail if any copy were down.", Change{"kv", "writeQuorum", 3.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

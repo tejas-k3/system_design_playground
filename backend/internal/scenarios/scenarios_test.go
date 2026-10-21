@@ -199,6 +199,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("one leader has no conflicts: %+v", res.Checks)
 		}
 	})
+	t.Run("quorum-overlap: only R + W > N passes", func(t *testing.T) {
+		sc := Get("quorum-overlap")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "kv", "writeQuorum", 2.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("R=1 W=2 does not overlap: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "kv", "writeQuorum", 3.0), sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("R=1 W=3 overlaps and should pass: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

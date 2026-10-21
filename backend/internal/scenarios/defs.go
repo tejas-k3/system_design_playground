@@ -1256,6 +1256,35 @@ func init() {
 		Debrief: "With more than one writer, concurrent writes to the same item are normal, and the conflict rule decides who loses. Last-writer-wins is easy and loses data silently; data types that merge keep every update.",
 	})
 
+	// Quorum overlap: a key-value store that answers quickly but sometimes shows a client its own old data
+	quorumOverlap := func(fixed bool) engine.Diagram {
+		r, w := 1.0, 1.0
+		if fixed {
+			r, w = 2, 2
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 50.0, "keySpace": 20.0, "keyDist": "uniform", "consistency": "causal", "timeoutMs": 3000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "dbPool": 200.0}).
+			n("kv", engine.KKVStore, cols[2], rowMid, P{"nodes": 5.0, "replicas": 3.0, "readQuorum": r, "writeQuorum": w, "readMs": 4.0, "writeMs": 60.0, "variability": "exponential", "concurrency": 32.0}).
+			e("users", "app").e("app", "kv").done()
+	}
+	register(&Scenario{
+		ID: "quorum-overlap", Title: "Read your own writes", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "The store is fast and never errors, but users sometimes lose sight of what they just saved.",
+		Story:   "A five-node key-value store keeps three copies of every key. To be quick, a write returns as soon as one copy has it and a read returns the first copy that answers. Users save a setting, reload, and sometimes see the old value. Support has noticed that it also flips back and forth between old and new.",
+		Diagram: quorumOverlap(false), Solution: quorumOverlap(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxSessionViolations: i(0), MaxP95Ms: f(600), MaxCostPerHour: f(1.6), StarCostPerHour: f(1.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"The goals panel counts reads that returned something older than what the same client already knew. Where could an older copy come from?",
+			"With three copies, a write acknowledged by one copy and a read answered by a different one need not meet: the read can reach copies the write has not got to yet.",
+			"Make every read overlap every acknowledged write: the read quorum plus the write quorum must be more than the number of copies (3). Two and two does it; the price is waiting for the second-fastest copy.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "With three copies, a read quorum of 1 and a write quorum of 3 would…", Options: []string{"Still show old data", "Never show an old value, but make writes slower and fail if any copy is down", "Be exactly as fast as 2 and 2"}, Answer: 1,
+			Explain: "1 + 3 is more than 3, so the read always meets a copy with the write, but a write now waits for the slowest copy and needs all of them to be up."}},
+		Debrief: "R + W > N makes reads overlap writes, so a client sees its own writes and never goes backwards. You buy it with latency (the kth fastest copy instead of the fastest) and with availability (fewer failures tolerated). Choose R and W for the workload: read-heavy systems often pick a cheap read and an expensive write.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
