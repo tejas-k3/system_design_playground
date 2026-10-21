@@ -67,6 +67,18 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 			s.restore(t)
 		}
 		return
+	case "clusterNodeDown":
+		if t.kind == KCoordinator {
+			s.coordNodesDown(t, int(ev.Factor), ev.DurationSec*1000, ev.Mode)
+		} else if t.kind == KKVStore {
+			s.kvNodesDown(t, int(ev.Factor), ev.DurationSec*1000)
+		}
+		return
+	case "leaderDown":
+		if t.kind == KCoordinator {
+			s.coordLeaderDown(t, ev.DurationSec*1000)
+		}
+		return
 	case "kvNodeDown":
 		if t.kind == KKVStore {
 			s.kvNodesDown(t, int(ev.Factor), ev.DurationSec*1000)

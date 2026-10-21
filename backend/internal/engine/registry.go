@@ -173,7 +173,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog, KKVStore},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog, KKVStore, KCoordinator},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				sel("version", "Release version", "Release", "v1", "Which release this server runs. A load balancer with a canary share sends that share of traffic to v2; a bad-release event can be aimed at one version.", opt("v1", "v1 (current)"), opt("v2", "v2 (new)")).adv(),
@@ -461,6 +461,20 @@ func init() {
 				variability("Speed"),
 			},
 			cost: func(p Params) float64 { return 0.1 * pf(p, "nodes", 5) },
+		},
+		{
+			Kind: KCoordinator, Name: "Coordinator", Description: "A small cluster (Raft or ZooKeeper style) that agrees on a leader. State written through it is strongly consistent, but it answers nothing without a leader.",
+			Lesson: "Losing the leader costs an election; losing the majority costs the service. An odd number of nodes tolerates (n-1)/2 failures.",
+			Accent: "#364fc7", Width: 160, Height: 72, CanConnect: nil,
+			Params: []ParamSpec{
+				num("nodes", "Nodes", "Cluster", 3, 1, 9, 2, "", "How many nodes. A majority must be up for a leader to exist: three tolerate one failure, five tolerate two."),
+				num("electionTimeoutMs", "Election timeout", "Cluster", 1000, 50, 20000, 50, "ms", "How long a node waits without hearing from the leader before it stands for election (randomised between one and two times this). Shorter recovers sooner but risks needless elections on a slow network."),
+				num("heartbeatMs", "Heartbeat", "Cluster", 150, 10, 5000, 10, "ms", "How often the leader tells the others it is alive.").adv(),
+				num("rttMs", "Round trip between nodes", "Cluster", 2, 0.1, 500, 0.5, "ms", "Every write waits for a majority to acknowledge, so it costs about one round trip.").adv(),
+				num("opMs", "Time per operation", "Speed", 1, 0.1, 100, 0.5, "ms", "Work done by the leader for each request.").adv(),
+				variability("Speed"),
+			},
+			cost: func(p Params) float64 { return 0.08 * pf(p, "nodes", 3) },
 		},
 		{
 			Kind: KIndex, Name: "Search Shard", Description: "One slice of a search index. A query has to ask every slice.",
