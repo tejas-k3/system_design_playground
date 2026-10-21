@@ -106,13 +106,18 @@ func (s *Sim) noteReshard() {
 		}
 		if t.assign != nil {
 			moved := 0
+			was := make([]bool, reshardSample)
 			for k := range assign {
 				if assign[k] != t.assign[k] {
 					moved++
+					was[k] = true
 				}
 			}
 			if moved > 0 || len(cand) != t.shardCount {
 				t.keysMoved, t.reshards = float64(moved)/reshardSample, t.reshards+1
+				if sec := t.f("rebalanceSec"); sec > 0 && moved > 0 {
+					t.movedKeys, t.moveUntil = was, s.now+sec*1000
+				}
 			}
 		}
 		t.assign, t.shardCount = assign, len(cand)

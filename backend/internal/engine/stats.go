@@ -205,6 +205,9 @@ func (s *Sim) Snapshot() Stats {
 		}
 		if n.kind == KShardRouter && n.reshards > 0 {
 			ex["keysMoved"] = n.keysMoved
+			if n.slowedMoves > 0 {
+				ex["slowedByMove"] = float64(n.slowedMoves)
+			}
 		}
 		if n.kind == KAppServer && (n.sessConns > 0 || sum.connects > 0) {
 			ex["sessions"] = float64(n.sessConns)

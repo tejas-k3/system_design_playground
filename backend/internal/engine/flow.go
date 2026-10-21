@@ -214,7 +214,12 @@ func (s *Sim) resolveTarget(e *edge, c *call, cm cmd) (*node, float64, *edge) {
 	x := s.pickShard(t, cand, h)
 	t.c.arr++
 	t.c.ok++
-	return x.to, e.latency + x.latency + 0.2, x
+	lat := e.latency + x.latency + 0.2
+	if s.now < t.moveUntil && t.movedKeys != nil && t.movedKeys[c.key%reshardSample] {
+		lat += t.f("rebalanceMs") // this key is still being moved: fetch it from where it used to live
+		t.slowedMoves++
+	}
+	return x.to, lat, x
 }
 
 func cmdIsRedis(c cmd) bool {
