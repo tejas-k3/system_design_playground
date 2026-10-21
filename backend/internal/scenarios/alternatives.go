@@ -79,6 +79,10 @@ var alternatives = map[string][]Alternative{
 		alt("Back up every 5 seconds, nothing else", false, 35.7, 164, 0.80, "The data lost drops to 3 seconds, but the restore still takes 51 seconds: backups set the recovery point, not the recovery time.", Change{"db", "backupEverySec", 5.0}),
 		alt("Restore at 600 MB/s, no backups", false, 77.9, 167, 0.74, "The database is back in 17 seconds, but with no backups the restore goes back to the very start: 28 seconds of writes lost.", Change{"db", "restoreMBps", 600.0}),
 	},
+	"lost-cart": {
+		alt("Pass writes on in 50 ms instead of 300", false, 100.0, 177, 0.74, "A shorter window means fewer collisions (234 lost instead of 1,038 over the run), but any two writes to one cart inside it still lose one.", Change{"db", "syncLagMs", 50.0}),
+		alt("Use a single leader", true, 100.0, 177, 0.74, "No conflicts at all, because every write goes through one place. It passes here; the price (not modelled in this run) is that the far region pays a cross-region round trip for every write.", Change{"db", "topology", "singleLeader"}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

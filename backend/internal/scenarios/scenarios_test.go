@@ -190,6 +190,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("a fast restore without backups still loses everything: %+v", res.Checks)
 		}
 	})
+	t.Run("lost-cart: a shorter delay still loses updates, merging and one leader do not", func(t *testing.T) {
+		sc := Get("lost-cart")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "syncLagMs", 50.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("50 ms still has conflicts: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "topology", "singleLeader"), sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("one leader has no conflicts: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
