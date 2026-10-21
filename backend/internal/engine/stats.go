@@ -200,6 +200,9 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.mlConflicts > 0 {
+			ex["writeConflicts"] = float64(n.mlConflicts)
+		}
 		if n.kind == KShardRouter && n.reshards > 0 {
 			ex["keysMoved"] = n.keysMoved
 		}

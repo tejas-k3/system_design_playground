@@ -97,8 +97,15 @@ type job struct {
 	ghost    bool  // a redelivered copy of a job still being worked on: it does the work again but is not counted again
 }
 
+type mlWrite struct {
+	t      float64
+	leader int
+}
+
 type node struct {
-	backups         []float64 // database: when each backup finished
+	backups         []float64       // database: when each backup finished
+	mlLast          map[int]mlWrite // multi-leader database: the latest write of each key and where it landed
+	mlConflicts     int
 	writeLog        []float64 // database that a restore is planned for: when each write was committed
 	logWrites       bool
 	corruptAt       float64       // database: when silent corruption began (0 = none)
