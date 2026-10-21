@@ -139,6 +139,8 @@ type logical struct {
 	hash      uint32
 	user      int  // the account sending the request (0 = identities not modelled)
 	heavy     bool // an expensive request (heavyPct), chosen from the request number
+	sawWrite  int  // per-client models: what the client knew of its own writes and reads of this key when it asked
+	sawRead   int
 	high      bool // an urgent request (priorityPct): chosen from the request number, no random draw
 	tr        *tracer
 	connect   bool // opens a long-lived connection (sessions arrival)
@@ -201,6 +203,7 @@ func (s *Sim) createLogical(c *node) *logical {
 		lg.write = true // a transfer is always a transaction
 	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
+	lg.sawWrite, lg.sawRead = c.sessWrite[lg.key], c.sessRead[lg.key] // nil maps read as 0
 	if n := int(c.f("identities")); n > 0 {
 		dist := "uniform"
 		if c.f("identitySkew") > 0 {
@@ -352,6 +355,7 @@ func (s *Sim) resolve(lg *logical, res Result) {
 				}
 			}
 			s.countFreshness(lg, res)
+			s.countSession(lg, res)
 		} else {
 			s.runFailed++
 			s.failHist.Add(lat)

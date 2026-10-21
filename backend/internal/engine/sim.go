@@ -98,6 +98,8 @@ type job struct {
 }
 
 type node struct {
+	sessWrite       map[int]int   // client: the newest version of each key this client has had acknowledged for its own writes
+	sessRead        map[int]int   // client: the newest version of each key this client has read
 	kvFree          [][]float64   // quorum store: when each slot of each cluster node is next free
 	kvVer           []map[int]int // quorum store: the version of each key each cluster node holds
 	kvDownUntil     []float64     // quorum store: when each cluster node comes back (0 = up)
@@ -266,6 +268,7 @@ type Sim struct {
 	runResolved, runOK, runFailed, runPending int
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
+	runSessReads, runRYW, runMono             int
 	runPartial, runHedged                     int
 	runFanWrites, runFanReads                 int
 	runWriteSkew                              int

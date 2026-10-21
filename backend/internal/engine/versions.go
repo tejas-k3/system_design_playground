@@ -82,6 +82,41 @@ func (s *Sim) countFreshness(lg *logical, res Result) {
 	}
 }
 
+// countSession checks a read against what this client already knows, for the per-client models: read-your-writes
+// (a read must not be older than the client's own last acknowledged write of the key), monotonic reads (a read must
+// not be older than one the client already had), and causal, which asks for both.
+func (s *Sim) countSession(lg *logical, res Result) {
+	if res.Ver < 0 {
+		return
+	}
+	cl := lg.client
+	model := cl.s("consistency")
+	if model != "readYourWrites" && model != "monotonic" && model != "causal" {
+		return
+	}
+	if cl.sessWrite == nil {
+		cl.sessWrite, cl.sessRead = map[int]int{}, map[int]int{}
+	}
+	if lg.write {
+		if res.Ver > cl.sessWrite[lg.key] {
+			cl.sessWrite[lg.key] = res.Ver
+		}
+		return
+	}
+	if lg.counted {
+		s.runSessReads++
+		if (model == "readYourWrites" || model == "causal") && res.Ver < lg.sawWrite {
+			s.runRYW++
+		}
+		if (model == "monotonic" || model == "causal") && res.Ver < lg.sawRead {
+			s.runMono++
+		}
+	}
+	if res.Ver > cl.sessRead[lg.key] {
+		cl.sessRead[lg.key] = res.Ver
+	}
+}
+
 func (s *Sim) commit(n *node, c *call) int {
 	if c.rid != 0 {
 		if _, seen := s.committed[c.rid]; seen {
