@@ -181,6 +181,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("retries add to the hot shard: %+v", res.Checks)
 		}
 	})
+	t.Run("restore-drill: backups alone and a fast restore alone each miss one goal", func(t *testing.T) {
+		sc := Get("restore-drill")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "backupEverySec", 5.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("frequent backups do not shorten the restore: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "db", "restoreMBps", 600.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("a fast restore without backups still loses everything: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

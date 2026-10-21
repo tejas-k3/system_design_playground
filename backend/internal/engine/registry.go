@@ -287,7 +287,13 @@ func init() {
 				flag("spatialIndex", "Spatial index", "Features", false, "Makes nearby-location searches cheap."),
 				flag("rowLocks", "Row locks", "Features", false, "Serialize writes per item so two bookings cannot overlap."),
 			},
-			cost: func(p Params) float64 { return 0.2 * math.Pow(pf(p, "connections", 16)/16, 1.2) },
+			cost: func(p Params) float64 {
+				c := 0.2 * math.Pow(pf(p, "connections", 16)/16, 1.2)
+				if pf(p, "backupEverySec", 0) > 0 { // somewhere to keep the backups, and bandwidth to stream them back
+					c += 0.02 + 0.0002*pf(p, "restoreMBps", 200)
+				}
+				return c
+			},
 		},
 		{
 			Kind: KReplica, Name: "Read Replica", Description: "A copy of the database that serves reads, slightly behind.",

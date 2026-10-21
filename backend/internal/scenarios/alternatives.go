@@ -75,6 +75,10 @@ var alternatives = map[string][]Alternative{
 	"zone-outage": {
 		alt("Spread only the servers over three zones", false, 56.2, 154, 1.92, "The balancer and the database are still in one zone, so losing it still takes the service down.", Change{"app2", "zone", "az-b"}, Change{"app3", "zone", "az-c"}),
 	},
+	"restore-drill": {
+		alt("Back up every 5 seconds, nothing else", false, 35.7, 164, 0.80, "The data lost drops to 3 seconds, but the restore still takes 51 seconds: backups set the recovery point, not the recovery time.", Change{"db", "backupEverySec", 5.0}),
+		alt("Restore at 600 MB/s, no backups", false, 77.9, 167, 0.74, "The database is back in 17 seconds, but with no backups the restore goes back to the very start: 28 seconds of writes lost.", Change{"db", "restoreMBps", 600.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

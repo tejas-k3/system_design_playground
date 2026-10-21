@@ -49,6 +49,7 @@ var conceptTags = map[string][]string{
 	"consumer-lag":           {"queues", "sharding"},
 	"hot-cell":               {"sharding"},
 	"reconnect-storm":        {"failure-handling", "overload-control"},
+	"restore-drill":          {"failure-handling", "replication"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},
