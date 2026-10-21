@@ -1197,6 +1197,36 @@ func init() {
 		Debrief: "Partitioning by a key that is itself skewed concentrates the skew. Spread hot keys (by sender, by a suffix, or by splitting the cell), and remember the price: reads of one key must then query every shard.",
 	})
 
+	// Restore drill: a bad migration corrupts the database; how much is lost and how long until it is back
+	restoreDrill := func(fixed bool) engine.Diagram {
+		every, mbps := 0.0, 200.0
+		if fixed {
+			every, mbps = 5, 600
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 60.0, "readPct": 50.0, "keySpace": 1000.0, "keyDist": "uniform", "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "dataGB": 10.0, "backupEverySec": every, "restoreMBps": mbps}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "restore-drill", Title: "The restore drill", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "A bad migration corrupts the database. How much is lost, and for how long is it gone?",
+		Story:   "At 25 seconds a bad migration starts silently corrupting rows. Someone notices three seconds later and restores the last backup from before the damage. The database holds 10 GB. There are no backups at all, and restoring streams 200 MB a second. The business can lose at most five seconds of writes and can be without the database for at most twenty seconds.",
+		Diagram: restoreDrill(false), Solution: restoreDrill(true),
+		Chaos:       []engine.ChaosEvent{{Type: "corrupt", NodeID: "db", AtSec: 25}, {Type: "restore", NodeID: "db", AtSec: 28}},
+		Goals:       engine.Goals{MinSuccessRate: 0.7, MaxRpoSec: f(5), MaxRtoSec: f(20), MaxCostPerHour: f(1.1), StarCostPerHour: f(1.0)},
+		DurationSec: 80, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Two numbers decide this: how much is lost (the recovery point) and how long you wait (the recovery time). Which setting moves each?",
+			"A restore goes back to the last backup before the damage, so the data lost is the time since that backup: with no backups it is everything. And the time to restore is the data size divided by the restore speed: 10 GB at 200 MB/s is over 50 seconds.",
+			"Turn on backups every few seconds on the database, and raise the restore speed. Each costs a little: a restore bandwidth that is higher than you need is wasted money.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Backing up every five seconds (and nothing else) will…", Options: []string{"Fix both the data lost and the time to restore", "Cut the data lost but leave the restore as slow as before", "Cut the time to restore"}, Answer: 1,
+			Explain: "How often you back up sets how much you can lose; how fast a backup streams back sets how long you wait. They are separate levers."}},
+		Debrief: "RPO and RTO are different dials: backup frequency sets the recovery point, restore bandwidth and data size set the recovery time. Pick them from what the business can bear, and then practise the restore.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
