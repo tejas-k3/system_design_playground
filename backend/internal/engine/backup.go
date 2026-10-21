@@ -53,3 +53,21 @@ func (s *Sim) restore(n *node) {
 		s.CrashNode(n.id, rto)
 	}
 }
+
+// multiLeaderWrite notes a write at one of several leaders. If the previous write of the same key was at another
+// leader less than syncLagMs ago, neither leader had seen the other's write: a conflict. Last-writer-wins drops
+// one of them, a merge keeps both.
+func (s *Sim) multiLeaderWrite(n *node, c *call) {
+	leaders := clampInt(int(n.f("leaders")), 2, 8)
+	leader := int(Hash32(c.hash*2246822519+3) % uint32(leaders))
+	if n.mlLast == nil {
+		n.mlLast = map[int]mlWrite{}
+	}
+	if prev, ok := n.mlLast[c.key]; ok && prev.leader != leader && s.now-prev.t < n.f("syncLagMs") {
+		n.mlConflicts++
+		if n.s("conflictPolicy") != "merge" && c.counted {
+			s.runLostUpdates++
+		}
+	}
+	n.mlLast[c.key] = mlWrite{s.now, leader}
+}

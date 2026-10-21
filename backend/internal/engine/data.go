@@ -562,6 +562,9 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		res := Result{Ver: -1, Done: true, Src: n}
 		switch {
 		case write:
+			if n.kind == KDatabase && n.s("topology") == "multiLeader" {
+				s.multiLeaderWrite(n, c)
+			}
 			res.Ver = s.commit(n, c)
 			if n.promoted {
 				n.sincePromotion++
