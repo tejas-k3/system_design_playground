@@ -200,6 +200,12 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.kvRepairs > 0 {
+			ex["repairs"] = float64(n.kvRepairs)
+		}
+		if n.kvHintsReplayed > 0 {
+			ex["hintsReplayed"] = float64(n.kvHintsReplayed)
+		}
 		if n.mlConflicts > 0 {
 			ex["writeConflicts"] = float64(n.mlConflicts)
 		}
