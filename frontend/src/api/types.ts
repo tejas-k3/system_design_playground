@@ -114,6 +114,7 @@ export interface Goals {
   maxDuplicates?: number
   maxLostWrites?: number
   maxLostUpdates?: number
+  maxSessionViolations?: number
   maxWriteSkew?: number
   maxJobsLost?: number
   minCustomerSuccess?: number
@@ -254,6 +255,9 @@ export interface RunStats {
   highTotal?: number // urgent requests resolved
   deadlineSkipped?: number // requests skipped in a queue because their client had already given up
   partial?: number // answers sent with fewer shards than required
+  sessionReads?: number
+  readYourWritesBroken?: number // reads older than the same client's own acknowledged write
+  monotonicBroken?: number // reads older than one the same client already had
   lostUpdates?: number // transfers that silently overwrote a concurrent commit (read committed)
   txAborts?: number // transactions aborted by a write conflict or as a deadlock victim
   deadlocks?: number

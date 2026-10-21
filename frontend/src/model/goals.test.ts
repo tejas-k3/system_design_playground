@@ -6,6 +6,18 @@ import { failedAfter, fmtCost, goalCost, goalRows, starTargets, successRate } fr
 const stats = (run: Partial<Stats['global']['run']>): Stats => ({ ...emptyStats(), global: { now: 5, inFlight: 0, cost: 0, avgCost: 0, run: { ...emptyStats().global.run, ...run } } })
 const row = (rows: ReturnType<typeof goalRows>, label: string) => rows.find((r) => r.label === label)!
 
+describe('per-client guarantees goal', () => {
+  const goals = { minSuccessRate: 0.9, maxSessionViolations: 0 }
+  it('adds up own-write misses and backwards reads', () => {
+    const r = row(goalRows(goals, stats({ resolved: 100, ok: 100, readYourWritesBroken: 3, monotonicBroken: 2 }), 1, 'running'), 'Per-client guarantees broken')
+    expect(r.actual).toBe('5')
+    expect(r.state).toBe('fail')
+  })
+  it('passes with none', () => {
+    expect(row(goalRows(goals, stats({ resolved: 100, ok: 100 }), 1, 'running'), 'Per-client guarantees broken').state).toBe('pass')
+  })
+})
+
 describe('goalRows', () => {
   const goals = { minSuccessRate: 0.99, maxP95Ms: 500, maxCostPerHour: 1, maxConflicts: 0 }
 
