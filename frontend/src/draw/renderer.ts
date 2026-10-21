@@ -235,6 +235,8 @@ function nodeSubtitle(n: Node, sc: Scene): string {
       return `${rp.partitions} partitions`
     case 'rateLimiter':
       return `${rp.limitRps}/s`
+    case 'coordinator':
+      return `${rp.nodes} nodes, ${rp.electionTimeoutMs} ms election`
     case 'kvStore':
       return `N=${rp.replicas} R=${rp.readQuorum} W=${rp.writeQuorum}`
     case 'index':
