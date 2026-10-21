@@ -407,6 +407,8 @@ func init() {
 				sel("hashing", "Key placement", "Routing", "mod", "How a key picks its shard. Hash mod n is simple, but adding or removing a shard remaps almost every key. A consistent-hashing ring puts each shard at several points on a circle and sends a key to the next point, so a new shard takes over only about 1/n of the keys.",
 					opt("mod", "Hash mod n"), opt("ring", "Consistent hashing ring")).adv(),
 				num("vnodes", "Points per shard", "Routing", 64, 1, 512, 1, "", "How many points each shard has on the ring. More points even the load out; with few, one shard can own a much bigger arc.").adv().showIf("hashing", "ring"),
+				num("rebalanceSec", "Time to move the data", "Routing", 0, 0, 600, 5, "s", "When a shard is added or removed, how long the data of the keys that changed shard takes to move. While it moves, a request for one of those keys is slower (it is fetched from the old shard). 0 = the move is instant.").adv(),
+				num("rebalanceMs", "Extra time for a moving key", "Routing", 200, 0, 5000, 10, "ms", "What a request for a key that is still moving pays on top of its normal time.").adv(),
 				sel("shardBy", "Shard by", "Routing", "key", "What decides which shard gets a request. The key keeps one item (or one map cell) on one shard, so a hot one overloads it. Spreading by the request evens the load, but then a read of one key would have to ask every shard, which is not modelled here.",
 					opt("key", "The item's key (cell, row)"), opt("request", "The request itself (spread evenly)")).adv(),
 			},
