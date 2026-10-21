@@ -18,6 +18,15 @@ describe('per-client guarantees goal', () => {
   })
 })
 
+describe('recovery goals', () => {
+  const goals = { minSuccessRate: 0.5, maxRpoSec: 10, maxRtoSec: 30 }
+  it('compares the data lost and the time to restore with their limits', () => {
+    const rows = goalRows(goals, stats({ resolved: 10, ok: 10, rpoSec: 8, rtoSec: 51.2 }), 1, true)
+    expect(row(rows, 'Data lost (RPO)')).toMatchObject({ actual: '8.0 s', state: 'pass' })
+    expect(row(rows, 'Time to restore (RTO)')).toMatchObject({ actual: '51.2 s', state: 'fail' })
+  })
+})
+
 describe('goalRows', () => {
   const goals = { minSuccessRate: 0.99, maxP95Ms: 500, maxCostPerHour: 1, maxConflicts: 0 }
 

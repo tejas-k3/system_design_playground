@@ -115,6 +115,8 @@ export interface Goals {
   maxLostWrites?: number
   maxLostUpdates?: number
   maxSessionViolations?: number
+  maxRpoSec?: number
+  maxRtoSec?: number
   maxWriteSkew?: number
   maxJobsLost?: number
   minCustomerSuccess?: number
@@ -255,6 +257,8 @@ export interface RunStats {
   highTotal?: number // urgent requests resolved
   deadlineSkipped?: number // requests skipped in a queue because their client had already given up
   partial?: number // answers sent with fewer shards than required
+  rpoSec?: number // seconds of writes the last restore lost
+  rtoSec?: number // seconds the database was unavailable restoring
   sessionReads?: number
   readYourWritesBroken?: number // reads older than the same client's own acknowledged write
   monotonicBroken?: number // reads older than one the same client already had
