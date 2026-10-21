@@ -255,6 +255,8 @@ func init() {
 				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it can work on at once."),
 				num("readMs", "Read time", "Speed", 10, 1, 500, 1, "ms", "Time for one read."),
 				num("writeMs", "Write time", "Speed", 30, 1, 1000, 1, "ms", "Time for one write."),
+				num("backupEverySec", "Backup every", "Backups", 0, 0, 3600, 5, "s", "Take a backup this often (0 = never). When something goes wrong a restore goes back to the last backup before the damage, so this is how much data can be lost: the RPO.").adv(),
+				num("restoreMBps", "Restore speed", "Backups", 200, 10, 10000, 10, "MB/s", "How fast a backup streams back. With the data size this sets how long the database is unavailable during a restore: the RTO.").adv(),
 				num("dataGB", "Data size", "Storage", 0, 0, 100000, 10, "GB", "How much data the database holds. With more data than the buffer pool, a share of reads must go to disk and cost 10x. 0 = not modelled.").adv(),
 				num("bufferPoolGB", "Memory for data", "Storage", 16, 1, 4096, 1, "GB", "RAM the database can use to keep data pages (its buffer pool or page cache).").adv(),
 				sel("model", "Data model", "Storage", "relational", "A preset that summarises what a data model is good at. Relational is the baseline. Document: single-key reads and writes are about 20% cheaper. Wide-column: writes cost 40% of the baseline, but a lookup by anything other than the partition key scans every partition. Time-series: writes cost 30%, random point reads 50% more.",

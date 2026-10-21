@@ -98,6 +98,10 @@ type job struct {
 }
 
 type node struct {
+	backups         []float64 // database: when each backup finished
+	writeLog        []float64 // database that a restore is planned for: when each write was committed
+	logWrites       bool
+	corruptAt       float64       // database: when silent corruption began (0 = none)
 	sessWrite       map[int]int   // client: the newest version of each key this client has had acknowledged for its own writes
 	sessRead        map[int]int   // client: the newest version of each key this client has read
 	kvFree          [][]float64   // quorum store: when each slot of each cluster node is next free
@@ -269,6 +273,7 @@ type Sim struct {
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int
+	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
 	runPartial, runHedged                     int
 	runFanWrites, runFanReads                 int
 	runWriteSkew                              int
@@ -364,9 +369,15 @@ func New(d Diagram, opts Options) *Sim {
 		if n.kind == KDatabase && n.s("engine") == "lsm" {
 			s.scheduleCompaction(n)
 		}
+		if n.kind == KDatabase && n.f("backupEverySec") > 0 {
+			s.scheduleBackup(n)
+		}
 	}
 	for _, ev := range opts.Chaos {
 		ev := ev
+		if ev.Type == "restore" && s.nodes[ev.NodeID] != nil { // count the writes a restore will lose exactly
+			s.nodes[ev.NodeID].logWrites = true
+		}
 		s.at(ev.AtSec*1000, func() { s.fireChaos(ev) })
 	}
 	for _, n := range s.order {
