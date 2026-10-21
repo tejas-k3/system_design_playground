@@ -108,14 +108,17 @@ type node struct {
 	mlConflicts     int
 	writeLog        []float64 // database that a restore is planned for: when each write was committed
 	logWrites       bool
-	corruptAt       float64       // database: when silent corruption began (0 = none)
-	sessWrite       map[int]int   // client: the newest version of each key this client has had acknowledged for its own writes
-	sessRead        map[int]int   // client: the newest version of each key this client has read
-	kvFree          [][]float64   // quorum store: when each slot of each cluster node is next free
-	kvVer           []map[int]int // quorum store: the version of each key each cluster node holds
-	kvDownUntil     []float64     // quorum store: when each cluster node comes back (0 = up)
-	hashRing        *ring         // consistent-hashing ring of a shard router
-	assign          []string      // where a sample of keys goes now (shard router), to measure how many move on a change
+	corruptAt       float64          // database: when silent corruption began (0 = none)
+	sessWrite       map[int]int      // client: the newest version of each key this client has had acknowledged for its own writes
+	sessRead        map[int]int      // client: the newest version of each key this client has read
+	kvFree          [][]float64      // quorum store: when each slot of each cluster node is next free
+	kvVer           []map[int]int    // quorum store: the version of each key each cluster node holds
+	kvDownUntil     []float64        // quorum store: when each cluster node comes back (0 = up)
+	kvHints         map[int][][2]int // quorum store: writes held for a node that is down (key, version), by that node
+	kvHintsReplayed int
+	kvRepairs       int
+	hashRing        *ring    // consistent-hashing ring of a shard router
+	assign          []string // where a sample of keys goes now (shard router), to measure how many move on a change
 	shardCount      int
 	keysMoved       float64 // share of the sample that moved at the last change of the children
 	movedKeys       []bool  // shard router: which sampled keys changed shard at the last change
