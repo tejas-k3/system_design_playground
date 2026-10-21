@@ -106,13 +106,17 @@ func (s *Sim) coordLeaderDown(n *node, dur float64) {
 
 func (s *Sim) procCoord(n *node, c *call, cb func(Result), release func()) {
 	release()
-	if c.cmd != cmdRead && c.cmd != cmdWrite {
+	if c.cmd != cmdRead && c.cmd != cmdWrite && c.cmd != cmdLock && c.cmd != cmdUnlock {
 		s.failAt(n, RNoRoute, cb)
 		return
 	}
 	s.coordInit(n)
 	if n.coordLeader < 0 {
 		s.failAt(n, RNoQuorum, cb)
+		return
+	}
+	if c.cmd == cmdLock || c.cmd == cmdUnlock {
+		s.coordLock(n, c, cb)
 		return
 	}
 	ms := n.f("opMs") + n.f("rttMs") // the leader answers once a majority has acknowledged
@@ -123,5 +127,36 @@ func (s *Sim) procCoord(n *node, c *call, cb func(Result), release func()) {
 			return
 		}
 		s.okAt(n, Result{Ver: -1, Done: true, Src: n}, cb)
+	})
+}
+
+// coordLock is the lock and lease service: a lock is held for its lease (ttl), and every grant comes with a fencing
+// token that is larger than any given before, so a resource can tell a stale holder from the current one.
+func (s *Sim) coordLock(n *node, c *call, cb func(Result)) {
+	s.after(s.service(n, n.f("opMs")+n.f("rttMs"))*n.slow, func() {
+		if n.coordLeader < 0 {
+			s.failAt(n, RNoQuorum, cb)
+			return
+		}
+		if n.coordLocks == nil {
+			n.coordLocks = map[int]redisLock{}
+		}
+		l, held := n.coordLocks[c.key]
+		if c.cmd == cmdUnlock {
+			if held && l.token == c.token {
+				delete(n.coordLocks, c.key)
+			}
+			s.okAt(n, Result{Ver: -1, Done: true}, cb)
+			return
+		}
+		if held && l.exp > s.now && l.token != c.token {
+			n.c.lockBusy++
+			n.c.ok++
+			cb(fail(RLockBusy))
+			return
+		}
+		n.coordFence++
+		n.coordLocks[c.key] = redisLock{token: c.token, exp: s.now + c.ttl, fence: n.coordFence}
+		s.okAt(n, Result{Ver: -1, Done: true, Fence: n.coordFence}, cb)
 	})
 }

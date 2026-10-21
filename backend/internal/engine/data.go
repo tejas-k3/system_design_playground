@@ -348,6 +348,9 @@ func (s *Sim) invalidate(n *node, c *call, ver int, then func()) {
 
 func (s *Sim) bookingWrite(n *node, c *call, done func(Result)) {
 	rd := s.redisEdge(n)
+	if n.s("lockService") == "coordinator" {
+		rd = s.first(n, KCoordinator)
+	}
 	if rd == nil {
 		s.dbWrite(n, c, done)
 		return
@@ -361,10 +364,24 @@ func (s *Sim) bookingWrite(n *node, c *call, done func(Result)) {
 	try = func() {
 		s.callCmd(n, rd, &bc, cmdLock, 0, func(res Result) {
 			if res.OK {
-				s.dbWrite(n, &bc, func(r Result) {
-					s.callCmd(n, rd, &bc, cmdUnlock, 0, func(Result) {})
-					done(r)
-				})
+				bc.fence = res.Fence
+				write := func() {
+					s.dbWrite(n, &bc, func(r Result) {
+						s.callCmd(n, rd, &bc, cmdUnlock, 0, func(Result) {})
+						done(r)
+					})
+				}
+				if n.pausedUntil > s.now { // frozen with the lock in hand: the write waits for the pause, the lease runs on
+					// what it believes when it freezes: it saw the item free (if it was) and will write on that
+					if pe := s.primaryEdge(n); pe != nil {
+						if db, _, _ := s.resolveTarget(pe, &bc, cmdWrite); db != nil && db.kind == KDatabase && db.booked[bc.key] == 0 {
+							bc.blind = true
+						}
+					}
+					s.at(n.pausedUntil, write)
+					return
+				}
+				write()
 				return
 			}
 			if res.Reason == RLockBusy && n.f("lockWaitMs") > 0 && s.now-start < n.f("lockWaitMs") {
@@ -622,7 +639,7 @@ func (s *Sim) dbBooking(n *node, c *call, cb func(Result), release func()) {
 			if crashed(unlock) {
 				return
 			}
-			if b := n.booked[c.key]; b != 0 && b != c.rid {
+			if b := n.booked[c.key]; b != 0 && b != c.rid && !c.blind { // a blind writer does not look again
 				unlock()
 				release()
 				s.okAt(n, Result{Ver: s.itemVer(c.key), Done: true, Src: n}, cb)
@@ -636,6 +653,18 @@ func (s *Sim) dbBooking(n *node, c *call, cb func(Result), release func()) {
 			s.after(ms, func() {
 				if crashed(unlock) {
 					return
+				}
+				if n.b("fencingTokens") && c.fence > 0 { // refuse a write from a holder whose lease has been superseded
+					if c.fence < n.fenceSeen[c.key] {
+						unlock()
+						release()
+						s.failAt(n, RStaleToken, cb)
+						return
+					}
+					if n.fenceSeen == nil {
+						n.fenceSeen = map[int]int{}
+					}
+					n.fenceSeen[c.key] = c.fence
 				}
 				if b := n.booked[c.key]; b != 0 && b != c.rid {
 					n.c.conflict++

@@ -222,6 +222,8 @@ func init() {
 				num("localCacheItems", "Local cache size", "Data access", 8, 1, 1000, 1, "items", "How many items each server keeps locally.").adv().showIf("hotKeyMode", "localCache"),
 				num("localCacheTtlSec", "Local cache lifetime", "Data access", 1, 0.1, 60, 0.1, "s", "How long a local copy is served before it is fetched again. A write through this server drops its copy at once; other servers' copies stay until they expire.").adv().showIf("hotKeyMode", "localCache"),
 				flag("idempotencyKeys", "Idempotency keys", "Data access", false, "Makes writes {{idempotency|idempotent}}: tag each write with its request id so a retried write is applied once (costs ~1 ms)."),
+				sel("lockService", "Locks come from", "Locks (Redis)", "redis", "Where this server takes locks for bookings. A coordinator (Raft/ZooKeeper style) also issues a fencing token with every lock, larger than any before; a Redis lock does not.",
+					opt("redis", "Redis"), opt("coordinator", "Coordinator (with fencing tokens)")).adv(),
 				num("lockWaitMs", "Lock wait", "Locks (Redis)", 0, 0, 5000, 25, "ms", "How long to keep retrying a busy lock before giving up (0 = fail fast).").needs(KRedis),
 				num("lockTtlMs", "Lock lease (TTL)", "Locks (Redis)", 2000, 100, 30000, 100, "ms", "Locks expire after this long even if never released.").needs(KRedis).adv(),
 			},
@@ -285,6 +287,7 @@ func init() {
 				num("maxConnections", "Max connections", "Capacity", 500, 10, 5000, 10, "", "Hard limit on open connections from all servers; beyond it connections are refused."),
 				num("queueCap", "Queue size", "Capacity", 100, 0, 5000, 10, "", "Queries that may wait for a free slot."),
 				flag("spatialIndex", "Spatial index", "Features", false, "Makes nearby-location searches cheap."),
+				flag("fencingTokens", "Refuse stale lock tokens", "Features", false, "A write that carries a fencing token older than one this database has already accepted for the item is refused: the holder's lease ran out and someone else has acted since. Needs a lock service that issues tokens (the coordinator).").adv(),
 				flag("rowLocks", "Row locks", "Features", false, "Serialize writes per item so two bookings cannot overlap."),
 			},
 			cost: func(p Params) float64 {
