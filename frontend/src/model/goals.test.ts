@@ -9,12 +9,12 @@ const row = (rows: ReturnType<typeof goalRows>, label: string) => rows.find((r) 
 describe('per-client guarantees goal', () => {
   const goals = { minSuccessRate: 0.9, maxSessionViolations: 0 }
   it('adds up own-write misses and backwards reads', () => {
-    const r = row(goalRows(goals, stats({ resolved: 100, ok: 100, readYourWritesBroken: 3, monotonicBroken: 2 }), 1, 'running'), 'Per-client guarantees broken')
+    const r = row(goalRows(goals, stats({ resolved: 100, ok: 100, readYourWritesBroken: 3, monotonicBroken: 2 }), 1, true), 'Per-client guarantees broken')
     expect(r.actual).toBe('5')
     expect(r.state).toBe('fail')
   })
   it('passes with none', () => {
-    expect(row(goalRows(goals, stats({ resolved: 100, ok: 100 }), 1, 'running'), 'Per-client guarantees broken').state).toBe('pass')
+    expect(row(goalRows(goals, stats({ resolved: 100, ok: 100 }), 1, true), 'Per-client guarantees broken').state).toBe('pass')
   })
 })
 
