@@ -58,6 +58,15 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 	case "crash":
 		s.CrashNode(t.id, ev.DownSec)
 		return
+	case "corrupt": // silent damage from now on: nothing fails, the data is just wrong until someone restores
+		t.corruptAt = s.now
+		s.logEvent("corrupt", t, 0)
+		return
+	case "restore":
+		if t.kind == KDatabase {
+			s.restore(t)
+		}
+		return
 	case "kvNodeDown":
 		if t.kind == KKVStore {
 			s.kvNodesDown(t, int(ev.Factor), ev.DurationSec*1000)

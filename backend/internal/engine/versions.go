@@ -132,6 +132,9 @@ func (s *Sim) commit(n *node, c *call) int {
 			s.commitLog = append(s.commitLog, commitRec{c.rid, s.now})
 		}
 	}
+	if n.logWrites {
+		n.writeLog = append(n.writeLog, s.now)
+	}
 	return s.bumpVer(c.key)
 }
 
