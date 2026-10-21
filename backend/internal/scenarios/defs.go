@@ -1227,6 +1227,35 @@ func init() {
 		Debrief: "RPO and RTO are different dials: backup frequency sets the recovery point, restore bandwidth and data size set the recovery time. Pick them from what the business can bear, and then practise the restore.",
 	})
 
+	// Lost cart: two leaders accept writes for the same cart; last-writer-wins silently drops one of them
+	lostCart := func(fixed bool) engine.Diagram {
+		policy := "lastWriterWins"
+		if fixed {
+			policy = "merge"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 150.0, "readPct": 0.0, "keySpace": 100.0, "keyDist": "uniform", "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "topology": "multiLeader", "leaders": 2.0, "syncLagMs": 300.0, "conflictPolicy": policy}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "lost-cart", Title: "The lost cart item", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Customers add items to a cart and some of them silently vanish.",
+		Story:   "To keep checkout fast in two regions, the cart database has two leaders that each accept writes and pass them to the other 300 ms later. Two people adding to the same cart in that gap each succeed, and then one of the additions disappears: the database keeps whichever write is newer. Nothing errors, so nobody notices until customers complain.",
+		Diagram: lostCart(false), Solution: lostCart(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxLostUpdates: i(0), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.0)},
+		DurationSec: 40, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Count the lost updates on the goals panel: every request succeeds, so what is being lost, and when?",
+			"A write to a cart at one leader and another write to the same cart at the other leader within 300 ms are concurrent: neither leader has seen the other's. With last-writer-wins one of them is thrown away.",
+			"Choose what happens on a conflict: a merging data type (a counter or a set that adds) keeps both. Shortening the delay only makes conflicts rarer, and one leader would avoid them altogether at the cost of a slow region.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "If the leaders passed writes on in 50 ms instead of 300, lost updates would…", Options: []string{"Disappear", "Become rarer but still happen", "Double"}, Answer: 1,
+			Explain: "The window in which two writes can be concurrent shrinks, so fewer collide, but any two writes inside it still conflict."}},
+		Debrief: "With more than one writer, concurrent writes to the same item are normal, and the conflict rule decides who loses. Last-writer-wins is easy and loses data silently; data types that merge keep every update.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
