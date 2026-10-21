@@ -168,6 +168,20 @@ const ICONS: Record<string, Draw> = {
       c.closePath()
     })
   },
+  coordinator: (c) => {
+    // a crown over three small nodes: one of them leads
+    stroke(c, () => {
+      c.moveTo(-6, -2)
+      c.lineTo(-6, -8)
+      c.lineTo(-2, -4)
+      c.lineTo(0, -9)
+      c.lineTo(2, -4)
+      c.lineTo(6, -8)
+      c.lineTo(6, -2)
+      c.closePath()
+    })
+    for (const x of [-7, 0, 7]) stroke(c, () => c.arc(x, 6, 2.6, 0, Math.PI * 2))
+  },
   index: (c) => {
     // a magnifier over a slice of lines
     stroke(c, () => c.arc(-2, -2, 7, 0, Math.PI * 2))
