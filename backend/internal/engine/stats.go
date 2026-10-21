@@ -200,6 +200,11 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.kind == KCoordinator && len(n.coordDown) > 0 {
+			ex["term"] = float64(n.coordTerm)
+			ex["leader"] = float64(n.coordLeader)
+			ex["nodesUp"] = float64(s.coordUpCount(n))
+		}
 		if n.kvRepairs > 0 {
 			ex["repairs"] = float64(n.kvRepairs)
 		}

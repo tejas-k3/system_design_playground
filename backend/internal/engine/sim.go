@@ -117,6 +117,10 @@ type node struct {
 	kvHints         map[int][][2]int // quorum store: writes held for a node that is down (key, version), by that node
 	kvHintsReplayed int
 	kvRepairs       int
+	coordDown       []float64 // coordinator: when each cluster node comes back (0 = up)
+	coordLeader     int       // coordinator: the leader, -1 while there is none
+	coordTerm       int
+	coordElecting   bool
 	hashRing        *ring    // consistent-hashing ring of a shard router
 	assign          []string // where a sample of keys goes now (shard router), to measure how many move on a change
 	shardCount      int
