@@ -70,6 +70,7 @@ type keyLock struct {
 type redisLock struct {
 	token int
 	exp   float64
+	fence int // the fencing token issued with the grant (coordinator locks only)
 }
 
 // bucket is one account's token bucket in a per-user rate limiter.
@@ -121,8 +122,11 @@ type node struct {
 	coordLeader     int       // coordinator: the leader, -1 while there is none
 	coordTerm       int
 	coordElecting   bool
-	hashRing        *ring    // consistent-hashing ring of a shard router
-	assign          []string // where a sample of keys goes now (shard router), to measure how many move on a change
+	coordLocks      map[int]redisLock // coordinator: the lock on each key
+	coordFence      int               // coordinator: the last fencing token handed out
+	fenceSeen       map[int]int       // database: the newest fencing token each key has accepted
+	hashRing        *ring             // consistent-hashing ring of a shard router
+	assign          []string          // where a sample of keys goes now (shard router), to measure how many move on a change
 	shardCount      int
 	keysMoved       float64 // share of the sample that moved at the last change of the children
 	movedKeys       []bool  // shard router: which sampled keys changed shard at the last change
