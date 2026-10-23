@@ -7,27 +7,28 @@ import (
 
 // Goals are the pass criteria and star thresholds of a challenge. Pointers mean "not required".
 type Goals struct {
-	MinSuccessRate       float64  `json:"minSuccessRate"`
-	MaxP50Ms             *float64 `json:"maxP50Ms,omitempty"`
-	MaxP95Ms             *float64 `json:"maxP95Ms,omitempty"`
-	MaxCostPerHour       *float64 `json:"maxCostPerHour,omitempty"`
-	MinJobsCompleted     *float64 `json:"minJobsCompleted,omitempty"` // fraction 0..1
-	MaxJobP95Ms          *float64 `json:"maxJobP95Ms,omitempty"`
-	MaxConflicts         *int     `json:"maxConflicts,omitempty"`
-	MaxStaleReadPct      *float64 `json:"maxStaleReadPct,omitempty"` // fraction 0..1
-	MaxDuplicates        *int     `json:"maxDuplicates,omitempty"`
-	MaxLostWrites        *int     `json:"maxLostWrites,omitempty"`
-	MaxLostUpdates       *int     `json:"maxLostUpdates,omitempty"`       // transfers that silently overwrote each other
-	MinCustomerSuccess   *float64 `json:"minCustomerSuccess,omitempty"`   // share of the real customers' requests that must succeed, bots set aside
-	MaxJobsLost          *int     `json:"maxJobsLost,omitempty"`          // jobs given up with nowhere to go (not dead-lettered)
-	MaxWriteSkew         *int     `json:"maxWriteSkew,omitempty"`         // on-call pairs left with the rule broken
-	MaxRpoSec            *float64 `json:"maxRpoSec,omitempty"`            // seconds of data a restore may lose
-	MaxRtoSec            *float64 `json:"maxRtoSec,omitempty"`            // seconds the database may be unavailable restoring
-	MinWorstTenant       *float64 `json:"minWorstTenant,omitempty"`       // the worst-served of the quiet tenants must still succeed at least this often
-	MaxLostEvents        *int     `json:"maxLostEvents,omitempty"`        // saved writes whose event never reached the queue
-	MaxSessionViolations *int     `json:"maxSessionViolations,omitempty"` // reads that broke read-your-writes or monotonic reads
-	StarCostPerHour      *float64 `json:"starCostPerHour,omitempty"`
-	StarP95Ms            *float64 `json:"starP95Ms,omitempty"`
+	MinSuccessRate          float64  `json:"minSuccessRate"`
+	MaxP50Ms                *float64 `json:"maxP50Ms,omitempty"`
+	MaxP95Ms                *float64 `json:"maxP95Ms,omitempty"`
+	MaxCostPerHour          *float64 `json:"maxCostPerHour,omitempty"`
+	MinJobsCompleted        *float64 `json:"minJobsCompleted,omitempty"` // fraction 0..1
+	MaxJobP95Ms             *float64 `json:"maxJobP95Ms,omitempty"`
+	MaxConflicts            *int     `json:"maxConflicts,omitempty"`
+	MaxStaleReadPct         *float64 `json:"maxStaleReadPct,omitempty"` // fraction 0..1
+	MaxDuplicates           *int     `json:"maxDuplicates,omitempty"`
+	MaxLostWrites           *int     `json:"maxLostWrites,omitempty"`
+	MaxLostUpdates          *int     `json:"maxLostUpdates,omitempty"`          // transfers that silently overwrote each other
+	MinCustomerSuccess      *float64 `json:"minCustomerSuccess,omitempty"`      // share of the real customers' requests that must succeed, bots set aside
+	MaxJobsLost             *int     `json:"maxJobsLost,omitempty"`             // jobs given up with nowhere to go (not dead-lettered)
+	MaxWriteSkew            *int     `json:"maxWriteSkew,omitempty"`            // on-call pairs left with the rule broken
+	MaxRpoSec               *float64 `json:"maxRpoSec,omitempty"`               // seconds of data a restore may lose
+	MaxRtoSec               *float64 `json:"maxRtoSec,omitempty"`               // seconds the database may be unavailable restoring
+	MinDeliveriesPerMessage *float64 `json:"minDeliveriesPerMessage,omitempty"` // copies of each accepted message that were delivered (fan-out)
+	MinWorstTenant          *float64 `json:"minWorstTenant,omitempty"`          // the worst-served of the quiet tenants must still succeed at least this often
+	MaxLostEvents           *int     `json:"maxLostEvents,omitempty"`           // saved writes whose event never reached the queue
+	MaxSessionViolations    *int     `json:"maxSessionViolations,omitempty"`    // reads that broke read-your-writes or monotonic reads
+	StarCostPerHour         *float64 `json:"starCostPerHour,omitempty"`
+	StarP95Ms               *float64 `json:"starP95Ms,omitempty"`
 }
 
 type Check struct {
@@ -195,6 +196,14 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxWriteSkew != nil {
 		checks = append(checks, Check{"Rule broken (write skew)", fmt.Sprintf("≤ %d", *g.MaxWriteSkew), fmt.Sprint(run.WriteSkew), run.WriteSkew <= *g.MaxWriteSkew})
+	}
+	if g.MinDeliveriesPerMessage != nil {
+		a, ok := "no messages", false
+		if run.OK > 0 && run.Jobs != nil {
+			per := float64(run.Jobs.Completed) / float64(run.OK)
+			a, ok = fmt.Sprintf("%.2f", per), per+eps >= *g.MinDeliveriesPerMessage
+		}
+		checks = append(checks, Check{"Deliveries per message", fmt.Sprintf("≥ %.1f", *g.MinDeliveriesPerMessage), a, ok})
 	}
 	if g.MinWorstTenant != nil {
 		a, ok := "no tenants", false

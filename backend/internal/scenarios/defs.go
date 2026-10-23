@@ -1415,6 +1415,41 @@ func init() {
 		Debrief: "A global rate limit protects the servers but not the tenants from each other. Limit per customer so one customer's burst runs into its own allowance, and add a shared limit on top if the total must be bounded too.",
 	})
 
+	// Notification fan-out: one event must reach email, push and SMS. A queue gives each message to one worker only
+	fanOut := func(fixed bool) engine.Diagram {
+		kind := engine.KQueue
+		if fixed {
+			kind = engine.KTopic
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "keySpace": 1000.0, "timeoutMs": 3000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0}).
+			n("events", kind, cols[2], rowMid, P{"capacity": 50000.0}).
+			n("log", engine.KDatabase, cols[4], rowMid, P{"connections": 16.0}).label("log", "Delivery log").
+			e("users", "app").e("app", "events")
+		for k, name := range []string{"Email", "Push", "SMS"} {
+			id := fmt.Sprintf("ch%d", k+1)
+			b.n(id, engine.KWorker, cols[3], float64(k)*110+60, P{"concurrency": 4.0, "processMs": 30.0}).label(id, name+" sender").e("events", id).e(id, "log")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "notification-fan-out", Title: "Tell everyone", Difficulty: "Medium",
+		Summary: "An order is placed, and only one of the three notifications goes out.",
+		Story:   "Every order has to produce an email, a push notification and an SMS, each sent by its own worker. The events go through a message queue, and the three workers all read from it. Orders are accepted and nothing errors, but each order produces just one notification: whichever worker got to the message first.",
+		Diagram: fanOut(false), Solution: fanOut(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MinDeliveriesPerMessage: f(2.9), MaxP95Ms: f(400), MaxCostPerHour: f(1.4), StarCostPerHour: f(1.2)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the goals: deliveries per message. How many copies of each order does the system produce, and how many does it need?",
+			"A queue hands each message to exactly one of the workers reading it, so the three workers share the work instead of each doing their own. Adding more workers makes the shared work faster, not wider.",
+			"Replace the queue with a topic (publish/subscribe): every worker connected to it is a subscriber and gets its own copy of every message.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "If email, push and SMS are three workers on one queue, an order produces…", Options: []string{"Three notifications", "One notification, from whichever worker took it", "No notification"}, Answer: 1,
+			Explain: "Workers on a queue compete for messages: each message is processed once. To give every consumer its own copy you need publish/subscribe."}},
+		Debrief: "A queue is for sharing work among identical workers; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
