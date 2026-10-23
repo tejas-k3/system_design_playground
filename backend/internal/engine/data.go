@@ -231,6 +231,10 @@ func (s *Sim) appRead(n *node, c *call, done func(Result)) {
 	useCache := !primaryOnly && len(caches) > 0
 	fetch := func(cb func(Result)) {
 		var e *edge
+		if reps := s.outOf(n, KReplica); !primaryOnly && len(reps) >= 2 && (n.f("hedgeReadsMs") > 0 || n.s("readSpread") == "roundRobin") {
+			s.replicaRead(n, c, reps, cb)
+			return
+		}
 		if !primaryOnly {
 			e = s.first(n, KReplica)
 		}

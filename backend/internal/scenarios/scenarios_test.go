@@ -232,6 +232,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("hash mod still slows four requests in five: %+v", res.Checks)
 		}
 	})
+	t.Run("heavy-tail: more threads do not help, hedging does", func(t *testing.T) {
+		sc := Get("heavy-tail")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "threads", 96.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("threads do not shorten a service-time tail: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "hedgeReadsMs", 5.0), sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("hedging after 5 ms also passes (and doubles the load): %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

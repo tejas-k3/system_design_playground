@@ -1351,6 +1351,40 @@ func init() {
 		Debrief: "Hash mod n makes resizing a cluster as expensive as rebuilding it. Consistent hashing moves only about 1/n of the keys when a node joins or leaves, which is why caches and key-value stores use it.",
 	})
 
+	// Heavy tail: identical replicas whose service times have a long tail; capacity cannot shorten it, a second ask can
+	heavyTail := func(fixed bool) engine.Diagram {
+		hedge := 0.0
+		if fixed {
+			hedge = 80
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 150.0, "readPct": 100.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 3000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 48.0, "queueCap": 2000.0, "dbPool": 100.0, "readSpread": "roundRobin", "hedgeReadsMs": hedge}).
+			n("db", engine.KDatabase, cols[3], 20, P{"connections": 16.0}).
+			e("users", "app").e("app", "db")
+		for k := 0; k < 3; k++ {
+			id := fmt.Sprintf("replica%d", k+1)
+			b.n(id, engine.KReplica, cols[2], float64(k)*100+60, P{"connections": 16.0, "readMs": 40.0, "variability": "heavy", "replicationLagMs": 50.0}).e("app", id)
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "heavy-tail", Title: "The slow one in a hundred", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Three healthy read replicas, and one read in twenty is far slower than the rest.",
+		Story:   "A product page reads from three identical read replicas, taking turns. Most reads take a few milliseconds, but the replicas have a long tail: now and then one read takes ten times as long, whichever replica serves it. The median is great. The slowest one in twenty is what customers feel, and adding threads or servers has not moved it.",
+		Diagram: heavyTail(false), Solution: heavyTail(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(230), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.8), StarP95Ms: f(190)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the latency distribution: the slow reads are the replicas' own long tail, not a queue. Are the threads or the replicas busy?",
+			"Adding capacity does not shorten a slow read, because the slow read is slow by itself. But the other two replicas are fine: the same read would almost certainly be quick if asked of another.",
+			"Hedge the reads (advanced setting on the app server): if a read has not been answered after a short wait, ask another replica too and take the first answer. Wait about the time a normal read takes; hedging too early doubles the load for nothing.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Hedging reads after 80 ms sends a second request for…", Options: []string{"Every read", "Only the slow ones, a small share of reads", "None, it only works when a replica is down"}, Answer: 1,
+			Explain: "Most reads finish before the wait is over, so only the few that are still waiting get a second request, a modest increase in load for a large cut in the tail."}},
+		Debrief: "Hedged requests trade a little extra load for a much shorter tail: the chance that two independent replicas are both slow is the square of the chance that one is. Wait about the p95 of a normal request before hedging, or you simply double your traffic.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0

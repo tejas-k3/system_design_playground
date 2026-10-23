@@ -94,6 +94,10 @@ var alternatives = map[string][]Alternative{
 	"add-a-shard": {
 		alt("Spread keys over a ring with one point per shard", true, 100.0, 148, 3.79, "Still a ring, so only about a fifth of the keys move; with a single point per shard the split is less even, but the move is still small enough here to pass.", Change{"shards", "hashing", "ring"}, Change{"shards", "vnodes", 1.0}),
 	},
+	"heavy-tail": {
+		alt("Give the app server 96 threads", false, 100.0, 264, 2.91, "The slow reads are slow by themselves, not queued: more threads leave the p95 where it was (264 ms) and cost more.", Change{"app", "threads", 96.0}),
+		alt("Hedge after only 5 ms", true, 100.0, 164, 2.12, "It passes and has the best p95, but almost every read gets a second request (6,082 hedges for about 6,000 reads): the replicas carry twice the load for a gain that waiting longer gets most of.", Change{"app", "hedgeReadsMs", 5.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
