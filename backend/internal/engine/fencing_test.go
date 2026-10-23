@@ -97,3 +97,22 @@ func TestWithoutThePauseTheLeaseHolds(t *testing.T) {
 		t.Errorf("with no pause the lock does its job: %d double bookings", c)
 	}
 }
+
+// A conditional write ("book this seat only if it is still free") checks at the moment of writing, atomically, so a
+// holder frozen past its lease cannot overwrite a booking made in the meantime, whatever its lock or token says.
+func TestAConditionalWriteRemovesEveryDoubleBookingEvenWithARedisLock(t *testing.T) {
+	plain, _ := fencingTotals(600, nil, nil, false)
+	cond, _ := fencingTotals(600, nil, Params{"conditionalWrite": true}, false)
+	t.Logf("redis lock: %d double bookings, %d with conditional writes", plain, cond)
+	if plain < 10 || cond != 0 {
+		t.Errorf("a compare-and-set at the resource cannot double book: %d without, %d with", plain, cond)
+	}
+}
+
+func TestConditionalWriteOffChangesNothing(t *testing.T) {
+	a, _ := fencingTotals(600, nil, nil, false)
+	b, _ := fencingTotals(600, nil, Params{"conditionalWrite": false}, false)
+	if a != b {
+		t.Errorf("off must equal the default: %d vs %d", a, b)
+	}
+}

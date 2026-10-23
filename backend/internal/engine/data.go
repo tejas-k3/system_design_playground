@@ -669,6 +669,12 @@ func (s *Sim) dbBooking(n *node, c *call, cb func(Result), release func()) {
 					}
 					n.fenceSeen[c.key] = c.fence
 				}
+				if b := n.booked[c.key]; b != 0 && b != c.rid && n.b("conditionalWrite") { // compare-and-set: it is taken, say so
+					unlock()
+					release()
+					s.okAt(n, Result{Ver: s.itemVer(c.key), Done: true, Src: n}, cb)
+					return
+				}
 				if b := n.booked[c.key]; b != 0 && b != c.rid {
 					n.c.conflict++
 					if c.counted {
