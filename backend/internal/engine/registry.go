@@ -252,7 +252,7 @@ func init() {
 		{
 			Kind: KDatabase, Name: "Database", Description: "The primary data store. Handles reads and writes.",
 			Lesson: "Connections and query time cap throughput long before disks do.",
-			Accent: "#e8590c", Width: 160, Height: 72, CanConnect: nil,
+			Accent: "#e8590c", Width: 160, Height: 72, CanConnect: []string{KCoordinator},
 			Params: []ParamSpec{
 				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it can work on at once."),
 				num("readMs", "Read time", "Speed", 10, 1, 500, 1, "ms", "Time for one read."),
@@ -275,6 +275,8 @@ func init() {
 					opt("stayDown", "Stay down until it restarts"), opt("promote", "Promote a replica")),
 				num("detectSec", "Failure detection", "Failover", 10, 1, 120, 1, "s", "How long until the failure is noticed.").showIf("onFailure", "promote"),
 				num("promoteSec", "Promotion time", "Failover", 20, 1, 300, 1, "s", "How long the replica takes to become the primary once the failure is noticed.").showIf("onFailure", "promote"),
+				sel("electionBy", "Who decides on failover", "Failover", "timer", "A timer promotes the replica on schedule whatever else is going on. With a coordinator (connect the database to one) promotion waits until the coordination service has a leader and a majority: promoting without one is how two primaries appear.",
+					opt("timer", "A timer"), opt("coordinator", "A coordinator (needs a connection to one)")).showIf("onFailure", "promote").needs(KCoordinator),
 				flag("fencing", "Fence the old primary", "Failover", true, "Keep a recovered old primary out. Without it, the old primary comes back, clients return to it, and every write the new primary took in the meantime is lost.").showIf("onFailure", "promote"),
 				num("indexes", "Secondary indexes", "Data", 0, 0, 6, 1, "", "Each index speeds up lookups by another field and makes every write 30% slower (it must update the index too). With none, a lookup by another field scans the table."),
 				sel("engine", "Storage engine", "Data", "btree", "How data is laid out on disk. B-tree: balanced reads and writes, no pauses. LSM tree: writes are cheap and sequential (half the write time) but a read may touch several levels (1.5x the read time), and the database periodically pauses writes to compact its files.",

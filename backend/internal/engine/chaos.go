@@ -144,9 +144,28 @@ func (s *Sim) scheduleFailover(db *node) {
 		}
 	})
 	s.after((db.f("detectSec")+db.f("promoteSec"))*1000, func() {
-		if db.down && db.epoch == ep {
-			s.promote(db)
+		if !(db.down && db.epoch == ep) {
+			return
 		}
+		zk := s.first(db, KCoordinator)
+		if db.s("electionBy") != "coordinator" || zk == nil {
+			s.promote(db)
+			return
+		}
+		// the decision belongs to the coordination service: wait for it to have a leader and a majority
+		var try func()
+		try = func() {
+			if !(db.down && db.epoch == ep) {
+				return
+			}
+			s.coordInit(zk.to)
+			if zk.to.coordLeader >= 0 && s.coordMajority(zk.to) {
+				s.promote(db)
+				return
+			}
+			s.after(100, try)
+		}
+		try()
 	})
 }
 
