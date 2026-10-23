@@ -5,6 +5,12 @@ package engine
 // by a compensating call to each of those services, newest first (a saga). A compensation that itself fails leaves
 // the order stuck for someone to fix.
 
+// inDoubtRec is a two-phase commit whose coordinator died between the votes and the decision.
+type inDoubtRec struct {
+	n     *node
+	since float64
+}
+
 func (s *Sim) workflowSteps(n *node) []*edge {
 	var steps []*edge
 	for _, e := range n.out {
@@ -27,6 +33,10 @@ func (s *Sim) workflowWrite(n *node, c *call, mode string, done func(Result)) bo
 	steps := s.workflowSteps(n)
 	if len(steps) < 2 {
 		return false
+	}
+	if mode == "twoPhase" {
+		s.twoPhase(n, c, steps, done)
+		return true
 	}
 	var run func(i int)
 	run = func(i int) {
@@ -57,6 +67,63 @@ func (s *Sim) workflowWrite(n *node, c *call, mode string, done func(Result)) bo
 	return true
 }
 
+// twoPhase asks every service to prepare (vote and hold its row), then tells every one to commit. A failed vote
+// aborts the ones that already voted yes. If the coordinator dies after a yes vote and before the decision is
+// delivered, the services that voted cannot decide on their own: they stay locked until the coordinator restarts.
+func (s *Sim) twoPhase(n *node, c *call, steps []*edge, done func(Result)) {
+	ep := n.epoch
+	lost := func() bool {
+		if n.epoch == ep {
+			return false
+		}
+		if c.counted {
+			s.runInDoubt++
+		}
+		s.inDoubt = append(s.inDoubt, inDoubtRec{n, s.now})
+		done(fail(RNodeDown))
+		return true
+	}
+	var phase func(i int, commit bool)
+	phase = func(i int, commit bool) {
+		if i == len(steps) {
+			if !commit {
+				phase(0, true)
+				return
+			}
+			done(Result{OK: true, Ver: -1, Done: true, Src: n})
+			return
+		}
+		s.callCmd(n, steps[i], c, stepCmd(steps[i]), 0, func(res Result) {
+			if lost() {
+				return
+			}
+			if res.OK {
+				phase(i+1, commit)
+				return
+			}
+			if i == 0 || commit {
+				done(res)
+				return
+			}
+			s.compensate(n, c, steps, i-1, false, func() { done(res) })
+		})
+	}
+	phase(0, false)
+}
+
+// releaseInDoubt ends the wait of every transaction the restarted coordinator left undecided.
+func (s *Sim) releaseInDoubt(n *node) {
+	keep := s.inDoubt[:0]
+	for _, r := range s.inDoubt {
+		if r.n == n {
+			s.runBlockedSec += (s.now - r.since) / 1000
+		} else {
+			keep = append(keep, r)
+		}
+	}
+	s.inDoubt = keep
+}
+
 // compensate undoes step i, then the ones before it. stuck is whether any undo has failed so far.
 func (s *Sim) compensate(n *node, c *call, steps []*edge, i int, stuck bool, then func()) {
 	if i < 0 {
@@ -80,5 +147,5 @@ func (s *Sim) compensate(n *node, c *call, steps []*edge, i int, stuck bool, the
 // steps of the workflow and not an extra call made before it.
 func (s *Sim) runsWorkflow(n *node) bool {
 	m := n.s("workflow")
-	return (m == "naive" || m == "saga") && len(s.workflowSteps(n)) >= 2
+	return (m == "naive" || m == "saga" || m == "twoPhase") && len(s.workflowSteps(n)) >= 2
 }

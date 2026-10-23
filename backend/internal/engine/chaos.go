@@ -245,6 +245,7 @@ func (s *Sim) RestartNode(id string) {
 	}
 	n.down = false
 	n.slow = 1
+	s.releaseInDoubt(n)
 	if n.store != nil { // a restarted cache or CDN comes back empty
 		n.store.Clear()
 	}
