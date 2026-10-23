@@ -5,10 +5,6 @@ import "testing"
 // The classic bug. A server takes a lock with a short lease, freezes (a garbage-collection pause) for longer than the
 // lease, another server takes the lock and books the same seat, and the first wakes up and books it too. Fencing
 // tokens fix it only if the lock service issues them and the database refuses a token older than one it has seen.
-func fencingRun(app, db Params, lockOnCoordinator bool) *Sim {
-	return fencingRunPause(600, app, db, lockOnCoordinator)
-}
-
 // fencingTotals adds up five seeds, since a double booking needs a pause to land inside a short window.
 func fencingTotals(pauseMs float64, app, db Params, coord bool) (conf, stale int) {
 	for seed := uint32(14); seed < 19; seed++ {
@@ -17,10 +13,6 @@ func fencingTotals(pauseMs float64, app, db Params, coord bool) (conf, stale int
 		stale += r.Errors["staleToken"]
 	}
 	return
-}
-
-func fencingRunPause(pauseMs float64, app, db Params, lockOnCoordinator bool) *Sim {
-	return fencingRunSeed(14, pauseMs, app, db, lockOnCoordinator)
 }
 
 func fencingRunSeed(seed uint32, pauseMs float64, app, db Params, lockOnCoordinator bool) *Sim {
@@ -63,8 +55,6 @@ func mergeParams(a, b Params) Params {
 	}
 	return out
 }
-
-func conflicts(s *Sim) int { return s.RunSnapshot().Conflicts }
 
 func TestAPausedLockHolderDoubleBooksWithRedisLocks(t *testing.T) {
 	c, _ := fencingTotals(600, nil, nil, false)
