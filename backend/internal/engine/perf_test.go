@@ -12,13 +12,13 @@ import (
 //
 // Baseline (Apple M-series laptop, 30 simulated seconds, 1,000 rps, 20 nodes): 65 ms, 90.7 MB and 1.56 M
 // allocations per run. Allocation counts and bytes do not depend on the machine, so their ceilings are tight
-// (about +20-25 %). Time does, so its ceiling is about 3x the baseline; set PERF_NS_CEILING_MS to tighten it on a
+// (about +20-25 %). Time does, so its ceiling is generous: 300 ms, raised from 200 ms at the owner's decision after the shared CI runner went over by up to 6 ms six times with unchanged allocations (the local benchmark is about 120 ms); set PERF_NS_CEILING_MS to tighten it on a
 // machine you have a baseline for (the ticket's rule of thumb is 1.4x).
 func TestPerfGuard(t *testing.T) {
 	if os.Getenv("PERF_GUARD") != "1" {
 		t.Skip("set PERF_GUARD=1 to run the performance guard")
 	}
-	ceilingMs := 200.0
+	ceilingMs := 300.0
 	if v, err := strconv.ParseFloat(os.Getenv("PERF_NS_CEILING_MS"), 64); err == nil && v > 0 {
 		ceilingMs = v
 	}
