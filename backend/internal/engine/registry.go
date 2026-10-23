@@ -165,6 +165,9 @@ func init() {
 			Params: []ParamSpec{
 				sel("algorithm", "Algorithm", "Routing", "roundRobin", "How the next server is chosen.",
 					opt("roundRobin", "Round robin"), opt("leastConn", "Least connections"), opt("random", "Random")),
+				sel("zoneRouting", "Zone preference", "Routing", "any", "Any zone: spread across every server. Own zone first: use only servers in the balancer's own availability zone, which saves the hop between zones (1.5 ms each way).",
+					opt("any", "Any zone"), opt("local", "Own zone first")).adv(),
+				flag("crossZoneFailover", "Fail over to other zones", "Routing", true, "With 'own zone first': when no server in the balancer's zone is available, send requests to the other zones. Off, they have nowhere to go until a server in the zone is back.").adv(),
 				flag("outlierEjection", "Eject outliers", "Health", false, "Temporarily remove servers that error a lot or are much slower than their peers."),
 				num("canaryPct", "Canary share", "Release", 0, 0, 100, 1, "%", "Send this share of requests to the servers running the new version (v2) and the rest to the old one (v1). 0 = every server gets its fair share.").adv(),
 				num("healthCheckSec", "Health check interval", "Health", 2, 1, 30, 1, "s", "How long a dead server keeps receiving traffic before the balancer notices."),
