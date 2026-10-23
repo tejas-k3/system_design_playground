@@ -107,6 +107,9 @@ var alternatives = map[string][]Alternative{
 	"go-global": {
 		alt("Give the US app server 96 threads", false, 100.0, 291, 2.48, "The delay is distance, not load: the p95 stays at 291 ms and the bill goes up.", Change{"app-us", "threads", 96.0}),
 	},
+	"payment-saga": {
+		alt("Let clients retry a failed order twice", false, 99.5, 606, 1.00, "Success rate goes up (a retry usually gets a different answer from the card processor) but every failed attempt still leaves its stock reserved: 302 orders half done on this seed, and the retries make the tail twice as slow.", Change{"users", "retries", 2.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
