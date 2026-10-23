@@ -61,6 +61,7 @@ var conceptTags = map[string][]string{
 	"payment-saga":           {"consistency", "failure-handling"},
 	"frozen-checkout":        {"consistency", "failure-handling"},
 	"who-is-the-leader":      {"replication", "failure-handling"},
+	"launch-day":             {"sharding", "capacity"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},
