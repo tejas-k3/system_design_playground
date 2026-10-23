@@ -1256,10 +1256,35 @@ func (s *Sim) arriveLog(n *node, c *call, cb func(Result)) {
 		}
 		l.jobs = append(l.jobs, j)
 	}
-	s.after(0.2, func() {
+	ack := 0.2
+	if n.s("ackMode") == "all" { // the acknowledgement waits until the followers have copied the message
+		ack += n.f("replicationLagMs")
+	}
+	s.after(ack, func() {
 		s.okAt(n, Result{Ver: -1, Done: true}, cb)
 		s.dispatch(n)
 	})
+}
+
+// logLoseUnreplicated is a log's leader dying with ackMode leader: messages it acknowledged less than the copy lag ago
+// had not reached the followers and are gone, though their producers were told they were safe.
+func (s *Sim) logLoseUnreplicated(q *node) {
+	cut := s.now - q.f("replicationLagMs")
+	for _, l := range q.lanes {
+		keep := l.head
+		for i := l.head; i < len(l.jobs); i++ {
+			j := l.jobs[i]
+			if j.enq > cut {
+				if j.counted {
+					s.runLost++
+				}
+				continue
+			}
+			l.jobs[keep] = j
+			keep++
+		}
+		l.jobs = l.jobs[:keep]
+	}
 }
 
 // logRebalanceCheck notices a change in who is in a consumer group (a member crashed, came back, was added or
