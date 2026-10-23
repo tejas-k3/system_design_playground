@@ -265,6 +265,8 @@ export interface RunStats {
   worstTenantSuccess?: number // the worst-served of the quiet tenants
   inconsistent?: number // multi-step writes left half done
   compensated?: number // multi-step writes rolled back
+  inDoubt?: number // two-phase commits left waiting for a crashed coordinator
+  blockedSec?: number // lock-seconds those transactions held
   stuck?: number // rolled back unsuccessfully
   eventsLost?: number // saved writes whose event never reached the queue
   rpoSec?: number // seconds of writes the last restore lost
