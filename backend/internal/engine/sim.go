@@ -154,6 +154,7 @@ type node struct {
 	global          *bucket         // the single allowance of a window-based limiter that is not per user
 	buckets         map[int]*bucket // a per-user rate limiter's allowance for each account seen so far
 	badUntil        float64         // a bad release answers every request with an error until then (0 = none)
+	region          string          // where in the world it runs, kept in step with the 'region' setting
 	zone            string          // availability zone, kept in step with the 'zone' setting
 	down            bool
 	downAt          float64

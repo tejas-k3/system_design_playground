@@ -12,7 +12,7 @@ func (s *Sim) addNode(d Node) *node {
 		booked: map[int]int{}, klocks: map[int]*keyLock{}, tver: map[int]int{}, txl: map[int]*txLock{}, txWaits: map[int]int{}, rr: map[string]int{},
 		lastBusy: s.now,
 	}
-	n.zone = n.s("zone")
+	n.zone, n.region = n.s("zone"), n.s("region")
 	n.tokens = n.f("burst")
 	n.tokensAt = s.now
 	s.configStore(n)
@@ -151,7 +151,7 @@ func (s *Sim) Sync(d Diagram) {
 		if n := s.nodes[dn.ID]; n != nil && n.kind == dn.Kind {
 			n.label, n.x, n.y = dn.Label, dn.X, dn.Y
 			n.p = Resolve(dn.Kind, dn.Params)
-			n.zone = n.s("zone")
+			n.zone, n.region = n.s("zone"), n.s("region")
 			s.configStore(n)
 			if n.kind == KRateLimiter {
 				n.tokens = math.Min(n.tokens, n.f("burst"))

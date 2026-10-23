@@ -136,7 +136,7 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown | addNode (a shard router gets one more shard, a copy of its first)
+	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown | addNode (a shard router gets one more shard, a copy of its first) | regionDown
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`
@@ -146,6 +146,7 @@ type ChaosEvent struct {
 	Kind        string  `json:"kind,omitempty"`        // badDeploy and rollingRestart: which kind of component
 	FractionPct float64 `json:"fractionPct,omitempty"` // badDeploy: share of that kind that gets the bad release (at least one)
 	IntervalSec float64 `json:"intervalSec,omitempty"` // rollingRestart: gap between one restart and the next
+	Region      string  `json:"region,omitempty"`      // regionDown only: every node placed in this region crashes for DurationSec
 	Zone        string  `json:"zone,omitempty"`        // zoneDown only: every node placed in this zone crashes for DurationSec
 	ToID        string  `json:"toId,omitempty"`        // linkDown only: the connection from NodeID to this node
 	Mode        string  `json:"mode,omitempty"`        // linkDown only: both | replies (requests arrive, answers are lost) | requests

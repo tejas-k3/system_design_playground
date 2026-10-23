@@ -89,6 +89,7 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 	if e.from.zone != e.to.zone && e.from.kind != KClient && e.to.kind != KClient {
 		oneWay += crossZoneMs // a hop between availability zones, each way
 	}
+	oneWay += regionMs(e.from.region, e.to.region) // and the distance between regions
 	req, resp := s.sizes(c)
 	fwd := oneWay + s.transmit(e, 0, req)
 	if via != nil {
@@ -137,6 +138,31 @@ func (s *Sim) hopArrive(e, via *edge, target *node, oneWay float64, resp float64
 			})
 		})
 	}
+}
+
+// regionMs is the one-way latency between two regions (0 inside one); an unset region is the default, us.
+func regionMs(a, b string) float64 {
+	if a == b || a == "" && b == "us" || a == "us" && b == "" {
+		return 0
+	}
+	if a == "" {
+		a = "us"
+	}
+	if b == "" {
+		b = "us"
+	}
+	if a > b {
+		a, b = b, a
+	}
+	switch a + "-" + b {
+	case "eu-us":
+		return 45
+	case "ap-us":
+		return 75
+	case "ap-eu":
+		return 100
+	}
+	return 0
 }
 
 // crossZoneMs is the extra one-way latency of a call between two availability zones of a region.
