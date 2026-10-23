@@ -52,8 +52,9 @@ type call struct {
 	ver      int
 	ttl      float64
 	token    int
-	fence    int  // the fencing token the caller holds from its lock (0 = none)
-	blind    bool // a holder that froze with its lock writes on what it saw before the freeze, without checking again
+	fence    int     // the fencing token the caller holds from its lock (0 = none)
+	readX    float64 // a read of a counter split over several rows costs this many times as much
+	blind    bool    // a holder that froze with its lock writes on what it saw before the freeze, without checking again
 	job      *job
 	fan      float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
 	high     bool    // an urgent request
