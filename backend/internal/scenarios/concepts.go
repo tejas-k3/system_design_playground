@@ -60,6 +60,7 @@ var conceptTags = map[string][]string{
 	"go-global":              {"capacity"},
 	"payment-saga":           {"consistency", "failure-handling"},
 	"frozen-checkout":        {"consistency", "failure-handling"},
+	"who-is-the-leader":      {"replication", "failure-handling"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},

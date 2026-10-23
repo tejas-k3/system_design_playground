@@ -272,6 +272,12 @@ func TestAlternateSolutions(t *testing.T) {
 			}
 		}
 	})
+	t.Run("who-is-the-leader: four coordination machines still lose the quorum", func(t *testing.T) {
+		sc := Get("who-is-the-leader")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "zk", "nodes", 4.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("4 machines need 3 for a majority; losing 2 leaves none: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
