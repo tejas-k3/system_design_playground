@@ -23,6 +23,7 @@ type Goals struct {
 	MaxWriteSkew         *int     `json:"maxWriteSkew,omitempty"`         // on-call pairs left with the rule broken
 	MaxRpoSec            *float64 `json:"maxRpoSec,omitempty"`            // seconds of data a restore may lose
 	MaxRtoSec            *float64 `json:"maxRtoSec,omitempty"`            // seconds the database may be unavailable restoring
+	MaxLostEvents        *int     `json:"maxLostEvents,omitempty"`        // saved writes whose event never reached the queue
 	MaxSessionViolations *int     `json:"maxSessionViolations,omitempty"` // reads that broke read-your-writes or monotonic reads
 	StarCostPerHour      *float64 `json:"starCostPerHour,omitempty"`
 	StarP95Ms            *float64 `json:"starP95Ms,omitempty"`
@@ -193,6 +194,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxWriteSkew != nil {
 		checks = append(checks, Check{"Rule broken (write skew)", fmt.Sprintf("≤ %d", *g.MaxWriteSkew), fmt.Sprint(run.WriteSkew), run.WriteSkew <= *g.MaxWriteSkew})
+	}
+	if g.MaxLostEvents != nil {
+		checks = append(checks, Check{"Events lost", fmt.Sprintf("≤ %d", *g.MaxLostEvents), fmt.Sprint(run.EventsLost), run.EventsLost <= *g.MaxLostEvents})
 	}
 	if g.MaxRpoSec != nil {
 		checks = append(checks, Check{"Data lost (RPO)", fmt.Sprintf("≤ %.0f s", *g.MaxRpoSec), fmt.Sprintf("%.1f s", run.RpoSec), run.RpoSec <= *g.MaxRpoSec+eps})

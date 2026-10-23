@@ -122,6 +122,7 @@ type node struct {
 	coordLeader     int       // coordinator: the leader, -1 while there is none
 	coordTerm       int
 	coordElecting   bool
+	outboxBacklog   int               // events saved with the data and not yet taken by the queue
 	coordLocks      map[int]redisLock // coordinator: the lock on each key
 	coordFence      int               // coordinator: the last fencing token handed out
 	fenceSeen       map[int]int       // database: the newest fencing token each key has accepted
@@ -294,6 +295,7 @@ type Sim struct {
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int
+	runEventsLost                             int
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
 	runPartial, runHedged                     int
 	runFanWrites, runFanReads                 int
