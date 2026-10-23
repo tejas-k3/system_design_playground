@@ -298,7 +298,7 @@ type Sim struct {
 	shardAdds                                 int
 	runEventsLost                             int
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
-	runPartial, runHedged                     int
+	runPartial, runHedged, runHedgeWins       int
 	runFanWrites, runFanReads                 int
 	runWriteSkew                              int
 	runLostUpdates, runTxAborts, runDeadlocks int
