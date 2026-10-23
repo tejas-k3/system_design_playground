@@ -25,6 +25,15 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 		s.changeEvent(ev)
 		return
 	}
+	if ev.Type == "regionDown" { // a bigger correlated failure: everything in the region crashes together
+		for _, n := range s.order {
+			if n.region == ev.Region && n.kind != KClient && !n.removed && !n.down {
+				s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "crash", NodeID: n.id, Label: n.label})
+				s.CrashNode(n.id, ev.DurationSec)
+			}
+		}
+		return
+	}
 	if ev.Type == "zoneDown" { // a correlated failure: everything placed in the zone crashes together
 		for _, n := range s.order {
 			if n.zone == ev.Zone && n.kind != KClient && !n.removed && !n.down {

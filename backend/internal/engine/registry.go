@@ -525,6 +525,10 @@ func init() {
 			cost: func(Params) float64 { return 0.08 },
 		},
 	}
+	for i := range specs { // everything, users included, is somewhere in the world
+		specs[i].Params = append(specs[i].Params, sel("region", "Region", "Placement", "us", "Where in the world it runs (for users: where they are). A call between regions pays the distance each way (us-eu 45 ms, us-ap 75 ms, eu-ap 100 ms), and a region outage takes down everything placed in it.",
+			opt("us", "US"), opt("eu", "Europe"), opt("ap", "Asia-Pacific")).adv())
+	}
 	for i := range specs { // every component except the users can be placed in an availability zone
 		if specs[i].Kind != KClient {
 			specs[i].Params = append(specs[i].Params, sel("zone", "Availability zone", "Placement", "az-a", "Where it runs. A call between two zones pays a hop each way, and a zone outage takes down everything placed in it.",
