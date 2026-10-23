@@ -54,6 +54,14 @@ describe('deliveries per message goal', () => {
   })
 })
 
+describe('orders left half done goal', () => {
+  it('counts the multi-step writes that stayed half done', () => {
+    const g = { minSuccessRate: 0.5, maxInconsistent: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, inconsistent: 7 }), 1, true), 'Orders left half done')).toMatchObject({ actual: '7', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Orders left half done').state).toBe('pass')
+  })
+})
+
 describe('goalRows', () => {
   const goals = { minSuccessRate: 0.99, maxP95Ms: 500, maxCostPerHour: 1, maxConflicts: 0 }
 
