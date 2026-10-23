@@ -152,7 +152,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 			})
 			return
 		}
-		if ee := s.first(n, KExternalAPI); ee != nil && (cc.write || ee.to.s("calledFor") == "all") {
+		if ee := s.first(n, KExternalAPI); ee != nil && !s.runsWorkflow(n) && (cc.write || ee.to.s("calledFor") == "all") {
 			s.callCmd(n, ee, &cc, cmdExternal, 0, func(res Result) {
 				if !res.OK {
 					done(res)
@@ -296,6 +296,9 @@ func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
 				return
 			}
 		default:
+			if m := n.s("workflow"); (m == "naive" || m == "saga") && s.workflowWrite(n, c, m, done) {
+				return
+			}
 			if m := n.s("eventPublish"); (m == "dualWrite" || m == "outbox") && s.eventWrite(n, c, m, done) {
 				return
 			}
