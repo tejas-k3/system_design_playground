@@ -1326,6 +1326,18 @@ func (s *Sim) dispatchLog(q *node) {
 		if l.running || l.head >= len(l.jobs) || q.down || q.grpPause[l.group] > s.now {
 			continue
 		}
+		if keep := q.f("retentionSec") * 1000; keep > 0 { // messages older than the retention are gone
+			for l.head < len(l.jobs) && s.now-l.jobs[l.head].enq > keep {
+				if l.jobs[l.head].counted {
+					s.jobLost++
+				}
+				l.jobs[l.head] = nil
+				l.head++
+			}
+			if l.head >= len(l.jobs) {
+				continue
+			}
+		}
 		w := s.laneOwner(q, l)
 		if w == nil || w.busy >= s.capacity(w) {
 			continue
