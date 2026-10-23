@@ -227,6 +227,16 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	if n.kind == KDatabase && n.s("onFailure") == "promote" {
 		s.scheduleFailover(n)
 	}
+	if n.kind == KLog && n.f("leaderElectionSec") > 0 && n.s("ackMode") != "instant" {
+		ep := n.epoch
+		s.after(n.f("leaderElectionSec")*1000, func() { // a follower becomes the leader while the old one is still down
+			if n.down && n.epoch == ep {
+				n.down = false
+				s.logEvent("promotion", n, 0)
+				s.dispatch(n)
+			}
+		})
+	}
 	if downSec > 0 {
 		ep := n.epoch
 		s.after(downSec*1000, func() {
