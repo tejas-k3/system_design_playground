@@ -260,6 +260,18 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("retrying leaves the reservations behind: %+v inconsistent %d", res.Checks, res.Run.Inconsistent)
 		}
 	})
+	t.Run("frozen-checkout: retries and capacity do not unlock the stuck transactions", func(t *testing.T) {
+		sc := Get("frozen-checkout")
+		for _, c := range []struct {
+			node, key string
+			v         float64
+		}{{"users", "retries", 2.0}, {"app", "threads", 96.0}} {
+			res := engine.RunToEnd(withParam(sc.Diagram, c.node, c.key, c.v), sc.Options(42), sc.Goals)
+			if res.Pass || res.Run.InDoubt == 0 {
+				t.Fatalf("%s=%v: transactions stay in doubt: %+v", c.key, c.v, res.Run.InDoubt)
+			}
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

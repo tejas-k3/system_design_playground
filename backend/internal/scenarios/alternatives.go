@@ -110,6 +110,10 @@ var alternatives = map[string][]Alternative{
 	"payment-saga": {
 		alt("Let clients retry a failed order twice", false, 99.5, 606, 1.00, "Success rate goes up (a retry usually gets a different answer from the card processor) but every failed attempt still leaves its stock reserved: 302 orders half done on this seed, and the retries make the tail twice as slow.", Change{"users", "retries", 2.0}),
 	},
+	"frozen-checkout": {
+		alt("Let clients retry a failed order twice", false, 79.3, 848, 1.00, "More requests get through once the server is back, but the transactions that were mid-flight when it died are still locked: 13 in doubt on this seed, and the retries push the p95 to 848 ms.", Change{"users", "retries", 2.0}),
+		alt("Give the app server 96 threads", false, 70.4, 517, 2.46, "Capacity does not change what happens when the coordinator dies: 12 transactions are still in doubt, and the bill goes up.", Change{"app", "threads", 96.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
