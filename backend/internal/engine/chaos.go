@@ -67,6 +67,11 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 			s.restore(t)
 		}
 		return
+	case "addNode": // a shard router gets one more shard: a copy of its first
+		if t.kind == KShardRouter {
+			s.addShard(t)
+		}
+		return
 	case "clusterNodeDown":
 		if t.kind == KCoordinator {
 			s.coordNodesDown(t, int(ev.Factor), ev.DurationSec*1000, ev.Mode)

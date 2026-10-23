@@ -91,6 +91,9 @@ var alternatives = map[string][]Alternative{
 	"lease-expired": {
 		alt("Make the lock lease 1 second", true, 97.5, 2238, 2.71, "Passes this run, because every pause (600 ms) is shorter than the lease. It is a bet on how long a pause can be: with 3-second pauses it double books again (6 on this seed), where the conditional write still has none.", Change{"app1", "lockTtlMs", 1000.0}, Change{"app2", "lockTtlMs", 1000.0}, Change{"app3", "lockTtlMs", 1000.0}),
 	},
+	"add-a-shard": {
+		alt("Spread keys over a ring with one point per shard", true, 100.0, 148, 3.79, "Still a ring, so only about a fifth of the keys move; with a single point per shard the split is less even, but the move is still small enough here to pass.", Change{"shards", "hashing", "ring"}, Change{"shards", "vnodes", 1.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
