@@ -110,6 +110,9 @@ type node struct {
 	mlConflicts     int
 	writeLog        []float64 // database that a restore is planned for: when each write was committed
 	logWrites       bool
+	grpSig          map[int]string  // log: who is in each consumer group, to notice a change
+	grpPause        map[int]float64 // log: each group is rebalancing (reads nothing) until then
+	rebalances      int
 	leakNext        float64          // rate limiter (leaky bucket): when the next request may leave
 	corruptAt       float64          // database: when silent corruption began (0 = none)
 	sessWrite       map[int]int      // client: the newest version of each key this client has had acknowledged for its own writes

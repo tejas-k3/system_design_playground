@@ -371,6 +371,7 @@ func init() {
 				num("capacity", "Backlog per partition", "Buffer", 5000, 10, 100000, 100, "messages", "Messages one partition may hold for a group; beyond it that group's copies are dropped."),
 				num("maxAttempts", "Attempts per message", "Delivery", 3, 1, 10, 1, "", "How many times a failing message is tried in place (the partition waits) before it is given up.").adv(),
 				flag("deadLetter", "Dead-letter queue", "Delivery", false, "Park messages that used up their attempts instead of dropping them.").adv(),
+				num("rebalanceSec", "Rebalance pause", "Delivery", 0, 0, 120, 1, "s", "When a member joins or leaves a consumer group, the whole group stops reading for this long while the partitions are handed out again (a stop-the-world rebalance), so the backlog grows for everyone. 0 = the partitions move over instantly.").adv(),
 			},
 			cost: func(p Params) float64 { return 0.03 * pf(p, "partitions", 4) / 4 },
 		},
