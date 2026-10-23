@@ -1343,13 +1343,24 @@ func (s *Sim) dispatchLog(q *node) {
 			continue
 		}
 		j := l.jobs[l.head]
-		l.jobs[l.head] = nil
+		keep := q.f("retentionSec") * 1000
+		if keep <= 0 { // nothing is kept once it has been read
+			l.jobs[l.head] = nil
+		}
 		l.head++
 		l.running = true
 		s.runJob(q, w, j)
-		if l.head > 256 && l.head*2 > len(l.jobs) {
-			l.jobs = append([]*job(nil), l.jobs[l.head:]...)
-			l.head = 0
+		cut := l.head
+		if keep > 0 { // read messages stay until they are older than the retention, so a group can read them again
+			cut = 0
+			for cut < l.head && (l.jobs[cut] == nil || s.now-l.jobs[cut].enq > keep) {
+				l.jobs[cut] = nil
+				cut++
+			}
+		}
+		if cut > 256 && cut*2 > len(l.jobs) {
+			l.jobs = append([]*job(nil), l.jobs[cut:]...)
+			l.head -= cut
 		}
 	}
 }
@@ -1378,3 +1389,17 @@ func (s *Sim) heavyMult(c *call) float64 {
 }
 
 func (s *Sim) classMult(c *call, n *node) float64 { return s.heavyMult(c) }
+
+// logReplay makes every consumer group read again the messages the log still has from the last back seconds.
+func (s *Sim) logReplay(q *node, back float64) {
+	from := s.now - back*1000
+	for _, l := range q.lanes {
+		i := l.head
+		for i > 0 && l.jobs[i-1] != nil && l.jobs[i-1].enq >= from {
+			i--
+		}
+		s.jobRedelivered += l.head - i
+		l.head = i
+	}
+	s.dispatch(q)
+}

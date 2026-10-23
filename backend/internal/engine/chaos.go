@@ -76,6 +76,11 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 			s.restore(t)
 		}
 		return
+	case "replay": // a log's consumer groups read the last Factor seconds again
+		if t.kind == KLog {
+			s.logReplay(t, ev.Factor)
+		}
+		return
 	case "addNode": // a shard router gets one more shard: a copy of its first
 		if t.kind == KShardRouter {
 			s.addShard(t)
