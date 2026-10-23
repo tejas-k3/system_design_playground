@@ -218,6 +218,14 @@ func (s *Sim) Snapshot() Stats {
 		if n.mlConflicts > 0 {
 			ex["writeConflicts"] = float64(n.mlConflicts)
 		}
+		if n.kind == KDatabase && (n.f("dataGB") > 0 || n.f("growthGBPerDay") > 0) {
+			ex["storedGB"] = n.f("dataGB")
+			// the average size over the next 365 days, charged by the month
+			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
+			if g, pool := n.f("growthGBPerDay"), n.f("bufferPoolGB"); g > 0 && n.f("dataGB") < pool {
+				ex["daysUntilBufferPoolFull"] = (pool - n.f("dataGB")) / g
+			}
+		}
 		if n.kind == KShardRouter && n.reshards > 0 {
 			ex["keysMoved"] = n.keysMoved
 			if n.slowedMoves > 0 {
