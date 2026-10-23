@@ -1034,6 +1034,19 @@ func (s *Sim) pickBackend(n *node) *edge {
 	if len(cand) == 0 {
 		return nil
 	}
+	if n.kind == KLoadBalancer && n.s("zoneRouting") == "local" {
+		var near []*edge
+		for _, e := range cand {
+			if e.to.zone == n.zone {
+				near = append(near, e)
+			}
+		}
+		if len(near) > 0 {
+			cand = near
+		} else if !n.b("crossZoneFailover") {
+			return nil
+		}
+	}
 	if n.kind == KLoadBalancer {
 		if pct := n.f("canaryPct"); pct > 0 {
 			cand = s.canarySplit(n, cand, pct)
