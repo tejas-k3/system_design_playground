@@ -35,6 +35,15 @@ describe('events lost goal', () => {
   })
 })
 
+describe('quiet tenant goal', () => {
+  const g = { minSuccessRate: 0.5, minWorstTenant: 0.95 }
+  it('shows the worst-served quiet tenant against the target', () => {
+    const rows = goalRows(g, stats({ resolved: 10, ok: 10, tenants: 4, worstTenantSuccess: 0.32 }), 1, true)
+    expect(row(rows, 'Worst-served quiet tenant')).toMatchObject({ actual: '32.0%', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, tenants: 4, worstTenantSuccess: 1 }), 1, true), 'Worst-served quiet tenant').state).toBe('pass')
+  })
+})
+
 describe('goalRows', () => {
   const goals = { minSuccessRate: 0.99, maxP95Ms: 500, maxCostPerHour: 1, maxConflicts: 0 }
 
