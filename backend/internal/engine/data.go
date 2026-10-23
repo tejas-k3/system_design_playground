@@ -166,7 +166,22 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 	})
 }
 
+// splitHotKey spreads the one hot item over several rows: a write goes to one of them, a read has to add all up.
+func splitHotKey(n *node, c *call, read bool) *call {
+	if n.s("hotKeyMode") != "split" || c.key != 0 {
+		return c
+	}
+	shards := clampInt(int(n.f("splitShards")), 2, 64)
+	cc := *c
+	cc.key = 1_000_000 + int(c.hash%uint32(shards))
+	if read {
+		cc.readX = float64(shards)
+	}
+	return &cc
+}
+
 func (s *Sim) appRead(n *node, c *call, done func(Result)) {
+	c = splitHotKey(n, c, true)
 	// a page with a body: after the lookup, the body is fetched from the object store the app server is wired to
 	if oe := s.first(n, KObjectStore); oe != nil && c.lg != nil && (c.wl == wlKV || c.wl == wlFeed) && c.lg.client.f("respKB") > 0 {
 		inner := done
@@ -260,6 +275,7 @@ func (s *Sim) appRead(n *node, c *call, done func(Result)) {
 }
 
 func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
+	c = splitHotKey(n, c, false)
 	if c.wl == wlFeed {
 		cc := *c
 		cc.fan = s.feedFan(n, c)
@@ -567,36 +583,57 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 	if c.heavy {
 		ms *= s.heavyMult(c)
 	}
-	took := s.service(n, ms) * n.slow
-	if write && n.stallUntil > s.now { // an LSM database is compacting: the write waits for it to finish
-		took += n.stallUntil - s.now
+	if c.readX > 1 && !write { // a counter split over several rows is read by adding them all up
+		ms *= c.readX
 	}
-	if write && n.kind == KDatabase && n.f("diskIops") > 0 {
-		per := 1000 / n.f("diskIops")
-		start := math.Max(s.now, n.diskFree)
-		n.diskFree = start + per*(1+n.f("indexes"))
-		took += n.diskFree - s.now
-	}
-	s.hold(n, took, release, cb, func() {
-		release()
-		res := Result{Ver: -1, Done: true, Src: n}
-		switch {
-		case write:
-			if n.kind == KDatabase && n.s("topology") == "multiLeader" {
-				s.multiLeaderWrite(n, c)
-			}
-			res.Ver = s.commit(n, c)
-			if n.promoted {
-				n.sincePromotion++
-			}
-		case c.wl == wlGeo || c.wl == wlLeader:
-		case n.kind == KReplica && !n.promoted:
-			res.Ver = s.verAt(c.key, s.now-s.replicaLag(n))
-		default:
-			res.Ver = s.itemVer(c.key)
+	exec := func(unlock func()) {
+		took := s.service(n, ms) * n.slow
+		if write && n.stallUntil > s.now { // an LSM database is compacting: the write waits for it to finish
+			took += n.stallUntil - s.now
 		}
-		s.okAt(n, res, cb)
-	})
+		if write && n.kind == KDatabase && n.f("diskIops") > 0 {
+			per := 1000 / n.f("diskIops")
+			start := math.Max(s.now, n.diskFree)
+			n.diskFree = start + per*(1+n.f("indexes"))
+			took += n.diskFree - s.now
+		}
+		s.hold(n, took, func() { unlock(); release() }, cb, func() {
+			unlock()
+			release()
+			res := Result{Ver: -1, Done: true, Src: n}
+			switch {
+			case write:
+				if n.kind == KDatabase && n.s("topology") == "multiLeader" {
+					s.multiLeaderWrite(n, c)
+				}
+				res.Ver = s.commit(n, c)
+				if n.promoted {
+					n.sincePromotion++
+				}
+			case c.wl == wlGeo || c.wl == wlLeader:
+			case n.kind == KReplica && !n.promoted:
+				res.Ver = s.verAt(c.key, s.now-s.replicaLag(n))
+			default:
+				res.Ver = s.itemVer(c.key)
+			}
+			s.okAt(n, res, cb)
+		})
+	}
+	if write && n.kind == KDatabase && n.b("hotRowLock") {
+		// writes to one row run one after another; a waiting write keeps its connection
+		ep := n.epoch
+		s.lockKey(n, c.key, func(unlock func()) {
+			if n.epoch != ep || n.removed {
+				unlock()
+				release()
+				s.failAt(n, RNodeDown, cb)
+				return
+			}
+			exec(unlock)
+		})
+		return
+	}
+	exec(func() {})
 }
 
 func (s *Sim) lockKey(n *node, key int, fn func(unlock func())) {
