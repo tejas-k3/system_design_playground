@@ -75,6 +75,7 @@ type redisLock struct {
 
 // bucket is one account's token bucket in a per-user rate limiter.
 type bucket struct {
+	leakNext   float64 // leaky bucket: when this account's next request may leave
 	tokens, at float64
 	winStart   float64   // window algorithms: when the current window began
 	count      float64   // requests admitted in the current window
@@ -109,6 +110,7 @@ type node struct {
 	mlConflicts     int
 	writeLog        []float64 // database that a restore is planned for: when each write was committed
 	logWrites       bool
+	leakNext        float64          // rate limiter (leaky bucket): when the next request may leave
 	corruptAt       float64          // database: when silent corruption began (0 = none)
 	sessWrite       map[int]int      // client: the newest version of each key this client has had acknowledged for its own writes
 	sessRead        map[int]int      // client: the newest version of each key this client has read
@@ -296,6 +298,7 @@ type Sim struct {
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int
 	shardAdds                                 int
+	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
 	runEventsLost                             int
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
 	runPartial, runHedged, runHedgeWins       int

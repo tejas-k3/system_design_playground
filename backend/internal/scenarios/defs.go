@@ -1385,6 +1385,36 @@ func init() {
 		Debrief: "Hedged requests trade a little extra load for a much shorter tail: the chance that two independent replicas are both slow is the square of the chance that one is. Wait about the p95 of a normal request before hedging, or you simply double your traffic.",
 	})
 
+	// Noisy tenant: one customer of a shared service sends most of the traffic; a single shared limit punishes everyone
+	noisyTenant := func(fixed bool) engine.Diagram {
+		keyBy := "none"
+		if fixed {
+			keyBy = "tenant"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 300.0, "readPct": 100.0, "identities": 100.0, "identitySkew": 1.2, "tenants": 4.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("rl", engine.KRateLimiter, cols[1], rowMid, P{"limitRps": 100.0, "burst": 20.0, "keyBy": keyBy}).
+			n("app", engine.KAppServer, cols[2], rowMid, P{"threads": 32.0, "queueCap": 1000.0}).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 32.0}).
+			e("users", "rl").e("rl", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "noisy-tenant", Title: "The noisy tenant", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "One customer is sending most of the traffic, and the others are the ones who suffer.",
+		Story:   "A shared API serves four customers (tenants). One of them runs a heavy integration and sends most of the requests. To protect the servers there is a rate limit of 100 requests a second for everyone together. The heavy tenant uses it all up; the three quiet tenants, who never come near a fair share, get errors.",
+		Diagram: noisyTenant(false), Solution: noisyTenant(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.45, MinWorstTenant: f(0.95), MaxP95Ms: f(400), MaxCostPerHour: f(1.6), StarCostPerHour: f(1.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at who is being rejected: the goals show how the worst-served quiet tenant is doing, not just the total.",
+			"One limit for all traffic together is first come, first served: whoever sends the most takes the most. A higher shared limit helps the quiet tenants only by also letting the noisy one send even more.",
+			"Make the rate limiter count per tenant (Limit per: each tenant): every tenant gets its own allowance, so the noisy one runs out without turning anyone else away.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Doubling the shared limit to 200 requests a second would…", Options: []string{"Fix it for the quiet tenants", "Help a little, but the noisy tenant still takes the larger share", "Make no difference"}, Answer: 1,
+			Explain: "A shared limit divides capacity in proportion to demand, so the loudest tenant keeps getting the most. A limit per tenant divides it fairly."}},
+		Debrief: "A global rate limit protects the servers but not the tenants from each other. Limit per customer so one customer's burst runs into its own allowance, and add a shared limit on top if the total must be bounded too.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
