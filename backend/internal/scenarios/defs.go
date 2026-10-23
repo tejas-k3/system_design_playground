@@ -1450,6 +1450,47 @@ func init() {
 		Debrief: "A queue is for sharing work among identical workers; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
 	})
 
+	// Go global: users on three continents, one stack in one region
+	goGlobal := func(fixed bool) engine.Diagram {
+		b := &bld{}
+		regions := []string{"us", "eu", "ap"}
+		names := map[string]string{"us": "US", "eu": "Europe", "ap": "Asia"}
+		for i, r := range regions {
+			b.n("users-"+r, engine.KClient, cols[0], float64(i)*120+30, P{"rps": 40.0, "readPct": 100.0, "timeoutMs": 3000.0, "retries": 0.0, "region": r, "geoRouting": fixed}).label("users-"+r, names[r]+" users")
+		}
+		stacks := []string{"us"}
+		if fixed {
+			stacks = regions
+		}
+		for i, r := range stacks {
+			lb, app, db := "lb-"+r, "app-"+r, "db-"+r
+			b.n(lb, engine.KLoadBalancer, cols[1], float64(i)*120+30, P{"region": r}).label(lb, names[r]+" balancer")
+			b.n(app, engine.KAppServer, cols[2], float64(i)*120+30, P{"threads": 24.0, "region": r}).label(app, names[r]+" app")
+			b.n(db, engine.KDatabase, cols[3], float64(i)*120+30, P{"connections": 16.0, "region": r}).label(db, names[r]+" database")
+			b.e(lb, app).e(app, db)
+			for _, u := range regions {
+				b.e("users-"+u, lb)
+			}
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "go-global", Title: "Go global", Difficulty: "Medium",
+		Summary: "Customers in Europe and Asia find the product slow, and the servers are fine.",
+		Story:   "The whole stack runs in the US. Customers in Europe and Asia get the same servers, the same database and the same code, but every request crosses an ocean twice, and the speed of light is not a setting you can change. The product team wants a snappy experience for everyone.",
+		Diagram: goGlobal(false), Solution: goGlobal(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(180), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.6), StarP95Ms: f(160)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Compare the latency of the three groups of users. What explains the difference when the servers are equally fast?",
+			"Distance. A request from Asia to the US pays about 75 ms each way before any work is done. More capacity cannot shorten that: the stack has to be closer to the users.",
+			"Run a stack (balancer, app, database) in each region, connect every user group to all of them, and turn on 'Send users to the nearest region' for the users. Remember the stacks cost money too.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Adding more servers in the US would make users in Asia…", Options: []string{"Much faster", "No faster: the delay is the distance, not the load", "Slower"}, Answer: 1,
+			Explain: "Latency to a far region is dominated by the distance each way. Capacity helps when servers are busy, not when the wait is the speed of light."}},
+		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to keeping their data consistent (which the multi-region database challenges are about).",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0

@@ -247,6 +247,12 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("a bigger shared limit still favours the loudest: %+v", res.Checks)
 		}
 	})
+	t.Run("go-global: capacity in one region does not help far users", func(t *testing.T) {
+		sc := Get("go-global")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app-us", "threads", 96.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("more US capacity does not shorten the ocean: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

@@ -234,6 +234,9 @@ func (s *Sim) startAttempt(lg *logical) {
 	}
 	c := lg.client
 	e := s.pickCyclic(c, "out", c.out, nil)
+	if c.b("geoRouting") {
+		e = s.nearestEdge(c)
+	}
 	if e == nil {
 		s.resolve(lg, Result{Reason: RNoRoute})
 		return
@@ -372,4 +375,22 @@ func (s *Sim) resolve(lg *logical, res Result) {
 			s.runErrors[res.Reason]++
 		}
 	}
+}
+
+// nearestEdge is geo routing: of the places a client can send to, those in the region closest to the user, taking
+// turns among them. If every nearby one is down the next nearest is used (a failover across regions).
+func (s *Sim) nearestEdge(c *node) *edge {
+	best := -1.0
+	for _, e := range c.out {
+		if e.removed || e.to.down {
+			continue
+		}
+		if d := regionMs(c.region, e.to.region); best < 0 || d < best {
+			best = d
+		}
+	}
+	if best < 0 {
+		return s.pickCyclic(c, "out", c.out, nil)
+	}
+	return s.pickCyclic(c, "geo", c.out, func(e *edge) bool { return !e.to.down && regionMs(c.region, e.to.region) == best })
 }

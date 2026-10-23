@@ -57,6 +57,7 @@ var conceptTags = map[string][]string{
 	"heavy-tail":             {"capacity", "overload-control"},
 	"noisy-tenant":           {"overload-control"},
 	"notification-fan-out":   {"queues"},
+	"go-global":              {"capacity"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},

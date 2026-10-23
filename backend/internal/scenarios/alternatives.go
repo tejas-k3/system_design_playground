@@ -104,6 +104,9 @@ var alternatives = map[string][]Alternative{
 	"notification-fan-out": {
 		alt("Give each sender 16 slots instead of 4", false, 100.0, 129, 1.64, "More capacity makes the shared work faster, not wider: each order still reaches only one of the three workers (1.00 deliveries per message) and the bill goes up.", Change{"ch1", "concurrency", 16.0}, Change{"ch2", "concurrency", 16.0}, Change{"ch3", "concurrency", 16.0}),
 	},
+	"go-global": {
+		alt("Give the US app server 96 threads", false, 100.0, 291, 2.48, "The delay is distance, not load: the p95 stays at 291 ms and the bill goes up.", Change{"app-us", "threads", 96.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
