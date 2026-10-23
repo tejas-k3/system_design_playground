@@ -27,6 +27,14 @@ describe('recovery goals', () => {
   })
 })
 
+describe('events lost goal', () => {
+  it('compares the lost events with the limit', () => {
+    const g = { minSuccessRate: 0.5, maxLostEvents: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, eventsLost: 1020 }), 1, true), 'Events lost')).toMatchObject({ actual: '1020', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Events lost').state).toBe('pass')
+  })
+})
+
 describe('goalRows', () => {
   const goals = { minSuccessRate: 0.99, maxP95Ms: 500, maxCostPerHour: 1, maxConflicts: 0 }
 
