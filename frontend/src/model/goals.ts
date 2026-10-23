@@ -54,6 +54,7 @@ export function goalRows(g: Goals, stats: Stats, cost: number | null, started: b
   }
   if (g.maxDuplicates !== undefined) rows.push({ label: 'Duplicate writes', target: `≤ ${g.maxDuplicates}`, actual: String(r.duplicates), state: !started ? 'pending' : r.duplicates <= g.maxDuplicates ? 'pass' : 'fail' })
   if (g.maxLostWrites !== undefined) rows.push({ label: 'Writes lost in a crash', target: `≤ ${g.maxLostWrites}`, actual: String(r.lostWrites), state: !started ? 'pending' : r.lostWrites <= g.maxLostWrites ? 'pass' : 'fail' })
+  if (g.maxLostEvents !== undefined) { const v = r.eventsLost ?? 0; rows.push({ label: 'Events lost', target: `≤ ${g.maxLostEvents}`, actual: String(v), state: !started ? 'pending' : v <= g.maxLostEvents ? 'pass' : 'fail' }) }
   if (g.maxRpoSec !== undefined) { const v = r.rpoSec ?? 0; rows.push({ label: 'Data lost (RPO)', target: `≤ ${g.maxRpoSec} s`, actual: `${v.toFixed(1)} s`, state: !started ? 'pending' : v <= g.maxRpoSec ? 'pass' : 'fail' }) }
   if (g.maxRtoSec !== undefined) { const v = r.rtoSec ?? 0; rows.push({ label: 'Time to restore (RTO)', target: `≤ ${g.maxRtoSec} s`, actual: `${v.toFixed(1)} s`, state: !started ? 'pending' : v <= g.maxRtoSec ? 'pass' : 'fail' }) }
   if (g.maxSessionViolations !== undefined) { const broken = (r.readYourWritesBroken ?? 0) + (r.monotonicBroken ?? 0); rows.push({ label: 'Per-client guarantees broken', target: `≤ ${g.maxSessionViolations}`, actual: String(broken), state: !started ? 'pending' : broken <= g.maxSessionViolations ? 'pass' : 'fail' }) }
