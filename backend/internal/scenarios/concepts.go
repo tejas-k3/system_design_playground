@@ -56,6 +56,7 @@ var conceptTags = map[string][]string{
 	"add-a-shard":            {"sharding", "capacity"},
 	"heavy-tail":             {"capacity", "overload-control"},
 	"noisy-tenant":           {"overload-control"},
+	"notification-fan-out":   {"queues"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},
