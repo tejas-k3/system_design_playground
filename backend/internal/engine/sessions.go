@@ -116,3 +116,13 @@ func (s *Sim) dropSessions(n *node) {
 		s.after(1+s.rng.Next()*sess.client.f("reconnectJitterSec")*1000, func() { s.connectSession(sess) })
 	}
 }
+
+// pushThreads is how many threads' worth of CPU the server spends pushing to its connected users: one push a second
+// to each of 2,000 users at 2 ms apiece is 4 threads, taken from ordinary requests.
+func (s *Sim) pushThreads(n *node) float64 {
+	rate := n.f("pushPerSec")
+	if rate <= 0 || n.sessConns <= 0 {
+		return 0
+	}
+	return rate * float64(n.sessConns) * n.f("pushCpuMs") / 1000
+}
