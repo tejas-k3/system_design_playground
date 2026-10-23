@@ -23,6 +23,7 @@ type Goals struct {
 	MaxWriteSkew         *int     `json:"maxWriteSkew,omitempty"`         // on-call pairs left with the rule broken
 	MaxRpoSec            *float64 `json:"maxRpoSec,omitempty"`            // seconds of data a restore may lose
 	MaxRtoSec            *float64 `json:"maxRtoSec,omitempty"`            // seconds the database may be unavailable restoring
+	MinWorstTenant       *float64 `json:"minWorstTenant,omitempty"`       // the worst-served of the quiet tenants must still succeed at least this often
 	MaxLostEvents        *int     `json:"maxLostEvents,omitempty"`        // saved writes whose event never reached the queue
 	MaxSessionViolations *int     `json:"maxSessionViolations,omitempty"` // reads that broke read-your-writes or monotonic reads
 	StarCostPerHour      *float64 `json:"starCostPerHour,omitempty"`
@@ -194,6 +195,13 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxWriteSkew != nil {
 		checks = append(checks, Check{"Rule broken (write skew)", fmt.Sprintf("≤ %d", *g.MaxWriteSkew), fmt.Sprint(run.WriteSkew), run.WriteSkew <= *g.MaxWriteSkew})
+	}
+	if g.MinWorstTenant != nil {
+		a, ok := "no tenants", false
+		if run.Tenants > 1 {
+			a, ok = pct(run.WorstTenantSuccess), run.WorstTenantSuccess+eps >= *g.MinWorstTenant
+		}
+		checks = append(checks, Check{"Worst-served quiet tenant", "≥ " + pct(*g.MinWorstTenant), a, ok})
 	}
 	if g.MaxLostEvents != nil {
 		checks = append(checks, Check{"Events lost", fmt.Sprintf("≤ %d", *g.MaxLostEvents), fmt.Sprint(run.EventsLost), run.EventsLost <= *g.MaxLostEvents})

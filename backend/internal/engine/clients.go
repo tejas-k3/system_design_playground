@@ -335,6 +335,16 @@ func (s *Sim) resolve(lg *logical, res Result) {
 			s.runCustOK++
 		}
 	}
+	if lg.counted && lg.user != 0 && lg.client.f("tenants") >= 1 { // how each tenant fared
+		tn := tenantOfUser(lg.client, lg.user)
+		for len(s.tenantTotal) < tn {
+			s.tenantTotal, s.tenantOK = append(s.tenantTotal, 0), append(s.tenantOK, 0)
+		}
+		s.tenantTotal[tn-1]++
+		if res.OK {
+			s.tenantOK[tn-1]++
+		}
+	}
 	if lg.counted && lg.high {
 		s.runHighTotal++
 		if res.OK {

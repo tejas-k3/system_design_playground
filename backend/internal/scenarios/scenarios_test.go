@@ -241,6 +241,12 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("hedging after 5 ms also passes (and doubles the load): %+v", res.Checks)
 		}
 	})
+	t.Run("noisy-tenant: a higher shared limit does not protect the quiet tenants", func(t *testing.T) {
+		sc := Get("noisy-tenant")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "rl", "limitRps", 200.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("a bigger shared limit still favours the loudest: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

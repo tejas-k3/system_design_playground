@@ -782,11 +782,25 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 			return
 		}
 	case KRateLimiter:
-		if !s.admit(n, c) {
+		if n.s("algorithm") == "leakyBucket" {
+			ok, wait := s.leak(n, c)
+			if !ok {
+				s.failAt(n, RRateLimited, cb)
+				return
+			}
+			n.c.adm++
+			if wait > 0 { // the request waits for its slot, then goes on as if it had just arrived
+				s.after(wait, func() {
+					s.submit(n, c, cb, func(release func()) { s.process(n, c, cb, release) })
+				})
+				return
+			}
+		} else if !s.admit(n, c) {
 			s.failAt(n, RRateLimited, cb)
 			return
+		} else {
+			n.c.adm++
 		}
-		n.c.adm++
 	}
 	s.submit(n, c, cb, func(release func()) { s.process(n, c, cb, release) })
 }
@@ -800,19 +814,24 @@ func (s *Sim) admit(n *node, c *call) bool {
 		}
 		n = s.sharedLimit
 	}
+	if n.s("algorithm") == "leakyBucket" {
+		ok, _ := s.leak(n, c)
+		return ok
+	}
 	if algo := n.s("algorithm"); algo != "tokenBucket" && algo != "" {
 		return s.admitWindow(n, c, algo)
 	}
-	if n.s("keyBy") != "user" || c.user == 0 {
+	key := limiterKey(n, c)
+	if key == 0 {
 		return s.takeToken(n)
 	}
 	if n.buckets == nil {
 		n.buckets = map[int]*bucket{}
 	}
-	b := n.buckets[c.user]
+	b := n.buckets[key]
 	if b == nil {
 		b = &bucket{tokens: n.f("burst"), at: s.now}
-		n.buckets[c.user] = b
+		n.buckets[key] = b
 	}
 	b.tokens = math.Min(n.f("burst"), b.tokens+(s.now-b.at)*n.f("limitRps")/1000)
 	b.at = s.now
@@ -831,13 +850,13 @@ func (s *Sim) admitWindow(n *node, c *call, algo string) bool {
 	win := n.f("windowSec") * 1000
 	aligned := math.Floor(s.now/win) * win // windows are aligned to the clock, as in a real limiter
 	var b *bucket
-	if n.s("keyBy") == "user" && c.user != 0 {
+	if key := limiterKey(n, c); key != 0 {
 		if n.buckets == nil {
 			n.buckets = map[int]*bucket{}
 		}
-		if b = n.buckets[c.user]; b == nil {
+		if b = n.buckets[key]; b == nil {
 			b = &bucket{winStart: aligned}
-			n.buckets[c.user] = b
+			n.buckets[key] = b
 		}
 	} else {
 		if n.global == nil {
