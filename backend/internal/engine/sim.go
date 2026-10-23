@@ -308,6 +308,8 @@ type Sim struct {
 	runInDoubt                                int     // two-phase commits left waiting for a crashed coordinator
 	runBlockedSec                             float64 // lock-seconds those waited
 	inDoubt                                   []inDoubtRec
+	keyCount                                  []int32 // requests per bucket of items
+	keyTotal                                  int
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
 	runPartial, runHedged, runHedgeWins       int
 	runFanWrites, runFanReads                 int
