@@ -590,7 +590,7 @@ func (s *Sim) dropConns(db *node) {
 func (s *Sim) capacity(n *node) int {
 	switch n.kind {
 	case KAppServer:
-		return int(n.f("threads")) * s.instancesOf(n)
+		return max(1, int(n.f("threads"))*s.instancesOf(n)-int(math.Round(s.pushThreads(n))))
 	case KDatabase, KReplica:
 		return int(n.f("connections"))
 	case KWorker:

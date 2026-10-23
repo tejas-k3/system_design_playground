@@ -207,6 +207,8 @@ func init() {
 				num("maxConns", "Max connections", "Capacity", 0, 0, 1000000, 100, "", "Long-lived connections one server holds; beyond it new ones are refused. 0 = no limit besides memory.").adv(),
 				num("memPerConnKB", "Memory per connection", "Failure modes", 0, 0, 10000, 10, "KB", "Memory each open connection takes. With a memory limit, this sets how many connections fit. 0 = not modelled.").adv(),
 				num("handshakeMs", "Connection setup", "Capacity", 0, 0, 1000, 5, "ms", "Time to set up a new long-lived connection (TLS, authentication).").adv(),
+				num("pushPerSec", "Pushes per second", "Capacity", 0, 0, 100, 0.5, "/s", "How many times a second the server pushes something (a score, a price) to every user connected to it. Each push to each connection costs the CPU below, whether or not anyone asked for anything.").adv(),
+				num("pushCpuMs", "CPU per push", "Capacity", 1, 0.1, 50, 0.5, "ms", "CPU time to send one push to one connection.").adv(),
 				num("memBaseMB", "Base memory", "Failure modes", 200, 0, 65536, 50, "MB", "What an idle server already uses.").adv(),
 				num("memPerReqMB", "Memory per request", "Failure modes", 1, 0.1, 500, 0.1, "MB", "Memory held by each request that is running or waiting in the queue.").adv(),
 				num("memRestartSec", "Restart time", "Failure modes", 5, 1, 120, 1, "s", "How long the killed server takes to come back.").adv(),

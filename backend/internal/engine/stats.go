@@ -249,6 +249,9 @@ func (s *Sim) Snapshot() Stats {
 			if cp := s.connCapacity(n); cp < 1<<30 {
 				ex["sessionCap"] = float64(cp)
 			}
+			if pt := s.pushThreads(n); pt > 0 {
+				ex["pushThreads"] = pt
+			}
 		}
 		if sum.localHit > 0 {
 			ex["localHitRps"] = float64(sum.localHit) / span
