@@ -136,7 +136,7 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown
+	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown | addNode (a shard router gets one more shard, a copy of its first)
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`

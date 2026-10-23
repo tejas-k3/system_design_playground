@@ -1316,6 +1316,41 @@ func init() {
 		Debrief: "Treat a lock as an optimisation, not a guarantee. Make the write itself safe: a conditional write (compare-and-set, unique constraint) refuses whatever arrives late, and a fencing token does the same when the resource can compare tokens.",
 	})
 
+	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
+	addShard := func(fixed bool) engine.Diagram {
+		hashing := "mod"
+		if fixed {
+			hashing = "ring"
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 100.0, "keySpace": 4000.0, "keyDist": "uniform", "timeoutMs": 5000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 48.0, "queueCap": 2000.0, "dbPool": 200.0}).
+			n("shards", engine.KShardRouter, cols[2], rowMid, P{"hashing": hashing, "vnodes": 128.0, "rebalanceSec": 10.0, "rebalanceMs": 400.0}).
+			e("users", "app").e("app", "shards")
+		for k := 0; k < 4; k++ {
+			id := fmt.Sprintf("db%d", k+1)
+			b.n(id, engine.KDatabase, cols[3], float64(k)*100+30, P{"connections": 32.0, "readMs": 5.0}).e("shards", id)
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "add-a-shard", Title: "Adding a shard under load", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "More capacity, and for ten seconds everything gets slower.",
+		Story:   "The four-shard database is getting full, so a fifth shard is added at 20 seconds while traffic keeps flowing. The router places each key on a shard by hashing it and taking the remainder after dividing by the number of shards, so adding one changes where almost every key lives. For ten seconds the data of every moved key is still travelling, and each request for one of them takes 400 ms longer.",
+		Diagram: addShard(false), Solution: addShard(true),
+		Chaos:       []engine.ChaosEvent{{Type: "addNode", NodeID: "shards", AtSec: 20}},
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(4.2), StarCostPerHour: f(4.0), StarP95Ms: f(200)},
+		DurationSec: 60, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Watch the router when the new shard arrives: how many keys moved, and how many requests were slowed by the move?",
+			"Placing a key by hash mod n changes the home of about four keys in five when n goes from 4 to 5. About 80% of requests wait for data that is still moving.",
+			"Place keys on a consistent-hashing ring instead (key placement on the shard router): a new shard takes over only about a fifth of the keys, so only about a fifth of the requests are slowed, and for a shorter time than the p95 notices.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth shard to a router that places keys by hash mod 4 moves about…", Options: []string{"A fifth of the keys", "Four fifths of the keys", "None, the new shard starts empty"}, Answer: 1,
+			Explain: "Changing the divisor changes the remainder for almost every key. A ring only reassigns the arc the new shard takes over, about one key in five."}},
+		Debrief: "Hash mod n makes resizing a cluster as expensive as rebuilding it. Consistent hashing moves only about 1/n of the keys when a node joins or leaves, which is why caches and key-value stores use it.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0

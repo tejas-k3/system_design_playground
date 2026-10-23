@@ -295,6 +295,7 @@ type Sim struct {
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int
+	shardAdds                                 int
 	runEventsLost                             int
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
 	runPartial, runHedged                     int

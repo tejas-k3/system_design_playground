@@ -226,6 +226,12 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("a conditional write has no double bookings whatever the pause: %d", res.Run.Conflicts)
 		}
 	})
+	t.Run("add-a-shard: more app threads do not hide the move, a ring does", func(t *testing.T) {
+		sc := Get("add-a-shard")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "app", "threads", 128.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("hash mod still slows four requests in five: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

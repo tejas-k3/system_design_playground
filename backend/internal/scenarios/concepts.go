@@ -53,6 +53,7 @@ var conceptTags = map[string][]string{
 	"lost-cart":              {"consistency", "replication"},
 	"quorum-overlap":         {"consistency", "replication"},
 	"lease-expired":          {"consistency", "failure-handling"},
+	"add-a-shard":            {"sharding", "capacity"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},
