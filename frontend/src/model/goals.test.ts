@@ -44,6 +44,16 @@ describe('quiet tenant goal', () => {
   })
 })
 
+describe('deliveries per message goal', () => {
+  const g = { minSuccessRate: 0.9, minDeliveriesPerMessage: 2.9 }
+  it('divides the deliveries by the accepted messages', () => {
+    const one = goalRows(g, stats({ resolved: 100, ok: 100, jobs: { enqueued: 100, completed: 100 } as never }), 1, true)
+    expect(row(one, 'Deliveries per message')).toMatchObject({ actual: '1.00', state: 'fail' })
+    const three = goalRows(g, stats({ resolved: 100, ok: 100, jobs: { enqueued: 300, completed: 300 } as never }), 1, true)
+    expect(row(three, 'Deliveries per message')).toMatchObject({ actual: '3.00', state: 'pass' })
+  })
+})
+
 describe('goalRows', () => {
   const goals = { minSuccessRate: 0.99, maxP95Ms: 500, maxCostPerHour: 1, maxConflicts: 0 }
 

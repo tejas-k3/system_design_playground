@@ -117,6 +117,7 @@ export interface Goals {
   maxSessionViolations?: number
   maxLostEvents?: number
   minWorstTenant?: number
+  minDeliveriesPerMessage?: number
   maxRpoSec?: number
   maxRtoSec?: number
   maxWriteSkew?: number
