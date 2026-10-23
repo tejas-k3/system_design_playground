@@ -276,6 +276,9 @@ func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
 				return
 			}
 		default:
+			if m := n.s("eventPublish"); (m == "dualWrite" || m == "outbox") && s.eventWrite(n, c, m, done) {
+				return
+			}
 			qe := s.first(n, KQueue)
 			if qe == nil {
 				qe = s.first(n, KTopic)
