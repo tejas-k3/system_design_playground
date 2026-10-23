@@ -303,6 +303,7 @@ type Sim struct {
 	runSessReads, runRYW, runMono             int
 	shardAdds                                 int
 	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
+	runInconsistent, runCompensated, runStuck int   // multi-step writes left half done, rolled back, and rolled back unsuccessfully
 	runEventsLost                             int
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
 	runPartial, runHedged, runHedgeWins       int

@@ -25,6 +25,7 @@ type Goals struct {
 	MaxRtoSec               *float64 `json:"maxRtoSec,omitempty"`               // seconds the database may be unavailable restoring
 	MinDeliveriesPerMessage *float64 `json:"minDeliveriesPerMessage,omitempty"` // copies of each accepted message that were delivered (fan-out)
 	MinWorstTenant          *float64 `json:"minWorstTenant,omitempty"`          // the worst-served of the quiet tenants must still succeed at least this often
+	MaxInconsistent         *int     `json:"maxInconsistent,omitempty"`         // multi-step writes left half done
 	MaxLostEvents           *int     `json:"maxLostEvents,omitempty"`           // saved writes whose event never reached the queue
 	MaxSessionViolations    *int     `json:"maxSessionViolations,omitempty"`    // reads that broke read-your-writes or monotonic reads
 	StarCostPerHour         *float64 `json:"starCostPerHour,omitempty"`
@@ -211,6 +212,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 			a, ok = pct(run.WorstTenantSuccess), run.WorstTenantSuccess+eps >= *g.MinWorstTenant
 		}
 		checks = append(checks, Check{"Worst-served quiet tenant", "≥ " + pct(*g.MinWorstTenant), a, ok})
+	}
+	if g.MaxInconsistent != nil {
+		checks = append(checks, Check{"Orders left half done", fmt.Sprintf("≤ %d", *g.MaxInconsistent), fmt.Sprint(run.Inconsistent), run.Inconsistent <= *g.MaxInconsistent})
 	}
 	if g.MaxLostEvents != nil {
 		checks = append(checks, Check{"Events lost", fmt.Sprintf("≤ %d", *g.MaxLostEvents), fmt.Sprint(run.EventsLost), run.EventsLost <= *g.MaxLostEvents})
