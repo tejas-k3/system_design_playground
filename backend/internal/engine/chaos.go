@@ -212,6 +212,9 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	if n.kind == KRedis {
 		s.loseRedisData(n)
 	}
+	if n.kind == KLog && n.s("ackMode") == "leader" {
+		s.logLoseUnreplicated(n)
+	}
 	if n.kind == KDatabase && n.s("onFailure") == "promote" {
 		s.scheduleFailover(n)
 	}
