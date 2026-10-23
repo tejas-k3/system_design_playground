@@ -1348,6 +1348,36 @@ func init() {
 		Debrief: "Quorums trade availability for safety. N machines tolerate (N-1)/2 failures: 3 tolerate one, 5 tolerate two. Size the cluster for the failures you expect together, and spread it across failure domains so they do not happen together.",
 	})
 
+	// Launch day: nearly every write is to one row, and row locks make those writes queue one behind the other
+	launchDay := func(fixed bool) engine.Diagram {
+		app := P{"threads": 64.0, "queueCap": 2000.0, "dbPool": 100.0}
+		if fixed {
+			app["hotKeyMode"] = "split"
+			app["splitShards"] = 8.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 200.0, "readPct": 0.0, "keySpace": 5000.0, "keyDist": "uniform", "hotKeyPct": 90.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, app).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 64.0, "writeMs": 20.0, "hotRowLock": true}).label("db", "Stock database").
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "launch-day", Title: "Launch day", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "The new phone goes on sale and every buyer decrements the same stock row.",
+		Story:   "At noon the new phone goes on sale. Nine in ten orders change the same row, the stock counter, and the database locks a row while it writes it, so those writes go one after another: 20 ms each is 50 a second, and 180 a second are arriving. The queue behind that row holds database connections, and the buyers time out before their turn comes. The rest of the shop has nothing wrong with it.",
+		Diagram: launchDay(false), Solution: launchDay(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.95, MaxP95Ms: f(500), MaxCostPerHour: f(4.0), StarCostPerHour: f(3.6), StarP95Ms: f(100)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Which row is slow, and what limits how fast one row can change?",
+			"A row lock lets one write at a time through. With 20 ms per write one row takes 50 writes a second whatever you do to the database around it; more connections only give the waiting writes somewhere to wait.",
+			"Stop writing to a single row: in the app server's hot-key setting, split the counter over several rows, so the writes go to different rows in parallel. Reading the total then costs adding the rows up.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Doubling the database connections will…", Options: []string{"Double the writes the hot row can take", "Not change what one row can take: the lock, not the connections, is the limit", "Halve the latency of every write"}, Answer: 1,
+			Explain: "A lock serialises the writes to its row. More connections let more of them wait at once, which does not make the row faster."}},
+		Debrief: "A hot row is a throughput ceiling of one over the write time, however big the database. Split the counter (several sub-rows added up on read), batch the updates, or queue them so they are applied in order without making buyers wait.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

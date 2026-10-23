@@ -118,6 +118,11 @@ var alternatives = map[string][]Alternative{
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),
 	},
+	"launch-day": {
+		alt("Give the database 256 connections", false, 0.0, 0, 7.83, "More connections let more writes wait at once; the row still lets one through every 20 ms. Nothing succeeds and the bill more than doubles.", Change{"db", "connections", 256.0}),
+		alt("Split the counter over only 2 rows", false, 0.0, 0, 3.32, "Two rows take 100 writes a second between them; 180 are asked for, so the queue still builds and everything times out.", Change{"app", "hotKeyMode", "split"}, Change{"app", "splitShards", 2.0}),
+		alt("Split the counter over 4 rows", false, 100.0, 507, 3.32, "Four rows can just take the load (200 a second), so nearly every order succeeds, but the rows run almost full and the p95 sits at the 500 ms goal: the margin is too thin.", Change{"app", "hotKeyMode", "split"}, Change{"app", "splitShards", 4.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
