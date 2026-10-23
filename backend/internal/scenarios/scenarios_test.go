@@ -253,6 +253,13 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("more US capacity does not shorten the ocean: %+v", res.Checks)
 		}
 	})
+	t.Run("payment-saga: retries do not undo half-done orders", func(t *testing.T) {
+		sc := Get("payment-saga")
+		res := engine.RunToEnd(withParam(sc.Diagram, "users", "retries", 2.0), sc.Options(42), sc.Goals)
+		if res.Pass || res.Run.Inconsistent == 0 {
+			t.Fatalf("retrying leaves the reservations behind: %+v inconsistent %d", res.Checks, res.Run.Inconsistent)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

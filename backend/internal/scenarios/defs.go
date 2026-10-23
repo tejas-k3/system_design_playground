@@ -1491,6 +1491,37 @@ func init() {
 		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to keeping their data consistent (which the multi-region database challenges are about).",
 	})
 
+	// Payment saga: checkout spans stock, card and shipping; a failed step must not leave a half-done order
+	paymentSaga := func(fixed bool) engine.Diagram {
+		mode := "naive"
+		if fixed {
+			mode = "saga"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 50.0, "readPct": 0.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 1000.0, "dbPool": 50.0, "workflow": mode}).
+			n("stock", engine.KDatabase, cols[2], 40, P{"connections": 16.0, "writeMs": 10.0}).label("stock", "Stock database").
+			n("card", engine.KExternalAPI, cols[2], 160, P{"latencyMs": 40.0, "errorPct": 15.0}).label("card", "Card processor").
+			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 0.0}).label("ship", "Shipping service").
+			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
+	}
+	register(&Scenario{
+		ID: "payment-saga", Title: "The half-finished order", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "When the card is declined, the stock stays reserved and nobody gets the item.",
+		Story:   "Checkout does three things in a row: reserve the item in the stock database, charge the card, and book shipping. The card processor declines about one payment in seven. When it does, the order fails, but the item stays reserved forever: stock slowly drains into orders that never complete. Finance cannot reconcile either.",
+		Diagram: paymentSaga(false), Solution: paymentSaga(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.8, MaxInconsistent: i(0), MaxP95Ms: f(500), MaxCostPerHour: f(1.6), StarCostPerHour: f(1.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Count the orders left half done on the goals panel. A declined card is a normal, expected failure: what should happen to the stock that was already reserved?",
+			"Nothing undoes the reservation, because the steps are just run in a row. Retrying the whole order does not help: it would reserve more stock each time.",
+			"Run the checkout as a saga (the app server's setting for writes that span services): when a later step fails, compensating calls undo the earlier steps, newest first. A few percent of orders still fail (declines are real), but none are left half done.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "With a saga, will fewer orders fail?", Options: []string{"Yes, it retries them", "No: the same orders fail, but each one is cleanly rolled back", "Yes, the card processor declines less"}, Answer: 1,
+			Explain: "A saga does not make steps succeed. It makes a failure safe by running the opposite of every earlier step, so the system ends up consistent."}},
+		Debrief: "Without a distributed transaction, consistency across services comes from compensation: every step has an undo, and a failure runs the undos backwards. Compensations must be possible, repeatable (idempotent), and watched: one that fails leaves a stuck order for a person.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
