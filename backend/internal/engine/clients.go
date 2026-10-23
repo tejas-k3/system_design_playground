@@ -203,6 +203,9 @@ func (s *Sim) createLogical(c *node) *logical {
 		lg.write = true // a transfer is always a transaction
 	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
+	if lg.counted {
+		s.countKey(lg.key)
+	}
 	lg.sawWrite, lg.sawRead = c.sessWrite[lg.key], c.sessRead[lg.key] // nil maps read as 0
 	if n := int(c.f("identities")); n > 0 {
 		dist := "uniform"
