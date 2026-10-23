@@ -145,3 +145,11 @@ describe('goalCost', () => {
     expect(goalCost(null, withAvg(0), true)).toBeNull()
   })
 })
+
+describe('transactions waiting on a dead coordinator goal', () => {
+  it('counts the two-phase commits left in doubt', () => {
+    const g = { minSuccessRate: 0.5, maxInDoubt: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, inDoubt: 4 }), 1, true), 'Transactions waiting on a dead coordinator')).toMatchObject({ actual: '4', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Transactions waiting on a dead coordinator').state).toBe('pass')
+  })
+})
