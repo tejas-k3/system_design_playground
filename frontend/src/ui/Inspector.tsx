@@ -375,6 +375,7 @@ function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
         {s.extra?.slowedByMove !== undefined && (<><dt>Requests slowed by the move</dt><dd>{Math.round(s.extra.slowedByMove).toLocaleString()}</dd></>)}
         {s.extra?.keysMoved !== undefined && (<><dt>Keys moved at last change</dt><dd>{Math.round(s.extra.keysMoved * 100)}%</dd></>)}
         {s.extra?.sessions !== undefined && (<><dt>Open connections</dt><dd>{Math.round(s.extra.sessions)}{s.extra.sessionCap !== undefined ? ` of ${Math.round(s.extra.sessionCap)}` : ''}</dd></>)}
+        {s.extra?.pushThreads !== undefined && (<><dt>Threads spent pushing</dt><dd>{s.extra.pushThreads.toFixed(1)}</dd></>)}
         {s.extra?.connectRps !== undefined && (<><dt>New connections</dt><dd>{rate(s.extra.connectRps)}/s</dd></>)}
         {s.extra?.localHitRps !== undefined && (<><dt>Local cache hits</dt><dd>{rate(s.extra.localHitRps)}/s</dd></>)}
         {s.extra?.evictRps !== undefined && (<><dt>Evictions</dt><dd>{rate(s.extra.evictRps)}/s</dd></>)}
