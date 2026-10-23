@@ -1522,6 +1522,38 @@ func init() {
 		Debrief: "Without a distributed transaction, consistency across services comes from compensation: every step has an undo, and a failure runs the undos backwards. Compensations must be possible, repeatable (idempotent), and watched: one that fails leaves a stuck order for a person.",
 	})
 
+	// Frozen checkout: two-phase commit across stock, card and shipping, and the server dies between the votes and the decision
+	frozenCheckout := func(fixed bool) engine.Diagram {
+		mode := "twoPhase"
+		if fixed {
+			mode = "saga"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 50.0, "readPct": 0.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 1000.0, "dbPool": 50.0, "workflow": mode}).
+			n("stock", engine.KDatabase, cols[2], 40, P{"connections": 16.0, "writeMs": 10.0}).label("stock", "Stock database").
+			n("card", engine.KExternalAPI, cols[2], 160, P{"latencyMs": 40.0, "errorPct": 5.0}).label("card", "Card processor").
+			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 0.0}).label("ship", "Shipping service").
+			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
+	}
+	register(&Scenario{
+		ID: "frozen-checkout", Title: "The frozen checkout", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "The checkout server dies mid-order and the stock rows stay locked until it comes back.",
+		Story:   "To be sure no order is ever half done, checkout runs as a two-phase commit: the stock database, the card processor and shipping each vote yes and hold their part, then the server tells all of them to commit. It works until the server dies in the gap between the votes and the decision. The services that voted cannot decide alone, so they sit locked, waiting for a server that is not coming back for a while. Operations wants no order left waiting on a dead coordinator.",
+		Diagram: frozenCheckout(false), Solution: frozenCheckout(true),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app", AtSec: 15, DownSec: 8}},
+		Goals:       engine.Goals{MinSuccessRate: 0.65, MaxInDoubt: i(0), MaxInconsistent: i(0), MaxP95Ms: f(500), MaxCostPerHour: f(1.6), StarCostPerHour: f(1.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the goals panel when the server crashes: how many orders are left waiting, and for whom?",
+			"The services voted yes and promised to wait for the decision. If the coordinator dies, nobody can tell them to commit or abort. Waiting costs locks held on the stock rows.",
+			"Run the checkout as a saga instead (the app server's setting for writes that span services): no service holds anything across steps, and a failure is undone by compensating calls.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Two-phase commit guarantees nothing is ever half done. What does it cost?", Options: []string{"Nothing, it is strictly better than a saga", "A second round of calls, and a stall while locked when the coordinator dies", "Lost data"}, Answer: 1,
+			Explain: "It buys atomicity with latency and blocking: every service holds its part until the decision arrives, and a coordinator that dies between the votes and the decision leaves them all stuck."}},
+		Debrief: "Two-phase commit is atomic but blocking: its weak point is the coordinator. Production systems replicate the coordinator, or avoid distributed transactions and accept eventual consistency with sagas, where each step is a small local transaction and failures are compensated.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
