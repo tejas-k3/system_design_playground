@@ -1262,9 +1262,40 @@ func (s *Sim) arriveLog(n *node, c *call, cb func(Result)) {
 	})
 }
 
+// logRebalanceCheck notices a change in who is in a consumer group (a member crashed, came back, was added or
+// removed) and, with rebalanceSec set, stops the whole group reading for that long while the partitions are handed out.
+func (s *Sim) logRebalanceCheck(q *node) {
+	if q.grpSig == nil {
+		q.grpSig, q.grpPause = map[int]string{}, map[int]float64{}
+	}
+	members := map[int]string{}
+	for _, e := range q.out {
+		if e.removed || e.to.kind != KWorker || e.to.removed || e.to.down {
+			continue
+		}
+		g := int(e.to.f("group"))
+		members[g] += e.to.id + ","
+	}
+	for _, g := range s.logGroups(q) {
+		sig := members[g]
+		old, seen := q.grpSig[g]
+		q.grpSig[g] = sig
+		if !seen || old == sig {
+			continue
+		}
+		q.rebalances++
+		if sec := q.f("rebalanceSec"); sec > 0 {
+			until := s.now + sec*1000
+			q.grpPause[g] = until
+			s.at(until, func() { s.dispatch(q) })
+		}
+	}
+}
+
 func (s *Sim) dispatchLog(q *node) {
+	s.logRebalanceCheck(q)
 	for _, l := range q.lanes {
-		if l.running || l.head >= len(l.jobs) || q.down {
+		if l.running || l.head >= len(l.jobs) || q.down || q.grpPause[l.group] > s.now {
 			continue
 		}
 		w := s.laneOwner(q, l)
