@@ -116,6 +116,7 @@ export interface Goals {
   maxLostUpdates?: number
   maxSessionViolations?: number
   maxLostEvents?: number
+  maxInconsistent?: number
   minWorstTenant?: number
   minDeliveriesPerMessage?: number
   maxRpoSec?: number
@@ -262,6 +263,9 @@ export interface RunStats {
   partial?: number // answers sent with fewer shards than required
   tenants?: number
   worstTenantSuccess?: number // the worst-served of the quiet tenants
+  inconsistent?: number // multi-step writes left half done
+  compensated?: number // multi-step writes rolled back
+  stuck?: number // rolled back unsuccessfully
   eventsLost?: number // saved writes whose event never reached the queue
   rpoSec?: number // seconds of writes the last restore lost
   rtoSec?: number // seconds the database was unavailable restoring
