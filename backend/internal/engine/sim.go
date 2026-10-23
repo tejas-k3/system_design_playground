@@ -305,6 +305,9 @@ type Sim struct {
 	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
 	runInconsistent, runCompensated, runStuck int   // multi-step writes left half done, rolled back, and rolled back unsuccessfully
 	runEventsLost                             int
+	runInDoubt                                int     // two-phase commits left waiting for a crashed coordinator
+	runBlockedSec                             float64 // lock-seconds those waited
+	inDoubt                                   []inDoubtRec
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
 	runPartial, runHedged, runHedgeWins       int
 	runFanWrites, runFanReads                 int
