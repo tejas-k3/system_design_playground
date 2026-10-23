@@ -367,6 +367,7 @@ function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
         {s.extra?.storedGB !== undefined && (<><dt>Stored</dt><dd>{Math.round(s.extra.storedGB).toLocaleString()} GB</dd></>)}
         {s.extra?.daysUntilBufferPoolFull !== undefined && (<><dt>Days until data outgrows memory</dt><dd>{Math.round(s.extra.daysUntilBufferPoolFull).toLocaleString()}</dd></>)}
         {s.extra?.yearStorageCost !== undefined && (<><dt>Storage, next year</dt><dd>${Math.round(s.extra.yearStorageCost).toLocaleString()}</dd></>)}
+        {s.extra?.rebalances !== undefined && (<><dt>Group rebalances</dt><dd>{Math.round(s.extra.rebalances)}</dd></>)}
         {s.extra?.outboxBacklog !== undefined && (<><dt>Events waiting in the outbox</dt><dd>{Math.round(s.extra.outboxBacklog).toLocaleString()}</dd></>)}
         {s.extra?.term !== undefined && (<><dt>Leader</dt><dd>{s.extra.leader !== undefined && s.extra.leader >= 0 ? `node ${Math.round(s.extra.leader) + 1}` : 'none (electing or no majority)'}, term {Math.round(s.extra.term)}, {Math.round(s.extra.nodesUp ?? 0)} nodes up</dd></>)}
         {s.extra?.writeConflicts !== undefined && (<><dt>Write conflicts</dt><dd>{Math.round(s.extra.writeConflicts).toLocaleString()}</dd></>)}
