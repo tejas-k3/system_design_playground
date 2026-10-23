@@ -114,6 +114,10 @@ var alternatives = map[string][]Alternative{
 		alt("Let clients retry a failed order twice", false, 79.3, 848, 1.00, "More requests get through once the server is back, but the transactions that were mid-flight when it died are still locked: 13 in doubt on this seed, and the retries push the p95 to 848 ms.", Change{"users", "retries", 2.0}),
 		alt("Give the app server 96 threads", false, 70.4, 517, 2.46, "Capacity does not change what happens when the coordinator dies: 12 transactions are still in doubt, and the bill goes up.", Change{"app", "threads", 96.0}),
 	},
+	"who-is-the-leader": {
+		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
+		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

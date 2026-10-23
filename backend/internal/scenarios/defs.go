@@ -1316,6 +1316,38 @@ func init() {
 		Debrief: "Treat a lock as an optimisation, not a guarantee. Make the write itself safe: a conditional write (compare-and-set, unique constraint) refuses whatever arrives late, and a fencing token does the same when the resource can compare tokens.",
 	})
 
+	// Who is the leader: failover is decided by a coordination service that has itself lost its majority
+	whoLeads := func(fixed bool) engine.Diagram {
+		nodes := 3.0
+		if fixed {
+			nodes = 5
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 40.0, "keyDist": "uniform", "keySpace": 20000.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[4], rowTop, P{"onFailure": "promote", "electionBy": "coordinator", "detectSec": 3.0, "promoteSec": 5.0}).
+			n("replica", engine.KReplica, cols[4], rowMid, P{"replicationLagMs": 500.0}).
+			n("zk", engine.KCoordinator, cols[4], rowBot, P{"nodes": nodes, "electionTimeoutMs": 1000.0}).label("zk", "Coordination service").
+			e("users", "lb").e("db", "zk").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
+	}
+	register(&Scenario{
+		ID: "who-is-the-leader", Title: "Who is the leader?", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "The primary is dead, a replica is ready, and nobody is allowed to promote it.",
+		Story:   "Failover here is not left to a timer: promotion waits until the coordination service agrees on who the leader is, because promoting without agreement is how two primaries appear. Tonight two of the coordination service's three machines fail at the same time as the database primary. The service has no majority, so it elects nobody, so the replica waits. Writes fail the whole time.",
+		Diagram: whoLeads(false), Solution: whoLeads(true),
+		Chaos:       []engine.ChaosEvent{{Type: "clusterNodeDown", NodeID: "zk", AtSec: 15, DurationSec: 40, Factor: 2}, {Type: "crash", NodeID: "db", AtSec: 20, DownSec: 60}},
+		Goals:       engine.Goals{MinSuccessRate: 0.85, MaxP95Ms: f(800), MaxLostWrites: i(100), MaxCostPerHour: f(2.5)},
+		DurationSec: 70, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"The replica is ready but the database is not promoting it. Who has to agree first, and can they?",
+			"The coordination service needs a majority of its machines to elect anyone. Count how many it has and how many it lost.",
+			"With 3 machines, losing 2 leaves no majority. Run 5 (a majority is 3): the same two failures leave a working quorum and the promotion goes ahead on schedule.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A 3-machine cluster loses two machines. Can the survivor keep serving as leader?", Options: []string{"Yes, one machine is enough", "No: a majority (2 of 3) is needed, otherwise two halves could each elect a leader", "Yes, but only for reads"}, Answer: 1,
+			Explain: "A majority is what makes two leaders impossible: two groups cannot both hold more than half. The price is that the cluster stops when it loses its majority."}},
+		Debrief: "Quorums trade availability for safety. N machines tolerate (N-1)/2 failures: 3 tolerate one, 5 tolerate two. Size the cluster for the failures you expect together, and spread it across failure domains so they do not happen together.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"
