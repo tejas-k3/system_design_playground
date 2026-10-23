@@ -88,6 +88,9 @@ var alternatives = map[string][]Alternative{
 		alt("Wait for two copies on reads only (R=2, W=1)", false, 100.0, 161, 1.30, "Closer, but 2 + 1 is still not more than 3: one read in the run still missed a write.", Change{"kv", "readQuorum", 2.0}),
 		alt("Write to all three copies (R=1, W=3)", true, 100.0, 321, 1.30, "1 + 3 is more than 3, so it works, but every write waits for the slowest copy (p95 321 ms against 216) and would fail if any copy were down.", Change{"kv", "writeQuorum", 3.0}),
 	},
+	"lease-expired": {
+		alt("Make the lock lease 1 second", true, 97.5, 2238, 2.71, "Passes this run, because every pause (600 ms) is shorter than the lease. It is a bet on how long a pause can be: with 3-second pauses it double books again (6 on this seed), where the conditional write still has none.", Change{"app1", "lockTtlMs", 1000.0}, Change{"app2", "lockTtlMs", 1000.0}, Change{"app3", "lockTtlMs", 1000.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

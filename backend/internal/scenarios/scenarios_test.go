@@ -208,6 +208,24 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("R=1 W=3 overlaps and should pass: %+v", res.Checks)
 		}
 	})
+	t.Run("lease-expired: a 1 s lease passes until pauses get longer, a conditional write does not care", func(t *testing.T) {
+		sc := Get("lease-expired")
+		lease := sc.Diagram
+		longer := sc.Diagram
+		for _, id := range []string{"app1", "app2", "app3"} {
+			lease = withParam(lease, id, "lockTtlMs", 1000.0)
+			longer = withParam(withParam(longer, id, "lockTtlMs", 1000.0), id, "gcPauseMs", 3000.0)
+		}
+		if res := engine.RunToEnd(lease, sc.Options(42), sc.Goals); !res.Pass {
+			t.Fatalf("a 1 s lease outlasts 600 ms pauses: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(longer, sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("3 s pauses outlast a 1 s lease: %+v", res.Checks)
+		}
+		if res := engine.RunToEnd(withParam(longer, "db", "conditionalWrite", true), sc.Options(42), sc.Goals); res.Run.Conflicts != 0 {
+			t.Fatalf("a conditional write has no double bookings whatever the pause: %d", res.Run.Conflicts)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

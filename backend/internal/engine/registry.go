@@ -296,6 +296,7 @@ func init() {
 				num("maxConnections", "Max connections", "Capacity", 500, 10, 5000, 10, "", "Hard limit on open connections from all servers; beyond it connections are refused."),
 				num("queueCap", "Queue size", "Capacity", 100, 0, 5000, 10, "", "Queries that may wait for a free slot."),
 				flag("spatialIndex", "Spatial index", "Features", false, "Makes nearby-location searches cheap."),
+				flag("conditionalWrite", "Book only if still free", "Features", false, "The write itself checks, atomically, that the item is still free (a compare-and-set, like a unique constraint or UPDATE ... WHERE free). A holder that froze past its lock lease then cannot overwrite a booking someone else made meanwhile, whatever its lock or token says.").adv(),
 				flag("fencingTokens", "Refuse stale lock tokens", "Features", false, "A write that carries a fencing token older than one this database has already accepted for the item is refused: the holder's lease ran out and someone else has acted since. Needs a lock service that issues tokens (the coordinator).").adv(),
 				flag("rowLocks", "Row locks", "Features", false, "Serialize writes per item so two bookings cannot overlap."),
 			},

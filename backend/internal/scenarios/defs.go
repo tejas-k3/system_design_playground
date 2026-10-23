@@ -1285,6 +1285,37 @@ func init() {
 		Debrief: "R + W > N makes reads overlap writes, so a client sees its own writes and never goes backwards. You buy it with latency (the kth fastest copy instead of the fastest) and with availability (fewer failures tolerated). Choose R and W for the workload: read-heavy systems often pick a cheap read and an expensive write.",
 	})
 
+	// Lease expired: a frozen lock holder wakes up and books a seat someone else already took
+	leaseExpired := func(fixed bool) engine.Diagram {
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 600.0, "readPct": 0.0, "workload": "booking", "keySpace": 3000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "writeMs": 40.0, "conditionalWrite": fixed}).
+			n("redis", engine.KRedis, cols[2], 320, nil).
+			e("users", "lb")
+		for k := 0; k < 3; k++ {
+			id := fmt.Sprintf("app%d", k+1)
+			b.n(id, engine.KAppServer, cols[2], float64(k)*100+30, P{"threads": 24.0, "queueCap": 2000.0, "lockTtlMs": 150.0, "lockWaitMs": 300.0, "dbPool": 100.0, "gcPauseMs": 600.0, "gcEverySec": 0.5}).e("lb", id).e(id, "db").e(id, "redis")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "lease-expired", Title: "The lease that ran out", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "The lock was held. The seat was booked twice anyway.",
+		Story:   "Seats are booked under a Redis lock that expires after 150 ms, so a crashed server cannot hold one forever. The app servers freeze for 600 ms every so often (a garbage-collection pause). A server that froze while holding a lock wakes up long after it expired, another server has booked the seat in the meantime, and the first one books it anyway: two people have the same seat.",
+		Diagram: leaseExpired(false), Solution: leaseExpired(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.93, MaxConflicts: i(0), MaxP95Ms: f(4000), StarP95Ms: f(500), MaxCostPerHour: f(3.2), StarCostPerHour: f(3.0)},
+		DurationSec: 90, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Look at when the double bookings happen: they follow the garbage-collection pauses. What does a server that was frozen believe about its lock when it wakes up?",
+			"It still thinks it holds the lock, but the lease ran out while it was frozen. Nothing the lock service does can reach into a process that is not running: the check has to happen where the write lands.",
+			"Make the database book a seat only if it is still free (a conditional write, like a unique constraint). A fencing token from a lock service helps only when the stale write arrives after the newer one; the conditional write does not depend on order.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Why is a lock with an expiry not enough to guarantee that only one process acts at a time?", Options: []string{"The expiry is always too short", "A paused process can act after its lock has expired and been given to someone else", "Redis loses locks"}, Answer: 1,
+			Explain: "A lease bounds how long a dead holder blocks others, but a live holder that is frozen does not know its lease ended. Only the resource being written can refuse the stale write."}},
+		Debrief: "Treat a lock as an optimisation, not a guarantee. Make the write itself safe: a conditional write (compare-and-set, unique constraint) refuses whatever arrives late, and a fencing token does the same when the resource can compare tokens.",
+	})
+
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
