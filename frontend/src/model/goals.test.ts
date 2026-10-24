@@ -176,3 +176,11 @@ describe('visitor counting goals', () => {
     expect(row(good, 'Memory to count visitors').state).toBe('pass')
   })
 })
+
+describe('top ten goal', () => {
+  it('counts how many of the true top ten were found', () => {
+    const g = { minSuccessRate: 0.5, minTopKRecall: 0.8 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, topKRecall: 0.2 }), 1, true), 'Top ten found')).toMatchObject({ actual: '2 of 10', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, topKRecall: 0.9 }), 1, true), 'Top ten found').state).toBe('pass')
+  })
+})
