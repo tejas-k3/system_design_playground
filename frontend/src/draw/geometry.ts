@@ -1,6 +1,7 @@
 import type { Diagram, Edge, Node, Note } from '../api/types'
 import type { Reg } from '../model/diagram'
 import { GROUP_HEADER } from '../model/groups'
+import { SHAPE_GRIP, arrowEnds, onShape, shapeRect } from '../model/shapes'
 
 export interface Rect {
   x: number
@@ -99,6 +100,9 @@ export type Hit =
   | { type: 'note'; id: string }
   | { type: 'group'; id: string } // the header band or border of a box
   | { type: 'groupResize'; id: string } // the grip at a selected box's bottom-right corner
+  | { type: 'shape'; id: string } // the outline of an ellipse or the shaft of an arrow
+  | { type: 'shapeResize'; id: string } // the grip at a selected ellipse's bottom-right corner
+  | { type: 'shapeEnd'; id: string; end: 'from' | 'to' } // a grabbable end of a selected arrow
   | { type: 'edge'; id: string }
   | { type: 'edgeEnd'; id: string; end: 'from' | 'to' } // a grabbable end of a selected connection
   | null
@@ -112,6 +116,7 @@ export function hitTest(
   handleFor: Set<string>,
   selectedEdges: Set<string> = new Set(),
   selectedGroups: Set<string> = new Set(),
+  selectedShapes: Set<string> = new Set(),
 ): Hit {
   const byId = new Map(d.nodes.map((n) => [n.id, n]))
   for (const e of d.edges) {
@@ -129,6 +134,15 @@ export function hitTest(
       if (Math.hypot(p.x - h.x, p.y - h.y) <= handleRadius(zoom) + 4 / zoom) return { type: 'handle', id }
     }
   }
+  for (const s of d.shapes ?? []) {
+    if (!selectedShapes.has(s.id)) continue
+    const r = SHAPE_GRIP / zoom
+    if (s.kind === 'arrow') {
+      const { a, b } = arrowEnds(s)
+      if (Math.hypot(p.x - b.x, p.y - b.y) <= r) return { type: 'shapeEnd', id: s.id, end: 'to' }
+      if (Math.hypot(p.x - a.x, p.y - a.y) <= r) return { type: 'shapeEnd', id: s.id, end: 'from' }
+    } else if (Math.hypot(p.x - (s.x + s.w), p.y - (s.y + s.h)) <= r) return { type: 'shapeResize', id: s.id }
+  }
   const groups = d.groups ?? []
   for (const g of groups) {
     if (selectedGroups.has(g.id) && Math.hypot(p.x - (g.x + g.w), p.y - (g.y + g.h)) <= GROUP_GRIP / zoom) return { type: 'groupResize', id: g.id }
@@ -144,6 +158,8 @@ export function hitTest(
     if (dist <= tol && (!best || dist < best.dist)) best = { id: e.id, dist }
   }
   if (best) return { type: 'edge', id: best.id }
+  const shapes = d.shapes ?? []
+  for (let i = shapes.length - 1; i >= 0; i--) if (onShape(p, shapes[i], 6 / zoom)) return { type: 'shape', id: shapes[i].id }
   // boxes are behind everything: only their header and border can be grabbed, and the smallest one under the pointer wins
   let box: { id: string; area: number } | null = null
   const bt = 6 / zoom
@@ -165,7 +181,7 @@ export function screenToWorld(p: Pt, v: { scrollX: number; scrollY: number; zoom
 }
 
 export function boundsOf(d: Diagram, reg: Reg, measure: (t: string, s: number) => { w: number; h: number }): Rect | null {
-  const rs: Rect[] = [...d.nodes.map((n) => nodeRect(n, reg)), ...d.notes.map((n) => noteRect(n, measure)), ...(d.groups ?? []).map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h }))]
+  const rs: Rect[] = [...d.nodes.map((n) => nodeRect(n, reg)), ...d.notes.map((n) => noteRect(n, measure)), ...(d.groups ?? []).map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h })), ...(d.shapes ?? []).map(shapeRect)]
   if (!rs.length) return null
   const x1 = Math.min(...rs.map((r) => r.x))
   const y1 = Math.min(...rs.map((r) => r.y))
