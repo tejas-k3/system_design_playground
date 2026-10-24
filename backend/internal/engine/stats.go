@@ -112,6 +112,7 @@ type RunStats struct {
 	Deadlocks            int             `json:"deadlocks,omitempty"`
 	WriteSkew            int             `json:"writeSkew,omitempty"` // on-call pairs left with the rule broken (two doctors off at once)
 	Jobs                 *JobStats       `json:"jobs,omitempty"`
+	Crawl                *CrawlStats     `json:"crawl,omitempty"`
 }
 
 // Event is one thing that happened to the system, for placing on the charts: crashes and restarts, slow-downs and
@@ -206,6 +207,9 @@ func (s *Sim) Snapshot() Stats {
 			}
 		}
 		ex := map[string]float64{}
+		if n.kind == KClient {
+			s.crawlExtra(n, ex)
+		}
 		if n.kind == KAppServer || n.kind == KWorker {
 			ex["poolWaiting"] = float64(s.poolWaiting(n))
 		}
@@ -373,6 +377,7 @@ func (s *Sim) Snapshot() Stats {
 			run.Errors[r.String()] = s.runErrors[r]
 		}
 	}
+	run.Crawl = s.crawlTotals()
 	if s.hasQueue {
 		run.Jobs = &JobStats{
 			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead, Redelivered: s.jobRedelivered,

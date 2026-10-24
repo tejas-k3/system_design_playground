@@ -371,6 +371,7 @@ type Sim struct {
 	okTr       []*tracer
 	stride     int
 	hopCount   int
+	crawl      map[string]*crawlState
 }
 
 // SeriesPoint is one point of the global time series.
