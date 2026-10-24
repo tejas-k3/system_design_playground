@@ -1557,6 +1557,36 @@ func init() {
 		Debrief: "Approximate nearest-neighbour search is a dial between recall and latency, and the top of the dial is steep: 99% recall costs far more than 94%. Pick the recall the application needs, not the maximum, and spend the saved time on capacity.",
 	})
 
+	// The GPU budget: a few huge prompts stall the one GPU the budget pays for
+	gpuBudget := func(fixed bool) engine.Diagram {
+		lim := P{"limitRps": 1000.0, "burst": 1000.0}
+		if fixed {
+			lim = P{"unit": "tokens", "limitTokensPerMin": 56000.0}
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 2.0, "readPct": 0.0, "keySpace": 10000.0, "keyDist": "uniform", "timeoutMs": 60000.0, "retries": 0.0, "requestTokens": 500.0, "bigRequestPct": 10.0}).
+			n("gate", engine.KRateLimiter, cols[1], rowMid, lim).label("gate", "Token limiter").
+			n("chat", engine.KAppServer, cols[2], rowMid, P{"threads": 64.0, "queueCap": 2000.0}).
+			n("model", engine.KLLMServer, cols[3], rowMid, P{"gpus": 1.0, "batchSize": 32.0, "kvCacheTokens": 200000.0, "outputTokens": 60.0, "queueCap": 400.0}).label("model", "Chat model").
+			e("users", "gate").e("gate", "chat").e("chat", "model").done()
+	}
+	register(&Scenario{
+		ID: "the-gpu-budget", Title: "The GPU budget", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "One user in ten pastes a book, and everyone else's first word takes seconds.",
+		Story:   "A chat assistant runs on the one GPU the budget pays for. Most prompts are short, but one in ten carries twenty times as many tokens (someone pasted a whole document), and reading ten thousand tokens takes the GPU two and a half seconds during which it writes nothing for anyone. The request limiter in front counts requests, so it sees nothing unusual: two a second, as always. Everyone waits for the first word, and a second GPU is not in the budget.",
+		Diagram: gpuBudget(false), Solution: gpuBudget(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.78, MaxTTFTMs: f(3000), MaxCostPerHour: f(6.0), StarCostPerHour: f(5.5), StarP95Ms: f(100)},
+		DurationSec: 120, WarmupSec: 20, Speed: 1,
+		Hints: [3]string{
+			"Look at the time to first token and at what the model is doing while users wait. What kind of request keeps the GPU busy?",
+			"The limiter counts requests, and all requests look alike to it. The cost of a request to the GPU is its prompt: a limiter that counts tokens would charge a pasted document for what it takes.",
+			"Switch the limiter's count to tokens and give it an allowance of about 56,000 tokens a minute: the short prompts fit easily, and the document-sized ones run the allowance dry and are turned away (roughly one request in ten is refused by design).",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A limiter that counts tokens instead of requests will mostly refuse…", Options: []string{"Everyone a little", "The few huge requests that use most of the tokens", "The newest users"}, Answer: 1,
+			Explain: "A request is let through only if its whole weight fits in what is left. A small one almost always does; a huge one needs far more than the bucket usually holds, so the heavy few are refused and the many light ones carry on."}},
+		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. Limiting by tokens (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

@@ -68,6 +68,7 @@ var conceptTags = map[string][]string{
 	"polite-crawler":         {"overload-control", "failure-handling"},
 	"slow-first-token":       {"capacity", "queues"},
 	"rag-under-load":         {"capacity", "storage-and-payload"},
+	"the-gpu-budget":         {"overload-control", "capacity"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},
