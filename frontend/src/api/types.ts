@@ -121,6 +121,7 @@ export interface Goals {
   maxLateDropped?: number
   maxStateKB?: number
   maxTTFTMs?: number
+  minRecall?: number
   minTopKRecall?: number
   maxCountErrorPct?: number
   maxResultDelaySec?: number
@@ -275,6 +276,7 @@ export interface RunStats {
   compensated?: number // multi-step writes rolled back
   inDoubt?: number // two-phase commits left waiting for a crashed coordinator
   lateDropped?: number // events a stream job dropped for arriving too late
+  recall?: number // share of the true nearest neighbours the vector search finds
   ttftMs?: number // time to first token of LLM answers (p95)
   itlMs?: number // gap between tokens of LLM answers (p95)
   topKRecall?: number // share of the true ten most popular items a stream job found
