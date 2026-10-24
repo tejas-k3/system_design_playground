@@ -173,5 +173,34 @@ func Sanitize(in Diagram) (Diagram, bool) {
 		}
 		out.Notes = append(out.Notes, Note{ID: n.ID, X: n.X, Y: n.Y, Text: n.Text, FontSize: fs})
 	}
+	for _, g := range in.Groups {
+		if len(out.Groups) >= MaxGroups {
+			adjusted = true
+			break
+		}
+		if !knownGroupKind[g.Kind] || !finite(g.X) || !finite(g.Y) || !finite(g.W) || !finite(g.H) || !claim(g.ID) {
+			adjusted = true
+			continue
+		}
+		w, h := clamp(g.W, MinGroupSize, MaxGroupSize), clamp(g.H, MinGroupSize, MaxGroupSize)
+		if w != g.W || h != g.H {
+			adjusted = true
+		}
+		label := g.Label
+		if r := []rune(label); len(r) > MaxGroupLabel {
+			label, adjusted = string(r[:MaxGroupLabel]), true
+		}
+		out.Groups = append(out.Groups, Group{ID: g.ID, Kind: g.Kind, Label: label, X: g.X, Y: g.Y, W: w, H: h, Collapsed: g.Collapsed})
+	}
 	return out, adjusted
 }
+
+// Limits on the visual group boxes.
+const (
+	MaxGroups     = 30
+	MinGroupSize  = 60
+	MaxGroupSize  = 4000
+	MaxGroupLabel = 60
+)
+
+var knownGroupKind = map[string]bool{"az": true, "region": true, "vpc": true, "service": true, "note": true}

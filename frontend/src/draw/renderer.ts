@@ -6,6 +6,8 @@ import type { Reg } from '../model/diagram'
 import { phaseChip } from '../model/phase'
 import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, HANDLE_R } from './geometry'
+import { GROUP_HEADER, groupInfo, groupsOf } from '../model/groups'
+import type { Guide } from '../model/snap'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
 
@@ -31,6 +33,7 @@ export interface Scene {
   validTargets: Set<string>
   rewire?: { edge: string; end: 'from' | 'to'; to: Pt; target: string | null; valid: Set<string> } | null // a connection end being dragged elsewhere
   marquee: Rect | null
+  guides?: Guide[] // alignment lines while dragging
   particles: ActiveParticle[]
   now: number
   editingNote: string | null
@@ -439,6 +442,61 @@ function drawNotes(ctx: CanvasRenderingContext2D, sc: Scene) {
   }
 }
 
+/** Boxes behind everything: a tinted fill, a dashed outline whose pattern depends on the kind, and a header that says what it is in words. */
+function drawGroups(ctx: CanvasRenderingContext2D, sc: Scene) {
+  const p = sc.palette
+  const zoom = sc.viewport.zoom
+  const tint: Record<string, string> = { region: p.muted, az: p.ok, vpc: p.accent, service: p.ink, note: p.muted }
+  const sorted = [...groupsOf(sc.diagram)].sort((a, b) => b.w * b.h - a.w * a.h) // big ones first so small ones sit on top
+  for (const g of sorted) {
+    const info = groupInfo(g.kind)
+    const color = tint[g.kind] ?? p.muted
+    const selected = sc.selection.has(g.id)
+    ctx.save()
+    ctx.globalAlpha = 0.09
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.roundRect(g.x, g.y, g.w, g.h, 12)
+    ctx.fill()
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = selected ? p.accent : color
+    ctx.lineWidth = selected ? 2.4 : 1.8
+    ctx.setLineDash(info.dash)
+    ctx.stroke()
+    ctx.setLineDash([])
+    const size = legibleSize(15, zoom, 11)
+    ctx.font = `${size}px ${FONT}`
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'left'
+    const tagW = ctx.measureText(info.tag).width + 12
+    const cy = g.y + GROUP_HEADER / 2 + 2
+    ctx.fillStyle = selected ? p.accent : color
+    ctx.beginPath()
+    ctx.roundRect(g.x + 10, cy - size * 0.7, tagW, size * 1.4, 5)
+    ctx.fill()
+    ctx.fillStyle = p.bg
+    ctx.fillText(info.tag, g.x + 16, cy + 1)
+    if (g.label) {
+      ctx.fillStyle = p.ink
+      let text = g.label
+      const room = g.w - tagW - 34
+      while (text.length > 1 && ctx.measureText(text).width > room) text = text.slice(0, -2) + '…'
+      if (room > 20) ctx.fillText(text, g.x + 10 + tagW + 8, cy + 1)
+    }
+    if (selected) {
+      const r = 6 / Math.min(1, zoom)
+      ctx.fillStyle = p.card
+      ctx.strokeStyle = p.accent
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.rect(g.x + g.w - r, g.y + g.h - r, r * 2, r * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+}
+
 export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: number, height: number, dpr: number, sc: Scene): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.fillStyle = sc.palette.bg
@@ -449,6 +507,7 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
   ctx.translate(v.scrollX, v.scrollY)
   ctx.scale(v.zoom, v.zoom)
   const nodes = new Map(sc.diagram.nodes.map((n) => [n.id, n]))
+  drawGroups(ctx, sc)
   drawEdge(ctx, rc, sc, nodes)
   if (sc.showParticles) drawParticles(ctx, sc, nodes)
   drawEdgeLabels(ctx, sc, nodes)
@@ -486,6 +545,24 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
   drawEdgeEnds(ctx, sc, nodes)
   drawRewire(ctx, sc, nodes)
   drawNotes(ctx, sc)
+  if (sc.guides?.length) {
+    ctx.save()
+    ctx.strokeStyle = sc.palette.accent
+    ctx.lineWidth = 1.2 / sc.viewport.zoom
+    ctx.setLineDash([6 / sc.viewport.zoom, 4 / sc.viewport.zoom])
+    ctx.beginPath()
+    for (const g of sc.guides) {
+      if (g.axis === 'x') {
+        ctx.moveTo(g.pos, g.from - 12)
+        ctx.lineTo(g.pos, g.to + 12)
+      } else {
+        ctx.moveTo(g.from - 12, g.pos)
+        ctx.lineTo(g.to + 12, g.pos)
+      }
+    }
+    ctx.stroke()
+    ctx.restore()
+  }
   if (sc.marquee) {
     const m = sc.marquee
     ctx.fillStyle = sc.palette.accent

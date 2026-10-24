@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 import { emptyInterview, type InterviewData } from '../model/interview'
 import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
-import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
+import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
 import { alignNodes, autoLayout, distributeNodes, type AlignMode } from '../model/arrange'
 import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
+import { GROUP_DEFAULT, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize, groupLabel, groupsOf, withMembers } from '../model/groups'
 import { isCompact, isNarrow } from '../model/responsive'
 
 export type Tool = 'select' | 'connect'
@@ -72,7 +73,8 @@ export interface State {
   focusNode(id: string): void
   clearRun(): void
   addNode(kind: string, x: number, y: number): string | null
-  moveNodes(ids: string[], dx: number, dy: number): void
+  /** Move pieces; boxes among them take what is inside along, unless `exact` says the list already says everything to move. */
+  moveNodes(ids: string[], dx: number, dy: number, exact?: boolean): void
   updateNode(id: string, patch: Partial<Pick<Node, 'label'>>): void
   setParam(id: string, key: string, value: number | string | boolean): void
   addEdge(from: string, to: string): string | null
@@ -81,6 +83,8 @@ export interface State {
   updateEdge(id: string, patch: Partial<Pick<Edge, 'latencyMs' | 'bandwidthMbps' | 'lossPct' | 'jitterMs' | 'protocol' | 'async'>>): void
   addNote(x: number, y: number): string
   updateNote(id: string, patch: Partial<Note>): void
+  addGroup(kind: GroupKind, x: number, y: number): string | null
+  updateGroup(id: string, patch: Partial<Pick<Group, 'label' | 'kind' | 'w' | 'h'>>): void
   deleteIds(ids: string[]): void
   deleteSelection(): void
   /** Remember the selected components (and the connections between them) for pasting. */
@@ -216,13 +220,18 @@ export const useStore = create<State>()((set, get) => {
       return id
     },
 
-    moveNodes: (ids, dx, dy) => {
-      const set_ = new Set(ids)
-      mutate((d) => ({
-        ...d,
-        nodes: d.nodes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
-        notes: d.notes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
-      }))
+    moveNodes: (ids, dx, dy, exact) => {
+      const reg = get().reg
+      mutate((d) => {
+        // moving a box takes what is inside it
+        const set_ = new Set(!exact && reg && groupsOf(d).length ? withMembers(d, ids, (n) => nodeRect(n, reg)) : ids)
+        return {
+          ...d,
+          nodes: d.nodes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
+          notes: d.notes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
+          ...(d.groups ? { groups: d.groups.map((g) => (set_.has(g.id) ? { ...g, x: g.x + dx, y: g.y + dy } : g)) } : {}),
+        }
+      })
     },
 
     updateNode: (id, patch) => mutate((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
@@ -283,15 +292,38 @@ export const useStore = create<State>()((set, get) => {
 
     updateNote: (id, patch) => mutate((d) => ({ ...d, notes: d.notes.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
 
+    addGroup: (kind, x, y) => {
+      if (groupsOf(get().diagram).length >= MAX_GROUPS) {
+        get().toast(`At most ${MAX_GROUPS} boxes`, 'warn')
+        return null
+      }
+      const id = newId('g')
+      mutate((d) => ({ ...d, groups: [...groupsOf(d), { id, kind, label: groupLabel(d, kind), x, y, ...GROUP_DEFAULT }] }))
+      set({ selection: [id], ui: { ...get().ui, welcome: false } })
+      return id
+    },
+
+    updateGroup: (id, patch) =>
+      mutate((d) => ({
+        ...d,
+        groups: groupsOf(d).map((g) => {
+          if (g.id !== id) return g
+          const next = { ...g, ...patch }
+          return { ...next, label: [...next.label].slice(0, MAX_GROUP_LABEL).join(''), w: clampGroupSize(next.w), h: clampGroupSize(next.h) }
+        }),
+      })),
+
     deleteIds: (ids) => {
       const kill = new Set(ids.filter((id) => !locked(id)))
       if (kill.size === 0) return
       const structural = get().diagram.nodes.some((n) => kill.has(n.id)) || get().diagram.edges.some((e) => kill.has(e.id))
       if (structural && guardTopology()) return
       mutate((d) => ({
+        ...d,
         nodes: d.nodes.filter((n) => !kill.has(n.id)),
         edges: d.edges.filter((e) => !kill.has(e.id) && !kill.has(e.from) && !kill.has(e.to)),
         notes: d.notes.filter((n) => !kill.has(n.id)),
+        ...(d.groups ? { groups: d.groups.filter((g) => !kill.has(g.id)) } : {}),
       }))
       set((s) => ({ selection: s.selection.filter((id) => !kill.has(id)) }))
     },
@@ -313,10 +345,12 @@ export const useStore = create<State>()((set, get) => {
     },
 
     copySelection: (quiet) => {
-      const clip = copySelection(get().diagram, get().selection)
+      const { diagram, selection, reg } = get()
+      // copying a box takes what is inside it
+      const clip = copySelection(diagram, reg ? withMembers(diagram, selection, (n) => nodeRect(n, reg)) : selection)
       if (clipIsEmpty(clip)) return
       clipboard = clip
-      if (!quiet) get().toast(`Copied ${clip.nodes.length + clip.notes.length}`, 'info')
+      if (!quiet) get().toast(`Copied ${clip.nodes.length + clip.notes.length + (clip.groups?.length ?? 0)}`, 'info')
     },
     paste: () => {
       if (!clipboard || clipIsEmpty(clipboard)) return
@@ -328,7 +362,7 @@ export const useStore = create<State>()((set, get) => {
         return out.diagram
       })
       // paste again and the next copy lands a step further along
-      clipboard = { ...clipboard, nodes: clipboard.nodes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), notes: clipboard.notes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })) }
+      clipboard = { ...clipboard, nodes: clipboard.nodes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), notes: clipboard.notes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), groups: (clipboard.groups ?? []).map((g) => ({ ...g, x: g.x + 24, y: g.y + 24 })) }
       set({ selection: ids, ui: { ...get().ui, welcome: false } })
     },
     duplicateSelection: () => {

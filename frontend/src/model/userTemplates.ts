@@ -10,10 +10,10 @@ const MAX_NAME = 40
 export function addUserTemplate(list: Template[], name: string, design: Diagram, id: string): Template[] {
   const title = name.trim().slice(0, MAX_NAME) || 'My template'
   const copy = structuredClone(design)
-  const x0 = Math.min(...copy.nodes.map((n) => n.x), ...copy.notes.map((n) => n.x))
-  const y0 = Math.min(...copy.nodes.map((n) => n.y), ...copy.notes.map((n) => n.y))
+  const x0 = Math.min(...copy.nodes.map((n) => n.x), ...copy.notes.map((n) => n.x), ...(copy.groups ?? []).map((n) => n.x))
+  const y0 = Math.min(...copy.nodes.map((n) => n.y), ...copy.notes.map((n) => n.y), ...(copy.groups ?? []).map((n) => n.y))
   if (Number.isFinite(x0) && Number.isFinite(y0)) {
-    for (const n of [...copy.nodes, ...copy.notes]) {
+    for (const n of [...copy.nodes, ...copy.notes, ...(copy.groups ?? [])]) {
       n.x -= x0
       n.y -= y0
     }

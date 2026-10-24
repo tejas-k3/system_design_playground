@@ -65,10 +65,25 @@ type Note struct {
 	FontSize float64 `json:"fontSize,omitempty"`
 }
 
+// Group is a labelled box drawn behind the components (an availability zone, a region, a VPC, a service boundary or a
+// plain box). It is purely visual: the simulation ignores groups, and which components belong to one is decided by
+// geometry in the editor, not stored here.
+type Group struct {
+	ID        string  `json:"id"`
+	Kind      string  `json:"kind"`
+	Label     string  `json:"label"`
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	W         float64 `json:"w"`
+	H         float64 `json:"h"`
+	Collapsed bool    `json:"collapsed,omitempty"`
+}
+
 type Diagram struct {
-	Nodes []Node `json:"nodes"`
-	Edges []Edge `json:"edges"`
-	Notes []Note `json:"notes"`
+	Nodes  []Node  `json:"nodes"`
+	Edges  []Edge  `json:"edges"`
+	Notes  []Note  `json:"notes"`
+	Groups []Group `json:"groups,omitempty"`
 }
 
 // Reason is why a request failed at some node.

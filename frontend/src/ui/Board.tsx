@@ -3,6 +3,8 @@ import { type ActiveParticle, PARTICLE_MS, createRough, measureText, render } fr
 import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld } from '../draw/geometry'
 import { palettes } from '../draw/theme'
 import { openOutputs } from '../model/diagram'
+import { groupRect, groupsOf, withMembers } from '../model/groups'
+import { type Guide, snapMove, unionRect } from '../model/snap'
 import { drainParticles, spawnTimes } from '../sim/particles'
 import { useStore } from '../state/store'
 import { NodeOutline } from './board/NodeOutline'
@@ -18,10 +20,14 @@ import { Minimap } from './board/Minimap'
 type Mode =
   | { k: 'idle' }
   | { k: 'pan'; sx: number; sy: number; moved: boolean }
-  | { k: 'drag'; last: Pt; ids: string[] }
+  | { k: 'drag'; ids: string[]; carry: string[]; start: Pt; applied: Pt; moving: Rect | null; others: Rect[] } // applied: how far the pieces have been moved so far, snapping included
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
   | { k: 'rewire'; edge: string; end: 'from' | 'to'; downAt: Pt; moved: boolean }
+  | { k: 'resize'; id: string; last: Pt }
   | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
+
+/** How close (in screen pixels) an edge or centre must get to a neighbour's before a dragged component snaps to it. */
+const SNAP_PX = 6
 
 type State = ReturnType<typeof useStore.getState>
 
@@ -43,6 +49,7 @@ export function Board() {
   const connectTo = useRef<{ target: string | null; pending: string | null }>({ target: null, pending: null })
   const rewireTo = useRef<string | null>(null) // the component a dragged connection end is over, if it could go there
   const marquee = useRef<Rect | null>(null)
+  const guides = useRef<Guide[]>([]) // alignment lines shown while dragging
   const touches = useRef(new Map<number, Pt>()) // active pointers in screen space, for pinch
   const pinch = useRef<PinchState | null>(null)
   const particles = useRef<ActiveParticle[]>([])
@@ -97,6 +104,7 @@ export function Board() {
       validTargets: valid,
       rewire: rw && rwEdge ? { edge: rw.edge, end: rw.end, to: screenToWorld(pointer.current, st.viewport), target: rewireTo.current, valid: rwValid } : null,
       marquee: marquee.current,
+      guides: guides.current,
       particles: particles.current,
       now,
       editingNote: noteEdit?.id ?? null,
@@ -136,7 +144,7 @@ export function Board() {
 
   const hitAt = (w: Pt) => {
     const st = useStore.getState()
-    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current), new Set(st.selection.filter((id) => st.diagram.edges.some((e) => e.id === id))))
+    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current), new Set(st.selection.filter((id) => st.diagram.edges.some((e) => e.id === id))), new Set(st.selection.filter((id) => st.diagram.groups?.some((g) => g.id === id))))
   }
 
   const finishConnect = (from: string, to: string | null) => {
@@ -157,7 +165,7 @@ export function Board() {
     touches.current.set(e.pointerId, sp)
     if (touches.current.size === 2) {
       // a second finger turns whatever was happening into a pinch: drop any drag or connection
-      if (mode.current.k === 'drag') st.endGesture()
+      if (mode.current.k === 'drag' || mode.current.k === 'resize') st.endGesture()
       mode.current = { k: 'idle' }
       connectTo.current = { target: null, pending: null }
       const [a, b] = [...touches.current.values()]
@@ -198,13 +206,33 @@ export function Board() {
       wake()
       return
     }
-    if (hit && (hit.type === 'node' || hit.type === 'note')) {
+    if (hit?.type === 'groupResize') {
+      st.beginGesture()
+      mode.current = { k: 'resize', id: hit.id, last: w }
+      setCursor('nwse-resize')
+      return
+    }
+    if (hit && (hit.type === 'node' || hit.type === 'note' || hit.type === 'group')) {
       if (e.shiftKey) {
         st.setSelection(st.selection.includes(hit.id) ? st.selection.filter((i) => i !== hit.id) : [...st.selection, hit.id])
       } else if (!st.selection.includes(hit.id)) st.setSelection([hit.id])
-      const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id))
+      const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id) || !!st.diagram.groups?.some((g) => g.id === id))
       st.beginGesture()
-      mode.current = { k: 'drag', last: w, ids }
+      const d = st.diagram
+      const rectOf = (id: string): Rect | null => {
+        const n = d.nodes.find((x) => x.id === id)
+        if (n) return nodeRect(n, st.reg!)
+        const t = d.notes.find((x) => x.id === id)
+        if (t) return noteRect(t, measureText)
+        const g = groupsOf(d).find((x) => x.id === id)
+        return g ? groupRect(g) : null
+      }
+      // what a box holds is settled when the drag starts, so passing over other components on the way does not pick them up
+      const carry = withMembers(d, ids, (n) => nodeRect(n, st.reg!))
+      const carried = new Set(carry)
+      const moving = unionRect(ids.map(rectOf).filter((r): r is Rect => !!r))
+      const others = [...d.nodes.map((n) => n.id), ...d.notes.map((n) => n.id), ...groupsOf(d).map((g) => g.id)].filter((id) => !carried.has(id)).map(rectOf).filter((r): r is Rect => !!r)
+      mode.current = { k: 'drag', ids, carry, start: w, applied: { x: 0, y: 0 }, moving, others }
       setCursor('grabbing')
       return
     }
@@ -248,7 +276,23 @@ export function Board() {
         return
       }
       case 'drag': {
-        st.moveNodes(m.ids, w.x - m.last.x, w.y - m.last.y)
+        let tx = w.x - m.start.x
+        let ty = w.y - m.start.y
+        guides.current = []
+        if (m.moving && !e.altKey) {
+          // line up with neighbours' edges and centres (hold Alt to move freely)
+          const s = snapMove({ ...m.moving, x: m.moving.x + tx, y: m.moving.y + ty }, m.others, SNAP_PX / st.viewport.zoom)
+          tx += s.dx
+          ty += s.dy
+          guides.current = s.guides
+        }
+        st.moveNodes(m.carry, tx - m.applied.x, ty - m.applied.y, true)
+        m.applied = { x: tx, y: ty }
+        return
+      }
+      case 'resize': {
+        const g = st.diagram.groups?.find((x) => x.id === m.id)
+        if (g) st.updateGroup(m.id, { w: g.w + (w.x - m.last.x), h: g.h + (w.y - m.last.y) })
         m.last = w
         return
       }
@@ -278,6 +322,7 @@ export function Board() {
         const ids = [
           ...st.diagram.nodes.filter((n) => rectsIntersect(r, nodeRect(n, st.reg!))).map((n) => n.id),
           ...st.diagram.notes.filter((n) => rectsIntersect(r, noteRect(n, measureText))).map((n) => n.id),
+          ...(st.diagram.groups ?? []).filter((g) => g.x >= r.x && g.y >= r.y && g.x + g.w <= r.x + r.w && g.y + g.h <= r.y + r.h).map((g) => g.id), // a box needs to be wholly inside
         ]
         st.setSelection(Array.from(new Set([...(m.additive ? m.base : []), ...ids])))
         wake()
@@ -297,7 +342,7 @@ export function Board() {
       connectTo.current.target = src && tgt && tgt.id !== src.id && st.reg.canConnect(src.kind, tgt.kind) ? tgt.id : null
       wake()
     }
-    setCursor(hit?.type === 'handle' ? 'crosshair' : hit ? 'pointer' : st.tool === 'connect' ? 'crosshair' : 'default')
+    setCursor(hit?.type === 'groupResize' ? 'nwse-resize' : hit?.type === 'handle' ? 'crosshair' : hit ? 'pointer' : st.tool === 'connect' ? 'crosshair' : 'default')
   }
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -312,7 +357,8 @@ export function Board() {
       setCursor('default')
       return
     }
-    if (m.k === 'drag') st.endGesture()
+    if (m.k === 'drag' || m.k === 'resize') st.endGesture()
+    guides.current = []
     if (m.k === 'pan' && !m.moved) st.setSelection([])
     if (m.k === 'rewire') {
       const target = rewireTo.current
