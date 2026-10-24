@@ -577,8 +577,8 @@ func init() {
 				num("queueCap", "Waiting searches", "Capacity", 200, 1, 100000, 10, "", "Searches that may wait for a free slot.").adv(),
 				num("gbPrice", "Price per GB of memory", "Cost", 0.4, 0, 10, 0.05, "$/GB-hr", "What holding the index in memory costs: the index must fit in RAM to be fast.").adv(),
 			},
-			cost: func(p Params) float64 {
-				return pf(p, "vectors", 1) * 1e6 * pf(p, "dims", 768) * 4 * 1.5 / 1e9 * pf(p, "gbPrice", 0.4) / 24 * 0.6
+			cost: func(p Params) float64 { // the memory it holds, plus the cores that search
+				return pf(p, "vectors", 1)*1e6*pf(p, "dims", 768)*4*1.5/1e9*pf(p, "gbPrice", 0.4)/24*0.6 + 0.05*pf(p, "connections", 32)
 			},
 		},
 		{

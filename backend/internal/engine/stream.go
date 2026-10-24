@@ -215,3 +215,17 @@ func (s *Sim) politely(n *node, e *edge, call func()) {
 	}
 	s.after(at-s.now, call)
 }
+
+// vectorRecall is the lowest recall among the vector stores of the design (0 when there is none).
+func (s *Sim) vectorRecall() float64 {
+	r, any := 1.0, false
+	for _, nd := range s.order {
+		if nd.kind == KVectorStore && !nd.removed {
+			r, any = min(r, 1-math.Pow(0.5, nd.f("efSearch")/32)), true
+		}
+	}
+	if !any {
+		return 0
+	}
+	return r
+}

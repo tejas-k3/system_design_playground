@@ -28,6 +28,7 @@ type Goals struct {
 	MaxInconsistent         *int     `json:"maxInconsistent,omitempty"`         // multi-step writes left half done
 	MaxInDoubt              *int     `json:"maxInDoubt,omitempty"`              // two-phase commits left waiting for a crashed coordinator
 	MaxTTFTMs               *float64 `json:"maxTTFTMs,omitempty"`               // time to first token (p95) of LLM answers
+	MinRecall               *float64 `json:"minRecall,omitempty"`               // share of the true nearest neighbours a vector store must find
 	MinTopKRecall           *float64 `json:"minTopKRecall,omitempty"`           // share of the true top ten a stream job must find
 	MaxStateKB              *float64 `json:"maxStateKB,omitempty"`              // memory a stream job needs to count its visitors
 	MaxCountErrorPct        *float64 `json:"maxCountErrorPct,omitempty"`        // error of an approximate visitor count
@@ -222,6 +223,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxInconsistent != nil {
 		checks = append(checks, Check{"Orders left half done", fmt.Sprintf("≤ %d", *g.MaxInconsistent), fmt.Sprint(run.Inconsistent), run.Inconsistent <= *g.MaxInconsistent})
+	}
+	if g.MinRecall != nil {
+		checks = append(checks, Check{"Vector search recall", fmt.Sprintf("≥ %.0f%%", *g.MinRecall*100), fmt.Sprintf("%.0f%%", run.Recall*100), run.Recall+eps >= *g.MinRecall})
 	}
 	if g.MaxTTFTMs != nil {
 		checks = append(checks, Check{"Time to first token (p95)", fmt.Sprintf("≤ %.0f ms", *g.MaxTTFTMs), fmt.Sprintf("%.0f ms", run.TTFTMs), run.TTFTMs <= *g.MaxTTFTMs+eps})

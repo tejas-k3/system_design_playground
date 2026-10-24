@@ -604,13 +604,15 @@ func (s *Sim) capacity(n *node) int {
 		return int(n.f("maxConcurrent"))
 	case KIndex:
 		return int(n.f("connections"))
+	case KVectorStore:
+		return int(n.f("connections"))
 	}
 	return 1 << 30
 }
 
 func (s *Sim) queueCap(n *node) int {
 	switch n.kind {
-	case KAppServer, KDatabase, KReplica, KRedis, KIndex:
+	case KAppServer, KDatabase, KReplica, KRedis, KIndex, KVectorStore:
 		return int(n.f("queueCap"))
 	case KCache:
 		return 2000
