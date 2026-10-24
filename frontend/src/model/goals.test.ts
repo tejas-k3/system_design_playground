@@ -165,3 +165,14 @@ describe('stream goals', () => {
     expect(row(ok, "Wait for a window's first result").state).toBe('pass')
   })
 })
+
+describe('visitor counting goals', () => {
+  it('compares the memory and the error of the visitor count', () => {
+    const g = { minSuccessRate: 0.5, maxStateKB: 16, maxCountErrorPct: 6 }
+    const bad = goalRows(g, stats({ resolved: 10, ok: 10, stateKB: 71.2, countErrorPct: 0 }), 1, true)
+    expect(row(bad, 'Memory to count visitors')).toMatchObject({ actual: '71.2 KB', state: 'fail' })
+    expect(row(bad, 'Error of the visitor count').state).toBe('pass')
+    const good = goalRows(g, stats({ resolved: 10, ok: 10, stateKB: 4, countErrorPct: 0.9 }), 1, true)
+    expect(row(good, 'Memory to count visitors').state).toBe('pass')
+  })
+})
