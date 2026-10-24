@@ -182,6 +182,11 @@ const ICONS: Record<string, Draw> = {
     })
     for (const x of [-7, 0, 7]) stroke(c, () => c.arc(x, 6, 2.6, 0, Math.PI * 2))
   },
+  vectorStore: (c) => {
+    // scattered points with a ring around the nearest ones
+    for (const [x, y] of [[-7, -5], [-2, 4], [3, -6], [6, 2], [-6, 6]]) stroke(c, () => c.arc(x, y, 1.4, 0, Math.PI * 2))
+    stroke(c, () => c.arc(1, -1, 6.5, 0, Math.PI * 2))
+  },
   llmServer: (c) => {
     // a chip with a spark: a GPU writing tokens
     stroke(c, () => c.rect(-7, -7, 14, 14))

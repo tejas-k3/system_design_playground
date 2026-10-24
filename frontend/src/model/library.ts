@@ -1,7 +1,7 @@
 const GROUPS: { title: string; kinds: string[] }[] = [
   { title: 'Traffic', kinds: ['client', 'loadBalancer', 'cdn', 'rateLimiter'] },
   { title: 'Compute', kinds: ['appServer', 'worker', 'llmServer'] },
-  { title: 'Data', kinds: ['database', 'readReplica', 'cache', 'redis', 'shardRouter', 'kvStore', 'coordinator', 'index'] },
+  { title: 'Data', kinds: ['database', 'readReplica', 'cache', 'redis', 'shardRouter', 'kvStore', 'coordinator', 'index', 'vectorStore'] },
   { title: 'Async and external', kinds: ['queue', 'topic', 'log', 'stream', 'objectStore', 'externalApi'] },
 ]
 
