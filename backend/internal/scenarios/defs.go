@@ -1616,6 +1616,43 @@ func init() {
 		Debrief: "Overload is not fixed by queueing more. Bound the wait, shed the requests that can be retried, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
 	})
 
+	// URL shortener: millions of reads of short links, and every new link takes its number from one counter row
+	urlShortener := func(fixed bool) engine.Diagram {
+		app := P{"threads": 64.0, "queueCap": 1000.0, "dbPool": 60.0}
+		b := (&bld{}).
+			n("visitors", engine.KClient, cols[0], rowTop, P{"rps": 1200.0, "readPct": 100.0, "keySpace": 50000.0, "keyDist": "zipf", "zipfS": 1.1, "timeoutMs": 1500.0, "retries": 0.0}).label("visitors", "Link visitors").
+			n("creators", engine.KClient, cols[0], rowBot, P{"rps": 70.0, "readPct": 0.0, "keySpace": 50000.0, "keyDist": "uniform", "hotKeyPct": 100.0, "timeoutMs": 1500.0, "retries": 0.0}).label("creators", "Link creators")
+		if fixed {
+			app["hotKeyMode"] = "split"
+			app["splitShards"] = 8.0
+			b.n("app", engine.KAppServer, cols[1], rowMid, app).
+				n("cache", engine.KCache, cols[2], rowMid, P{"capacityItems": 4000.0, "ttlSec": 300.0, "startWarm": true}).
+				n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 12.0, "readMs": 20.0, "writeMs": 20.0, "hotRowLock": true}).label("db", "Link database").
+				e("visitors", "app").e("creators", "app").e("app", "cache").e("cache", "db").e("app", "db")
+		} else {
+			b.n("app", engine.KAppServer, cols[1], rowMid, app).
+				n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 12.0, "readMs": 20.0, "writeMs": 20.0, "hotRowLock": true}).label("db", "Link database").
+				e("visitors", "app").e("creators", "app").e("app", "db")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "url-shortener", Title: "The URL shortener", Difficulty: "Medium",
+		Summary: "Short links are read hundreds of times for every one created, and every new link takes its number from one counter row.",
+		Story:   "Visitors follow short links at 1,200 a second, a few viral ones far more than the rest, and new links are created at 70 a second. Every read goes to the database, which can answer about 600 a second at best. Each new link also takes the next number from a single counter row, and the row lock lets one such write through every 20 ms: 50 a second, while 70 are asked for. The waiting writes hold database connections that the readers need.",
+		Diagram: urlShortener(false), Solution: urlShortener(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(250), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.7), StarP95Ms: f(100)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"There are two different problems here, one on the read path and one on the write path. Which one do the failures come from first?",
+			"Reads: a few links are followed again and again, so a cache in front of the database answers most of them. Writes: one counter row is a ceiling of one write per 20 ms however big the database.",
+			"Add a cache between the app server and the database, and in the app server's hot-key setting split the counter over several rows (or hand each server its own range of numbers).",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A cache in front of the database would fix…", Options: []string{"The slow reads, but not the counter", "Both the reads and the counter", "Only the counter"}, Answer: 0,
+			Explain: "A cache absorbs repeated reads. Creating a link is a write, and every write to the counter row still has to take its turn at the database."}},
+		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and the database is left with the misses. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

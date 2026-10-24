@@ -166,6 +166,12 @@ var alternatives = map[string][]Alternative{
 		alt("Double the threads to 16", false, 100.0, 582, 0.74, "Enough capacity for all 400 a second, so nothing is turned away, but it costs $0.74 an hour against a $0.65 budget and the p95 is still 582 ms.", Change{"app", "threads", 16.0}),
 		alt("Shed above 50 ms", true, 50.3, 239, 0.56, "Passes with the lowest p95 of the lot (239 ms): a tighter bound keeps the queue shorter still. The price is that bursts get turned away more eagerly.", Change{"app", "shedAboveQueueMs", 50.0}),
 	},
+	"url-shortener": {
+		alt("Split the counter over 8 rows, nothing else", false, 0.0, 0, 2.40, "The new links no longer queue on one row, but 1,200 reads a second still go straight to a database that answers about 600: nothing succeeds. Fixing the write path leaves the read path.", Change{"app", "hotKeyMode", "split"}, Change{"app", "splitShards", 8.0}),
+		alt("Give the database 64 connections", false, 67.6, 1447, 3.32, "More connections let more reads and counter writes wait at once. Still a third of requests fail, the counter row still lets one write through every 20 ms, and the bill is over budget.", Change{"db", "connections", 64.0}),
+		alt("Make a write take 10 ms instead of 20", false, 0.0, 0, 2.40, "The counter row now takes 100 writes a second instead of 50, enough for the 70 asked for, but the reads still swamp the database: a faster write does not make the reads cheaper.", Change{"db", "writeMs", 10.0}),
+		alt("Split the counter and run the database with 32 connections, no cache", true, 100.0, 225, 2.72, "Enough connections to answer every read at the database. It passes on this seed (and on 7 of the 9 seeds tried; the p95 sits close to the 250 ms goal), but it costs $2.72 against $2.53 for the cache and loses the cache's star.", Change{"app", "hotKeyMode", "split"}, Change{"app", "splitShards", 8.0}, Change{"db", "connections", 32.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

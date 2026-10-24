@@ -81,4 +81,5 @@ var conceptTags = map[string][]string{
 	"ten-thousand-students":  {"capacity", "autoscaling"},
 	"checkout-during-a-sale": {"consistency", "overload-control"},
 	"shed-the-cheap-traffic": {"overload-control", "capacity"},
+	"url-shortener":          {"caching", "sharding"},
 }
