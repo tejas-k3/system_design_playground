@@ -3,6 +3,7 @@ package engine
 import (
 	"math"
 	"math/bits"
+	"sort"
 )
 
 // Probabilistic structures: a Bloom filter (is it in the set?), a count-min sketch (how often?) and HyperLogLog
@@ -109,4 +110,67 @@ func (h *HLL) Count() float64 {
 		return m * math.Log(m/float64(zeros))
 	}
 	return est
+}
+
+// ExactTopK counts every item exactly: perfect, and one counter for each distinct item seen.
+type ExactTopK struct{ n map[uint32]int }
+
+func NewExactTopK() *ExactTopK     { return &ExactTopK{n: map[uint32]int{}} }
+func (e *ExactTopK) Add(x uint32)  { e.n[x]++ }
+func (e *ExactTopK) Counters() int { return len(e.n) }
+func (e *ExactTopK) Top(k int) []uint32 {
+	return topOf(e.n, k)
+}
+
+// SketchTopK finds heavy hitters in fixed memory: a count-min sketch estimates every item and a short list of
+// candidates keeps the ones with the highest estimates.
+type SketchTopK struct {
+	cm   *CountMin
+	cand map[uint32]int
+	cap  int
+}
+
+func NewSketchTopK(k, width, depth int, seed uint32) *SketchTopK {
+	return &SketchTopK{cm: NewCountMin(width, depth, seed), cand: map[uint32]int{}, cap: 3 * k}
+}
+
+func (s *SketchTopK) Counters() int   { return len(s.cm.t) * s.cm.w }
+func (s *SketchTopK) Candidates() int { return len(s.cand) }
+
+func (s *SketchTopK) Add(x uint32) {
+	s.cm.Add(x, 1)
+	est := s.cm.Estimate(x)
+	if _, ok := s.cand[x]; ok || len(s.cand) < s.cap {
+		s.cand[x] = est
+		return
+	}
+	lowKey, low := uint32(0), int(^uint(0)>>1)
+	for k, v := range s.cand { // the weakest candidate, ties by smallest key so the result is reproducible
+		if v < low || (v == low && k < lowKey) {
+			lowKey, low = k, v
+		}
+	}
+	if est > low {
+		delete(s.cand, lowKey)
+		s.cand[x] = est
+	}
+}
+
+func (s *SketchTopK) Top(k int) []uint32 { return topOf(s.cand, k) }
+
+func topOf(m map[uint32]int, k int) []uint32 {
+	keys := make([]uint32, 0, len(m))
+	for x := range m {
+		keys = append(keys, x)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if m[keys[i]] != m[keys[j]] {
+			return m[keys[i]] > m[keys[j]]
+		}
+		return keys[i] < keys[j]
+	})
+	if len(keys) > k {
+		keys = keys[:k]
+	}
+	return keys
 }
