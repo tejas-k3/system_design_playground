@@ -639,7 +639,7 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		ms *= c.readX
 	}
 	exec := func(unlock func()) {
-		took := s.service(n, ms) * n.slow
+		took := s.service(n, ms*contentionMult(n)) * n.slow
 		if write && n.stallUntil > s.now { // an LSM database is compacting: the write waits for it to finish
 			took += n.stallUntil - s.now
 		}

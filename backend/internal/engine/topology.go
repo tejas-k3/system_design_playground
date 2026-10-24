@@ -16,6 +16,7 @@ func (s *Sim) addNode(d Node) *node {
 	n.tokens = n.f("burst")
 	n.tokensAt = s.now
 	s.configStore(n)
+	s.adaptiveSync(n)
 	s.nodes[n.id] = n
 	s.order = append(s.order, n)
 	n.idBase = len(s.order) * 1_000_000
