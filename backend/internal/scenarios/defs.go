@@ -1465,6 +1465,39 @@ func init() {
 		Debrief: "Heavy hitters are few, and a structure that only needs to be right about them can be tiny. A count-min sketch plus a short candidate list finds the top items in a fixed table; the width bounds the overcount and the depth bounds the chance of it. Exactness costs memory in proportion to the number of different items.",
 	})
 
+	// Polite crawler: the sites it fetches from refuse a crawler that comes in rushes
+	politeCrawler := func(fixed bool) engine.Diagram {
+		app := P{"threads": 16.0, "queueCap": 500.0, "hostChoice": "byKey"}
+		if fixed {
+			app["perHostRps"] = 8.0
+		}
+		b := (&bld{}).
+			n("crawl", engine.KClient, cols[0], rowMid, P{"rps": 12.0, "readPct": 100.0, "arrival": "bursty", "burstFactor": 4.0, "burstSec": 2.0, "keySpace": 3000.0, "keyDist": "uniform", "timeoutMs": 8000.0, "retries": 0.0}).
+			n("crawler", engine.KAppServer, cols[1], rowMid, app).
+			n("pages", engine.KDatabase, cols[3], rowBot, P{"connections": 8.0}).label("pages", "Page store").
+			e("crawl", "crawler").e("crawler", "pages")
+		for k, h := range []string{"s1", "s2", "s3"} {
+			b.n(h, engine.KExternalAPI, cols[2], float64(k)*110+40, P{"latencyMs": 100.0, "errorPct": 0.0, "calledFor": "all", "politeRps": 8.0}).label(h, "Site "+h[1:]).e("crawler", h)
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "polite-crawler", Title: "The polite crawler", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The sites keep answering 429 to the crawler, and it is about to be blocked.",
+		Story:   "A crawler fetches pages from three sites. Its work arrives in rushes, so for a couple of seconds at a time it asks one site for 16 pages a second, while each site says it will serve a crawler at most 8 a second and answers 429 (too many requests) beyond that. Over a whole minute the crawler is nowhere near the limit, but the sites do not average: a crawler that keeps getting 429 gets blocked for good.",
+		Diagram: politeCrawler(false), Solution: politeCrawler(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(7000), MaxCostPerHour: f(1.5), StarP95Ms: f(100)},
+		DurationSec: 120, WarmupSec: 10, Speed: 1,
+		Hints: [3]string{
+			"Look at the failure reasons: who is refusing the crawler, and when does it happen?",
+			"The sites count calls per second, not per minute. During a rush the crawler asks for twice what a site allows.",
+			"Give the crawler server a limit on calls per second to any one site (its 'Calls per second to one service' setting, under Show advanced), equal to what the sites allow. The excess waits its turn instead of being refused.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Limiting the crawler to 8 calls a second per site (what the sites allow) will…", Options: []string{"Make it slower on average, since it can never go faster than 7", "Leave its speed unchanged", "Make every fetch faster"}, Answer: 0,
+			Explain: "A limit is a ceiling: a rush that used to be refused now queues. Nothing is lost, but pages wait their turn, and a limit below the average load would make the queue grow without end."}},
+		Debrief: "Politeness is a per-host rate limit on the crawler itself, usually with a queue per host so that waiting for one slow or strict site does not block the others. The average rate is what you plan capacity with, but the peak rate decides whether you get blocked.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

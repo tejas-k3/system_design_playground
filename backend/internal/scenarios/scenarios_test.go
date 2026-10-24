@@ -302,6 +302,15 @@ func TestAlternateSolutions(t *testing.T) {
 			}
 		}
 	})
+	t.Run("polite-crawler: retries keep hitting the limit, a too-low limit times out", func(t *testing.T) {
+		sc := Get("polite-crawler")
+		if res := engine.RunToEnd(withParam(sc.Diagram, "crawl", "retries", 2.0), sc.Options(42), sc.Goals); res.Pass || res.Run.Errors["rateLimited"] == 0 {
+			t.Fatalf("retries still hit the 429s: %+v", res.Run.Errors)
+		}
+		if res := engine.RunToEnd(withParam(sc.Diagram, "crawler", "perHostRps", 3.0), sc.Options(42), sc.Goals); res.Pass {
+			t.Fatalf("3 calls a second is below the crawler's own average: %+v", res.Checks)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
