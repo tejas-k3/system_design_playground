@@ -172,6 +172,13 @@ var alternatives = map[string][]Alternative{
 		alt("Make a write take 10 ms instead of 20", false, 0.0, 0, 2.40, "The counter row now takes 100 writes a second instead of 50, enough for the 70 asked for, but the reads still swamp the database: a faster write does not make the reads cheaper.", Change{"db", "writeMs", 10.0}),
 		alt("Split the counter and run the database with 32 connections, no cache", true, 100.0, 225, 2.72, "Enough connections to answer every read at the database. It passes on this seed (and on 7 of the 9 seeds tried; the p95 sits close to the 250 ms goal), but it costs $2.72 against $2.53 for the cache and loses the cache's star.", Change{"app", "hotKeyMode", "split"}, Change{"app", "splitShards", 8.0}, Change{"db", "connections", 32.0}),
 	},
+	"rate-limiter-showdown": {
+		alt("Switch to a token bucket (burst 300)", false, 32.8, 974, 0.88, "A bucket that holds 300 tokens lets a whole second's allowance through in the first moments of a burst, and refills while it is spent: no better than the fixed window at protecting the database (p95 974 ms).", Change{"rl", "algorithm", "tokenBucket"}),
+		alt("Switch to a leaky bucket", false, 33.1, 1141, 0.88, "It smooths what it lets out, but it queues the burst at the limiter instead of turning it away, so requests still wait over a second.", Change{"rl", "algorithm", "leakyBucket"}),
+		alt("Keep the fixed window but halve the limit to 150", false, 18.8, 606, 0.88, "Twice 150 is 300, so the database is safe, but every ordinary second now turns away half of what it used to admit: 18.8% succeed against the 20% the partner needs.", Change{"rl", "limitRps", 150.0}),
+		alt("Use the sliding window counter", true, 26.4, 655, 0.88, "A cheap approximation of the log: it weighs the previous window by how much of it still overlaps, so a burst across the edge is counted against both. Close to the log's numbers, with one counter per window instead of a record per request.", Change{"rl", "algorithm", "slidingWindowCounter"}),
+		alt("Token bucket with a burst of only 100", true, 21.0, 408, 0.88, "Passes with the best p95 (408 ms) because it never lets more than 100 through in a rush; the price is the least successful traffic of all, only just over the 20% floor.", Change{"rl", "algorithm", "tokenBucket"}, Change{"rl", "burst", 100.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

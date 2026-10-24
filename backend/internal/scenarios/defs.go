@@ -1653,6 +1653,39 @@ func init() {
 		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and the database is left with the misses. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
 	})
 
+	// Rate limiter showdown: a partner's job fires a burst on the second, across the edge of the limiter's window
+	var edgeSpikes []engine.TrafficPoint
+	edgeSpikes = append(edgeSpikes, engine.TrafficPoint{0, 100})
+	for k := 2; k <= 60; k += 2 {
+		at := float64(k)
+		edgeSpikes = append(edgeSpikes, engine.TrafficPoint{at - 0.1, 100}, engine.TrafficPoint{at - 0.09, 8000}, engine.TrafficPoint{at + 0.09, 8000}, engine.TrafficPoint{at + 0.1, 100})
+	}
+	limiterShowdown := func(algo string) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 100.0, "keySpace": 2000.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("rl", engine.KRateLimiter, cols[1], rowMid, P{"limitRps": 300.0, "burst": 300.0, "algorithm": algo, "windowSec": 1.0}).
+			n("app", engine.KAppServer, cols[2], rowMid, P{"threads": 32.0, "queueCap": 2000.0}).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 7.0, "readMs": 20.0}).
+			e("users", "rl").e("rl", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "rate-limiter-showdown", Title: "Rate limiter showdown", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The limiter promises 300 requests a second, and the database sees twice that for a moment.",
+		Story:   "A partner's batch job fires a burst of requests every other second, centred on the instant the clock ticks over, on top of a steady trickle of other users. The rate limiter promises no more than 300 requests a second to a database that does about 350, yet the database is drowning for a second after every burst. The limiter counts requests in fixed one-second windows that reset on the clock: half of each burst lands at the end of one window and half at the start of the next, and each half is given a full allowance. Most of the burst has to be turned away either way.",
+		Diagram: limiterShowdown("fixedWindow"), Solution: limiterShowdown("slidingWindowLog"),
+		Traffic:     map[string][]engine.TrafficPoint{"users": edgeSpikes},
+		Goals:       engine.Goals{MinSuccessRate: 0.2, MaxP95Ms: f(800), MaxCostPerHour: f(1.1), StarCostPerHour: f(1.0)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at what the database receives in the second around a burst, not at what the limiter allows per window.",
+			"A fixed window forgets everything at its edge. A burst that straddles the edge is admitted twice, once in each window, so up to twice the limit gets through in a fraction of a second.",
+			"Change the limiter's algorithm to one that never lets more than the limit through in any window-length span: the sliding window log is exact, the sliding window counter is a cheap approximation.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A burst straddling the edge of a fixed one-second window with a limit of 300 lets through up to…", Options: []string{"300 requests", "600 requests", "It depends on the burst size"}, Answer: 1,
+			Explain: "Each window has its own count: the last moments of one window and the first moments of the next can each admit the whole allowance."}},
+		Debrief: "Every rate-limiting algorithm makes a different promise at the boundary. A fixed window is cheap but allows up to twice the limit across its edge; a sliding log is exact and costs memory per request; a sliding counter is cheap and close; a token bucket allows a burst up to its size and then a steady rate. Pick the one whose worst case your backend can survive.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"
