@@ -216,6 +216,12 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.kind == KVectorStore {
+			ef := n.f("efSearch")
+			ex["searchMs"] = n.f("searchBaseMs") + ef*n.f("perCandidateMs")
+			ex["recall"] = 1 - math.Pow(0.5, ef/32)
+			ex["memoryGB"] = n.f("vectors") * 1e6 * n.f("dims") * 4 * 1.5 / 1e9
+		}
 		if n.kind == KLLMServer && n.llm != nil && s.now > 0 {
 			st := n.llm
 			ex["tokensPerSec"] = float64(st.tokens) / (s.now / 1000)

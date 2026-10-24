@@ -983,6 +983,12 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 		s.procKV(n, c, cb, release)
 	case KCoordinator:
 		s.procCoord(n, c, cb, release)
+	case KVectorStore:
+		ms := n.f("searchBaseMs") + n.f("efSearch")*n.f("perCandidateMs")
+		s.hold(n, s.service(n, ms)*n.slow, release, cb, func() {
+			release()
+			s.okAt(n, Result{Ver: -1, Done: true, Src: n}, cb)
+		})
 	case KIndex:
 		s.hold(n, s.service(n, n.f("queryMs"))*n.slow, release, cb, func() {
 			release()

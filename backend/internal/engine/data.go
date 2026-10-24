@@ -140,6 +140,20 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 				s.appRead(n, &cc, done)
 			}
 		}
+		if ve := s.first(n, KVectorStore); ve != nil { // retrieval first; the answer, if there is a model, is written from what it found
+			s.callCmd(n, ve, &cc, cmdRead, 0, func(res Result) {
+				if !res.OK {
+					done(res)
+					return
+				}
+				if le := s.first(n, KLLMServer); le != nil {
+					s.callCmd(n, le, &cc, cmdEnqueue, 0, done)
+					return
+				}
+				done(res)
+			})
+			return
+		}
 		if le := s.first(n, KLLMServer); le != nil { // the answer is written by the LLM server
 			s.callCmd(n, le, &cc, cmdEnqueue, 0, done)
 			return
