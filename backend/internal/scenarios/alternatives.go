@@ -137,6 +137,11 @@ var alternatives = map[string][]Alternative{
 		alt("A sketch 4,000 counters wide and 4 deep", false, 100.0, 132, 0.38, "Finds the whole top ten, but its 16,000 counters take 63 KB: nearly as much as the exact table and far over the 16 KB budget.", Change{"trending", "topK", "countMin"}, Change{"trending", "sketchWidth", 4000.0}, Change{"trending", "sketchDepth", 4.0}),
 		alt("A sketch 300 counters wide and 3 deep", true, 100.0, 132, 0.38, "4 KB, and it finds 9 or 10 of the top ten on every seed tried: a cheaper answer that still passes. The head of a Zipf crowd is so far ahead of the rest that it survives a lot of sharing.", Change{"trending", "topK", "countMin"}, Change{"trending", "sketchWidth", 300.0}, Change{"trending", "sketchDepth", 3.0}),
 	},
+	"polite-crawler": {
+		alt("Let the crawler retry refused fetches twice", false, 80.1, 831, 0.37, "Each refusal is retried straight away, into the same rush: 243 fetches are still refused (429) and the crawler keeps hammering the sites it is meant to be gentle with.", Change{"crawl", "retries", 2.0}),
+		alt("Limit the crawler to 3 fetches a second per site", false, 30.4, 7791, 0.37, "Politer than needed: 3 a second is below the 4 a second the crawler averages, so the queue grows for the whole run and most fetches time out.", Change{"crawler", "perHostRps", 3.0}),
+		alt("Limit the crawler to 5 fetches a second per site", false, 57.1, 7638, 0.37, "Above the average but only just: the waiting never fully clears between rushes, and on this seed over a third of the fetches time out. A limit is only safe with room over the average load.", Change{"crawler", "perHostRps", 5.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
