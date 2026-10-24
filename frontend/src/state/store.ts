@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { emptyInterview, type InterviewData } from '../model/interview'
-import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
+import type { InterviewData } from '../model/interview'
+import type { StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, Shape, ShapeKind, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
 import { alignNodes, distributeNodes, type AlignMode } from '../model/arrange'
@@ -10,8 +10,9 @@ import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
 import { GROUP_DEFAULT, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize, groupLabel, groupsOf, withMembers } from '../model/groups'
 import { isCompact, isNarrow } from '../model/responsive'
-import { readLevel, writeLevel, type LearnerLevel } from '../model/level'
-import { noteAnswer, noteHint, noteRun, noteWrong, type ChallengeRecord } from '../model/record'
+import { readLevel, type LearnerLevel } from '../model/level'
+import type { ChallengeRecord } from '../model/record'
+import { learningActions } from './learningActions'
 
 export type Tool = 'select' | 'connect'
 export interface Viewport {
@@ -472,12 +473,6 @@ export const useStore = create<State>()((set, get) => {
     setNodeSeries: (nodeSeries) => set({ nodeSeries }),
     setCost: (cost) => set({ cost }),
     setFindings: (findings) => set({ findings }),
-    recordStars: (id, stars) => set((s) => ((s.progress[id] ?? 0) >= stars ? {} : { progress: { ...s.progress, [id]: stars } })),
-    setInterview: (interview) => set({ interview }),
-    startInterview: (minutes) => set((s) => ({ interview: { ...(s.interview ?? emptyInterview()), session: newSession(Math.min(360, Math.max(1, minutes)) * 60_000, Date.now()) }, ui: { ...s.ui, welcome: false } })),
-    interviewStage: (stage) => set((s) => (s.interview?.session ? { interview: { ...s.interview, session: switchStage(s.interview.session, stage, Date.now()) } } : {})),
-    interviewPause: (paused) => set((s) => (s.interview?.session ? { interview: { ...s.interview, session: (paused ? pause : resume)(s.interview.session, Date.now()) } } : {})),
-    endInterview: () => set((s) => (s.interview ? { interview: { ...s.interview, session: null } } : {})),
     setPinned: (pinned) => set({ pinned: pinned ? structuredClone(pinned) : null }),
     setConnection: (connection) => set({ connection }),
 
@@ -518,30 +513,6 @@ export const useStore = create<State>()((set, get) => {
         ui: { ...s.ui, welcome: !(s.sandbox?.nodes.length), result: false, library: !isNarrow() },
       })
     },
-    recordPrediction: (p, answer) =>
-      set((s) => {
-        if (!s.scenario || p.id in s.scenario.predictions) return {}
-        const id = s.scenario.def.id
-        return {
-          scenario: { ...s.scenario, predictions: { ...s.scenario.predictions, [p.id]: answer } },
-          records: answer.correct ? s.records : { ...s.records, [id]: noteWrong(s.records[id]) },
-        }
-      }),
-    addHint: (text) =>
-      set((s) => {
-        if (!s.scenario || s.scenario.hints.length >= s.scenario.def.hintCount) return {}
-        const id = s.scenario.def.id
-        const level = s.scenario.hints.length + 1
-        return { scenario: { ...s.scenario, hints: [...s.scenario.hints, text], hintLevel: level }, records: { ...s.records, [id]: noteHint(s.records[id], level) } }
-      }),
-    showAnswer: (text) =>
-      set((s) => (s.scenario ? { scenario: { ...s.scenario, answer: text }, records: { ...s.records, [s.scenario.def.id]: noteAnswer(s.records[s.scenario.def.id]) } } : {})),
-    setLevel: (level) => {
-      writeLevel(level)
-      set({ level })
-    },
-    importProgress: (progress, records) => set({ progress, records }),
-    setDebrief: (text, deeper) => set((s) => (s.scenario ? { scenario: { ...s.scenario, debrief: text, deeper: typeof deeper === 'string' && deeper.trim() ? deeper : null } } : {})),
     showSolution: (d) => {
       if (!get().scenario) return
       const mine = structuredClone(get().diagram)
@@ -558,13 +529,7 @@ export const useStore = create<State>()((set, get) => {
     adoptDiagram: (d) => set((s) => ({ diagram: d, selection: s.selection.filter((id) => d.nodes.some((n) => n.id === id)) })),
     compareWithReference: (reference) =>
       set((s) => (s.scenario ? { scenario: { ...s.scenario, compare: { mine: structuredClone(s.diagram), reference: uniqueLabels(structuredClone(reference)) } } } : {})),
-    setResult: (score) =>
-      set((s) => {
-        if (!s.scenario) return {}
-        const id = s.scenario.def.id
-        const better = score.stars > (s.progress[id] ?? 0)
-        return { scenario: { ...s.scenario, result: score }, ui: { ...s.ui, result: true }, progress: better ? { ...s.progress, [id]: score.stars } : s.progress, records: { ...s.records, [id]: noteRun(s.records[id], score.pass) } }
-      }),
+    ...learningActions(set),
 
     hydrate: (p) =>
       set((s) => ({
