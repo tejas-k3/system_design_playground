@@ -1,13 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { GLOSSARY, plain, splitMarkup, termById } from './glossary'
 
-const REQUIRED = ['p50', 'p95', 'p99', 'throughput', 'utilisation', 'littles-law', 'queueing-knee', 'thread-pool', 'connection-pool', 'circuit-breaker', 'retry-storm', 'metastable-failure', 'idempotency', 'cache-hit-rate', 'ttl', 'stampede', 'eviction', 'replication-lag', 'failover', 'split-brain', 'fencing', 'quorum', 'consistency-levels', 'sharding', 'hot-key', 'backpressure', 'load-shedding', 'autoscaling', 'slo']
+const REQUIRED = ['p50', 'p95', 'p99', 'throughput', 'utilisation', 'littles-law', 'queueing-knee', 'thread-pool', 'connection-pool', 'circuit-breaker', 'retry-storm', 'metastable-failure', 'idempotency', 'cache-hit-rate', 'ttl', 'stampede', 'eviction', 'replication-lag', 'failover', 'split-brain', 'fencing', 'quorum', 'consistency-levels', 'sharding', 'hot-key', 'backpressure', 'load-shedding', 'autoscaling', 'slo', 'consistent-hashing', 'tail-latency-amplification', 'bulkhead', 'dead-letter-queue', 'cap-trade-off', 'write-ahead-log', 'leader-election', 'read-your-writes', 'exactly-once-delivery', 'thundering-herd']
+
+// Keep this list in sync with IDs registered in backend/internal/scenarios/defs.go.
+const CHALLENGE_IDS = ['hello-world', 'opening-night', 'slow-reads', 'connection-crunch', 'retry-pileup', 'stale-prices', 'double-booked', 'charged-twice', 'disappearing-money', 'vendor-wait', 'write-flood', 'server-down', 'live-scoreboard', 'nearby-drivers', 'scoreboard-survives', 'primary-dies', 'morning-rush', 'cut-off', 'flaky-neighbour', 'cache-stampede', 'sync-or-async', 'fence-the-old-primary', 'wave-rider', 'passed-the-load-test', 'flash-crowd', 'hot-shard', 'scan-pollution', 'search-tail', 'celebrity-post', 'image-egress', 'video-upload', 'gc-storm', 'disk-writes', 'one-heavy-query', 'nobody-on-call', 'slow-query', 'pick-the-store', 'poison-pill', 'consumer-lag', 'hot-cell', 'restore-drill', 'lost-cart', 'quorum-overlap', 'lease-expired', 'who-is-the-leader', 'launch-day', 'count-the-clicks', 'unique-visitors', 'top-ten', 'polite-crawler', 'slow-first-token', 'rag-under-load', 'the-gpu-budget', 'shed-the-cheap-traffic', 'url-shortener', 'rate-limiter-showdown', 'multi-region-reads', 'add-a-shard', 'heavy-tail', 'noisy-tenant', 'notification-fan-out', 'go-global', 'payment-saga', 'frozen-checkout', 'reconnect-storm', 'bad-deploy', 'zone-outage', 'retry-storm', 'bot-flood', 'upload-500kb', 'edge-cache', 'one-slow-server', 'split-the-database', 'launch-day-capstone']
 
 describe('glossary', () => {
   it('covers every term the ticket lists, once each', () => {
     const ids = GLOSSARY.map((t) => t.id)
-    for (const id of REQUIRED) expect(ids, id).toContain(id)
     expect(new Set(ids).size).toBe(ids.length)
+    for (const id of REQUIRED) expect(ids, id).toContain(id)
+    for (const term of GLOSSARY) {
+      if (term.challenge) expect(CHALLENGE_IDS, `${term.id} challenge`).toContain(term.challenge)
+      if (REQUIRED.slice(-10).includes(term.id)) {
+        expect(term.short, `${term.id} short`).toMatch(/\.$/)
+        expect(term.short, `${term.id} short`).not.toMatch(/[\r\n]/)
+        expect(term.short.length, `${term.id} short length`).toBeLessThanOrEqual(140)
+        expect(term.long.length, `${term.id} long length`).toBeGreaterThanOrEqual(150)
+        expect(term.long.length, `${term.id} long length`).toBeLessThanOrEqual(600)
+      }
+    }
   })
   it('gives each term a one-sentence definition and a longer explanation', () => {
     for (const t of GLOSSARY) {
