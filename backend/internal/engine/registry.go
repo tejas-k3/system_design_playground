@@ -358,6 +358,7 @@ func init() {
 				flag("priorityQueue", "Urgent first", "Delivery", false, "Hand out urgent jobs (the users' urgent share) before any other job, however long the backlog.").adv(),
 				num("delayMs", "Delivery delay", "Delivery", 0, 0, 600000, 100, "ms", "Hold every job back this long before workers may take it (delayed or scheduled delivery). Held jobs still count against the queue's capacity.").adv(),
 				flag("deadLetter", "Dead-letter queue", "Delivery", false, "Park jobs that used up their attempts for inspection instead of dropping them. They are counted as dead, not lost.").adv(),
+				flag("dedupeIds", "Drop repeated message ids", "Delivery", false, "A message whose id the queue has already accepted is acknowledged but not stored again, as a deduplicating queue does. Without it, a producer that retries after a timeout (an outbox relay, say) can leave the same event in the queue twice.").adv(),
 				num("maxMessageKB", "Largest message", "Buffer", 256, 1, 10240, 1, "KB", "Messages above this size are refused (managed queues commonly allow 256 KB; a log, 1 MB). Only applies when the users' request size is set. Store big bodies elsewhere and queue a pointer.").adv().fixed(),
 			},
 			cost: func(Params) float64 { return 0.04 },
