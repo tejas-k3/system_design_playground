@@ -4,6 +4,7 @@ import type { Drawable } from 'roughjs/bin/core'
 import type { Diagram, Node, Stats } from '../api/types'
 import type { Reg } from '../model/diagram'
 import { phaseChip } from '../model/phase'
+import { placementTag } from '../model/placement'
 import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { GROUP_HEADER, groupInfo, groupsOf } from '../model/groups'
@@ -379,12 +380,38 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
     }
     if (ns.hitRate >= 0) chip(ctx, `hit ${Math.round(ns.hitRate * 100)}%`, cx, cy, p.grid, p.ink, ck)
   }
+  let tagX = r.x + r.w - 8
   if (n.locked) {
     ctx.fillStyle = p.muted
     ctx.font = `11px ${FONT}`
     ctx.textAlign = 'right'
-    ctx.fillText('fixed', r.x + r.w - 8, r.y + r.h - 6)
+    ctx.fillText('fixed', tagX, r.y + r.h - 6)
+    tagX -= ctx.measureText('fixed').width + 10
   }
+  const place = placementTag(n)
+  if (place) drawPlacement(ctx, p.muted, place, tagX, r.y + r.h - 6)
+}
+
+/** A small map pin and the placement text, right-aligned at x: the pin and the words, so the place is never only a colour. */
+function drawPlacement(ctx: CanvasRenderingContext2D, color: string, text: string, x: number, y: number) {
+  ctx.save()
+  ctx.fillStyle = color
+  ctx.strokeStyle = color
+  ctx.font = `11px ${FONT}`
+  ctx.textAlign = 'right'
+  ctx.fillText(text, x, y)
+  const w = ctx.measureText(text).width
+  const px = x - w - 8
+  ctx.lineWidth = 1.4
+  ctx.beginPath()
+  ctx.arc(px, y - 7, 2.6, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(px - 2.2, y - 5.6)
+  ctx.lineTo(px, y - 0.5)
+  ctx.lineTo(px + 2.2, y - 5.6)
+  ctx.stroke()
+  ctx.restore()
 }
 
 function drawHandle(ctx: CanvasRenderingContext2D, sc: Scene, n: Node) {
