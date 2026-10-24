@@ -165,6 +165,7 @@ const (
 	wlTransfer // every request moves money between two accounts: a two-key read-modify-write transaction
 	wlOnCall   // read a pair of rows, then write one of them: the write-skew workload (see txn.go)
 	wlFeed     // posts fan out to followers' timelines; reads fetch a timeline (see feed.go)
+	wlCrawl    // every request fetches the next URL of a crawl frontier (see crawl.go)
 )
 
 func workloadOf(n *node) int {
@@ -181,6 +182,8 @@ func workloadOf(n *node) int {
 		return wlFeed
 	case "oncall":
 		return wlOnCall
+	case "crawl":
+		return wlCrawl
 	}
 	return wlKV
 }
@@ -210,6 +213,9 @@ func (s *Sim) createLogical(c *node) *logical {
 		}
 	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
+	if lg.wl == wlCrawl {
+		lg.key = s.crawlFetch(c) // the site of the page taken from the frontier
+	}
 	if lg.counted {
 		s.countKey(lg.key)
 	}
