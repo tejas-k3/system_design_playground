@@ -172,6 +172,7 @@ type scenarioSummary struct {
 	ID         string   `json:"id"`
 	Title      string   `json:"title"`
 	Difficulty string   `json:"difficulty"`
+	Level      string   `json:"level"`
 	Summary    string   `json:"summary"`
 	ConfigOnly bool     `json:"configOnly,omitempty"`
 	Open       bool     `json:"open,omitempty"`
@@ -181,7 +182,7 @@ type scenarioSummary struct {
 func (s *Server) listScenarios(w http.ResponseWriter, r *http.Request) {
 	out := []scenarioSummary{}
 	for _, sc := range scenarios.All() {
-		out = append(out, scenarioSummary{sc.ID, sc.Title, sc.Difficulty, sc.Summary, sc.ConfigOnly, sc.Open, sc.Concepts})
+		out = append(out, scenarioSummary{sc.ID, sc.Title, sc.Difficulty, sc.Level, sc.Summary, sc.ConfigOnly, sc.Open, sc.Concepts})
 	}
 	writeJSON(w, 200, out)
 }
@@ -233,7 +234,8 @@ func (s *Server) answerPrediction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "choose one of the options")
 		return
 	}
-	writeJSON(w, 200, map[string]any{"choice": req.Choice, "correct": req.Choice == q.Answer, "answer": q.Answer, "explain": q.Explain})
+	// the player chose a position in the shuffled order (scenarios.ShownOptions); answer in the same positions
+	writeJSON(w, 200, map[string]any{"choice": req.Choice, "correct": sc.StoredIndex(q, req.Choice) == q.Answer, "answer": sc.ShownAnswer(q), "explain": q.Explain})
 }
 
 // getDebrief is shown with the result, not before it.

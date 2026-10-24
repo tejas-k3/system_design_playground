@@ -31,6 +31,7 @@ type PublicScenario struct {
 	ID          string                           `json:"id"`
 	Title       string                           `json:"title"`
 	Difficulty  string                           `json:"difficulty"`
+	Level       string                           `json:"level"`
 	Summary     string                           `json:"summary"`
 	Story       string                           `json:"story"`
 	Diagram     engine.Diagram                   `json:"diagram"`
@@ -50,12 +51,13 @@ type PublicScenario struct {
 // Public is the first-load view of the challenge.
 func (s *Scenario) Public() PublicScenario {
 	p := PublicScenario{
-		ID: s.ID, Title: s.Title, Difficulty: s.Difficulty, Summary: s.Summary, Story: s.Story, Diagram: s.Diagram, Goals: s.Goals,
+		ID: s.ID, Title: s.Title, Difficulty: s.Difficulty, Level: s.Level, Summary: s.Summary, Story: s.Story, Diagram: s.Diagram, Goals: s.Goals,
 		Traffic: s.Traffic, Chaos: s.Chaos, DurationSec: s.DurationSec, WarmupSec: s.WarmupSec, Speed: s.Speed,
 		ConfigOnly: s.ConfigOnly, Open: s.Open, HintCount: len(s.Hints), Concepts: s.Concepts,
 	}
-	for _, q := range s.Predictions {
-		p.Predictions = append(p.Predictions, PublicPrediction{ID: q.ID, Question: q.Question, Options: q.Options})
+	for i := range s.Predictions {
+		q := &s.Predictions[i]
+		p.Predictions = append(p.Predictions, PublicPrediction{ID: q.ID, Question: q.Question, Options: s.ShownOptions(q)})
 	}
 	return p
 }
@@ -82,6 +84,7 @@ type Scenario struct {
 	ID          string                           `json:"id"`
 	Title       string                           `json:"title"`
 	Difficulty  string                           `json:"difficulty"`
+	Level       string                           `json:"level"` // interview band: sde1, sde2 or sde3 (levels.go)
 	Summary     string                           `json:"summary"`
 	Story       string                           `json:"story"`
 	Diagram     engine.Diagram                   `json:"diagram"`
@@ -120,6 +123,7 @@ func register(s *Scenario) {
 	}
 	s.Goals = s.Goals.WithStarTargets()
 	s.Concepts = conceptTags[s.ID]
+	s.Level = levelOf[s.ID]
 	all = append(all, s)
 	byID[s.ID] = s
 }

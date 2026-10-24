@@ -729,11 +729,12 @@ func TestHintsPredictionsAndDebriefAreFetchedOnRequest(t *testing.T) {
 		_ = json.NewDecoder(resp.Body).Decode(&m)
 		return resp.StatusCode, m
 	}
-	wrong := (q.Answer + 1) % len(q.Options)
-	if code, m := post(wrong); code != 200 || m["correct"] != false || int(m["answer"].(float64)) != q.Answer || m["explain"] != q.Explain {
+	right := sc.ShownAnswer(&q) // positions are those of the shuffled order the page shows
+	wrong := (right + 1) % len(q.Options)
+	if code, m := post(wrong); code != 200 || m["correct"] != false || int(m["answer"].(float64)) != right || m["explain"] != q.Explain {
 		t.Errorf("a wrong choice is told the answer and why: %d %v", code, m)
 	}
-	if _, m := post(q.Answer); m["correct"] != true {
+	if _, m := post(right); m["correct"] != true {
 		t.Errorf("the right choice is marked right: %v", m)
 	}
 	if code, _ := post(99); code != 400 {
