@@ -182,6 +182,25 @@ const ICONS: Record<string, Draw> = {
     })
     for (const x of [-7, 0, 7]) stroke(c, () => c.arc(x, 6, 2.6, 0, Math.PI * 2))
   },
+  llmServer: (c) => {
+    // a chip with a spark: a GPU writing tokens
+    stroke(c, () => c.rect(-7, -7, 14, 14))
+    for (const p of [-4, 0, 4]) {
+      stroke(c, () => {
+        c.moveTo(p, -10)
+        c.lineTo(p, -7)
+      })
+      stroke(c, () => {
+        c.moveTo(p, 7)
+        c.lineTo(p, 10)
+      })
+    }
+    stroke(c, () => {
+      c.moveTo(-3, 3)
+      c.lineTo(0, -4)
+      c.lineTo(3, 3)
+    })
+  },
   stream: (c) => {
     // a wave running through a window frame
     stroke(c, () => {
