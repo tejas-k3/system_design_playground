@@ -180,7 +180,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog, KKVStore, KCoordinator, KStream, KLLMServer},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog, KKVStore, KCoordinator, KStream, KLLMServer, KVectorStore},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				sel("version", "Release version", "Release", "v1", "Which release this server runs. A load balancer with a canary share sends that share of traffic to v2; a bad-release event can be aimed at one version.", opt("v1", "v1 (current)"), opt("v2", "v2 (new)")).adv(),
@@ -562,6 +562,24 @@ func init() {
 				num("gpuHourly", "Price per GPU", "Cost", 2.5, 0, 100, 0.1, "$/hr", "What one GPU costs for an hour.").adv(),
 			},
 			cost: func(p Params) float64 { return pf(p, "gpus", 1) * pf(p, "gpuHourly", 2.5) },
+		},
+		{
+			Kind: KVectorStore, Name: "Vector Store", Description: "Finds the stored items whose embeddings are nearest to a query's, approximately.",
+			Lesson: "Approximate search trades recall for speed: looking at more candidates finds more of the true neighbours and takes longer.",
+			Accent: "#9c36b5", Width: 160, Height: 72, CanConnect: nil,
+			Params: []ParamSpec{
+				num("vectors", "Stored vectors", "Index", 1, 0.01, 10000, 1, "millions", "How many embeddings the index holds."),
+				num("dims", "Dimensions", "Index", 768, 8, 8192, 64, "", "Numbers per embedding. Memory is vectors x dimensions x 4 bytes, plus about half again for the graph that makes search fast."),
+				num("efSearch", "Candidates examined", "Search", 64, 8, 2048, 8, "", "How many candidates a search examines. More finds more of the true nearest neighbours (recall: 1 - 0.5^(this / 32)) and takes longer."),
+				num("searchBaseMs", "Fixed time per search", "Speed", 4, 0.1, 500, 0.5, "ms", "Time for every search whatever it examines.").adv(),
+				num("perCandidateMs", "Time per candidate", "Speed", 0.05, 0.001, 5, 0.01, "ms", "Time to examine one candidate.").adv(),
+				num("connections", "Searches at once", "Capacity", 32, 1, 1024, 1, "", "Searches it works on at the same time.").adv(),
+				num("queueCap", "Waiting searches", "Capacity", 200, 1, 100000, 10, "", "Searches that may wait for a free slot.").adv(),
+				num("gbPrice", "Price per GB of memory", "Cost", 0.4, 0, 10, 0.05, "$/GB-hr", "What holding the index in memory costs: the index must fit in RAM to be fast.").adv(),
+			},
+			cost: func(p Params) float64 {
+				return pf(p, "vectors", 1) * 1e6 * pf(p, "dims", 768) * 4 * 1.5 / 1e9 * pf(p, "gbPrice", 0.4) / 24 * 0.6
+			},
 		},
 		{
 			Kind: KIndex, Name: "Search Shard", Description: "One slice of a search index. A query has to ask every slice.",
