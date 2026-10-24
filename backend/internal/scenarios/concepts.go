@@ -83,4 +83,5 @@ var conceptTags = map[string][]string{
 	"shed-the-cheap-traffic": {"overload-control", "capacity"},
 	"url-shortener":          {"caching", "sharding"},
 	"rate-limiter-showdown":  {"overload-control"},
+	"multi-region-reads":     {"replication", "consistency"},
 }

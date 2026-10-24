@@ -1686,6 +1686,43 @@ func init() {
 		Debrief: "Every rate-limiting algorithm makes a different promise at the boundary. A fixed window is cheap but allows up to twice the limit across its edge; a sliding log is exact and costs memory per request; a sliding counter is cheap and close; a token bucket allows a burst up to its size and then a steady rate. Pick the one whose worst case your backend can survive.",
 	})
 
+	// Multi-region reads: app servers sit near every user, but the one database is in the US
+	multiRegion := func(fixed bool) engine.Diagram {
+		b := &bld{}
+		regions := []string{"us", "eu", "ap"}
+		names := map[string]string{"us": "US", "eu": "Europe", "ap": "Asia"}
+		b.n("db", engine.KDatabase, cols[3], rowTop, P{"connections": 32.0, "readMs": 8.0, "writeMs": 15.0, "region": "us"}).label("db", "Primary database (US)")
+		for i, r := range regions {
+			y := float64(i)*130 + 30
+			users, app := "users-"+r, "app-"+r
+			b.n(users, engine.KClient, cols[0], y, P{"rps": 60.0, "readPct": 98.0, "keySpace": 500.0, "keyDist": "uniform", "timeoutMs": 3000.0, "retries": 0.0, "region": r, "consistency": "bounded", "maxStaleMs": 1000.0, "geoRouting": true}).label(users, names[r]+" users")
+			b.n(app, engine.KAppServer, cols[1], y, P{"threads": 24.0, "region": r}).label(app, names[r]+" app")
+			b.e(users, app).e(app, "db")
+			if fixed && r != "us" {
+				rep := "replica-" + r
+				b.n(rep, engine.KReplica, cols[2], y, P{"connections": 16.0, "readMs": 8.0, "replicationLagMs": 100.0, "region": r}).label(rep, names[r]+" replica")
+				b.e(app, rep)
+			}
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "multi-region-reads", Title: "Multi-region reads", Difficulty: "Medium",
+		Summary: "App servers are in three regions, yet reads in Europe and Asia are still slow.",
+		Story:   "Last quarter the app servers moved close to the users, and every user is sent to the nearest one. The database is still a single primary in the US, so a read from Europe or Asia crosses an ocean twice to be answered, and the app server spends most of its time waiting for the answer. Reads are 98% of the traffic, and a read may be at most a second out of date.",
+		Diagram: multiRegion(false), Solution: multiRegion(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(200), MaxStaleReadPct: f(0.02), MaxCostPerHour: f(2.6), StarCostPerHour: f(2.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Compare the latency of the three groups of users. Where does the extra time in Europe and Asia go?",
+			"Every read from Europe crosses to the US and back, about 90 ms of distance before the database does anything; Asia pays 150 ms. The app servers are already close, so the data has to come closer too.",
+			"Put a read replica in Europe and one in Asia, in their regions, and wire each region's app server to its replica. Reads are answered locally, writes still go to the US primary, and a replica runs a little behind, which a read that may be a second old can live with.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A read replica in Asia will make reads there faster, and writes from Asia…", Options: []string{"Faster too", "No faster: they still go to the primary", "Slower"}, Answer: 1,
+			Explain: "A replica serves reads only. Every write still has to reach the one primary, so a write from Asia keeps paying the distance."}},
+		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add replication lag that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or sharding users by home region.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

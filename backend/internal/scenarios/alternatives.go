@@ -179,6 +179,11 @@ var alternatives = map[string][]Alternative{
 		alt("Use the sliding window counter", true, 26.4, 655, 0.88, "A cheap approximation of the log: it weighs the previous window by how much of it still overlaps, so a burst across the edge is counted against both. Close to the log's numbers, with one counter per window instead of a record per request.", Change{"rl", "algorithm", "slidingWindowCounter"}),
 		alt("Token bucket with a burst of only 100", true, 21.0, 408, 0.88, "Passes with the best p95 (408 ms) because it never lets more than 100 through in a rush; the price is the least successful traffic of all, only just over the 20% floor.", Change{"rl", "algorithm", "tokenBucket"}, Change{"rl", "burst", 100.0}),
 	},
+	"multi-region-reads": {
+		alt("Give every app server 96 threads", false, 100.0, 280, 7.25, "The servers were never busy; they wait on the ocean. The p95 stays at 280 ms and the bill more than triples.", Change{"app-us", "threads", 96.0}, Change{"app-eu", "threads", 96.0}, Change{"app-ap", "threads", 96.0}),
+		alt("Move the primary database to Europe", false, 100.0, 334, 2.02, "Europe's reads get fast, but now the US and Asia cross an ocean to reach it (Asia to Europe is the longest hop of all): the p95 is worse, 334 ms, not better.", Change{"db", "region", "eu"}),
+		alt("Move the Asian app server to the US", false, 100.0, 280, 2.02, "The app server is next to the database now, but the users are an ocean from the app server: the distance is paid on the way in instead of on the way to the data.", Change{"app-ap", "region", "us"}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
