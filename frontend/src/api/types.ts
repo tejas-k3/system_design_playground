@@ -274,6 +274,7 @@ export interface RunStats {
   worstTenantSuccess?: number // the worst-served of the quiet tenants
   inconsistent?: number // multi-step writes left half done
   compensated?: number // multi-step writes rolled back
+  eventDups?: number // events a queue accepted a second time (a producer retried after a lost answer)
   inDoubt?: number // two-phase commits left waiting for a crashed coordinator
   lateDropped?: number // events a stream job dropped for arriving too late
   recall?: number // share of the true nearest neighbours the vector search finds
