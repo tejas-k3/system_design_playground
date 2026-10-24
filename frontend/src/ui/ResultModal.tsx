@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { fetchDebrief, fetchScenarios } from '../api/client'
+import { fetchScenarios } from '../api/client'
 import type { ScenarioSummary } from '../api/types'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
+import { loadDebrief } from '../state/learning'
 import { useStore } from '../state/store'
 import { starTargets } from '../model/goals'
 import { Stars } from './Stars'
@@ -18,10 +19,9 @@ export function ResultModal() {
   useEffect(() => {
     if (open) fetchScenarios().then(setList).catch(() => undefined)
   }, [open])
-  const setDebrief = useStore((s) => s.setDebrief)
   useEffect(() => { // the debrief comes with a passing result, not with the challenge
-    if (open && sc?.result?.pass && sc.debrief === null) fetchDebrief(sc.def.id).then((d) => setDebrief(d.debrief)).catch(() => undefined)
-  }, [open, sc?.result?.pass, sc?.debrief, sc?.def.id, setDebrief])
+    if (open && sc?.result?.pass && sc.debrief === null) void loadDebrief(sc.def.id)
+  }, [open, sc?.result?.pass, sc?.debrief, sc?.def.id])
   useEscapeKey(open && !!sc?.result, () => setUi({ result: false }))
   if (!sc?.result || !open) return null
   const r = sc.result
@@ -50,6 +50,7 @@ export function ResultModal() {
           </tbody>
         </table>
         {r.pass && sc.debrief && <p className="debrief"><Rich text={sc.debrief} /></p>}
+        {r.pass && sc.debrief && sc.deeper && <Deeper key={sc.def.id} text={sc.deeper} />}
         {r.pass && <Alternatives id={sc.def.id} />}
         <div className="row-btns end">
           <button autoFocus onClick={close}>Keep tweaking</button>
@@ -57,6 +58,17 @@ export function ResultModal() {
           {r.pass && next && <button className="primary" onClick={() => { close(); loadScenario(next.id) }}>Next: {next.title}</button>}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** The optional longer explanation: collapsed until asked for. */
+function Deeper({ text }: { text: string }) {
+  const [shown, setShown] = useState(false)
+  return (
+    <div className="deeper">
+      <button aria-expanded={shown} aria-controls="deeper-text" onClick={() => setShown(!shown)}>{shown ? 'Hide the deeper explanation' : 'Go deeper'}</button>
+      {shown && <p id="deeper-text" className="debrief"><Rich text={text} /></p>}
     </div>
   )
 }
