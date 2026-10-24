@@ -1,5 +1,7 @@
 package engine
 
+import "math"
+
 // A stream job in the diagram: events reach it from an app server, it keeps windows of event time (see WindowAgg),
 // and a crash makes the windows that fired since its last checkpoint fire again unless it delivers exactly once.
 
@@ -20,6 +22,7 @@ func (s *Sim) arriveStream(n *node, c *call, cb func(Result)) {
 		at -= n.f("lateBySec")
 	}
 	n.win.Add(at)
+	s.countVisitor(n, c.key)
 	if s.now-n.winCPAt >= n.f("checkpointSec")*1000 {
 		n.winCPAt, n.winCP = s.now, len(n.win.Emitted)
 	}
@@ -65,3 +68,54 @@ func (s *Sim) streamDelay() float64 {
 	}
 	return d
 }
+
+// countVisitor adds a visitor id to the stream job's distinct count, exactly or in a HyperLogLog sketch.
+func (s *Sim) countVisitor(n *node, id int) {
+	mode := n.s("counting")
+	if mode != "exact" && mode != "hyperLogLog" {
+		return
+	}
+	if n.uniqExact == nil {
+		n.uniqExact = map[int]struct{}{}
+	}
+	n.uniqExact[id] = struct{}{} // the truth; in hyperLogLog mode it is only kept to measure the error
+	if mode == "hyperLogLog" {
+		if n.uniqHLL == nil {
+			n.uniqHLL = NewHLL(uint(n.f("hllPrecision")))
+		}
+		n.uniqHLL.Add(uint32(id))
+	}
+}
+
+// visitorStats is the distinct count, the memory a real job would need for it and the error of the estimate.
+func (s *Sim) visitorStats(n *node) (uniques, stateKB, errPct float64, ok bool) {
+	switch n.s("counting") {
+	case "exact":
+		if n.uniqExact == nil {
+			return 0, 0, 0, false
+		}
+		return float64(len(n.uniqExact)), float64(len(n.uniqExact)) * 16 / 1024, 0, true // an id and its slot: about 16 bytes
+	case "hyperLogLog":
+		if n.uniqHLL == nil {
+			return 0, 0, 0, false
+		}
+		est, truth := n.uniqHLL.Count(), float64(len(n.uniqExact))
+		return est, float64(len(n.uniqHLL.reg)) / 1024, math.Abs(est-truth) / truth * 100, true
+	}
+	return 0, 0, 0, false
+}
+
+// streamCounting is the memory and the error of the worst stream job that counts visitors.
+func (s *Sim) streamCounting() (stateKB, errPct float64) {
+	for _, nd := range s.order {
+		if nd.kind == KStream && !nd.removed {
+			if _, kb, e, ok := s.visitorStats(nd); ok {
+				stateKB, errPct = max(stateKB, kb), max(errPct, e)
+			}
+		}
+	}
+	return
+}
+
+func (s *Sim) stateKB() float64  { kb, _ := s.streamCounting(); return kb }
+func (s *Sim) countErr() float64 { _, e := s.streamCounting(); return e }

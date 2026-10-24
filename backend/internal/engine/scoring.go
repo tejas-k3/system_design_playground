@@ -27,6 +27,8 @@ type Goals struct {
 	MinWorstTenant          *float64 `json:"minWorstTenant,omitempty"`          // the worst-served of the quiet tenants must still succeed at least this often
 	MaxInconsistent         *int     `json:"maxInconsistent,omitempty"`         // multi-step writes left half done
 	MaxInDoubt              *int     `json:"maxInDoubt,omitempty"`              // two-phase commits left waiting for a crashed coordinator
+	MaxStateKB              *float64 `json:"maxStateKB,omitempty"`              // memory a stream job needs to count its visitors
+	MaxCountErrorPct        *float64 `json:"maxCountErrorPct,omitempty"`        // error of an approximate visitor count
 	MaxLateDropped          *int     `json:"maxLateDropped,omitempty"`          // events a stream job dropped for arriving too late
 	MaxResultDelaySec       *float64 `json:"maxResultDelaySec,omitempty"`       // how long after a window ends a stream job first emits it
 	MaxLostEvents           *int     `json:"maxLostEvents,omitempty"`           // saved writes whose event never reached the queue
@@ -218,6 +220,12 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxInconsistent != nil {
 		checks = append(checks, Check{"Orders left half done", fmt.Sprintf("≤ %d", *g.MaxInconsistent), fmt.Sprint(run.Inconsistent), run.Inconsistent <= *g.MaxInconsistent})
+	}
+	if g.MaxStateKB != nil {
+		checks = append(checks, Check{"Memory to count visitors", fmt.Sprintf("≤ %.0f KB", *g.MaxStateKB), fmt.Sprintf("%.1f KB", run.StateKB), run.StateKB <= *g.MaxStateKB+eps})
+	}
+	if g.MaxCountErrorPct != nil {
+		checks = append(checks, Check{"Error of the visitor count", fmt.Sprintf("≤ %.0f%%", *g.MaxCountErrorPct), fmt.Sprintf("%.1f%%", run.CountErrorPct), run.CountErrorPct <= *g.MaxCountErrorPct+eps})
 	}
 	if g.MaxLateDropped != nil {
 		checks = append(checks, Check{"Late events dropped", fmt.Sprintf("≤ %d", *g.MaxLateDropped), fmt.Sprint(run.LateDropped), run.LateDropped <= *g.MaxLateDropped})

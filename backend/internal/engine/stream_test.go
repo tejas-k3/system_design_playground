@@ -53,3 +53,37 @@ func TestACrashRepeatsWindowsOnlyWithAtLeastOnce(t *testing.T) {
 		t.Errorf("exactly-once never repeats an output: %v", eo["duplicateWindows"])
 	}
 }
+
+// Counting the different visitors in a stream: exactly (a table with every id seen) or with HyperLogLog (a few
+// bytes, a small error). 200 events a second over 5,000 possible visitors for a minute.
+func uniqueRun(counting string, p float64) map[string]float64 {
+	b := &builder{}
+	b.node("u", KClient, Params{"rps": 200.0, "readPct": 0.0, "keySpace": 5000.0, "keyDist": "uniform", "timeoutMs": 2000.0})
+	b.node("a", KAppServer, Params{"threads": 32.0})
+	b.node("st", KStream, Params{"counting": counting, "hllPrecision": p})
+	b.edge("u", "a").edge("a", "st")
+	d, _ := Sanitize(b.d)
+	s := New(d, Options{Seed: 12})
+	s.Advance(60000)
+	return s.Snapshot().Nodes["st"].Extra
+}
+
+func TestHyperLogLogCountsVisitorsInAFractionOfTheMemory(t *testing.T) {
+	exact := uniqueRun("exact", 10)
+	hll := uniqueRun("hyperLogLog", 10)
+	t.Logf("exact: %.0f visitors, %.1f KB; HyperLogLog p=10: %.0f, %.1f KB, error %.2f%%", exact["uniques"], exact["stateKB"], hll["uniques"], hll["stateKB"], hll["countErrorPct"])
+	if exact["uniques"] < 4500 || exact["countErrorPct"] != 0 {
+		t.Errorf("exact counting is exact: %v, error %v", exact["uniques"], exact["countErrorPct"])
+	}
+	if hll["stateKB"]*20 > exact["stateKB"] {
+		t.Errorf("1,024 registers take a small fraction of the table: %.1f vs %.1f KB", hll["stateKB"], exact["stateKB"])
+	}
+	// the standard error at p = 10 is 1.04 / sqrt(1024) = 3.25%; three of them is the limit
+	if hll["countErrorPct"] > 9.75 {
+		t.Errorf("error beyond three standard errors: %.2f%%", hll["countErrorPct"])
+	}
+	tiny := uniqueRun("hyperLogLog", 4)
+	if tiny["countErrorPct"] <= hll["countErrorPct"] {
+		t.Errorf("sixteen registers are less accurate than 1,024: %.2f%% vs %.2f%%", tiny["countErrorPct"], hll["countErrorPct"])
+	}
+}
