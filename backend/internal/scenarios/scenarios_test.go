@@ -278,6 +278,13 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("4 machines need 3 for a majority; losing 2 leaves none: %+v", res.Checks)
 		}
 	})
+	t.Run("count-the-clicks: a long watermark delay loses the freshness goal", func(t *testing.T) {
+		sc := Get("count-the-clicks")
+		res := engine.RunToEnd(withParam(sc.Diagram, "clicks", "watermarkDelaySec", 25.0), sc.Options(42), sc.Goals)
+		if res.Pass || res.Run.LateDropped != 0 || res.Run.ResultDelaySec != 25 {
+			t.Fatalf("waiting 25 s catches every click and fails the 3 s goal: %+v dropped %d delay %.0f", res.Checks, res.Run.LateDropped, res.Run.ResultDelaySec)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

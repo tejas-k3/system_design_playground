@@ -78,6 +78,8 @@ type RunStats struct {
 	Compensated          int             `json:"compensated,omitempty"`          // multi-step writes rolled back by compensation
 	Stuck                int             `json:"stuck,omitempty"`                // rolled back unsuccessfully: needs a person
 	HottestKeyShare      float64         `json:"hottestKeyShare,omitempty"`      // share of requests that go to the single busiest item
+	LateDropped          int             `json:"lateDropped,omitempty"`          // events a stream job dropped for arriving too late
+	ResultDelaySec       float64         `json:"resultDelaySec,omitempty"`       // seconds after a window ends before a stream job first emits it
 	InDoubt              int             `json:"inDoubt,omitempty"`              // two-phase commits left waiting for a crashed coordinator
 	BlockedSec           float64         `json:"blockedSec,omitempty"`           // lock-seconds those transactions held
 	RpoSec               float64         `json:"rpoSec,omitempty"`               // seconds of writes lost by the last restore
@@ -321,7 +323,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, LateDropped: s.streamLate(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {
