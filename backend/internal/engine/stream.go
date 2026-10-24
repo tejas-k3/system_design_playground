@@ -186,3 +186,32 @@ func (s *Sim) topRecall() float64 {
 	}
 	return r
 }
+
+// hostEdge is the external service a request goes to: the first one, or with hostChoice "byKey" the one its key
+// belongs to (as a crawler picks the site a page lives on).
+func (s *Sim) hostEdge(n *node, key int) *edge {
+	if n.s("hostChoice") != "byKey" {
+		return s.first(n, KExternalAPI)
+	}
+	hosts := s.outOf(n, KExternalAPI)
+	if len(hosts) == 0 {
+		return nil
+	}
+	return hosts[key%len(hosts)]
+}
+
+// politely runs a call to an external service now, or when the server's per-service limit lets it.
+func (s *Sim) politely(n *node, e *edge, call func()) {
+	rate := n.f("perHostRps")
+	if rate <= 0 {
+		call()
+		return
+	}
+	at := max(s.now, e.politeAt)
+	e.politeAt = at + 1000/rate
+	if at <= s.now {
+		call()
+		return
+	}
+	s.after(at-s.now, call)
+}

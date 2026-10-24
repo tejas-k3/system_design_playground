@@ -999,6 +999,19 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 			s.okAt(n, Result{Ver: -1, Done: true}, cb)
 		})
 	case KExternalAPI:
+		if rate := n.f("politeRps"); rate > 0 { // a site that refuses more than it likes
+			if n.hostAt == 0 { // the first call: a full bucket
+				n.hostTokens = rate
+			}
+			n.hostTokens = min(rate, n.hostTokens+(s.now-n.hostAt)*rate/1000)
+			n.hostAt = s.now
+			if n.hostTokens < 1 {
+				release()
+				s.failAt(n, RRateLimited, cb)
+				return
+			}
+			n.hostTokens--
+		}
 		s.hold(n, s.service(n, n.f("latencyMs"))*n.slow, release, cb, func() {
 			release()
 			if s.rng.Next() < n.f("errorPct")/100 {
