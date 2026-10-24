@@ -270,6 +270,42 @@ var alternatives = map[string][]Alternative{
 		alt("Promote the replica in 2 seconds", false, 87.7, 185, 0.94, "The outage is shorter (88% succeed), but the 3 seconds of unreplicated writes are still lost: 253 of them. Speed of recovery and loss of data are different dials.", Change{"db", "promoteSec", 2.0}),
 		alt("Notice the failure in 1 second", false, 81.0, 185, 0.94, "Quicker detection shortens the outage but not the data lost: the replica was still 3 seconds behind when the primary died.", Change{"db", "detectSec", 1.0}),
 	},
+	"wave-rider": {
+		alt("Keep at least 2 servers running", false, 92.7, 918, 0.34, "Better (93% succeed) but a wave still arrives at twice the capacity of what is running, and a new server takes ten seconds to boot. Short of what the first seconds of a wave need.", Change{"app1", "minInstances", 2.0}),
+		alt("Keep at least 4 servers running", true, 100.0, 192, 0.36, "Passes with the lowest p95: more of the wave is already covered when it starts. It costs about the same as the reference.", Change{"app1", "minInstances", 4.0}),
+		alt("Scale up at 30% busy instead of 60%", true, 99.7, 204, 0.44, "Passes by reacting sooner, but the scaler then keeps more servers than the wave needs: $0.44 an hour against $0.36.", Change{"app1", "targetUtilPct", 30.0}),
+	},
+	"passed-the-load-test": {
+		alt("Give the app server 6 threads", false, 99.5, 1119, 0.28, "Nearly everyone is served (99.5%), but at the peak requests queue for over a second.", Change{"app1", "threads", 6.0}),
+		alt("Let 500 requests queue instead of 100", false, 1.3, 4941, 0.26, "A deeper queue just makes the requests wait longer: almost everyone gives up before their turn.", Change{"app1", "queueCap", 500.0}),
+		alt("Give the app server 16 threads", true, 100.0, 196, 0.50, "Passes with capacity to spare, but the bill is $0.50 an hour against $0.32 for 8 threads.", Change{"app1", "threads", 16.0}),
+	},
+	"flash-crowd": {
+		alt("Limit the public to 150 requests a second", false, 83.3, 196, 0.33, "A limit low enough to keep the rush off the server also rejects requests that a deeper queue could have absorbed: 83% succeed.", Change{"limiter", "limitRps", 150.0}, Change{"limiter", "burst", 150.0}),
+		alt("Let 1,000 requests queue", false, 100.0, 865, 0.33, "Every request is served, but the ones in the back of a rush wait most of a second: the p95 is over the goal.", Change{"app1", "queueCap", 1000.0}),
+		alt("Let 100 requests queue, nothing else", true, 97.6, 618, 0.33, "Passes, narrowly, with the same cost as the starting design: a queue deep enough to hold a rush. The p95 (618 ms) is close to the 700 ms goal.", Change{"app1", "queueCap", 100.0}),
+		alt("Give the server 10 threads, nothing else", true, 97.3, 181, 0.37, "Passes with a lower p95 than the queue: more threads work off the rush faster, for four cents an hour more.", Change{"app1", "threads", 10.0}),
+	},
+	"hot-shard": {
+		alt("Give every shard 16 connections", false, 100.0, 200, 1.97, "Twice the connections is enough for the shard that holds the hot key, but all four shards have to be doubled to get it: $1.97 against the $1.70 budget, to serve one hot item.", Change{"db1", "connections", 16.0}, Change{"db2", "connections", 16.0}, Change{"db3", "connections", 16.0}, Change{"db4", "connections", 16.0}),
+		alt("Give each app server 32 threads", false, 76.3, 974, 3.59, "The wait is at the one shard holding the hot key, not in the app servers; more threads just wait there too, at more than twice the price.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}, Change{"app3", "threads", 32.0}, Change{"app4", "threads", 32.0}),
+		alt("Place keys on a consistent-hashing ring", false, 72.8, 710, 1.52, "A ring decides which shard a key lives on, but the hot key is still one key on one shard: where it lives does not change how often it is asked for.", Change{"router", "hashing", "ring"}),
+	},
+	"scan-pollution": {
+		alt("Evict the least recently used", false, 100.0, 408, 1.75, "Nearly there (p95 408 ms against 400): a recently used scan entry pushes a popular one out as the crawler sweeps through, so some popular items are lost between visits.", Change{"cache", "eviction", "lru"}),
+		alt("Make the cache 2,000 items", true, 100.0, 253, 1.79, "Passes: with room for the whole popular set and some of the scan, the crawler cannot push it out. A little more memory instead of a smarter policy.", Change{"cache", "capacityItems", 2000.0}),
+		alt("Give the database 32 connections", true, 100.0, 200, 2.12, "Passes by answering the misses faster instead of avoiding them: $2.12 against $1.75, and the cache is still being polluted.", Change{"db", "connections", 32.0}),
+	},
+	"celebrity-post": {
+		alt("Pull every timeline on read", true, 100.0, 158, 1.00, "Passes: nothing is copied into followers' timelines, so a celebrity's post costs one write. Reading builds the timeline each time, which this load can afford; at much higher read rates the hybrid is the safer choice.", Change{"app", "feedStrategy", "pullOnRead"}),
+		alt("Hybrid, but only above 100,000 followers", false, 96.9, 753, 1.00, "No author here has that many, so every post is still pushed to every follower and the celebrity's post still swamps the writes. The threshold has to be below the celebrities.", Change{"app", "feedStrategy", "hybrid"}, Change{"app", "celebrityThreshold", 100000.0}),
+		alt("Give the database 64 connections", false, 96.9, 753, 1.86, "The celebrity's post is millions of small writes; more connections do not shrink them and the bill goes up.", Change{"db", "connections", 64.0}),
+	},
+	"image-egress": {
+		alt("Serve 30 KB thumbnails instead of 300 KB images", true, 100.0, 225, 2.14, "Passes: ten times fewer bytes is ten times less egress. Without a CDN every view still pays it, so it is inside the $2.50 budget but costs almost twice what the CDN reference does ($1.13).", Change{"users", "respKB", 30.0}),
+		alt("Serve 100 KB images instead of 300 KB", false, 100.0, 229, 4.38, "A third of the bytes is a third of the egress, but it is still $4.38 an hour against the $2.50 budget.", Change{"users", "respKB", 100.0}),
+		alt("Give the app server only 8 threads", false, 69.2, 955, 7.08, "Saving on the server does not help: the bill is the bandwidth, and slowing the server only makes requests fail.", Change{"app", "threads", 8.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
