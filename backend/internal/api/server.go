@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -132,9 +133,31 @@ func logRequests(next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, code: 200}
 		next.ServeHTTP(sw, r)
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/healthz" {
-			log.Printf("%s %s %d %s", r.Method, r.URL.Path, sw.code, time.Since(start).Round(time.Millisecond))
+			log.Printf("%s %s %d %s", r.Method, routeLabel(r), sw.code, time.Since(start).Round(time.Millisecond))
 		}
 	})
+}
+
+// routeLabel is the mux pattern that served the request without its method ("/api/designs/{id}"),
+// never the raw path, which can carry a design id. Unmatched requests and 405s have no pattern.
+func routeLabel(r *http.Request) string {
+	if _, route, ok := strings.Cut(r.Pattern, " "); ok {
+		return route
+	}
+	if r.Pattern != "" {
+		return r.Pattern
+	}
+	return "(unmatched)"
+}
+
+// pathFreeErr drops the file path from an *fs.PathError (it holds the design id) and keeps the
+// operation and the underlying cause.
+func pathFreeErr(err error) string {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return pe.Op + ": " + pe.Err.Error()
+	}
+	return err.Error()
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -412,7 +435,7 @@ func (s *Server) saveDesign(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := s.designs.Put(d)
 	if err != nil {
-		log.Printf("save design: %v", err)
+		log.Printf("save design: %s", pathFreeErr(err))
 		writeErr(w, http.StatusInternalServerError, "could not save the design")
 		return
 	}
