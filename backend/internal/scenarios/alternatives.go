@@ -370,6 +370,37 @@ var alternatives = map[string][]Alternative{
 		alt("Turn on row locks", false, 100.0, 200, 1.00, "A row lock protects the row each transaction writes; the two doctors write different rows after reading each other's, so the rule is still broken 39 times.", Change{"db", "rowLocks", true}),
 		alt("Let clients retry twice", false, 100.0, 200, 1.00, "Nothing fails, so there is nothing to retry; the rule is still broken.", Change{"users", "retries", 2.0}),
 	},
+	"hello-world": {
+		alt("Give the app server 16 threads", false, 0.0, 0, 0.48, "Capacity is not what is missing: the app server still touches no data store, so the check that every server is wired to data fails, and the bill goes up.", Change{"app", "threads", 16.0}),
+		alt("Give the database 64 connections", false, 0.0, 0, 1.16, "A bigger database that nothing is connected to does no work: the server still touches no data store, and the bill is nearly twice the $0.60 budget.", Change{"db", "connections", 64.0}),
+	},
+	"vendor-wait": {
+		alt("Give each app server 32 threads", false, 99.2, 918, 1.82, "Enough threads that nearly everything succeeds, but every write still waits out the vendor's 400 ms, so the p95 is 918 ms, and the bill is over the $1.40 budget.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}),
+		alt("Make the vendor answer in 100 ms instead of 400", false, 99.3, 538, 0.42, "Threads are freed four times sooner and nearly everything succeeds, and it is cheap, but the user still waits for the vendor: the p95 is 538 ms against the 400 ms goal. You rarely control a vendor, and a queue removes the wait whatever its speed.", Change{"ext", "latencyMs", 100.0}),
+		alt("Let clients retry twice", false, 1.1, 6143, 0.42, "Retries add more requests on top of a design that is already overloaded by the vendor wait: only 1.1% succeed.", Change{"users", "retries", 2.0}),
+	},
+	"live-scoreboard": {
+		alt("Give the database 64 connections", false, 70.0, 1034, 1.38, "More rank queries can run at once, so more succeed (70%), but each one still sorts the scores at ten times the cost of a read: the p95 is over a second, and the bill is over the $1.20 budget.", Change{"db", "connections", 64.0}),
+		alt("Give each app server 32 threads", false, 61.8, 1536, 2.62, "The servers were waiting on the database, not short of threads: more of them only wait there too. Fewer than two thirds succeed and the bill is more than double the budget.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}, Change{"app3", "threads", 32.0}),
+	},
+	"nearby-drivers": {
+		alt("Give the database 64 connections", false, 40.6, 1987, 1.28, "More searches scan the table at the same time, but each still reads all of it: only 40.6% succeed, the p95 is nearly two seconds and the bill is over $1.20.", Change{"db", "connections", 64.0}),
+		alt("Make a database read take 5 ms", false, 98.8, 1119, 0.42, "A faster scan gets success close to the goal (98.8% against 99%), but each search still reads the whole table: the p95 is 1,119 ms against the 250 ms goal. A spatial index avoids the scan instead of speeding it up.", Change{"db", "readMs", 5.0}),
+	},
+	"scoreboard-survives": {
+		alt("Let clients retry twice", false, 95.3, 148, 0.60, "Retries do nothing for the scores already held in Redis's memory when it crashes: 4,777 writes lost against the 400 allowed.", Change{"users", "retries", 2.0}),
+		alt("Give each app server 32 threads", false, 93.3, 140, 2.70, "Capacity does not change what a crash empties: 4,759 writes lost against 400, and the bill is more than four times higher.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}, Change{"app3", "threads", 32.0}),
+	},
+	"split-the-database": {
+		alt("Give the one database 32 connections", true, 100.0, 204, 1.61, "Passes: 32 connections at 40 ms a write can commit about 800 a second, more than the 630 asked for, and it costs $1.61 against $1.57 for two shards. It is a legitimate answer for this load; it is a single machine with about 27% headroom, where two shards also leave room to add a third.", Change{"db", "connections", 32.0}),
+		alt("Make a write take 25 ms instead of 40", false, 97.6, 487, 1.35, "One database can then commit about 640 writes a second against the 630 asked for: no headroom, so the queue builds, 97.6% succeed (under the 99% needed) and the p95 sits just under the goal at 487 ms.", Change{"db", "writeMs", 25.0}),
+		alt("Give each app server 64 threads", false, 61.2, 1211, 9.27, "The writes wait at the database, not at the servers: more threads only let more of them wait there, and the bill is nearly four times the budget.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}, Change{"app3", "threads", 64.0}, Change{"app4", "threads", 64.0}),
+	},
+	"launch-day-capstone": {
+		alt("Give each of the two servers 16 threads", false, 68.8, 848, 0.79, "A bigger pair absorbs more of the ramp (68.8% succeed), but there are still only two servers, so a crash still takes half of them, and the p95 is 848 ms against 700.", Change{"app1", "threads", 16.0}, Change{"app2", "threads", 16.0}),
+		alt("Make a database read take 5 ms instead of 15", false, 53.1, 936, 0.42, "Faster reads are not enough: only 53.1% succeed and the p95 is 936 ms, with the same two servers having to carry the ramp to 800 requests a second.", Change{"db", "readMs", 5.0}),
+		alt("Turn clients' retries off", false, 44.7, 783, 0.42, "Fewer duplicate requests, but nothing is rescued either: 44.7% succeed and the p95 is 783 ms.", Change{"users", "retries", 0.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
