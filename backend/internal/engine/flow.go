@@ -784,6 +784,9 @@ func (s *Sim) arrive(n *node, c *call, cb func(Result)) {
 	case KLog:
 		s.arriveLog(n, c, cb)
 		return
+	case KStream:
+		s.arriveStream(n, c, cb)
+		return
 	case KClient, KWorker:
 		s.failAt(n, RNoRoute, cb)
 		return

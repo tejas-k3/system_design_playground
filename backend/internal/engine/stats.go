@@ -209,6 +209,18 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.kind == KStream && n.win != nil {
+			emitted := 0
+			for _, e := range n.win.Emitted {
+				if !e.Update {
+					emitted++
+				}
+			}
+			ex["windows"] = float64(emitted)
+			ex["lateDropped"] = float64(n.win.LateDropped)
+			ex["windowUpdates"] = float64(n.win.Updates)
+			ex["duplicateWindows"] = float64(n.winDup)
+		}
 		if n.kind == KLog && n.rebalances > 0 {
 			ex["rebalances"] = float64(n.rebalances)
 		}
