@@ -88,3 +88,48 @@ func TestLosingTooManyNodesLosesTheQuorum(t *testing.T) {
 		t.Errorf("three of five nodes down leaves some keys with fewer than two copies: %.3f", three)
 	}
 }
+
+// The k-th fastest of N exponential service times has mean m x (1/N + 1/(N-1) + ... + 1/(N-k+1)). With N = 3 and a
+// mean of 60 ms that is 20 ms (k = 1), 50 ms (k = 2) and 110 ms (k = 3), so waiting for two copies instead of one adds
+// 30 ms and waiting for all three adds 90 ms, whatever the fixed overhead of the path is.
+func TestReadLatencyDifferencesFollowTheOrderStatistics(t *testing.T) {
+	mean := func(r float64) float64 {
+		s := quorumRunWith(Params{"readPct": 100.0, "rps": 100.0}, Params{"readQuorum": r, "writeQuorum": 1.0, "readMs": 60.0}, nil)
+		return s.RunSnapshot().Mean
+	}
+	m1, m2, m3 := mean(1), mean(2), mean(3)
+	t.Logf("mean latency: R=1 %.1f ms, R=2 %.1f ms (+%.1f, expected +30), R=3 %.1f ms (+%.1f, expected +90)", m1, m2, m2-m1, m3, m3-m1)
+	if d := m2 - m1; d < 30*0.85 || d > 30*1.15 {
+		t.Errorf("R=2 should cost 30 ms more than R=1, within 15%%: %.1f", d)
+	}
+	if d := m3 - m1; d < 90*0.85 || d > 90*1.15 {
+		t.Errorf("R=3 should cost 90 ms more than R=1, within 15%%: %.1f", d)
+	}
+}
+
+// Hinted handoff conserves writes: after the node is back and its hints are replayed, it holds, for every key it is a
+// copy of, the newest version any copy has: nothing written during the outage is missing.
+func TestHintedHandoffLeavesNoCopyBehind(t *testing.T) {
+	_, _, s := staleAfterReturn(Params{"hintedHandoff": true})
+	n := s.nodes["kv"]
+	nodes, copies, _, _ := kvShape(n)
+	missing, checked := 0, 0
+	for k, have := range n.kvVer[0] { // node 0 is the one that went down
+		first := int(Hash32(uint32(k)*2654435761+11) % uint32(nodes))
+		newest := 0
+		for j := 0; j < copies; j++ {
+			newest = max(newest, n.kvVer[(first+j)%nodes][k])
+		}
+		checked++
+		if have < newest {
+			missing++
+		}
+	}
+	t.Logf("%d keys on the returned node checked, %d older than the newest copy (writes since it came back may still be on their way)", checked, missing)
+	if checked == 0 {
+		t.Fatalf("the node should hold keys")
+	}
+	if frac := float64(missing) / float64(checked); frac > 0.15 {
+		t.Errorf("hinted handoff should leave almost nothing behind, got %.2f", frac)
+	}
+}
