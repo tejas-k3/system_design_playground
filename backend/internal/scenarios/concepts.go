@@ -63,6 +63,7 @@ var conceptTags = map[string][]string{
 	"who-is-the-leader":      {"replication", "failure-handling"},
 	"launch-day":             {"sharding", "capacity"},
 	"count-the-clicks":       {"queues", "consistency"},
+	"unique-visitors":        {"storage-and-payload", "capacity"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},

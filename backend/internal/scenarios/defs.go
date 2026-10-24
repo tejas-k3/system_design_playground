@@ -1407,6 +1407,35 @@ func init() {
 		Debrief: "Event time is when something happened, not when you heard about it. The watermark is a guess about how late data can be: too tight and you drop data, too loose and you answer slowly. Allowed lateness, with updates to published windows, lets you answer early and still end up correct.",
 	})
 
+	// Unique visitors: counting different people exactly needs memory that grows with the audience
+	uniqueVisitors := func(fixed bool) engine.Diagram {
+		st := P{"counting": "exact"}
+		if fixed {
+			st = P{"counting": "hyperLogLog", "hllPrecision": 12.0}
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 200.0, "readPct": 0.0, "keySpace": 5000.0, "keyDist": "uniform", "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0, "queueCap": 500.0}).
+			n("visitors", engine.KStream, cols[2], rowMid, st).label("visitors", "Unique visitors").
+			e("users", "app").e("app", "visitors").done()
+	}
+	register(&Scenario{
+		ID: "unique-visitors", Title: "Unique visitors", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Counting each visitor exactly needs a table that grows with the audience.",
+		Story:   "The marketing dashboard shows how many different people visited. The stream job keeps every visitor id it has seen, so the table grows with the audience, and the job has a memory budget of 16 KB for it (in this small run; a real audience is thousands of times larger and so is the table). Marketing is happy with a number that is right to within a few percent.",
+		Diagram: uniqueVisitors(false), Solution: uniqueVisitors(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxStateKB: f(16), MaxCountErrorPct: f(6), MaxCostPerHour: f(1.0)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the stream job's memory for counting. What makes it grow, and how fast?",
+			"An exact count needs to remember every id to know whether it was seen before. If a number that is slightly off is acceptable, there are structures that count distinct items in a fixed, tiny amount of memory.",
+			"Switch the job's visitor counting to HyperLogLog. Its precision sets the number of registers: more registers, less error, more memory. Pick one that fits both the 16 KB budget and the 6% error.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A HyperLogLog with twice the registers has…", Options: []string{"Half the error, twice the memory", "About 30% less error for twice the memory", "The same error, it only helps with more visitors"}, Answer: 1,
+			Explain: "The error falls with the square root of the registers: doubling them divides it by about 1.4, while memory doubles. Accuracy gets expensive quickly."}},
+		Debrief: "Approximate structures trade a bounded, known error for memory that does not grow with the data: HyperLogLog counts distinct items, a Bloom filter answers 'seen before?', a count-min sketch counts how often. They are the answer whenever the exact version will not fit.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

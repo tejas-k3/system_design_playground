@@ -285,6 +285,14 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("waiting 25 s catches every click and fails the 3 s goal: %+v dropped %d delay %.0f", res.Checks, res.Run.LateDropped, res.Run.ResultDelaySec)
 		}
 	})
+	t.Run("unique-visitors: too much precision breaks the memory budget", func(t *testing.T) {
+		sc := Get("unique-visitors")
+		d := withParam(withParam(sc.Diagram, "visitors", "counting", "hyperLogLog"), "visitors", "hllPrecision", 16.0)
+		res := engine.RunToEnd(d, sc.Options(42), sc.Goals)
+		if res.Pass || res.Run.StateKB < 60 {
+			t.Fatalf("65,536 registers are 64 KB, over the 16 KB budget: %+v kb %.1f", res.Checks, res.Run.StateKB)
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
