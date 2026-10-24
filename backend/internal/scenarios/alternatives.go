@@ -142,6 +142,12 @@ var alternatives = map[string][]Alternative{
 		alt("Limit the crawler to 3 fetches a second per site", false, 30.4, 7791, 0.37, "Politer than needed: 3 a second is below the 4 a second the crawler averages, so the queue grows for the whole run and most fetches time out.", Change{"crawler", "perHostRps", 3.0}),
 		alt("Limit the crawler to 5 fetches a second per site", false, 57.1, 7638, 0.37, "Above the average but only just: the waiting never fully clears between rushes, and on this seed over a third of the fetches time out. A limit is only safe with room over the average load.", Change{"crawler", "perHostRps", 5.0}),
 	},
+	"slow-first-token": {
+		alt("Write 16 answers at once", false, 100.0, 22698, 4.76, "Four times the batch, but one GPU still finishes only about 2.6 requests a second against the 3 that arrive, so the queue keeps growing and the first token waits 17 seconds.", Change{"model", "batchSize", 16.0}),
+		alt("Buy a second GPU and keep the batch at 4", false, 55.5, 29362, 7.26, "Two GPUs at a batch of 4 finish about 2.1 requests a second: still below the 3 that arrive, and over the budget.", Change{"model", "gpus", 2.0}),
+		alt("Two GPUs with the big batch", false, 100.0, 5348, 7.26, "The first token is fast (285 ms) and the answers stream quickly, but a second GPU is $2.50 an hour the budget does not have.", Change{"model", "gpus", 2.0}, Change{"model", "batchSize", 64.0}, Change{"model", "kvCacheTokens", 64000.0}),
+		alt("Write 32 answers at once", true, 100.0, 10695, 4.76, "Enough for the load: the first token takes 1.5 s on this seed, inside the 2.5 s goal, though with less room than a batch of 64.", Change{"model", "batchSize", 32.0}, Change{"model", "kvCacheTokens", 64000.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

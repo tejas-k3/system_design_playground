@@ -66,6 +66,7 @@ var conceptTags = map[string][]string{
 	"unique-visitors":        {"storage-and-payload", "capacity"},
 	"top-ten":                {"storage-and-payload", "caching"},
 	"polite-crawler":         {"overload-control", "failure-handling"},
+	"slow-first-token":       {"capacity", "queues"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},
