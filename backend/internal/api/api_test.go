@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -644,5 +645,101 @@ func TestAlternativesEndpoint(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&raw)
 	if _, leaked := raw["alternatives"]; leaked {
 		t.Fatal("scenario payload carries the alternatives")
+	}
+}
+
+// The first load of a challenge must not carry what gives it away: the hints, the answers to the prediction
+// questions and their explanations, and the debrief come only when asked for.
+func TestAChallengeLoadsWithoutItsHintsAnswersOrDebrief(t *testing.T) {
+	ts := newTestServer(t)
+	for _, sc := range scenarios.All() {
+		resp, err := http.Get(ts.URL + "/api/scenarios/" + sc.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body []byte
+		body, _ = io.ReadAll(resp.Body)
+		resp.Body.Close()
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(body, &raw); err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range []string{"hints", "debrief", "solution"} {
+			if _, leaked := raw[key]; leaked {
+				t.Errorf("%s: the first load carries %q", sc.ID, key)
+			}
+		}
+		var hc int
+		_ = json.Unmarshal(raw["hintCount"], &hc)
+		if hc != 3 {
+			t.Errorf("%s: hintCount %d", sc.ID, hc)
+		}
+		// no hint text, no explanation text anywhere in the payload
+		for _, h := range sc.Hints {
+			if h != "" && strings.Contains(string(body), h[:min(len(h), 40)]) {
+				t.Errorf("%s: a hint is in the first load: %q", sc.ID, h[:min(len(h), 40)])
+			}
+		}
+		for _, q := range sc.Predictions {
+			if strings.Contains(string(body), q.Explain[:min(len(q.Explain), 40)]) || strings.Contains(string(body), `"answer"`) || strings.Contains(string(body), `"explain"`) {
+				t.Errorf("%s: a prediction answer or explanation is in the first load", sc.ID)
+			}
+		}
+		if d := sc.Debrief; d != "" && strings.Contains(string(body), d[:min(len(d), 40)]) {
+			t.Errorf("%s: the debrief is in the first load", sc.ID)
+		}
+	}
+}
+
+func TestHintsPredictionsAndDebriefAreFetchedOnRequest(t *testing.T) {
+	ts := newTestServer(t)
+	sc := scenarios.Get("slow-reads")
+	get := func(path string) (int, map[string]any) {
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var m map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&m)
+		return resp.StatusCode, m
+	}
+	for n := 1; n <= 3; n++ {
+		code, m := get("/api/scenarios/slow-reads/hints/" + strconv.Itoa(n))
+		if code != 200 || m["hint"] != sc.Hints[n-1] {
+			t.Errorf("hint %d: %d %v", n, code, m)
+		}
+	}
+	for _, bad := range []string{"0", "4", "x"} {
+		if code, _ := get("/api/scenarios/slow-reads/hints/" + bad); code != 404 {
+			t.Errorf("hint %s should be 404, got %d", bad, code)
+		}
+	}
+	if code, m := get("/api/scenarios/slow-reads/debrief"); code != 200 || m["debrief"] != sc.Debrief {
+		t.Errorf("debrief: %d %v", code, m)
+	}
+	q := sc.Predictions[0]
+	post := func(choice int) (int, map[string]any) {
+		resp, err := http.Post(ts.URL+"/api/scenarios/slow-reads/predictions/"+q.ID, "application/json", strings.NewReader(`{"choice":`+strconv.Itoa(choice)+`}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var m map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&m)
+		return resp.StatusCode, m
+	}
+	wrong := (q.Answer + 1) % len(q.Options)
+	if code, m := post(wrong); code != 200 || m["correct"] != false || int(m["answer"].(float64)) != q.Answer || m["explain"] != q.Explain {
+		t.Errorf("a wrong choice is told the answer and why: %d %v", code, m)
+	}
+	if _, m := post(q.Answer); m["correct"] != true {
+		t.Errorf("the right choice is marked right: %v", m)
+	}
+	if code, _ := post(99); code != 400 {
+		t.Errorf("a choice outside the options is refused: %d", code)
+	}
+	if code, _ := get("/api/scenarios/nope/hints/1"); code != 404 {
+		t.Errorf("unknown challenge: %d", code)
 	}
 }

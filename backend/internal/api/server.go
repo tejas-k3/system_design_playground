@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -91,6 +92,9 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/scenarios/{id}", s.getScenario)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/solution", s.getSolution)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/alternatives", s.getAlternatives)
+	s.mux.HandleFunc("GET /api/scenarios/{id}/hints/{n}", s.getHint)
+	s.mux.HandleFunc("POST /api/scenarios/{id}/predictions/{pid}", s.answerPrediction)
+	s.mux.HandleFunc("GET /api/scenarios/{id}/debrief", s.getDebrief)
 	s.mux.HandleFunc("GET /api/questions", s.listQuestions)
 	s.mux.HandleFunc("GET /api/questions/{id}", s.getQuestion)
 	s.mux.HandleFunc("POST /api/questions/{id}/answer", s.answerQuestion)
@@ -188,12 +192,58 @@ func (s *Server) getScenario(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "no such scenario")
 		return
 	}
+	pub := sc.Public()
 	if sc.Open { // the load and the failures are part of the test: the server runs them, the client never sees them
-		c := *sc
-		c.Traffic, c.Chaos = nil, nil
-		sc = &c
+		pub.Traffic, pub.Chaos = nil, nil
 	}
-	writeJSON(w, 200, sc)
+	writeJSON(w, 200, pub)
+}
+
+// getHint reveals one hint, when the player asks for it.
+func (s *Server) getHint(w http.ResponseWriter, r *http.Request) {
+	sc := scenarios.Get(r.PathValue("id"))
+	if sc == nil {
+		writeErr(w, 404, "no such scenario")
+		return
+	}
+	n, err := strconv.Atoi(r.PathValue("n"))
+	if err != nil || sc.Hint(n) == "" {
+		writeErr(w, 404, "no such hint")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"level": n, "hint": sc.Hint(n)})
+}
+
+// answerPrediction takes the player's choice and only then says which answer was right and why.
+func (s *Server) answerPrediction(w http.ResponseWriter, r *http.Request) {
+	sc := scenarios.Get(r.PathValue("id"))
+	if sc == nil {
+		writeErr(w, 404, "no such scenario")
+		return
+	}
+	q := sc.Prediction(r.PathValue("pid"))
+	if q == nil {
+		writeErr(w, 404, "no such question")
+		return
+	}
+	var req struct {
+		Choice int `json:"choice"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&req); err != nil || req.Choice < 0 || req.Choice >= len(q.Options) {
+		writeErr(w, 400, "choose one of the options")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"choice": req.Choice, "correct": req.Choice == q.Answer, "answer": q.Answer, "explain": q.Explain})
+}
+
+// getDebrief is shown with the result, not before it.
+func (s *Server) getDebrief(w http.ResponseWriter, r *http.Request) {
+	sc := scenarios.Get(r.PathValue("id"))
+	if sc == nil {
+		writeErr(w, 404, "no such scenario")
+		return
+	}
+	writeJSON(w, 200, map[string]string{"debrief": sc.Debrief})
 }
 
 func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {

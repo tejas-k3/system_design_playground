@@ -17,6 +17,67 @@ type Prediction struct {
 	Explain  string   `json:"explain"`
 }
 
+// PublicPrediction is a prediction question as the page first sees it: no answer, no explanation.
+type PublicPrediction struct {
+	ID       string   `json:"id"`
+	Question string   `json:"question"`
+	Options  []string `json:"options"`
+}
+
+// PublicScenario is a challenge as the page first loads it. What would give the challenge away is left out and fetched
+// only when the player asks: each hint when it is revealed, a prediction's answer when a choice is made, the debrief
+// when the result is shown (so a look at the network traffic of a page load shows none of them).
+type PublicScenario struct {
+	ID          string                           `json:"id"`
+	Title       string                           `json:"title"`
+	Difficulty  string                           `json:"difficulty"`
+	Summary     string                           `json:"summary"`
+	Story       string                           `json:"story"`
+	Diagram     engine.Diagram                   `json:"diagram"`
+	Goals       engine.Goals                     `json:"goals"`
+	Traffic     map[string][]engine.TrafficPoint `json:"traffic,omitempty"`
+	Chaos       []engine.ChaosEvent              `json:"chaos,omitempty"`
+	DurationSec float64                          `json:"durationSec"`
+	WarmupSec   float64                          `json:"warmupSec"`
+	Speed       float64                          `json:"speed"`
+	ConfigOnly  bool                             `json:"configOnly,omitempty"`
+	Open        bool                             `json:"open,omitempty"`
+	HintCount   int                              `json:"hintCount"`
+	Predictions []PublicPrediction               `json:"predictions,omitempty"`
+	Concepts    []string                         `json:"concepts,omitempty"`
+}
+
+// Public is the first-load view of the challenge.
+func (s *Scenario) Public() PublicScenario {
+	p := PublicScenario{
+		ID: s.ID, Title: s.Title, Difficulty: s.Difficulty, Summary: s.Summary, Story: s.Story, Diagram: s.Diagram, Goals: s.Goals,
+		Traffic: s.Traffic, Chaos: s.Chaos, DurationSec: s.DurationSec, WarmupSec: s.WarmupSec, Speed: s.Speed,
+		ConfigOnly: s.ConfigOnly, Open: s.Open, HintCount: len(s.Hints), Concepts: s.Concepts,
+	}
+	for _, q := range s.Predictions {
+		p.Predictions = append(p.Predictions, PublicPrediction{ID: q.ID, Question: q.Question, Options: q.Options})
+	}
+	return p
+}
+
+// Hint is the text of the nth hint (1 to 3), "" when there is none.
+func (s *Scenario) Hint(n int) string {
+	if n < 1 || n > len(s.Hints) {
+		return ""
+	}
+	return s.Hints[n-1]
+}
+
+// Prediction finds a prediction question by id.
+func (s *Scenario) Prediction(id string) *Prediction {
+	for i := range s.Predictions {
+		if s.Predictions[i].ID == id {
+			return &s.Predictions[i]
+		}
+	}
+	return nil
+}
+
 type Scenario struct {
 	ID          string                           `json:"id"`
 	Title       string                           `json:"title"`
