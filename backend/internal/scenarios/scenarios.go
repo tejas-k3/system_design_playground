@@ -70,6 +70,10 @@ func (s *Scenario) Hint(n int) string {
 	return s.Hints[n-1]
 }
 
+// AnswerHint is the plain statement of what solves the challenge: the step after hint 3, shown only when the player
+// asks for it.
+func (s *Scenario) AnswerHint() string { return s.Answer }
+
 // Prediction finds a prediction question by id.
 func (s *Scenario) Prediction(id string) *Prediction {
 	for i := range s.Predictions {
@@ -98,8 +102,10 @@ type Scenario struct {
 	ConfigOnly  bool                             `json:"configOnly,omitempty"`
 	Open        bool                             `json:"open,omitempty"` // build from a blank canvas; the traffic and failures are hidden and there is no reference solution to show
 	Hints       [3]string                        `json:"hints"`
+	Answer      string                           `json:"-"` // what hint 3 used to say outright; served only by the answer-hint endpoint, behind an extra click
 	Predictions []Prediction                     `json:"predictions,omitempty"`
 	Debrief     string                           `json:"debrief"`
+	Deeper      string                           `json:"-"`                  // optional longer debrief for an experienced engineer, served with the debrief on request
 	Concepts    []string                         `json:"concepts,omitempty"` // ideas it practises, from the fixed Concepts list
 }
 

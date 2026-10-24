@@ -93,6 +93,7 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/scenarios/{id}/solution", s.getSolution)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/alternatives", s.getAlternatives)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/hints/{n}", s.getHint)
+	s.mux.HandleFunc("GET /api/scenarios/{id}/answer-hint", s.getAnswerHint)
 	s.mux.HandleFunc("POST /api/scenarios/{id}/predictions/{pid}", s.answerPrediction)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/debrief", s.getDebrief)
 	s.mux.HandleFunc("GET /api/questions", s.listQuestions)
@@ -215,6 +216,20 @@ func (s *Server) getHint(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"level": n, "hint": sc.Hint(n)})
 }
 
+// getAnswerHint is the plain statement of the solution, behind its own request after the three hints.
+func (s *Server) getAnswerHint(w http.ResponseWriter, r *http.Request) {
+	sc := scenarios.Get(r.PathValue("id"))
+	if sc == nil {
+		writeErr(w, 404, "no such scenario")
+		return
+	}
+	if sc.AnswerHint() == "" {
+		writeErr(w, 404, "no answer hint")
+		return
+	}
+	writeJSON(w, 200, map[string]string{"answer": sc.AnswerHint()})
+}
+
 // answerPrediction takes the player's choice and only then says which answer was right and why.
 func (s *Server) answerPrediction(w http.ResponseWriter, r *http.Request) {
 	sc := scenarios.Get(r.PathValue("id"))
@@ -245,7 +260,7 @@ func (s *Server) getDebrief(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "no such scenario")
 		return
 	}
-	writeJSON(w, 200, map[string]string{"debrief": sc.Debrief})
+	writeJSON(w, 200, map[string]string{"debrief": sc.Debrief, "deeper": sc.Deeper})
 }
 
 func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {

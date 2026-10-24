@@ -685,9 +685,51 @@ func TestAChallengeLoadsWithoutItsHintsAnswersOrDebrief(t *testing.T) {
 				t.Errorf("%s: a prediction answer or explanation is in the first load", sc.ID)
 			}
 		}
+		if a := sc.AnswerHint(); a != "" && strings.Contains(string(body), a[:min(len(a), 40)]) {
+			t.Errorf("%s: the answer hint is in the first load", sc.ID)
+		}
+		if d := sc.Deeper; d != "" && strings.Contains(string(body), d[:min(len(d), 40)]) {
+			t.Errorf("%s: the deeper debrief is in the first load", sc.ID)
+		}
+		if _, leaked := raw["answer"]; leaked {
+			t.Errorf("%s: the first load carries %q", sc.ID, "answer")
+		}
 		if d := sc.Debrief; d != "" && strings.Contains(string(body), d[:min(len(d), 40)]) {
 			t.Errorf("%s: the debrief is in the first load", sc.ID)
 		}
+	}
+}
+
+func TestDebriefCarriesTheDeeperExplanation(t *testing.T) {
+	ts := newTestServer(t)
+	fetch := func(id string) map[string]any {
+		resp, err := http.Get(ts.URL + "/api/scenarios/" + id + "/debrief")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var m map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&m)
+		return m
+	}
+	for _, sc := range scenarios.All() {
+		m := fetch(sc.ID)
+		if m["debrief"] != sc.Debrief {
+			t.Errorf("%s: the debrief changed: %v", sc.ID, m["debrief"])
+		}
+		d, present := m["deeper"].(string)
+		if !present {
+			t.Errorf("%s: the debrief response has no deeper field", sc.ID)
+		}
+		if d != sc.Deeper {
+			t.Errorf("%s: deeper %q does not match the challenge", sc.ID, d)
+		}
+		if sc.Difficulty == "Hard" && len(d) < 200 {
+			t.Errorf("%s: a Hard challenge's debrief carries only %d characters of deeper text", sc.ID, len(d))
+		}
+	}
+	if d := fetch("hello-world")["deeper"]; d != "" {
+		t.Errorf("a challenge without a deeper explanation should return an empty string, got %v", d)
 	}
 }
 
@@ -714,6 +756,12 @@ func TestHintsPredictionsAndDebriefAreFetchedOnRequest(t *testing.T) {
 		if code, _ := get("/api/scenarios/slow-reads/hints/" + bad); code != 404 {
 			t.Errorf("hint %s should be 404, got %d", bad, code)
 		}
+	}
+	if code, m := get("/api/scenarios/slow-reads/answer-hint"); code != 200 || m["answer"] != sc.AnswerHint() || sc.AnswerHint() == "" {
+		t.Errorf("answer hint: %d %v", code, m)
+	}
+	if code, _ := get("/api/scenarios/no-such-challenge/answer-hint"); code != 404 {
+		t.Errorf("an unknown challenge's answer hint should be 404, got %d", code)
 	}
 	if code, m := get("/api/scenarios/slow-reads/debrief"); code != 200 || m["debrief"] != sc.Debrief {
 		t.Errorf("debrief: %d %v", code, m)
