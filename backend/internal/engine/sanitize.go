@@ -192,8 +192,45 @@ func Sanitize(in Diagram) (Diagram, bool) {
 		}
 		out.Groups = append(out.Groups, Group{ID: g.ID, Kind: g.Kind, Label: label, X: g.X, Y: g.Y, W: w, H: h, Collapsed: g.Collapsed})
 	}
+	for _, sh := range in.Shapes {
+		if len(out.Shapes) >= MaxShapes {
+			adjusted = true
+			break
+		}
+		if !knownShapeKind[sh.Kind] || !finite(sh.X) || !finite(sh.Y) || !finite(sh.W) || !finite(sh.H) || !claim(sh.ID) {
+			adjusted = true
+			continue
+		}
+		var w, h float64
+		if sh.Kind == "arrow" {
+			w, h = clamp(sh.W, -MaxShapeSize, MaxShapeSize), clamp(sh.H, -MaxShapeSize, MaxShapeSize)
+			if math.Hypot(w, h) < 1 { // an arrow needs a visible length
+				w = MinShapeSize
+			}
+		} else {
+			w, h = clamp(sh.W, MinShapeSize, MaxShapeSize), clamp(sh.H, MinShapeSize, MaxShapeSize)
+		}
+		if w != sh.W || h != sh.H {
+			adjusted = true
+		}
+		label := sh.Label
+		if r := []rune(label); len(r) > MaxShapeLabel {
+			label, adjusted = string(r[:MaxShapeLabel]), true
+		}
+		out.Shapes = append(out.Shapes, Shape{ID: sh.ID, Kind: sh.Kind, Label: label, X: sh.X, Y: sh.Y, W: w, H: h})
+	}
 	return out, adjusted
 }
+
+// Limits on the visual annotation shapes (ellipses and arrows).
+const (
+	MaxShapes     = 40
+	MinShapeSize  = 20
+	MaxShapeSize  = 4000
+	MaxShapeLabel = 60
+)
+
+var knownShapeKind = map[string]bool{"ellipse": true, "arrow": true}
 
 // Limits on the visual group boxes.
 const (

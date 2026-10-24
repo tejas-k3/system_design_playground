@@ -79,11 +79,24 @@ type Group struct {
 	Collapsed bool    `json:"collapsed,omitempty"`
 }
 
+// Shape is a purely visual annotation drawn over the boxes: an ellipse (X, Y, W, H is its bounding box) or an arrow
+// (from X, Y to X+W, Y+H; W and H are signed). The simulation ignores shapes. Label is an optional caption.
+type Shape struct {
+	ID    string  `json:"id"`
+	Kind  string  `json:"kind"` // ellipse | arrow
+	Label string  `json:"label"`
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	W     float64 `json:"w"`
+	H     float64 `json:"h"`
+}
+
 type Diagram struct {
 	Nodes  []Node  `json:"nodes"`
 	Edges  []Edge  `json:"edges"`
 	Notes  []Note  `json:"notes"`
 	Groups []Group `json:"groups,omitempty"`
+	Shapes []Shape `json:"shapes,omitempty"` // absent in older designs
 }
 
 // Reason is why a request failed at some node.
