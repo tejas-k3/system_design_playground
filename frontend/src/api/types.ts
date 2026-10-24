@@ -120,6 +120,7 @@ export interface Goals {
   maxInDoubt?: number
   maxLateDropped?: number
   maxStateKB?: number
+  maxTTFTMs?: number
   minTopKRecall?: number
   maxCountErrorPct?: number
   maxResultDelaySec?: number
@@ -274,6 +275,8 @@ export interface RunStats {
   compensated?: number // multi-step writes rolled back
   inDoubt?: number // two-phase commits left waiting for a crashed coordinator
   lateDropped?: number // events a stream job dropped for arriving too late
+  ttftMs?: number // time to first token of LLM answers (p95)
+  itlMs?: number // gap between tokens of LLM answers (p95)
   topKRecall?: number // share of the true ten most popular items a stream job found
   stateKB?: number // memory a stream job needs to count its different visitors
   countErrorPct?: number // error of an approximate visitor count

@@ -184,3 +184,11 @@ describe('top ten goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10, topKRecall: 0.9 }), 1, true), 'Top ten found').state).toBe('pass')
   })
 })
+
+describe('time to first token goal', () => {
+  it('compares the p95 time to first token', () => {
+    const g = { minSuccessRate: 0.5, maxTTFTMs: 500 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, ttftMs: 1800 }), 1, true), 'Time to first token (p95)')).toMatchObject({ actual: '1800 ms', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, ttftMs: 300 }), 1, true), 'Time to first token (p95)').state).toBe('pass')
+  })
+})
