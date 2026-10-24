@@ -149,6 +149,21 @@ export interface Goals {
   starP95Ms?: number
 }
 
+/** What a crawl workload did: pages fetched, links found, what the seen-URL check kept out or skipped by mistake. */
+export interface CrawlStats {
+  fetched: number
+  discovered: number
+  duplicatesSkipped: number
+  missed: number
+  refetched: number
+  trapDepth: number
+  frontier: number
+  dedupKB: number
+  expectedMissed: number
+  recallPct: number
+  dropped?: number
+}
+
 /** A prediction question as the page first loads it: the answer and the explanation come only after a choice. */
 export interface Prediction {
   id: string
@@ -293,6 +308,7 @@ export interface RunStats {
   worstTenantSuccess?: number // the worst-served of the quiet tenants
   inconsistent?: number // multi-step writes left half done
   compensated?: number // multi-step writes rolled back
+  crawl?: CrawlStats // only when the users run the crawl workload
   eventDups?: number // events a queue accepted a second time (a producer retried after a lost answer)
   inDoubt?: number // two-phase commits left waiting for a crashed coordinator
   lateDropped?: number // events a stream job dropped for arriving too late
