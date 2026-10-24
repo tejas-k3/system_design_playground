@@ -21,6 +21,9 @@ describe('eventLabel', () => {
     expect(eventLabel(ev(25, 'promotion', 'Read Replica', { lost: 0 }))).toBe('Read Replica promoted to primary (no writes lost)')
     expect(eventLabel(ev(50, 'splitbrain', 'Database', { lost: 1972 }))).toBe('Database rejoined as primary: 1972 writes lost')
   })
+  it('words a configuration push', () => {
+    expect(eventLabel(ev(1, 'configPush'))).toBe('Database was given a new configuration')
+  })
   it('falls back to the type for an event it does not know', () => {
     expect(eventLabel(ev(1, 'mystery'))).toBe('Database: mystery')
   })
@@ -28,7 +31,7 @@ describe('eventLabel', () => {
 
 describe('eventGlyph', () => {
   it('gives every known event a distinct one-character cue so markers do not rely on colour', () => {
-    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'scaleUp', 'serverUp', 'scaleDown', 'gc', 'compaction']
+    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'scaleUp', 'serverUp', 'scaleDown', 'gc', 'compaction', 'configPush']
     const glyphs = types.map(eventGlyph)
     expect(new Set(glyphs).size).toBe(types.length)
     expect(glyphs.every((g) => g.length === 1)).toBe(true)
