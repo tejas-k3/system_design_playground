@@ -182,6 +182,17 @@ const ICONS: Record<string, Draw> = {
     })
     for (const x of [-7, 0, 7]) stroke(c, () => c.arc(x, 6, 2.6, 0, Math.PI * 2))
   },
+  stream: (c) => {
+    // a wave running through a window frame
+    stroke(c, () => {
+      c.rect(-9, -7, 18, 14)
+    })
+    stroke(c, () => {
+      c.moveTo(-9, 0)
+      c.bezierCurveTo(-5, -8, -2, 8, 1, 0)
+      c.bezierCurveTo(4, -6, 6, 6, 9, 0)
+    })
+  },
   index: (c) => {
     // a magnifier over a slice of lines
     stroke(c, () => c.arc(-2, -2, 7, 0, Math.PI * 2))
