@@ -118,6 +118,8 @@ export interface Goals {
   maxLostEvents?: number
   maxInconsistent?: number
   maxInDoubt?: number
+  maxLateDropped?: number
+  maxResultDelaySec?: number
   minWorstTenant?: number
   minDeliveriesPerMessage?: number
   maxRpoSec?: number
@@ -268,6 +270,8 @@ export interface RunStats {
   inconsistent?: number // multi-step writes left half done
   compensated?: number // multi-step writes rolled back
   inDoubt?: number // two-phase commits left waiting for a crashed coordinator
+  lateDropped?: number // events a stream job dropped for arriving too late
+  resultDelaySec?: number // seconds after a window ends before a stream job first emits it
   blockedSec?: number // lock-seconds those transactions held
   stuck?: number // rolled back unsuccessfully
   eventsLost?: number // saved writes whose event never reached the queue
