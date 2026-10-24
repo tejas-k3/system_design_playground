@@ -13,6 +13,8 @@ export function ScenarioPanel() {
   const stats = useStore((s) => s.stats)
   const cost = useStore((s) => s.cost)
   const status = useStore((s) => s.sim.status)
+  const ui = useStore((s) => s.ui)
+  const setUi = useStore((s) => s.setUi)
   const revealHint = useStore((s) => s.revealHint)
   const answer = useStore((s) => s.answerPrediction)
   const showSolution = useStore((s) => s.showSolution)
@@ -53,6 +55,15 @@ export function ScenarioPanel() {
             ))}
           </ul>
           {stars && <p className="muted small">{stars}</p>}
+          {sc.result && !ui.result && (
+            <p className="result-again">
+              <button onClick={() => setUi({ result: true })}>Show the result{sc.result.pass ? ' (passed)' : ''}</button>
+              <span className="muted small"> {sc.result.pass ? '' : 'Change the design, then press Run again.'}</span>
+            </p>
+          )}
+          {!sc.result && status !== 'stopped' && rows.length > 0 && rows.every((r) => r.state === 'pass') && (
+            <p className="muted small" role="status">All goals are met so far. The final result appears when the run ends{status === 'paused' ? ': press Resume to let it finish.' : '.'}</p>
+          )}
           {pred && status === 'stopped' && (
             <div className="predict">
               <h3>Predict first</h3>
@@ -109,13 +120,14 @@ export function ScenarioPanel() {
 
 function VsReference({ mine, reference }: { mine: import('../api/types').Diagram; reference: import('../api/types').Diagram }) {
   const reg = useStore((s) => s.reg)!
-  const lines = describeDiff(diffDiagrams(mine, reference, reg), reg)
+  const diff = diffDiagrams(mine, reference, reg)
+  const lines = describeDiff(diff, reg)
   return (
     <section className="vs-reference" aria-label="Your design versus the reference">
       <h3>Your design vs the reference</h3>
       {lines.length === 0 ? <p className="muted small">Identical to the reference.</p> : (
         <>
-          <p className="muted small">{lines.length} {lines.length === 1 ? 'difference' : 'differences'}. Other designs can work too: this is the reference's way.</p>
+          <p className="muted small">{diff.sameArchitecture ? 'Same components and connections as the reference; only settings differ.' : `${lines.length} ${lines.length === 1 ? 'difference' : 'differences'}. Other designs can work too: this is the reference's way.`}</p>
           <ul>{lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
         </>
       )}

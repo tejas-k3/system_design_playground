@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { emptyInterview, type InterviewData } from '../model/interview'
 import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
-import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel } from '../model/diagram'
+import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
 import { alignNodes, autoLayout, distributeNodes, type AlignMode } from '../model/arrange'
 import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
@@ -74,6 +74,8 @@ export interface State {
   updateNode(id: string, patch: Partial<Pick<Node, 'label'>>): void
   setParam(id: string, key: string, value: number | string | boolean): void
   addEdge(from: string, to: string): string | null
+  /** Move one end of an existing connection to another component: same arrow, new place. */
+  rewireEdge(edgeId: string, end: 'from' | 'to', nodeId: string): boolean
   updateEdge(id: string, patch: Partial<Pick<Edge, 'latencyMs' | 'bandwidthMbps' | 'lossPct' | 'jitterMs' | 'protocol' | 'async'>>): void
   addNote(x: number, y: number): string
   updateNote(id: string, patch: Partial<Note>): void
@@ -227,6 +229,28 @@ export const useStore = create<State>()((set, get) => {
         ...d,
         nodes: d.nodes.map((n) => (n.id === id ? { ...n, params: { ...n.params, [key]: value } } : n)),
       })),
+
+    rewireEdge: (edgeId, end, nodeId) => {
+      const { reg, diagram } = get()
+      const e = diagram.edges.find((x) => x.id === edgeId)
+      if (!reg || !e) return false
+      const from = end === 'from' ? nodeId : e.from
+      const to = end === 'to' ? nodeId : e.to
+      const f = diagram.nodes.find((n) => n.id === from)
+      const t = diagram.nodes.find((n) => n.id === to)
+      if (!f || !t || from === to || (end === 'from' ? e.from : e.to) === nodeId) return false
+      if (guardTopology()) return false
+      if (!reg.canConnect(f.kind, t.kind)) {
+        get().toast(`${reg.spec(f.kind)?.name} can't connect to ${reg.spec(t.kind)?.name}`, 'warn')
+        return false
+      }
+      if (diagram.edges.some((x) => x.id !== edgeId && x.from === from && x.to === to)) {
+        get().toast('Those two are already connected', 'info')
+        return false
+      }
+      mutate((d) => ({ ...d, edges: d.edges.map((x) => (x.id === edgeId ? { ...x, from, to, latencyMs: reg.defaultLatency(f.kind, t.kind) } : x)) }))
+      return true
+    },
 
     addEdge: (from, to) => {
       const { reg, diagram } = get()
@@ -414,8 +438,9 @@ export const useStore = create<State>()((set, get) => {
     showSolution: (d) => {
       if (!get().scenario) return
       const mine = structuredClone(get().diagram)
-      mutate(() => structuredClone(d))
-      set((s) => ({ scenario: s.scenario ? { ...s.scenario, solved: true, compare: { mine, reference: structuredClone(d) } } : null, selection: [] }))
+      const ref = uniqueLabels(structuredClone(d))
+      mutate(() => structuredClone(ref))
+      set((s) => ({ scenario: s.scenario ? { ...s.scenario, solved: true, compare: { mine, reference: ref } } : null, selection: [] }))
     },
     applyTemplate: (d) => {
       if (guardTopology()) return
@@ -425,7 +450,7 @@ export const useStore = create<State>()((set, get) => {
     },
     adoptDiagram: (d) => set((s) => ({ diagram: d, selection: s.selection.filter((id) => d.nodes.some((n) => n.id === id)) })),
     compareWithReference: (reference) =>
-      set((s) => (s.scenario ? { scenario: { ...s.scenario, compare: { mine: structuredClone(s.diagram), reference: structuredClone(reference) } } } : {})),
+      set((s) => (s.scenario ? { scenario: { ...s.scenario, compare: { mine: structuredClone(s.diagram), reference: uniqueLabels(structuredClone(reference)) } } } : {})),
     setResult: (score) =>
       set((s) => {
         if (!s.scenario) return {}

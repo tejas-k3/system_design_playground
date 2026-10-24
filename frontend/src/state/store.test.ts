@@ -166,3 +166,37 @@ describe('stats', () => {
     expect(st().ui.library).toBe(true)
   })
 })
+
+describe('moving an end of an existing connection', () => {
+  it('points the same arrow at another component, undoably', () => {
+    const { a, d } = setup()
+    const d2 = st().addNode('database', 300, 200)!
+    const e = st().addEdge(a, d)!
+    expect(st().rewireEdge(e, 'to', d2)).toBe(true)
+    expect(st().diagram.edges).toHaveLength(1)
+    expect(st().diagram.edges[0]).toMatchObject({ id: e, from: a, to: d2 })
+    st().undo()
+    expect(st().diagram.edges[0]).toMatchObject({ id: e, from: a, to: d })
+  })
+
+  it('moves the source end too', () => {
+    const { a, d } = setup()
+    const a2 = st().addNode('appServer', 0, 200)!
+    const e = st().addEdge(a, d)!
+    expect(st().rewireEdge(e, 'from', a2)).toBe(true)
+    expect(st().diagram.edges[0]).toMatchObject({ id: e, from: a2, to: d })
+  })
+
+  it('refuses a connection the kinds do not allow, a duplicate, a loop and a no-op', () => {
+    const { a, d } = setup()
+    const a2 = st().addNode('appServer', 0, 200)!
+    const e = st().addEdge(a, d)!
+    st().addEdge(a2, d)
+    const before = st().diagram.edges
+    expect(st().rewireEdge(e, 'to', a2)).toBe(false) // an app server cannot be fed into an app server here
+    expect(st().rewireEdge(e, 'from', a2)).toBe(false) // a2 already sends to d
+    expect(st().rewireEdge(e, 'to', a)).toBe(false) // a loop
+    expect(st().rewireEdge(e, 'to', d)).toBe(false) // already there
+    expect(st().diagram.edges).toEqual(before)
+  })
+})

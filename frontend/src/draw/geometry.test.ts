@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Diagram } from '../api/types'
 import type { Reg } from '../model/diagram'
-import { HANDLE_R, particleShape, fitFontSize, handlePos, handleRadius, hitTest, legibleSize, nodeRect } from './geometry'
+import { HANDLE_R, edgeGeom, particleShape, fitFontSize, handlePos, handleRadius, hitTest, legibleSize, nodeRect } from './geometry'
 
 const reg = { spec: () => ({ width: 160, height: 72 }) } as unknown as Reg
 const diagram = { nodes: [{ id: 'a', kind: 'appServer', x: 0, y: 0, label: 'a', params: {} }], edges: [], notes: [] } as unknown as Diagram
@@ -63,5 +63,24 @@ describe('particleShape', () => {
     expect(particleShape({ fail: true, back: true })).toBe('cross')
     expect(particleShape({ fail: false, back: true })).toBe('dot')
     expect(particleShape({ fail: false, back: false })).toBe('dot')
+  })
+})
+
+describe('grabbing the end of a selected connection', () => {
+  const two = {
+    nodes: [
+      { id: 'a', kind: 'appServer', x: 0, y: 0, label: 'A', params: {} },
+      { id: 'b', kind: 'database', x: 400, y: 0, label: 'B', params: {} },
+    ],
+    edges: [{ id: 'e1', from: 'a', to: 'b', latencyMs: 5 }],
+    notes: [],
+  } as unknown as Diagram
+
+  it('finds either end of a selected connection, and nothing special for an unselected one', () => {
+    const g = edgeGeom(two.edges[0], new Map(two.nodes.map((n) => [n.id, n])), reg)!
+    const none = new Set<string>()
+    expect(hitTest(g.b, two, reg, 1, measure, none, new Set(['e1']))).toEqual({ type: 'edgeEnd', id: 'e1', end: 'to' })
+    expect(hitTest(g.a, two, reg, 1, measure, none, new Set(['e1']))).toEqual({ type: 'edgeEnd', id: 'e1', end: 'from' })
+    expect(hitTest(g.b, two, reg, 1, measure, none)?.type).not.toBe('edgeEnd')
   })
 })

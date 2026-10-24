@@ -109,6 +109,7 @@ export function play(): void {
   withSocket((sock) => {
     const s = useStore.getState()
     if (s.sim.status === 'stopped' || !!s.scenario?.result) {
+      if (s.scenario?.result) s.clearRun() // a new run starts from nothing: the last result and its numbers no longer describe it
       s.setUi({ welcome: false })
       sendInit()
     }

@@ -51,8 +51,40 @@ describe('diffDiagrams', () => {
     expect(describeDiff(diffDiagrams(extra, mine, reg), reg)).toEqual(['Remove Spare (Database)', 'Remove the connection from App 1 to Spare'])
   })
 
-  it('tells apart components that share a label by adding their id', () => {
-    const twin = (t: number) => dia([node('u', 'client', 'Users'), node('a1', 'appServer', 'App Server', { threads: 8 }), node('a2', 'appServer', 'App Server', { threads: t })], [])
-    expect(describeDiff(diffDiagrams(twin(8), twin(16), reg), reg)).toEqual(['App Server (a2): t is 8, the reference uses 16'])
+  it('pairs components by what they connect to, not by their ids, so a hand-built design is not "different"', () => {
+    const ref = dia(
+      [node('u', 'client', 'Users'), node('lb', 'loadBalancer', 'Load Balancer'), node('app1', 'appServer', 'App Server', { threads: 8 }), node('app2', 'appServer', 'App Server', { threads: 8 }), node('cache', 'cache', 'Cache'), node('db', 'database', 'Database')],
+      [edge('u', 'lb'), edge('lb', 'app1'), edge('lb', 'app2'), edge('app1', 'cache'), edge('app2', 'cache'), edge('cache', 'db')],
+    )
+    const built = dia(
+      [node('n_x1', 'client', 'Users'), node('n_x2', 'loadBalancer', 'Load Balancer'), node('n_x3', 'appServer', 'App Server', { threads: 8 }), node('n_x4', 'appServer', 'App Server 2', { threads: 8 }), node('n_x5', 'cache', 'Cache'), node('n_x6', 'database', 'Database')],
+      [edge('n_x1', 'n_x2'), edge('n_x2', 'n_x3'), edge('n_x2', 'n_x4'), edge('n_x3', 'n_x5'), edge('n_x4', 'n_x5'), edge('n_x5', 'n_x6')],
+    )
+    const d = diffDiagrams(built, ref, reg)
+    expect(describeDiff(d, reg)).toEqual([])
+    expect(d.sameArchitecture).toBe(true)
+  })
+
+  it('names components as they are on your canvas and never shows an internal id', () => {
+    const ref = dia([node('u', 'client', 'Users'), node('app1', 'appServer', 'App Server', { threads: 16 }), node('app2', 'appServer', 'App Server', { threads: 8 })], [edge('u', 'app1'), edge('u', 'app2')])
+    const built = dia([node('n_a', 'client', 'Users'), node('n_b', 'appServer', 'App Server', { threads: 8 }), node('n_c', 'appServer', 'App Server 2', { threads: 8 })], [edge('n_a', 'n_b'), edge('n_a', 'n_c')])
+    const lines = describeDiff(diffDiagrams(built, ref, reg), reg)
+    expect(lines).toEqual(['App Server: t is 8, the reference uses 16'])
+    expect(lines.join(' ')).not.toMatch(/n_[abc]|app1|app2/)
+  })
+
+  it('numbers a reference-only component after your own labels so a sentence cannot be ambiguous', () => {
+    const ref = dia([node('u', 'client', 'Users'), node('c1', 'cache', 'Cache'), node('a1', 'appServer', 'App Server')], [edge('u', 'a1'), edge('a1', 'c1')])
+    const built = dia([node('u', 'client', 'Users'), node('a1', 'appServer', 'App Server'), node('x', 'cache', 'Cache')], [edge('u', 'a1')])
+    // the cache pairs with yours by kind; the connection to it is missing
+    expect(describeDiff(diffDiagrams(built, ref, reg), reg)).toEqual(['Connect App Server to Cache'])
+  })
+})
+
+describe('uniqueLabels', () => {
+  it('numbers components that share a label, in order, and leaves the rest alone', async () => {
+    const { uniqueLabels } = await import('./diagram')
+    const d = uniqueLabels(dia([node('a', 'appServer', 'App Server'), node('b', 'appServer', 'App Server'), node('c', 'database', 'DB'), node('d', 'appServer', 'App Server')]))
+    expect(d.nodes.map((n) => n.label)).toEqual(['App Server', 'App Server 2', 'DB', 'App Server 3'])
   })
 })

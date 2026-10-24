@@ -86,11 +86,15 @@ export function noteRect(n: Note, measure: (text: string, size: number) => { w: 
   return { x: n.x, y: n.y, w: m.w + 16, h: m.h + 12 }
 }
 
+/** Screen-pixel radius of the grab area at each end of a selected connection. */
+export const EDGE_END_RADIUS = 9
+
 export type Hit =
   | { type: 'handle'; id: string }
   | { type: 'node'; id: string }
   | { type: 'note'; id: string }
   | { type: 'edge'; id: string }
+  | { type: 'edgeEnd'; id: string; end: 'from' | 'to' } // a grabbable end of a selected connection
   | null
 
 export function hitTest(
@@ -100,8 +104,17 @@ export function hitTest(
   zoom: number,
   measure: (text: string, size: number) => { w: number; h: number },
   handleFor: Set<string>,
+  selectedEdges: Set<string> = new Set(),
 ): Hit {
   const byId = new Map(d.nodes.map((n) => [n.id, n]))
+  for (const e of d.edges) {
+    if (!selectedEdges.has(e.id)) continue
+    const g = edgeGeom(e, byId, reg)
+    if (!g) continue
+    const r = EDGE_END_RADIUS / zoom
+    if (Math.hypot(p.x - g.b.x, p.y - g.b.y) <= r) return { type: 'edgeEnd', id: e.id, end: 'to' }
+    if (Math.hypot(p.x - g.a.x, p.y - g.a.y) <= r) return { type: 'edgeEnd', id: e.id, end: 'from' }
+  }
   for (const id of handleFor) {
     const n = byId.get(id)
     if (n) {

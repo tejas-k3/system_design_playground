@@ -25,6 +25,8 @@ export function Toolbar() {
   const connection = useStore((s) => s.connection)
   const requestFit = useStore((s) => s.requestFit)
   const running = status === 'running'
+  const ended = useStore((s) => !!s.scenario?.result) // a challenge run that has finished: Play starts a new run, it does not carry on
+  const playLabel = running ? 'Pause' : ended ? 'Run again' : status === 'paused' ? 'Resume' : 'Play'
 
   return (
     <header className="toolbar">
@@ -58,9 +60,9 @@ export function Toolbar() {
       </div>
 
       <div className="group sim" role="group" aria-label="Simulation">
-        <button className={`play ${running ? 'on' : ''}`} onClick={togglePlay} title="Play / pause (Space)" aria-label={running ? 'Pause' : 'Play'}>
+        <button className={`play ${running ? 'on' : ''}`} onClick={togglePlay} title="Play / pause (Space)" aria-label={playLabel}>
           {running ? <Icon d="M8 5v14M16 5v14" /> : <Icon d="M7 4l13 8-13 8z" fill />}
-          <span>{running ? 'Pause' : status === 'paused' ? 'Resume' : 'Play'}</span>
+          <span>{playLabel}</span>
         </button>
         <button onClick={step} disabled={running} title="Step 100 ms" aria-label="Step">
           <Icon d="M5 5l9 7-9 7zM18 5v14" />
