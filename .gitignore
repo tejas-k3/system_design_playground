@@ -11,3 +11,7 @@ docs/**/*.md
 !docs/DEPLOYMENT.md
 !docs/ACCESSIBILITY_TESTING.md
 !docs/COMPONENTS.md
+
+# screenshots and other review evidence stay on the local disk only, never in commits
+docs/review/evidence/
+graphify-out/
