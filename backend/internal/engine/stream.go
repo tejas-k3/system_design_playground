@@ -42,3 +42,26 @@ func (s *Sim) streamCrashed(n *node) {
 		}
 	}
 }
+
+// streamLate is the events every stream job has dropped for arriving after their window closed for good.
+func (s *Sim) streamLate() int {
+	n := 0
+	for _, nd := range s.order {
+		if nd.kind == KStream && nd.win != nil && !nd.removed {
+			n += nd.win.LateDropped
+		}
+	}
+	return n
+}
+
+// streamDelay is the longest wait for a first result among the stream jobs that took in events: a window is emitted
+// when the watermark passes its end, which is the watermark delay after the newest event it could hold.
+func (s *Sim) streamDelay() float64 {
+	d := 0.0
+	for _, nd := range s.order {
+		if nd.kind == KStream && nd.win != nil && !nd.removed {
+			d = max(d, nd.f("watermarkDelaySec"))
+		}
+	}
+	return d
+}

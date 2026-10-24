@@ -1378,6 +1378,35 @@ func init() {
 		Debrief: "A hot row is a throughput ceiling of one over the write time, however big the database. Split the counter (several sub-rows added up on read), batch the updates, or queue them so they are applied in order without making buyers wait.",
 	})
 
+	// Count the clicks: a stream job counts clicks per window, but some arrive long after they happened
+	countClicks := func(fixed bool) engine.Diagram {
+		st := P{"windowSec": 10.0, "watermarkDelaySec": 2.0, "lateEventPct": 15.0, "lateBySec": 20.0}
+		if fixed {
+			st["allowedLatenessSec"] = 30.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 200.0, "readPct": 0.0, "keySpace": 10000.0, "keyDist": "uniform", "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0, "queueCap": 500.0}).
+			n("clicks", engine.KStream, cols[2], rowMid, st).label("clicks", "Clicks per 10 seconds").
+			e("users", "app").e("app", "clicks").done()
+	}
+	register(&Scenario{
+		ID: "count-the-clicks", Title: "Count the clicks", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The click counts are wrong because some clicks arrive late.",
+		Story:   "A dashboard shows clicks per ten seconds, counted by a stream job by the time each click happened. About one click in seven comes from a phone that was offline and reaches the server twenty seconds after it happened. The job has already published the window by then and throws the click away, so the totals are always a little low. The dashboard must still show each window within three seconds of it ending.",
+		Diagram: countClicks(false), Solution: countClicks(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxLateDropped: i(20), MaxResultDelaySec: f(3), MaxCostPerHour: f(1.0)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the stream job's stats: how many clicks does it drop, and why?",
+			"A window is published when the watermark (the newest click time minus a delay) passes its end. A click that arrives after that is dropped, unless the job is told to accept late ones for a while.",
+			"Waiting longer before publishing (the watermark delay) would catch them, but the dashboard must not wait more than three seconds. Instead, allow lateness: publish on time, then update the window when a late click arrives.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "To count clicks that arrive 20 seconds late, the dashboard must…", Options: []string{"Wait 20 seconds before showing anything", "Show the window on time and correct it when the late clicks arrive", "Ignore late clicks, they are rare"}, Answer: 1,
+			Explain: "A longer watermark delay trades freshness for completeness. Allowed lateness gives both, at the price of results that change after they were shown."}},
+		Debrief: "Event time is when something happened, not when you heard about it. The watermark is a guess about how late data can be: too tight and you drop data, too loose and you answer slowly. Allowed lateness, with updates to published windows, lets you answer early and still end up correct.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"
