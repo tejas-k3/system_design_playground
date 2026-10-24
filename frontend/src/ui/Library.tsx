@@ -1,4 +1,5 @@
 import { nodeRect, rectsIntersect } from '../draw/geometry'
+import { GROUP_KINDS, GROUP_DEFAULT } from '../model/groups'
 import { groupKinds } from '../model/library'
 import { useStore } from '../state/store'
 
@@ -32,6 +33,14 @@ export function Library() {
       }
     }
     addNode(kind, best.x, best.y)
+  }
+
+  const addBox = (kind: (typeof GROUP_KINDS)[number]['kind']) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.board canvas')
+    const r = canvas?.getBoundingClientRect()
+    const cx = ((r?.width ?? 800) / 2 - viewport.scrollX) / viewport.zoom
+    const cy = ((r?.height ?? 500) / 2 - viewport.scrollY) / viewport.zoom
+    useStore.getState().addGroup(kind, Math.round(cx - GROUP_DEFAULT.w / 2), Math.round(cy - GROUP_DEFAULT.h / 2))
   }
 
   return (
@@ -69,6 +78,23 @@ export function Library() {
           </ul>
         </section>
       ))}
+      <section aria-label="Boxes">
+        <h3>Boxes</h3>
+        <p className="muted small">Draw a region, zone or network around components. Moving a box moves what is inside it. Labels only: the simulation ignores boxes.</p>
+        <ul>
+          {GROUP_KINDS.map((k) => (
+            <li key={k.kind}>
+              <button className="lib-item" onClick={() => addBox(k.kind)} aria-label={`Add a ${k.name} box`}>
+                <span className="swatch" style={{ background: 'transparent', border: '2px dashed currentColor' }} aria-hidden />
+                <span className="lib-text">
+                  <b>{k.name}</b>
+                  <small>{k.tag} box</small>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
       <button className="linkish" onClick={() => useStore.getState().setUi({ templates: true })} disabled={configOnly}>Starter templates…</button>
       <p className="muted small">Click or drag onto the canvas. Drag from a node's right-hand handle to connect.</p>
     </aside>

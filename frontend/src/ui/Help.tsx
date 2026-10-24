@@ -21,6 +21,7 @@ export function Help() {
     ['Drag empty space', 'Pan the canvas'],
     ['Shift + drag', 'Box-select'],
     ['Double-click empty', 'Add a note'],
+    ['Boxes (library)', 'Add a region, zone or network box; drag its header to move it and what is inside, drag its corner to resize, name it in the inspector'],
     ['Esc', 'Clear selection / cancel connecting'],
   ]
   return (

@@ -1,5 +1,6 @@
 import type { Diagram, Edge, Node, Note } from '../api/types'
 import type { Reg } from '../model/diagram'
+import { GROUP_HEADER } from '../model/groups'
 
 export interface Rect {
   x: number
@@ -86,6 +87,9 @@ export function noteRect(n: Note, measure: (text: string, size: number) => { w: 
   return { x: n.x, y: n.y, w: m.w + 16, h: m.h + 12 }
 }
 
+/** Screen-pixel radius of a selected box's resize grip. */
+export const GROUP_GRIP = 10
+
 /** Screen-pixel radius of the grab area at each end of a selected connection. */
 export const EDGE_END_RADIUS = 9
 
@@ -93,6 +97,8 @@ export type Hit =
   | { type: 'handle'; id: string }
   | { type: 'node'; id: string }
   | { type: 'note'; id: string }
+  | { type: 'group'; id: string } // the header band or border of a box
+  | { type: 'groupResize'; id: string } // the grip at a selected box's bottom-right corner
   | { type: 'edge'; id: string }
   | { type: 'edgeEnd'; id: string; end: 'from' | 'to' } // a grabbable end of a selected connection
   | null
@@ -105,6 +111,7 @@ export function hitTest(
   measure: (text: string, size: number) => { w: number; h: number },
   handleFor: Set<string>,
   selectedEdges: Set<string> = new Set(),
+  selectedGroups: Set<string> = new Set(),
 ): Hit {
   const byId = new Map(d.nodes.map((n) => [n.id, n]))
   for (const e of d.edges) {
@@ -122,6 +129,10 @@ export function hitTest(
       if (Math.hypot(p.x - h.x, p.y - h.y) <= handleRadius(zoom) + 4 / zoom) return { type: 'handle', id }
     }
   }
+  const groups = d.groups ?? []
+  for (const g of groups) {
+    if (selectedGroups.has(g.id) && Math.hypot(p.x - (g.x + g.w), p.y - (g.y + g.h)) <= GROUP_GRIP / zoom) return { type: 'groupResize', id: g.id }
+  }
   for (let i = d.notes.length - 1; i >= 0; i--) if (inRect(p, noteRect(d.notes[i], measure))) return { type: 'note', id: d.notes[i].id }
   for (let i = d.nodes.length - 1; i >= 0; i--) if (inRect(p, nodeRect(d.nodes[i], reg))) return { type: 'node', id: d.nodes[i].id }
   let best: { id: string; dist: number } | null = null
@@ -132,7 +143,18 @@ export function hitTest(
     const dist = distToSegment(p, g.a, g.b)
     if (dist <= tol && (!best || dist < best.dist)) best = { id: e.id, dist }
   }
-  return best ? { type: 'edge', id: best.id } : null
+  if (best) return { type: 'edge', id: best.id }
+  // boxes are behind everything: only their header and border can be grabbed, and the smallest one under the pointer wins
+  let box: { id: string; area: number } | null = null
+  const bt = 6 / zoom
+  for (const g of groups) {
+    const r = { x: g.x, y: g.y, w: g.w, h: g.h }
+    if (!inRect(p, r, bt)) continue
+    const inHeader = inRect(p, { x: g.x, y: g.y, w: g.w, h: GROUP_HEADER })
+    const onBorder = !inRect(p, { x: g.x + bt, y: g.y + bt, w: g.w - 2 * bt, h: g.h - 2 * bt })
+    if ((inHeader || onBorder) && (!box || g.w * g.h < box.area)) box = { id: g.id, area: g.w * g.h }
+  }
+  return box ? { type: 'group', id: box.id } : null
 }
 
 export function worldToScreen(p: Pt, v: { scrollX: number; scrollY: number; zoom: number }): Pt {
@@ -143,7 +165,7 @@ export function screenToWorld(p: Pt, v: { scrollX: number; scrollY: number; zoom
 }
 
 export function boundsOf(d: Diagram, reg: Reg, measure: (t: string, s: number) => { w: number; h: number }): Rect | null {
-  const rs: Rect[] = [...d.nodes.map((n) => nodeRect(n, reg)), ...d.notes.map((n) => noteRect(n, measure))]
+  const rs: Rect[] = [...d.nodes.map((n) => nodeRect(n, reg)), ...d.notes.map((n) => noteRect(n, measure)), ...(d.groups ?? []).map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h }))]
   if (!rs.length) return null
   const x1 = Math.min(...rs.map((r) => r.x))
   const y1 = Math.min(...rs.map((r) => r.y))

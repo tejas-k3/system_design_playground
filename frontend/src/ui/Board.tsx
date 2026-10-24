@@ -21,6 +21,7 @@ type Mode =
   | { k: 'drag'; last: Pt; ids: string[] }
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
   | { k: 'rewire'; edge: string; end: 'from' | 'to'; downAt: Pt; moved: boolean }
+  | { k: 'resize'; id: string; last: Pt }
   | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
 
 type State = ReturnType<typeof useStore.getState>
@@ -136,7 +137,7 @@ export function Board() {
 
   const hitAt = (w: Pt) => {
     const st = useStore.getState()
-    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current), new Set(st.selection.filter((id) => st.diagram.edges.some((e) => e.id === id))))
+    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current), new Set(st.selection.filter((id) => st.diagram.edges.some((e) => e.id === id))), new Set(st.selection.filter((id) => st.diagram.groups?.some((g) => g.id === id))))
   }
 
   const finishConnect = (from: string, to: string | null) => {
@@ -157,7 +158,7 @@ export function Board() {
     touches.current.set(e.pointerId, sp)
     if (touches.current.size === 2) {
       // a second finger turns whatever was happening into a pinch: drop any drag or connection
-      if (mode.current.k === 'drag') st.endGesture()
+      if (mode.current.k === 'drag' || mode.current.k === 'resize') st.endGesture()
       mode.current = { k: 'idle' }
       connectTo.current = { target: null, pending: null }
       const [a, b] = [...touches.current.values()]
@@ -198,11 +199,17 @@ export function Board() {
       wake()
       return
     }
-    if (hit && (hit.type === 'node' || hit.type === 'note')) {
+    if (hit?.type === 'groupResize') {
+      st.beginGesture()
+      mode.current = { k: 'resize', id: hit.id, last: w }
+      setCursor('nwse-resize')
+      return
+    }
+    if (hit && (hit.type === 'node' || hit.type === 'note' || hit.type === 'group')) {
       if (e.shiftKey) {
         st.setSelection(st.selection.includes(hit.id) ? st.selection.filter((i) => i !== hit.id) : [...st.selection, hit.id])
       } else if (!st.selection.includes(hit.id)) st.setSelection([hit.id])
-      const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id))
+      const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id) || !!st.diagram.groups?.some((g) => g.id === id))
       st.beginGesture()
       mode.current = { k: 'drag', last: w, ids }
       setCursor('grabbing')
@@ -252,6 +259,12 @@ export function Board() {
         m.last = w
         return
       }
+      case 'resize': {
+        const g = st.diagram.groups?.find((x) => x.id === m.id)
+        if (g) st.updateGroup(m.id, { w: g.w + (w.x - m.last.x), h: g.h + (w.y - m.last.y) })
+        m.last = w
+        return
+      }
       case 'connect': {
         if (Math.hypot(sp.x - m.downAt.x, sp.y - m.downAt.y) > 4) m.moved = true
         const hit = hitAt(w)
@@ -278,6 +291,7 @@ export function Board() {
         const ids = [
           ...st.diagram.nodes.filter((n) => rectsIntersect(r, nodeRect(n, st.reg!))).map((n) => n.id),
           ...st.diagram.notes.filter((n) => rectsIntersect(r, noteRect(n, measureText))).map((n) => n.id),
+          ...(st.diagram.groups ?? []).filter((g) => g.x >= r.x && g.y >= r.y && g.x + g.w <= r.x + r.w && g.y + g.h <= r.y + r.h).map((g) => g.id), // a box needs to be wholly inside
         ]
         st.setSelection(Array.from(new Set([...(m.additive ? m.base : []), ...ids])))
         wake()
@@ -297,7 +311,7 @@ export function Board() {
       connectTo.current.target = src && tgt && tgt.id !== src.id && st.reg.canConnect(src.kind, tgt.kind) ? tgt.id : null
       wake()
     }
-    setCursor(hit?.type === 'handle' ? 'crosshair' : hit ? 'pointer' : st.tool === 'connect' ? 'crosshair' : 'default')
+    setCursor(hit?.type === 'groupResize' ? 'nwse-resize' : hit?.type === 'handle' ? 'crosshair' : hit ? 'pointer' : st.tool === 'connect' ? 'crosshair' : 'default')
   }
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -312,7 +326,7 @@ export function Board() {
       setCursor('default')
       return
     }
-    if (m.k === 'drag') st.endGesture()
+    if (m.k === 'drag' || m.k === 'resize') st.endGesture()
     if (m.k === 'pan' && !m.moved) st.setSelection([])
     if (m.k === 'rewire') {
       const target = rewireTo.current
