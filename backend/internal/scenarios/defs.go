@@ -1587,6 +1587,142 @@ func init() {
 		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. Limiting by tokens (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
 	})
 
+	// Shed the cheap traffic: more arrives than the server can do, and a deep queue makes every request wait out its timeout
+	shedCheap := func(fixed bool) engine.Diagram {
+		app := P{"threads": 8.0, "queueCap": 2000.0}
+		if fixed {
+			app["shedAboveQueueMs"] = 100.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 400.0, "readPct": 100.0, "keySpace": 5000.0, "priorityPct": 20.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, app).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "shed-the-cheap-traffic", Title: "Shed the cheap traffic", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "More traffic than the server can do, and a long queue makes everyone give up.",
+		Story:   "Midday traffic is 400 requests a second and the app server can finish about 250. Excess requests wait in a queue that holds 2,000 of them, and a request that waited two seconds is abandoned by its user, so most of the work is spent on answers nobody is waiting for. One request in five is marked urgent (checkouts); the rest can be asked again later.",
+		Diagram: shedCheap(false), Solution: shedCheap(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.4, MaxP95Ms: f(500), MaxCostPerHour: f(0.65), StarCostPerHour: f(0.6), StarP95Ms: f(200)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the queue and at how long a request waits in it. Is the server busy with requests whose users are still there?",
+			"Past 250 a second a longer queue only makes every request older. Turning some requests away early keeps the queue short, so the ones that are admitted are answered in time.",
+			"Set 'Shed above' on the app server to a few hundred milliseconds: when the oldest waiting request is older than that, ordinary requests are turned away at the door and the urgent ones are still admitted.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Turning away some requests at the door will make the share of requests answered…", Options: []string{"Lower than it is now", "Higher, because the server stops wasting work on requests whose users gave up", "The same"}, Answer: 1,
+			Explain: "An overloaded server with a deep queue serves requests so late that their users have left: very little of its work counts. Shedding spends the same capacity on requests that are still wanted."}},
+		Debrief: "Overload is not fixed by queueing more. Bound the wait, shed the requests that can be retried, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
+	})
+
+	// URL shortener: millions of reads of short links, and every new link takes its number from one counter row
+	urlShortener := func(fixed bool) engine.Diagram {
+		app := P{"threads": 64.0, "queueCap": 1000.0, "dbPool": 60.0}
+		b := (&bld{}).
+			n("visitors", engine.KClient, cols[0], rowTop, P{"rps": 1200.0, "readPct": 100.0, "keySpace": 50000.0, "keyDist": "zipf", "zipfS": 1.1, "timeoutMs": 1500.0, "retries": 0.0}).label("visitors", "Link visitors").
+			n("creators", engine.KClient, cols[0], rowBot, P{"rps": 70.0, "readPct": 0.0, "keySpace": 50000.0, "keyDist": "uniform", "hotKeyPct": 100.0, "timeoutMs": 1500.0, "retries": 0.0}).label("creators", "Link creators")
+		if fixed {
+			app["hotKeyMode"] = "split"
+			app["splitShards"] = 8.0
+			b.n("app", engine.KAppServer, cols[1], rowMid, app).
+				n("cache", engine.KCache, cols[2], rowMid, P{"capacityItems": 4000.0, "ttlSec": 300.0, "startWarm": true}).
+				n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 12.0, "readMs": 20.0, "writeMs": 20.0, "hotRowLock": true}).label("db", "Link database").
+				e("visitors", "app").e("creators", "app").e("app", "cache").e("cache", "db").e("app", "db")
+		} else {
+			b.n("app", engine.KAppServer, cols[1], rowMid, app).
+				n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 12.0, "readMs": 20.0, "writeMs": 20.0, "hotRowLock": true}).label("db", "Link database").
+				e("visitors", "app").e("creators", "app").e("app", "db")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "url-shortener", Title: "The URL shortener", Difficulty: "Medium",
+		Summary: "Short links are read hundreds of times for every one created, and every new link takes its number from one counter row.",
+		Story:   "Visitors follow short links at 1,200 a second, a few viral ones far more than the rest, and new links are created at 70 a second. Every read goes to the database, which can answer about 600 a second at best. Each new link also takes the next number from a single counter row, and the row lock lets one such write through every 20 ms: 50 a second, while 70 are asked for. The waiting writes hold database connections that the readers need.",
+		Diagram: urlShortener(false), Solution: urlShortener(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(250), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.7), StarP95Ms: f(100)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"There are two different problems here, one on the read path and one on the write path. Which one do the failures come from first?",
+			"Reads: a few links are followed again and again, so a cache in front of the database answers most of them. Writes: one counter row is a ceiling of one write per 20 ms however big the database.",
+			"Add a cache between the app server and the database, and in the app server's hot-key setting split the counter over several rows (or hand each server its own range of numbers).",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A cache in front of the database would fix…", Options: []string{"The slow reads, but not the counter", "Both the reads and the counter", "Only the counter"}, Answer: 0,
+			Explain: "A cache absorbs repeated reads. Creating a link is a write, and every write to the counter row still has to take its turn at the database."}},
+		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and the database is left with the misses. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
+	})
+
+	// Rate limiter showdown: a partner's job fires a burst on the second, across the edge of the limiter's window
+	var edgeSpikes []engine.TrafficPoint
+	edgeSpikes = append(edgeSpikes, engine.TrafficPoint{0, 100})
+	for k := 2; k <= 60; k += 2 {
+		at := float64(k)
+		edgeSpikes = append(edgeSpikes, engine.TrafficPoint{at - 0.1, 100}, engine.TrafficPoint{at - 0.09, 8000}, engine.TrafficPoint{at + 0.09, 8000}, engine.TrafficPoint{at + 0.1, 100})
+	}
+	limiterShowdown := func(algo string) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 100.0, "keySpace": 2000.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("rl", engine.KRateLimiter, cols[1], rowMid, P{"limitRps": 300.0, "burst": 300.0, "algorithm": algo, "windowSec": 1.0}).
+			n("app", engine.KAppServer, cols[2], rowMid, P{"threads": 32.0, "queueCap": 2000.0}).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 7.0, "readMs": 20.0}).
+			e("users", "rl").e("rl", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "rate-limiter-showdown", Title: "Rate limiter showdown", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The limiter promises 300 requests a second, and the database sees twice that for a moment.",
+		Story:   "A partner's batch job fires a burst of requests every other second, centred on the instant the clock ticks over, on top of a steady trickle of other users. The rate limiter promises no more than 300 requests a second to a database that does about 350, yet the database is drowning for a second after every burst. The limiter counts requests in fixed one-second windows that reset on the clock: half of each burst lands at the end of one window and half at the start of the next, and each half is given a full allowance. Most of the burst has to be turned away either way.",
+		Diagram: limiterShowdown("fixedWindow"), Solution: limiterShowdown("slidingWindowLog"),
+		Traffic:     map[string][]engine.TrafficPoint{"users": edgeSpikes},
+		Goals:       engine.Goals{MinSuccessRate: 0.2, MaxP95Ms: f(800), MaxCostPerHour: f(1.1), StarCostPerHour: f(1.0)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at what the database receives in the second around a burst, not at what the limiter allows per window.",
+			"A fixed window forgets everything at its edge. A burst that straddles the edge is admitted twice, once in each window, so up to twice the limit gets through in a fraction of a second.",
+			"Change the limiter's algorithm to one that never lets more than the limit through in any window-length span: the sliding window log is exact, the sliding window counter is a cheap approximation.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A burst straddling the edge of a fixed one-second window with a limit of 300 lets through up to…", Options: []string{"300 requests", "600 requests", "It depends on the burst size"}, Answer: 1,
+			Explain: "Each window has its own count: the last moments of one window and the first moments of the next can each admit the whole allowance."}},
+		Debrief: "Every rate-limiting algorithm makes a different promise at the boundary. A fixed window is cheap but allows up to twice the limit across its edge; a sliding log is exact and costs memory per request; a sliding counter is cheap and close; a token bucket allows a burst up to its size and then a steady rate. Pick the one whose worst case your backend can survive.",
+	})
+
+	// Multi-region reads: app servers sit near every user, but the one database is in the US
+	multiRegion := func(fixed bool) engine.Diagram {
+		b := &bld{}
+		regions := []string{"us", "eu", "ap"}
+		names := map[string]string{"us": "US", "eu": "Europe", "ap": "Asia"}
+		b.n("db", engine.KDatabase, cols[3], rowTop, P{"connections": 32.0, "readMs": 8.0, "writeMs": 15.0, "region": "us"}).label("db", "Primary database (US)")
+		for i, r := range regions {
+			y := float64(i)*130 + 30
+			users, app := "users-"+r, "app-"+r
+			b.n(users, engine.KClient, cols[0], y, P{"rps": 60.0, "readPct": 98.0, "keySpace": 500.0, "keyDist": "uniform", "timeoutMs": 3000.0, "retries": 0.0, "region": r, "consistency": "bounded", "maxStaleMs": 1000.0, "geoRouting": true}).label(users, names[r]+" users")
+			b.n(app, engine.KAppServer, cols[1], y, P{"threads": 24.0, "region": r}).label(app, names[r]+" app")
+			b.e(users, app).e(app, "db")
+			if fixed && r != "us" {
+				rep := "replica-" + r
+				b.n(rep, engine.KReplica, cols[2], y, P{"connections": 16.0, "readMs": 8.0, "replicationLagMs": 100.0, "region": r}).label(rep, names[r]+" replica")
+				b.e(app, rep)
+			}
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "multi-region-reads", Title: "Multi-region reads", Difficulty: "Medium",
+		Summary: "App servers are in three regions, yet reads in Europe and Asia are still slow.",
+		Story:   "Last quarter the app servers moved close to the users, and every user is sent to the nearest one. The database is still a single primary in the US, so a read from Europe or Asia crosses an ocean twice to be answered, and the app server spends most of its time waiting for the answer. Reads are 98% of the traffic, and a read may be at most a second out of date.",
+		Diagram: multiRegion(false), Solution: multiRegion(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(200), MaxStaleReadPct: f(0.02), MaxCostPerHour: f(2.6), StarCostPerHour: f(2.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Compare the latency of the three groups of users. Where does the extra time in Europe and Asia go?",
+			"Every read from Europe crosses to the US and back, about 90 ms of distance before the database does anything; Asia pays 150 ms. The app servers are already close, so the data has to come closer too.",
+			"Put a read replica in Europe and one in Asia, in their regions, and wire each region's app server to its replica. Reads are answered locally, writes still go to the US primary, and a replica runs a little behind, which a read that may be a second old can live with.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A read replica in Asia will make reads there faster, and writes from Asia…", Options: []string{"Faster too", "No faster: they still go to the primary", "Slower"}, Answer: 1,
+			Explain: "A replica serves reads only. Every write still has to reach the one primary, so a write from Asia keeps paying the distance."}},
+		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add replication lag that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or sharding users by home region.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"
