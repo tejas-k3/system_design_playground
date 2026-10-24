@@ -90,3 +90,31 @@ func TestHyperLogLogErrorIsWithinThreeStandardErrors(t *testing.T) {
 	}
 	t.Logf("standard error %.4f; rms error over 20 cardinalities %.4f", se, math.Sqrt(sumSq/20))
 }
+
+// At small precisions the error is large and has to match theory too: over 300 different sets of 4,577 ids, the rms
+// relative error is within 25% of 1.04 / sqrt(2^p) and the estimates are not biased.
+func TestHyperLogLogErrorMatchesTheoryAtSmallPrecisions(t *testing.T) {
+	const n, trials = 4577, 300
+	for _, p := range []uint{4, 6, 8} {
+		se := 1.04 / math.Sqrt(float64(int(1)<<p))
+		var sq, sum float64
+		for i := 0; i < trials; i++ {
+			h := NewHLL(p)
+			base := uint32(i) * 7919
+			for j := 0; j < n; j++ {
+				h.Add(base + uint32(j)*3)
+			}
+			r := (h.Count() - n) / n
+			sq += r * r
+			sum += r
+		}
+		rms, bias := math.Sqrt(sq/trials), sum/trials
+		t.Logf("p=%d: standard error %.3f, measured %.3f, bias %.3f", p, se, rms, bias)
+		if math.Abs(rms-se)/se > 0.25 {
+			t.Errorf("p=%d: rms error %.3f is not within 25%% of the theory %.3f", p, rms, se)
+		}
+		if math.Abs(bias) > se/3 {
+			t.Errorf("p=%d: the estimates are biased by %.3f", p, bias)
+		}
+	}
+}
