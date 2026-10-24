@@ -53,15 +53,11 @@ func (s *Server) runCandidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.runs.Add(1)
-	select {
-	case s.runSlots <- struct{}{}:
-		defer func() { <-s.runSlots }()
-	default:
-		s.metrics.runsRefused.Add(1)
-		w.Header().Set("Retry-After", "2")
-		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+	release, ok := s.acquireRunSlot(w)
+	if !ok {
 		return
 	}
+	defer release()
 	res, err := q.RunCandidate(*req.Candidate, 42)
 	if err != nil {
 		writeErr(w, 400, err.Error())
@@ -82,15 +78,11 @@ func (s *Server) buildQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.runs.Add(1)
-	select {
-	case s.runSlots <- struct{}{}:
-		defer func() { <-s.runSlots }()
-	default:
-		s.metrics.runsRefused.Add(1)
-		w.Header().Set("Retry-After", "2")
-		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+	release, ok := s.acquireRunSlot(w)
+	if !ok {
 		return
 	}
+	defer release()
 	res, err := q.BuildAndTest(req.Answers, 42)
 	if err != nil {
 		writeErr(w, 400, err.Error())

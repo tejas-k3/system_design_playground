@@ -172,15 +172,11 @@ func (s *Server) sweep(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Float64s(xs)
 
-	select {
-	case s.runSlots <- struct{}{}:
-		defer func() { <-s.runSlots }()
-	default:
-		s.metrics.runsRefused.Add(1)
-		w.Header().Set("Retry-After", "2")
-		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+	release, ok := s.acquireRunSlot(w)
+	if !ok {
 		return
 	}
+	defer release()
 	seed := uint32(42)
 	if req.Seed != nil {
 		seed = *req.Seed

@@ -382,15 +382,11 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 		}
 		opts.StopTrafficAtMs = dur * 1000
 	}
-	select {
-	case s.runSlots <- struct{}{}:
-		defer func() { <-s.runSlots }()
-	default:
-		s.metrics.runsRefused.Add(1)
-		w.Header().Set("Retry-After", "2")
-		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+	release, ok := s.acquireRunSlot(w)
+	if !ok {
 		return
 	}
+	defer release()
 	sim := engine.New(d, opts)
 	deadline := time.Now().Add(10 * time.Second)
 	limit := opts.StopTrafficAtMs + 60000
@@ -408,6 +404,21 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 		resp.Score = &sc
 	}
 	writeJSON(w, 200, resp)
+}
+
+// acquireRunSlot takes one of the headless-run slots. When all are busy it counts the refusal, writes
+// the 503 (Retry-After 2) and returns ok=false, and the caller just returns. Otherwise the caller
+// must call release when the run is over (defer it).
+func (s *Server) acquireRunSlot(w http.ResponseWriter) (release func(), ok bool) {
+	select {
+	case s.runSlots <- struct{}{}:
+		return func() { <-s.runSlots }, true
+	default:
+		s.metrics.runsRefused.Add(1)
+		w.Header().Set("Retry-After", "2")
+		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+		return nil, false
+	}
 }
 
 // saveDesign stores a diagram (sanitized first) and returns the id that opens it.
