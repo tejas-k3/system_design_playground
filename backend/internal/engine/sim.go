@@ -253,6 +253,7 @@ type node struct {
 	c    counters
 	ring [ringSize]counters
 	util [ringSize]float64
+	ad   *adaptiveLimit
 }
 
 func (n *node) f(k string) float64 { return pf(n.p, k, 0) }
@@ -502,6 +503,7 @@ func (s *Sim) tick() {
 		}
 		s.markBusy(n)
 		s.autoscale(n)
+		s.adaptiveSync(n)
 		if n.kind == KAppServer && !n.down && n.f("memLimitMB") > 0 {
 			held := float64(n.busy+len(n.q)-n.qh) / float64(s.instancesOf(n))
 			conns := float64(n.sessConns) / float64(s.instancesOf(n)) * n.f("memPerConnKB") / 1024

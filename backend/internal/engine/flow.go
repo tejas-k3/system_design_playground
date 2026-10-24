@@ -626,6 +626,9 @@ func (s *Sim) markBusy(n *node) {
 }
 
 func (s *Sim) releaser(n *node) func() {
+	if n.ad != nil {
+		return s.adaptiveReleaser(n)
+	}
 	done := false
 	return func() {
 		if done {
@@ -639,7 +642,7 @@ func (s *Sim) releaser(n *node) func() {
 }
 
 func (s *Sim) submit(n *node, c *call, cb func(Result), run func(release func())) {
-	if n.busy < s.capacity(n) && n.pausedUntil <= s.now {
+	if s.hasRoom(n) && n.pausedUntil <= s.now {
 		s.markBusy(n)
 		n.busy++
 		if c.sp != nil {
@@ -660,7 +663,7 @@ func (s *Sim) submit(n *node, c *call, cb func(Result), run func(release func())
 }
 
 func (s *Sim) startNext(n *node) {
-	for !n.down && n.pausedUntil <= s.now && n.busy < s.capacity(n) && n.qh < len(n.q) {
+	for !n.down && n.pausedUntil <= s.now && s.hasRoom(n) && n.qh < len(n.q) {
 		var t *task
 		if n.kind == KAppServer && n.s("queueOrder") == "lifo" {
 			t = n.q[len(n.q)-1]

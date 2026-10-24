@@ -210,6 +210,7 @@ func (s *Sim) Snapshot() Stats {
 		if n.kind == KClient {
 			s.crawlExtra(n, ex)
 		}
+		s.adaptiveExtra(n, ex)
 		if n.kind == KAppServer || n.kind == KWorker {
 			ex["poolWaiting"] = float64(s.poolWaiting(n))
 		}
