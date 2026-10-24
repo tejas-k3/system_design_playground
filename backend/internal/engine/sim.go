@@ -224,6 +224,10 @@ type node struct {
 	laneIdx map[[2]int]*lane
 	rrNext  int            // round-robin partition choice
 	lastSeq map[[2]int]int // per (group, key): the newest message a consumer has finished
+	win     *WindowAgg     // stream job: the windows it keeps
+	winCP   int            // stream job: how many outputs had been emitted at the last checkpoint
+	winCPAt float64        // stream job: when that checkpoint was taken
+	winDup  int            // stream job: outputs sent a second time after a crash
 	hjobs   []*job         // urgent jobs of a priority queue, served before jobs
 	hh      int
 	delayed int // jobs held back by the queue's delivery delay

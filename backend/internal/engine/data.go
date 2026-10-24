@@ -309,6 +309,9 @@ func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
 			if qe == nil {
 				qe = s.first(n, KLog)
 			}
+			if qe == nil {
+				qe = s.first(n, KStream)
+			}
 			if qe != nil {
 				s.callCmd(n, qe, c, cmdEnqueue, 0, done)
 				return

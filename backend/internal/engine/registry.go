@@ -178,7 +178,7 @@ func init() {
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
 			Lesson: "A thread waiting on a slow database cannot serve anyone else.",
 			Accent: "#868e96", Width: 160, Height: 72,
-			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog, KKVStore, KCoordinator},
+			CanConnect: []string{KCache, KDatabase, KReplica, KQueue, KShardRouter, KExternalAPI, KRedis, KObjectStore, KIndex, KTopic, KLog, KKVStore, KCoordinator, KStream},
 			Params: []ParamSpec{
 				num("threads", "Threads", "Capacity", 8, 1, 64, 1, "", "Concurrent requests it can work on. Bigger machines cost more than proportionally."),
 				sel("version", "Release version", "Release", "v1", "Which release this server runs. A load balancer with a canary share sends that share of traffic to v2; a bad-release event can be aimed at one version.", opt("v1", "v1 (current)"), opt("v2", "v2 (new)")).adv(),
@@ -509,6 +509,24 @@ func init() {
 				variability("Speed"),
 			},
 			cost: func(p Params) float64 { return 0.08 * pf(p, "nodes", 3) },
+		},
+		{
+			Kind: KStream, Name: "Stream Job", Description: "Counts events in windows of event time (when they happened, not when they arrived), with a watermark that decides when a window is final.",
+			Lesson: "Events arrive late and out of order: the watermark trades waiting for completeness against answering on time.",
+			Accent: "#087f5b", Width: 160, Height: 72, CanConnect: nil,
+			Params: []ParamSpec{
+				num("windowSec", "Window", "Windows", 10, 1, 3600, 1, "s", "Length of each window of event time."),
+				num("slideSec", "Slide", "Windows", 0, 0, 3600, 1, "s", "How often a new window starts. 0 = the same as the window (tumbling windows, each event counted once); a smaller value gives overlapping sliding windows, and an event is counted in window / slide of them.").adv(),
+				num("watermarkDelaySec", "Watermark delay", "Windows", 2, 0, 600, 1, "s", "The watermark is the newest event time seen minus this. A window is emitted when the watermark passes its end: a longer delay waits for stragglers, a shorter one answers sooner."),
+				num("allowedLatenessSec", "Allowed lateness", "Windows", 0, 0, 3600, 1, "s", "How long after a window was emitted a late event still updates it (and the window is emitted again). After that the event is dropped.").adv(),
+				sel("delivery", "Delivery", "Delivery", "atLeastOnce", "At-least-once: after a crash the windows that fired since the last checkpoint fire again, so the sink sees duplicates. Exactly-once: outputs are committed with each checkpoint so a crash repeats nothing, at the cost of a little more time per event.",
+					opt("atLeastOnce", "At-least-once"), opt("exactlyOnce", "Exactly-once")),
+				num("checkpointSec", "Checkpoint every", "Delivery", 10, 1, 600, 1, "s", "How often the job saves its place. After a crash it restarts from the last one.").adv(),
+				num("lateEventPct", "Late events", "Input", 0, 0, 100, 1, "%", "Share of events that happened earlier than they arrive (a phone that was offline).").adv(),
+				num("lateBySec", "Late by", "Input", 5, 0, 3600, 1, "s", "How much earlier than their arrival the late events happened.").adv(),
+				num("opMs", "Time per event", "Speed", 1, 0.1, 100, 0.5, "ms", "Work to take in one event.").adv(),
+			},
+			cost: func(Params) float64 { return 0.1 },
 		},
 		{
 			Kind: KIndex, Name: "Search Shard", Description: "One slice of a search index. A query has to ask every slice.",
