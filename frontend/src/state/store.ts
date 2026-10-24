@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { emptyInterview, type InterviewData } from '../model/interview'
 import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
-import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
+import type { Diagram, Edge, Finding, Node, Note, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
 import { alignNodes, autoLayout, distributeNodes, type AlignMode } from '../model/arrange'
 import { nodeRect } from '../draw/geometry'
@@ -17,8 +17,10 @@ export interface Viewport {
 export interface ScenarioState {
   def: Scenario
   hintLevel: number
+  hints: string[] // the hints revealed so far, each fetched when asked for
+  debrief: string | null // fetched when the result is shown
   result: Score | null
-  predictions: Record<string, number>
+  predictions: Record<string, PredictionAnswer> // answered prediction questions, with what the server said
   solved: boolean
   compare: { mine: Diagram; reference: Diagram } | null // your design next to the reference, once you ask or reveal it
 }
@@ -124,8 +126,9 @@ export interface State {
   dismissToast(id: number): void
   openScenario(def: Scenario): void
   exitScenario(): void
-  answerPrediction(p: Prediction, choice: number): void
-  revealHint(): void
+  recordPrediction(p: Prediction, answer: PredictionAnswer): void
+  addHint(text: string): void
+  setDebrief(text: string): void
   showSolution(d: Diagram): void
   compareWithReference(reference: Diagram): void
   adoptDiagram(d: Diagram): void
@@ -412,7 +415,7 @@ export const useStore = create<State>()((set, get) => {
         selection: [],
         stats: emptyStats(),
         traces: null,
-        scenario: { def, hintLevel: 0, result: null, predictions: {}, solved: false, compare: null },
+        scenario: { def, hintLevel: 0, hints: [], debrief: null, result: null, predictions: {}, solved: false, compare: null },
         sim: { ...s.sim, status: 'stopped', speed: def.speed || 1 },
         ui: { ...s.ui, picker: false, welcome: false, result: false, library: !def.configOnly && !isNarrow() },
       })
@@ -432,9 +435,11 @@ export const useStore = create<State>()((set, get) => {
         ui: { ...s.ui, welcome: !(s.sandbox?.nodes.length), result: false, library: !isNarrow() },
       })
     },
-    answerPrediction: (p, choice) =>
-      set((s) => (s.scenario && !(p.id in s.scenario.predictions) ? { scenario: { ...s.scenario, predictions: { ...s.scenario.predictions, [p.id]: choice } } } : {})),
-    revealHint: () => set((s) => (s.scenario ? { scenario: { ...s.scenario, hintLevel: Math.min(3, s.scenario.hintLevel + 1) } } : {})),
+    recordPrediction: (p, answer) =>
+      set((s) => (s.scenario && !(p.id in s.scenario.predictions) ? { scenario: { ...s.scenario, predictions: { ...s.scenario.predictions, [p.id]: answer } } } : {})),
+    addHint: (text) =>
+      set((s) => (s.scenario && s.scenario.hints.length < s.scenario.def.hintCount ? { scenario: { ...s.scenario, hints: [...s.scenario.hints, text], hintLevel: s.scenario.hints.length + 1 } } : {})),
+    setDebrief: (text) => set((s) => (s.scenario ? { scenario: { ...s.scenario, debrief: text } } : {})),
     showSolution: (d) => {
       if (!get().scenario) return
       const mine = structuredClone(get().diagram)

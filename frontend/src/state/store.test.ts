@@ -19,7 +19,7 @@ function setup() {
 const scenario = (configOnly: boolean): Scenario =>
   ({
     id: 's1', title: 'T', difficulty: 'Easy', summary: '', story: '', configOnly, speed: 1, durationSec: 10, warmupSec: 0,
-    goals: { minSuccessRate: 0.9 }, hints: ['', '', ''], debrief: '',
+    goals: { minSuccessRate: 0.9 }, hintCount: 3,
     diagram: { nodes: [{ id: 'u', kind: 'client', x: 0, y: 0, label: 'Users', params: {}, locked: true }], edges: [], notes: [] },
   }) as Scenario
 
@@ -117,10 +117,23 @@ describe('challenges', () => {
     expect(st().progress.s1).toBe(3)
   })
 
-  it('reveals at most three hints', () => {
+  it('reveals at most as many hints as the challenge has, each one arriving with its text', () => {
     st().openScenario(scenario(false))
-    for (let i = 0; i < 5; i++) st().revealHint()
+    expect(st().scenario?.hints).toEqual([])
+    for (let i = 0; i < 5; i++) st().addHint(`hint ${i + 1}`)
     expect(st().scenario?.hintLevel).toBe(3)
+    expect(st().scenario?.hints).toEqual(['hint 1', 'hint 2', 'hint 3'])
+  })
+
+  it('keeps the first answer to a prediction and the debrief once it is fetched', () => {
+    st().openScenario(scenario(false))
+    const p = { id: 'p1', question: 'q', options: ['a', 'b'] }
+    st().recordPrediction(p, { choice: 0, correct: false, answer: 1, explain: 'because' })
+    st().recordPrediction(p, { choice: 1, correct: true, answer: 1, explain: 'because' })
+    expect(st().scenario?.predictions.p1).toMatchObject({ choice: 0, answer: 1 })
+    expect(st().scenario?.debrief).toBeNull()
+    st().setDebrief('what to remember')
+    expect(st().scenario?.debrief).toBe('what to remember')
   })
 })
 

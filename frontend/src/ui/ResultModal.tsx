@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchScenarios } from '../api/client'
+import { fetchDebrief, fetchScenarios } from '../api/client'
 import type { ScenarioSummary } from '../api/types'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
@@ -18,6 +18,10 @@ export function ResultModal() {
   useEffect(() => {
     if (open) fetchScenarios().then(setList).catch(() => undefined)
   }, [open])
+  const setDebrief = useStore((s) => s.setDebrief)
+  useEffect(() => { // the debrief comes with a passing result, not with the challenge
+    if (open && sc?.result?.pass && sc.debrief === null) fetchDebrief(sc.def.id).then((d) => setDebrief(d.debrief)).catch(() => undefined)
+  }, [open, sc?.result?.pass, sc?.debrief, sc?.def.id, setDebrief])
   useEscapeKey(open && !!sc?.result, () => setUi({ result: false }))
   if (!sc?.result || !open) return null
   const r = sc.result
@@ -45,7 +49,7 @@ export function ResultModal() {
             ))}
           </tbody>
         </table>
-        {r.pass && <p className="debrief"><Rich text={sc.def.debrief} /></p>}
+        {r.pass && sc.debrief && <p className="debrief"><Rich text={sc.debrief} /></p>}
         {r.pass && <Alternatives id={sc.def.id} />}
         <div className="row-btns end">
           <button autoFocus onClick={close}>Keep tweaking</button>

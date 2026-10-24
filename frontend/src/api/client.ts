@@ -1,4 +1,4 @@
-import type { Alternative, BuildResult, ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { Alternative, BuildResult, ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, PredictionAnswer, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -17,6 +17,10 @@ export const fetchRegistry = () => fetch('/api/registry').then((r) => json<Regis
 export const fetchScenarios = () => fetch('/api/scenarios').then((r) => json<ScenarioSummary[]>(r))
 export const fetchScenario = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}`).then((r) => json<Scenario>(r))
 export const fetchAlternatives = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/alternatives`).then((r) => json<Alternative[]>(r))
+export const fetchHint = (id: string, level: number) => fetch(`/api/scenarios/${encodeURIComponent(id)}/hints/${level}`).then((r) => json<{ level: number; hint: string }>(r))
+export const fetchDebrief = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/debrief`).then((r) => json<{ debrief: string }>(r))
+export const answerPrediction = (id: string, predictionId: string, choice: number) =>
+  fetch(`/api/scenarios/${encodeURIComponent(id)}/predictions/${encodeURIComponent(predictionId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ choice }) }).then((r) => json<PredictionAnswer>(r))
 export const fetchSolution = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/solution`).then((r) => json<Diagram>(r))
 
 /** Store a diagram on the server and return the id that opens it. */

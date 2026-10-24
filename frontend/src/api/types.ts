@@ -136,10 +136,17 @@ export interface Goals {
   starP95Ms?: number
 }
 
+/** A prediction question as the page first loads it: the answer and the explanation come only after a choice. */
 export interface Prediction {
   id: string
   question: string
   options: string[]
+}
+
+/** What the server says to a choice: the right answer, and why. */
+export interface PredictionAnswer {
+  choice: number
+  correct: boolean
   answer: number
   explain: string
 }
@@ -171,10 +178,9 @@ export interface Scenario extends ScenarioSummary {
   durationSec: number
   warmupSec: number
   speed: number
-  hints: [string, string, string]
+  hintCount: number // the hints themselves are fetched one at a time, when asked for
   traffic?: Record<string, [number, number][]> // a client's rate over time, in seconds and rps, replacing its own setting
   predictions?: Prediction[]
-  debrief: string
 }
 
 /** Something that happened during the run, for markers on the charts (times in seconds, like the series). */

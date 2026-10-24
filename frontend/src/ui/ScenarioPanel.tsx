@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchSolution } from '../api/client'
+import { answerPrediction, fetchHint, fetchSolution } from '../api/client'
 import { describeDiff, diffDiagrams } from '../model/diff'
 import { goalCost, goalRows, starTargets } from '../model/goals'
 import { isNarrow } from '../model/responsive'
@@ -15,8 +15,9 @@ export function ScenarioPanel() {
   const status = useStore((s) => s.sim.status)
   const ui = useStore((s) => s.ui)
   const setUi = useStore((s) => s.setUi)
-  const revealHint = useStore((s) => s.revealHint)
-  const answer = useStore((s) => s.answerPrediction)
+  const addHint = useStore((s) => s.addHint)
+  const recordPrediction = useStore((s) => s.recordPrediction)
+  const [asking, setAsking] = useState(false) // a hint or an answer is on its way from the server
   const showSolution = useStore((s) => s.showSolution)
   const exit = useStore((s) => s.exitScenario)
   const compareWith = useStore((s) => s.compareWithReference)
@@ -28,7 +29,7 @@ export function ScenarioPanel() {
   const rows = goalRows(def.goals, stats, goalCost(cost, stats, status !== 'stopped'), status !== 'stopped')
   const stars = starTargets(def.goals)
   const pred = def.predictions?.[0]
-  const picked = pred ? sc.predictions[pred.id] : undefined
+  const picked = pred ? sc.predictions[pred.id] : undefined // what the server said to the player's choice
 
   return (
     <section className={`scenario ${open ? '' : 'closed'}`} aria-label="Challenge">
@@ -70,17 +71,26 @@ export function ScenarioPanel() {
               <p>{pred.question}</p>
               <div className="choices">
                 {pred.options.map((o, i) => (
-                  <button key={o} disabled={picked !== undefined} className={picked === undefined ? '' : i === pred.answer ? 'right' : i === picked ? 'wrong' : ''} onClick={() => answer(pred, i)}>
+                  <button key={o} disabled={picked !== undefined || asking} className={picked === undefined ? '' : i === picked.answer ? 'right' : i === picked.choice ? 'wrong' : ''} onClick={async () => {
+                    setAsking(true)
+                    try {
+                      recordPrediction(pred, await answerPrediction(def.id, pred.id, i))
+                    } catch (e) {
+                      useStore.getState().toast((e as Error).message, 'error')
+                    } finally {
+                      setAsking(false)
+                    }
+                  }}>
                     {o}
                   </button>
                 ))}
               </div>
-              {picked !== undefined && <p className="muted small">{pred.explain}</p>}
+              {picked !== undefined && <p className="muted small">{picked.explain}</p>}
             </div>
           )}
           {sc.hintLevel > 0 && (
             <ol className="hints">
-              {def.hints.slice(0, sc.hintLevel).map((h, i) => <li key={i}><Rich text={h} /></li>)}
+              {sc.hints.map((h, i) => <li key={i}><Rich text={h} /></li>)}
             </ol>
           )}
           {sc.result?.pass && !sc.compare && !def.open && (
@@ -96,10 +106,19 @@ export function ScenarioPanel() {
           )}
           {sc.compare && reg && <VsReference mine={sc.compare.mine} reference={sc.compare.reference} />}
           <div className="row-btns">
-            <button onClick={revealHint} disabled={sc.hintLevel >= 3}>{sc.hintLevel === 0 ? 'Give me a hint' : sc.hintLevel < 3 ? 'Another hint' : 'No more hints'}</button>
+            <button disabled={sc.hintLevel >= def.hintCount || asking} onClick={async () => {
+              setAsking(true)
+              try {
+                addHint((await fetchHint(def.id, sc.hintLevel + 1)).hint)
+              } catch (e) {
+                useStore.getState().toast((e as Error).message, 'error')
+              } finally {
+                setAsking(false)
+              }
+            }}>{sc.hintLevel === 0 ? 'Give me a hint' : sc.hintLevel < def.hintCount ? 'Another hint' : 'No more hints'}</button>
             {!def.open && <button
-              disabled={sc.hintLevel < 3}
-              title={sc.hintLevel < 3 ? 'Use all three hints first' : 'Replace your design with the reference solution'}
+              disabled={sc.hintLevel < def.hintCount}
+              title={sc.hintLevel < def.hintCount ? 'Use all three hints first' : 'Replace your design with the reference solution'}
               onClick={async () => {
                 try {
                   reset()
