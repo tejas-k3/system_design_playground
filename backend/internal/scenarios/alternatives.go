@@ -184,6 +184,27 @@ var alternatives = map[string][]Alternative{
 		alt("Move the primary database to Europe", false, 100.0, 334, 2.02, "Europe's reads get fast, but now the US and Asia cross an ocean to reach it (Asia to Europe is the longest hop of all): the p95 is worse, 334 ms, not better.", Change{"db", "region", "eu"}),
 		alt("Move the Asian app server to the US", false, 100.0, 280, 2.02, "The app server is next to the database now, but the users are an ocean from the app server: the distance is paid on the way in instead of on the way to the data.", Change{"app-ap", "region", "us"}),
 	},
+	"opening-night": {
+		alt("Give the one server 16 threads", false, 67.8, 280, 0.48, "Four times the threads is about 400 requests a second at best, against the 600 the launch brings: better, but a third of the requests are still turned away.", Change{"app1", "threads", 16.0}),
+		alt("Give the one server 32 threads", false, 100.0, 151, 1.00, "Enough room for 600 a second, but one big machine costs more than proportionally: $1.00 an hour against the $0.90 budget, where four small servers cost $0.62, and it is still a single point of failure.", Change{"app1", "threads", 32.0}),
+		alt("Give the database 64 connections", false, 21.7, 710, 1.09, "The database was not the bottleneck: the single app server's four threads were. Nothing improves and the bill goes up.", Change{"db", "connections", 64.0}),
+		alt("Let clients retry twice", false, 21.9, 1187, 0.24, "Retries add load to a server that is already full, so the tail gets longer and nothing more succeeds.", Change{"users", "retries", 2.0}),
+	},
+	"slow-reads": {
+		alt("Give the database 64 connections", false, 69.2, 643, 1.38, "The database could already take the reads in parallel: the app servers are the limit, because each request holds a thread for the whole 40 ms read. More connections change nothing and cost more.", Change{"db", "connections", 64.0}),
+		alt("Give each app server 32 threads", false, 80.6, 738, 2.62, "More threads hold more slow reads at once, which helps (81% succeed), but it nearly doubles the bill past the budget and the reads are still 40 ms each.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}, Change{"app3", "threads", 32.0}),
+		alt("Halve the database read time to 20 ms", false, 95.7, 468, 0.52, "A faster database frees threads sooner and nearly fixes the failures, but every read still pays 20 ms and the p95 (468 ms) is far from the goal; a cache answers the popular items without asking the database at all.", Change{"db", "readMs", 20.0}),
+	},
+	"slow-query": {
+		alt("Give the database 64 connections", false, 100.0, 507, 1.86, "More scans can run side by side, so nothing times out, but each one still reads the whole table: the p95 is 507 ms and the bill is over budget.", Change{"db", "connections", 64.0}),
+		alt("Give the app server 64 threads", false, 96.8, 1013, 2.46, "The app server was not the limit; the threads just wait on the database scans. The p95 is over a second and the cost doubles.", Change{"app", "threads", 64.0}),
+		alt("Add three indexes instead of one", true, 100.0, 164, 1.00, "Passes with the same result as one index here, because only one field is looked up. The extra two are wasted: every index makes each write 30% slower, which this mostly-read traffic hides.", Change{"db", "indexes", 3.0}),
+	},
+	"edge-cache": {
+		alt("Give each app server 32 threads", false, 100.0, 154, 2.62, "The origin copes if every server is big enough, but it pays for it: $2.62 an hour against the $1.20 budget. A CDN answers the repeated requests for $0.10.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}, Change{"app3", "threads", 32.0}),
+		alt("Give the database 64 connections", false, 66.1, 408, 1.38, "The servers, not the database, were saturated, so nothing improves and the bill goes up.", Change{"db", "connections", 64.0}),
+		alt("Make a database read take 5 ms", false, 75.3, 369, 0.52, "A faster store helps (75% succeed) but every request still travels to the origin, and the servers are still the limit.", Change{"db", "readMs", 5.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
