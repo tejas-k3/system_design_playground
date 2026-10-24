@@ -1,6 +1,7 @@
-import type { Diagram, Edge, Group, Node, Note } from '../api/types'
+import type { Diagram, Edge, Group, Node, Note, Shape } from '../api/types'
 import { uniqueLabel } from './diagram'
 import { MAX_GROUPS, groupsOf } from './groups'
+import { MAX_SHAPES, shapesOf } from './shapes'
 
 /** What copy keeps: the chosen components and notes, and the connections whose both ends are chosen. */
 export interface Clip {
@@ -8,6 +9,7 @@ export interface Clip {
   edges: Edge[]
   notes: Note[]
   groups?: Group[]
+  shapes?: Shape[]
 }
 
 export const PASTE_OFFSET = 24
@@ -21,10 +23,11 @@ export function copySelection(d: Diagram, ids: string[]): Clip {
     edges: structuredClone(d.edges.filter((e) => have.has(e.from) && have.has(e.to))),
     notes: structuredClone(d.notes.filter((n) => pick.has(n.id))),
     groups: structuredClone(groupsOf(d).filter((g) => pick.has(g.id))),
+    shapes: structuredClone(shapesOf(d).filter((s) => pick.has(s.id))),
   }
 }
 
-export const clipIsEmpty = (c: Clip | null): boolean => !c || (c.nodes.length === 0 && c.notes.length === 0 && !c.groups?.length)
+export const clipIsEmpty = (c: Clip | null): boolean => !c || (c.nodes.length === 0 && c.notes.length === 0 && !c.groups?.length && !c.shapes?.length)
 
 /**
  * Adds a copy of the clip to the diagram: fresh ids, a free label for each component, everything moved by
@@ -48,6 +51,8 @@ export function pasteClip(d: Diagram, clip: Clip, newId: (prefix: string) => str
   const notes = clip.notes.map((n) => ({ ...structuredClone(n), id: newId('t'), x: n.x + offset, y: n.y + offset }))
   const room = Math.max(0, MAX_GROUPS - groupsOf(d).length)
   const groups = (clip.groups ?? []).slice(0, room).map((g) => ({ ...structuredClone(g), id: newId('g'), x: g.x + offset, y: g.y + offset }))
-  out = { ...d, nodes: [...d.nodes, ...nodes], edges: [...d.edges, ...edges], notes: [...d.notes, ...notes], ...(groups.length ? { groups: [...groupsOf(d), ...groups] } : {}) }
-  return { diagram: out, ids: [...nodes.map((n) => n.id), ...notes.map((n) => n.id), ...groups.map((g) => g.id)] }
+  const shapeRoom = Math.max(0, MAX_SHAPES - shapesOf(d).length)
+  const shapes = (clip.shapes ?? []).slice(0, shapeRoom).map((s) => ({ ...structuredClone(s), id: newId('s'), x: s.x + offset, y: s.y + offset }))
+  out = { ...d, nodes: [...d.nodes, ...nodes], edges: [...d.edges, ...edges], notes: [...d.notes, ...notes], ...(groups.length ? { groups: [...groupsOf(d), ...groups] } : {}), ...(shapes.length ? { shapes: [...shapesOf(d), ...shapes] } : {}) }
+  return { diagram: out, ids: [...nodes.map((n) => n.id), ...notes.map((n) => n.id), ...groups.map((g) => g.id), ...shapes.map((s) => s.id)] }
 }

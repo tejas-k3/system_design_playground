@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { emptyInterview, type InterviewData } from '../model/interview'
 import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
-import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
+import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, Shape, ShapeKind, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
-import { alignNodes, autoLayout, distributeNodes, type AlignMode } from '../model/arrange'
+import { alignNodes, distributeNodes, type AlignMode } from '../model/arrange'
+import { tidyDiagram } from '../model/tidy'
+import { MAX_SHAPES, MAX_SHAPE_LABEL, clampShape, newShape, shapesOf } from '../model/shapes'
 import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
 import { GROUP_DEFAULT, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize, groupLabel, groupsOf, withMembers } from '../model/groups'
@@ -85,6 +87,10 @@ export interface State {
   updateNote(id: string, patch: Partial<Note>): void
   addGroup(kind: GroupKind, x: number, y: number): string | null
   updateGroup(id: string, patch: Partial<Pick<Group, 'label' | 'kind' | 'w' | 'h'>>): void
+  addShape(kind: ShapeKind, x: number, y: number): string | null
+  updateShape(id: string, patch: Partial<Pick<Shape, 'label' | 'w' | 'h'>>): void
+  /** Drag one end of an arrow by (dx, dy); the other end stays put. */
+  moveShapeEnd(id: string, end: 'from' | 'to', dx: number, dy: number): void
   deleteIds(ids: string[]): void
   deleteSelection(): void
   /** Remember the selected components (and the connections between them) for pasting. */
@@ -230,6 +236,7 @@ export const useStore = create<State>()((set, get) => {
           nodes: d.nodes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
           notes: d.notes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),
           ...(d.groups ? { groups: d.groups.map((g) => (set_.has(g.id) ? { ...g, x: g.x + dx, y: g.y + dy } : g)) } : {}),
+          ...(d.shapes ? { shapes: d.shapes.map((s) => (ids.includes(s.id) ? { ...s, x: s.x + dx, y: s.y + dy } : s)) } : {}),
         }
       })
     },
@@ -313,6 +320,36 @@ export const useStore = create<State>()((set, get) => {
         }),
       })),
 
+    addShape: (kind, x, y) => {
+      if (shapesOf(get().diagram).length >= MAX_SHAPES) {
+        get().toast(`At most ${MAX_SHAPES} shapes`, 'warn')
+        return null
+      }
+      const id = newId('s')
+      mutate((d) => ({ ...d, shapes: [...shapesOf(d), newShape(id, kind, x, y)] }))
+      set({ selection: [id], ui: { ...get().ui, welcome: false } })
+      return id
+    },
+
+    updateShape: (id, patch) =>
+      mutate((d) => ({
+        ...d,
+        shapes: shapesOf(d).map((s) => {
+          if (s.id !== id) return s
+          const next = { ...s, ...patch }
+          return { ...next, label: [...next.label].slice(0, MAX_SHAPE_LABEL).join(''), ...clampShape(next.kind, next.w, next.h) }
+        }),
+      })),
+
+    moveShapeEnd: (id, end, dx, dy) =>
+      mutate((d) => ({
+        ...d,
+        shapes: shapesOf(d).map((s) => {
+          if (s.id !== id || s.kind !== 'arrow') return s
+          return end === 'to' ? { ...s, ...clampShape('arrow', s.w + dx, s.h + dy) } : { ...s, x: s.x + dx, y: s.y + dy, ...clampShape('arrow', s.w - dx, s.h - dy) }
+        }),
+      })),
+
     deleteIds: (ids) => {
       const kill = new Set(ids.filter((id) => !locked(id)))
       if (kill.size === 0) return
@@ -324,6 +361,7 @@ export const useStore = create<State>()((set, get) => {
         edges: d.edges.filter((e) => !kill.has(e.id) && !kill.has(e.from) && !kill.has(e.to)),
         notes: d.notes.filter((n) => !kill.has(n.id)),
         ...(d.groups ? { groups: d.groups.filter((g) => !kill.has(g.id)) } : {}),
+        ...(d.shapes ? { shapes: d.shapes.filter((s) => !kill.has(s.id)) } : {}),
       }))
       set((s) => ({ selection: s.selection.filter((id) => !kill.has(id)) }))
     },
@@ -340,7 +378,7 @@ export const useStore = create<State>()((set, get) => {
     tidyLayout: () => {
       const reg = get().reg
       if (!reg || get().diagram.nodes.length === 0) return
-      mutate((d) => autoLayout(d, (n) => nodeRect(n, reg)))
+      mutate((d) => tidyDiagram(d, (n) => nodeRect(n, reg)))
       get().requestFit()
     },
 
@@ -350,7 +388,7 @@ export const useStore = create<State>()((set, get) => {
       const clip = copySelection(diagram, reg ? withMembers(diagram, selection, (n) => nodeRect(n, reg)) : selection)
       if (clipIsEmpty(clip)) return
       clipboard = clip
-      if (!quiet) get().toast(`Copied ${clip.nodes.length + clip.notes.length + (clip.groups?.length ?? 0)}`, 'info')
+      if (!quiet) get().toast(`Copied ${clip.nodes.length + clip.notes.length + (clip.groups?.length ?? 0) + (clip.shapes?.length ?? 0)}`, 'info')
     },
     paste: () => {
       if (!clipboard || clipIsEmpty(clipboard)) return
@@ -362,7 +400,7 @@ export const useStore = create<State>()((set, get) => {
         return out.diagram
       })
       // paste again and the next copy lands a step further along
-      clipboard = { ...clipboard, nodes: clipboard.nodes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), notes: clipboard.notes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), groups: (clipboard.groups ?? []).map((g) => ({ ...g, x: g.x + 24, y: g.y + 24 })) }
+      clipboard = { ...clipboard, nodes: clipboard.nodes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), notes: clipboard.notes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), groups: (clipboard.groups ?? []).map((g) => ({ ...g, x: g.x + 24, y: g.y + 24 })), shapes: (clipboard.shapes ?? []).map((s) => ({ ...s, x: s.x + 24, y: s.y + 24 })) }
       set({ selection: ids, ui: { ...get().ui, welcome: false } })
     },
     duplicateSelection: () => {

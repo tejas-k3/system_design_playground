@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { miniLayout, miniToViewport } from './minimap'
+import { miniLayout, miniTag, miniToViewport } from './minimap'
+
+describe('miniTag', () => {
+  it('shows the tag and label when the box is wide enough', () => {
+    expect(miniTag({ kind: 'az', label: 'us-east-1a' }, 120)).toBe('AZ: us-east-1a')
+  })
+  it('falls back to the short tag, then to nothing', () => {
+    expect(miniTag({ kind: 'az', label: 'us-east-1a' }, 24)).toBe('AZ')
+    expect(miniTag({ kind: 'az', label: 'us-east-1a' }, 6)).toBe('')
+  })
+})
 
 const map = { w: 200, h: 120 }
 const bounds = { x: 0, y: 0, w: 1000, h: 400 }

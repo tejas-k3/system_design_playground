@@ -1,5 +1,6 @@
 import { nodeRect, rectsIntersect } from '../draw/geometry'
 import { GROUP_KINDS, GROUP_DEFAULT } from '../model/groups'
+import { ARROW_DEFAULT, ELLIPSE_DEFAULT, SHAPE_KINDS, type ShapeKindInfo } from '../model/shapes'
 import { groupKinds } from '../model/library'
 import { useStore } from '../state/store'
 
@@ -51,6 +52,22 @@ export function Library() {
     useStore.getState().addGroup(kind, x, y)
   }
 
+  const addShape = (kind: ShapeKindInfo['kind']) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.board canvas')
+    const r = canvas?.getBoundingClientRect()
+    const cx = ((r?.width ?? 800) / 2 - viewport.scrollX) / viewport.zoom
+    const cy = ((r?.height ?? 500) / 2 - viewport.scrollY) / viewport.zoom
+    const size = kind === 'arrow' ? ARROW_DEFAULT : ELLIPSE_DEFAULT
+    let x = Math.round(cx - size.w / 2)
+    let y = Math.round(cy - size.h / 2)
+    const have = useStore.getState().diagram.shapes ?? []
+    while (have.some((s) => s.x === x && s.y === y)) {
+      x += 24
+      y += 24
+    }
+    useStore.getState().addShape(kind, x, y)
+  }
+
   return (
     <aside className="library" aria-label="Component library">
       <h2>Components</h2>
@@ -97,6 +114,23 @@ export function Library() {
                 <span className="lib-text">
                   <b>{k.name}</b>
                   <small>{k.tag} box</small>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section aria-label="Shapes">
+        <h3>Shapes</h3>
+        <p className="muted small">Circle or point at something. Drawing only: the simulation ignores them, and an arrow is not a connection.</p>
+        <ul>
+          {SHAPE_KINDS.map((k) => (
+            <li key={k.kind}>
+              <button className="lib-item" onClick={() => addShape(k.kind)} aria-label={`Add an ${k.name.toLowerCase()} annotation`}>
+                <span className="swatch" style={{ background: 'transparent', border: '2px solid currentColor', borderRadius: k.kind === 'ellipse' ? '50%' : 2 }} aria-hidden>{k.kind === 'arrow' ? '→' : ''}</span>
+                <span className="lib-text">
+                  <b>{k.name}</b>
+                  <small>{k.hint}</small>
                 </span>
               </button>
             </li>

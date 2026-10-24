@@ -42,6 +42,17 @@ export interface Group {
   h: number
   collapsed?: boolean // reserved; the editor does not collapse yet
 }
+export type ShapeKind = 'ellipse' | 'arrow'
+/** A purely visual annotation: an ellipse (x, y, w, h is its bounding box) or an arrow (from x, y to x+w, y+h; w and h are signed). */
+export interface Shape {
+  id: string
+  kind: ShapeKind
+  label: string // optional caption, drawn as text
+  x: number
+  y: number
+  w: number
+  h: number
+}
 export interface SweepPoint {
   value: number // load multiple, or the setting's value as used
   rps: number
@@ -70,6 +81,7 @@ export interface Diagram {
   edges: Edge[]
   notes: Note[]
   groups?: Group[] // absent in older designs
+  shapes?: Shape[] // absent in older designs
 }
 
 export interface ParamSpec {

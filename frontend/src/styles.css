@@ -298,6 +298,10 @@ ul.templates button { display: grid; gap: 6px; text-align: left; width: 100%; pa
 
 .minimap { position: absolute; right: 12px; bottom: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); cursor: crosshair; touch-action: none; }
 .minimap .mm-node { fill: var(--ink-soft, #8a8071); opacity: 0.7; }
+.minimap .mm-box { fill: none; stroke: var(--ink-soft, #8a8071); stroke-width: 1; }
+.minimap .mm-tag { font: 7px sans-serif; fill: var(--ink-soft, #8a8071); pointer-events: none; }
+.minimap .mm-shape { fill: none; stroke: var(--ink, #333); stroke-width: 1.2; }
+.minimap .mm-head { fill: var(--ink, #333); }
 .minimap .mm-view { fill: color-mix(in srgb, var(--accent, #b43a0a) 12%, transparent); stroke: var(--accent, #b43a0a); stroke-width: 1.5; }
 @media (max-width: 900px) { .minimap { display: none; } }
 

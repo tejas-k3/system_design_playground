@@ -4,6 +4,7 @@ import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screen
 import { palettes } from '../draw/theme'
 import { openOutputs } from '../model/diagram'
 import { groupRect, groupsOf, withMembers } from '../model/groups'
+import { shapeRect, shapesOf } from '../model/shapes'
 import { type Guide, snapMove, unionRect } from '../model/snap'
 import { drainParticles, spawnTimes } from '../sim/particles'
 import { useStore } from '../state/store'
@@ -23,7 +24,7 @@ type Mode =
   | { k: 'drag'; ids: string[]; carry: string[]; start: Pt; applied: Pt; moving: Rect | null; others: Rect[] } // applied: how far the pieces have been moved so far, snapping included
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
   | { k: 'rewire'; edge: string; end: 'from' | 'to'; downAt: Pt; moved: boolean }
-  | { k: 'resize'; id: string; last: Pt }
+  | { k: 'resize'; id: string; last: Pt; shape?: boolean; end?: 'from' | 'to' } // a box or ellipse corner, or (with `end`) one end of an arrow
   | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
 
 /** How close (in screen pixels) an edge or centre must get to a neighbour's before a dragged component snaps to it. */
@@ -144,7 +145,7 @@ export function Board() {
 
   const hitAt = (w: Pt) => {
     const st = useStore.getState()
-    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current), new Set(st.selection.filter((id) => st.diagram.edges.some((e) => e.id === id))), new Set(st.selection.filter((id) => st.diagram.groups?.some((g) => g.id === id))))
+    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current), new Set(st.selection.filter((id) => st.diagram.edges.some((e) => e.id === id))), new Set(st.selection.filter((id) => st.diagram.groups?.some((g) => g.id === id))), new Set(st.selection.filter((id) => st.diagram.shapes?.some((s) => s.id === id))))
   }
 
   const finishConnect = (from: string, to: string | null) => {
@@ -212,11 +213,17 @@ export function Board() {
       setCursor('nwse-resize')
       return
     }
-    if (hit && (hit.type === 'node' || hit.type === 'note' || hit.type === 'group')) {
+    if (hit?.type === 'shapeResize' || hit?.type === 'shapeEnd') {
+      st.beginGesture()
+      mode.current = { k: 'resize', id: hit.id, last: w, shape: true, ...(hit.type === 'shapeEnd' ? { end: hit.end } : {}) }
+      setCursor(hit.type === 'shapeEnd' ? 'move' : 'nwse-resize')
+      return
+    }
+    if (hit && (hit.type === 'node' || hit.type === 'note' || hit.type === 'group' || hit.type === 'shape')) {
       if (e.shiftKey) {
         st.setSelection(st.selection.includes(hit.id) ? st.selection.filter((i) => i !== hit.id) : [...st.selection, hit.id])
       } else if (!st.selection.includes(hit.id)) st.setSelection([hit.id])
-      const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id) || !!st.diagram.groups?.some((g) => g.id === id))
+      const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id) || !!st.diagram.groups?.some((g) => g.id === id) || !!st.diagram.shapes?.some((s) => s.id === id))
       st.beginGesture()
       const d = st.diagram
       const rectOf = (id: string): Rect | null => {
@@ -225,13 +232,15 @@ export function Board() {
         const t = d.notes.find((x) => x.id === id)
         if (t) return noteRect(t, measureText)
         const g = groupsOf(d).find((x) => x.id === id)
-        return g ? groupRect(g) : null
+        if (g) return groupRect(g)
+        const sh = shapesOf(d).find((x) => x.id === id)
+        return sh ? shapeRect(sh) : null
       }
       // what a box holds is settled when the drag starts, so passing over other components on the way does not pick them up
       const carry = withMembers(d, ids, (n) => nodeRect(n, st.reg!))
       const carried = new Set(carry)
       const moving = unionRect(ids.map(rectOf).filter((r): r is Rect => !!r))
-      const others = [...d.nodes.map((n) => n.id), ...d.notes.map((n) => n.id), ...groupsOf(d).map((g) => g.id)].filter((id) => !carried.has(id)).map(rectOf).filter((r): r is Rect => !!r)
+      const others = [...d.nodes.map((n) => n.id), ...d.notes.map((n) => n.id), ...groupsOf(d).map((g) => g.id), ...shapesOf(d).map((s) => s.id)].filter((id) => !carried.has(id)).map(rectOf).filter((r): r is Rect => !!r)
       mode.current = { k: 'drag', ids, carry, start: w, applied: { x: 0, y: 0 }, moving, others }
       setCursor('grabbing')
       return
@@ -291,6 +300,13 @@ export function Board() {
         return
       }
       case 'resize': {
+        if (m.shape) {
+          const s = shapesOf(st.diagram).find((x) => x.id === m.id)
+          if (s && m.end) st.moveShapeEnd(m.id, m.end, w.x - m.last.x, w.y - m.last.y)
+          else if (s) st.updateShape(m.id, { w: s.w + (w.x - m.last.x), h: s.h + (w.y - m.last.y) })
+          m.last = w
+          return
+        }
         const g = st.diagram.groups?.find((x) => x.id === m.id)
         if (g) st.updateGroup(m.id, { w: g.w + (w.x - m.last.x), h: g.h + (w.y - m.last.y) })
         m.last = w
@@ -322,6 +338,7 @@ export function Board() {
         const ids = [
           ...st.diagram.nodes.filter((n) => rectsIntersect(r, nodeRect(n, st.reg!))).map((n) => n.id),
           ...st.diagram.notes.filter((n) => rectsIntersect(r, noteRect(n, measureText))).map((n) => n.id),
+          ...shapesOf(st.diagram).filter((s) => rectsIntersect(r, shapeRect(s))).map((s) => s.id),
           ...(st.diagram.groups ?? []).filter((g) => g.x >= r.x && g.y >= r.y && g.x + g.w <= r.x + r.w && g.y + g.h <= r.y + r.h).map((g) => g.id), // a box needs to be wholly inside
         ]
         st.setSelection(Array.from(new Set([...(m.additive ? m.base : []), ...ids])))
@@ -342,7 +359,7 @@ export function Board() {
       connectTo.current.target = src && tgt && tgt.id !== src.id && st.reg.canConnect(src.kind, tgt.kind) ? tgt.id : null
       wake()
     }
-    setCursor(hit?.type === 'groupResize' ? 'nwse-resize' : hit?.type === 'handle' ? 'crosshair' : hit ? 'pointer' : st.tool === 'connect' ? 'crosshair' : 'default')
+    setCursor(hit?.type === 'groupResize' || hit?.type === 'shapeResize' ? 'nwse-resize' : hit?.type === 'shapeEnd' ? 'move' : hit?.type === 'handle' ? 'crosshair' : hit ? 'pointer' : st.tool === 'connect' ? 'crosshair' : 'default')
   }
 
   const onPointerUp = (e: React.PointerEvent) => {

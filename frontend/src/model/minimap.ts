@@ -1,4 +1,18 @@
 import type { Rect } from '../draw/geometry'
+import { groupInfo } from './groups'
+
+/** Approximate width of one character of the map's 7px label text. */
+export const MINI_CHAR = 4.2
+
+/** The text to print in a box's outline on the map: "AZ: label" if it fits, the short tag if only that fits, else nothing. */
+export function miniTag(g: { kind: string; label: string }, width: number): string {
+  const info = groupInfo(g.kind)
+  const full = g.label ? `${info.tag}: ${g.label}` : info.tag
+  const room = width - 6
+  if (full.length * MINI_CHAR <= room) return full
+  if (info.tag.length * MINI_CHAR <= room) return info.tag
+  return ''
+}
 import type { Viewport } from '../state/store'
 
 export interface MiniLayout {

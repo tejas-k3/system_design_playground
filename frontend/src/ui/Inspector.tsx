@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GroupKind, NodeStats, ParamSpec } from '../api/types'
 import { nodeRect } from '../draw/geometry'
+import { MAX_SHAPE, MAX_SHAPE_LABEL, MIN_SHAPE, shapeInfo } from '../model/shapes'
 import { GROUP_KINDS, MAX_GROUP, MAX_GROUP_LABEL, MIN_GROUP, groupInfo, groupMembers } from '../model/groups'
 import { palettes } from '../draw/theme'
 import type { AlignMode } from '../model/arrange'
@@ -44,10 +45,11 @@ export function Inspector() {
   const edge = only ? diagram.edges.find((e) => e.id === only) : undefined
   const note = only ? diagram.notes.find((n) => n.id === only) : undefined
   const group = only ? diagram.groups?.find((g) => g.id === only) : undefined
+  const shape = only ? diagram.shapes?.find((g) => g.id === only) : undefined
   return (
     <aside className="inspector" aria-label="Inspector">
       <button className="collapse" onClick={() => setUi({ inspector: false })} aria-label="Collapse inspector" title="Collapse">›</button>
-      {node ? <NodePanel id={node.id} /> : edge ? <EdgePanel id={edge.id} /> : note ? <NotePanel id={note.id} /> : group ? <GroupPanel id={group.id} /> : <Overview count={selection.length} />}
+      {node ? <NodePanel id={node.id} /> : edge ? <EdgePanel id={edge.id} /> : note ? <NotePanel id={note.id} /> : group ? <GroupPanel id={group.id} /> : shape ? <ShapePanel id={shape.id} /> : <Overview count={selection.length} />}
     </aside>
   )
 }
@@ -589,6 +591,34 @@ function GroupPanel({ id }: { id: string }) {
       </div>
       <p className="muted small">Holds {comps} component{comps === 1 ? '' : 's'}{other > 0 ? ` and ${other} other item${other === 1 ? '' : 's'}` : ''}. Moving the box moves them. The simulation ignores boxes.</p>
       <button className="danger-outline" onClick={() => del([id])}>Delete box (keeps what is inside)</button>
+    </div>
+  )
+}
+
+function ShapePanel({ id }: { id: string }) {
+  const shape = useStore((s) => s.diagram.shapes?.find((g) => g.id === id))
+  const updateShape = useStore((s) => s.updateShape)
+  const del = useStore((s) => s.deleteIds)
+  if (!shape) return null
+  const arrow = shape.kind === 'arrow'
+  const num = (set: (n: number) => void) => (e: React.ChangeEvent<HTMLInputElement>) => Number.isFinite(e.target.valueAsNumber) && set(e.target.valueAsNumber)
+  return (
+    <div className="panel">
+      <h2>{shapeInfo(shape.kind).name}</h2>
+      <div className="field">
+        <label htmlFor="sl">Caption (optional)</label>
+        <input id="sl" type="text" value={shape.label} maxLength={MAX_SHAPE_LABEL} onChange={(e) => updateShape(id, { label: e.target.value })} />
+      </div>
+      <div className="field">
+        <label htmlFor="sw">{arrow ? 'Tip: across (px, negative = left)' : 'Width'}</label>
+        <input id="sw" type="number" min={arrow ? -MAX_SHAPE : MIN_SHAPE} max={MAX_SHAPE} step={20} value={Math.round(shape.w)} onChange={num((w) => updateShape(id, { w }))} />
+      </div>
+      <div className="field">
+        <label htmlFor="sh">{arrow ? 'Tip: down (px, negative = up)' : 'Height'}</label>
+        <input id="sh" type="number" min={arrow ? -MAX_SHAPE : MIN_SHAPE} max={MAX_SHAPE} step={20} value={Math.round(shape.h)} onChange={num((h) => updateShape(id, { h }))} />
+      </div>
+      <p className="muted small">{arrow ? 'A free arrow for pointing at something; drag either end, or use the arrow keys to move it. It is not a connection.' : 'An ellipse to circle part of the design; drag its outline to move it and its corner to resize.'} The simulation ignores it.</p>
+      <button className="danger-outline" onClick={() => del([id])}>Delete {shapeInfo(shape.kind).name.toLowerCase()}</button>
     </div>
   )
 }

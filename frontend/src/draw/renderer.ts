@@ -8,6 +8,7 @@ import { placementTag } from '../model/placement'
 import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { GROUP_HEADER, groupInfo, groupsOf } from '../model/groups'
+import { arrowEnds, shapesOf } from '../model/shapes'
 import type { Guide } from '../model/snap'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
@@ -524,6 +525,82 @@ function drawGroups(ctx: CanvasRenderingContext2D, sc: Scene) {
   }
 }
 
+/** Ellipses and arrows: outlines only, so what they point at stays visible. A caption, if any, is drawn as text on a plate. */
+function drawShapes(ctx: CanvasRenderingContext2D, sc: Scene) {
+  const p = sc.palette
+  const zoom = sc.viewport.zoom
+  for (const s of shapesOf(sc.diagram)) {
+    const selected = sc.selection.has(s.id)
+    ctx.save()
+    ctx.strokeStyle = selected ? p.accent : p.ink
+    ctx.fillStyle = selected ? p.accent : p.ink
+    ctx.lineWidth = selected ? 3 : 2.4
+    ctx.lineCap = 'round'
+    let cap: Pt
+    if (s.kind === 'arrow') {
+      const { a, b } = arrowEnds(s)
+      const ang = Math.atan2(b.y - a.y, b.x - a.x)
+      const head = 14
+      ctx.beginPath()
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x - Math.cos(ang) * head * 0.6, b.y - Math.sin(ang) * head * 0.6)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(b.x, b.y)
+      ctx.lineTo(b.x - Math.cos(ang - 0.45) * head, b.y - Math.sin(ang - 0.45) * head)
+      ctx.lineTo(b.x - Math.cos(ang + 0.45) * head, b.y - Math.sin(ang + 0.45) * head)
+      ctx.closePath()
+      ctx.fill()
+      cap = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      if (selected) {
+        const r = 5 / Math.min(1, zoom)
+        ctx.fillStyle = p.card
+        ctx.lineWidth = 2
+        // the start is a solid dot; the tip is a ring around the head so the arrowhead stays visible
+        ctx.beginPath()
+        ctx.arc(a.x, a.y, r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(b.x - Math.cos(ang) * head * 0.5, b.y - Math.sin(ang) * head * 0.5, head * 0.75, 0, Math.PI * 2)
+        ctx.lineWidth = 1.4
+        ctx.setLineDash([4, 3])
+        ctx.stroke()
+      }
+    } else {
+      ctx.beginPath()
+      ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, s.w / 2, s.h / 2, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      cap = { x: s.x + s.w / 2, y: s.y }
+      if (selected) {
+        const r = 6 / Math.min(1, zoom)
+        ctx.fillStyle = p.card
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.rect(s.x + s.w - r, s.y + s.h - r, r * 2, r * 2)
+        ctx.fill()
+        ctx.stroke()
+      }
+    }
+    if (s.label) {
+      const size = legibleSize(15, zoom, 11)
+      ctx.font = `${size}px ${FONT}`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const w = ctx.measureText(s.label).width + 12
+      ctx.fillStyle = p.bg
+      ctx.globalAlpha = 0.9
+      ctx.beginPath()
+      ctx.roundRect(cap.x - w / 2, cap.y - size * 0.8, w, size * 1.6, 5)
+      ctx.fill()
+      ctx.globalAlpha = 1
+      ctx.fillStyle = p.ink
+      ctx.fillText(s.label, cap.x, cap.y + 1)
+    }
+    ctx.restore()
+  }
+}
+
 export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: number, height: number, dpr: number, sc: Scene): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.fillStyle = sc.palette.bg
@@ -571,6 +648,7 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
   }
   drawEdgeEnds(ctx, sc, nodes)
   drawRewire(ctx, sc, nodes)
+  drawShapes(ctx, sc)
   drawNotes(ctx, sc)
   if (sc.guides?.length) {
     ctx.save()

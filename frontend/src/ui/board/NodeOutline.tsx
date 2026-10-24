@@ -1,4 +1,5 @@
 import { groupTitle } from '../../model/groups'
+import { shapeTitle } from '../../model/shapes'
 import { useStore } from '../../state/store'
 
 /** "Cache" is already clear; "Frontend cache" is worth saying is a Cache. */
@@ -14,7 +15,8 @@ export function NodeOutline() {
   const selection = useStore((s) => s.selection)
   const setSelection = useStore((s) => s.setSelection)
   const groups = diagram.groups ?? []
-  if (!reg || (diagram.nodes.length === 0 && groups.length === 0)) return null
+  const shapes = diagram.shapes ?? []
+  if (!reg || (diagram.nodes.length === 0 && groups.length === 0 && shapes.length === 0)) return null
   const label = (id: string) => diagram.nodes.find((n) => n.id === id)?.label ?? id
   return (
     <ul className="outline" aria-label="Components on the canvas">
@@ -22,6 +24,13 @@ export function NodeOutline() {
         <li key={g.id}>
           <button aria-pressed={selection.includes(g.id)} onClick={() => setSelection([g.id])}>
             {`Box, ${groupTitle(g)}`}
+          </button>
+        </li>
+      ))}
+      {shapes.map((s) => (
+        <li key={s.id}>
+          <button aria-pressed={selection.includes(s.id)} onClick={() => setSelection([s.id])}>
+            {`Annotation, ${shapeTitle(s)}`}
           </button>
         </li>
       ))}
