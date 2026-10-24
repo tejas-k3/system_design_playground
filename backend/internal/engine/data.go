@@ -152,13 +152,15 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 			})
 			return
 		}
-		if ee := s.first(n, KExternalAPI); ee != nil && !s.runsWorkflow(n) && (cc.write || ee.to.s("calledFor") == "all") {
-			s.callCmd(n, ee, &cc, cmdExternal, 0, func(res Result) {
-				if !res.OK {
-					done(res)
-					return
-				}
-				run()
+		if ee := s.hostEdge(n, cc.key); ee != nil && !s.runsWorkflow(n) && (cc.write || ee.to.s("calledFor") == "all") {
+			s.politely(n, ee, func() {
+				s.callCmd(n, ee, &cc, cmdExternal, 0, func(res Result) {
+					if !res.OK {
+						done(res)
+						return
+					}
+					run()
+				})
 			})
 			return
 		}
