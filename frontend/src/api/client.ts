@@ -19,8 +19,8 @@ export const fetchScenario = (id: string) => fetch(`/api/scenarios/${encodeURICo
 export const fetchAlternatives = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/alternatives`).then((r) => json<Alternative[]>(r))
 export const fetchHint = (id: string, level: number) => fetch(`/api/scenarios/${encodeURIComponent(id)}/hints/${level}`).then((r) => json<{ level: number; hint: string }>(r))
 export const fetchDebrief = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/debrief`).then((r) => json<{ debrief: string; deeper?: string }>(r))
-/** The full answer, kept apart from the hints. An older server has no such route and answers 404. */
-export const fetchAnswerHint = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/answer-hint`).then((r) => json<{ hint?: string }>(r))
+/** The full answer, kept apart from the hints (the server sends it as `answer`). An older server has no such route and answers 404. */
+export const fetchAnswerHint = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/answer-hint`).then((r) => json<{ answer?: string; hint?: string }>(r)).then((d) => ({ hint: d.answer ?? d.hint }))
 export const answerPrediction = (id: string, predictionId: string, choice: number) =>
   fetch(`/api/scenarios/${encodeURIComponent(id)}/predictions/${encodeURIComponent(predictionId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ choice }) }).then((r) => json<PredictionAnswer>(r))
 export const fetchSolution = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/solution`).then((r) => json<Diagram>(r))
