@@ -1,5 +1,6 @@
-import type { Diagram, Edge, Group, GroupKind, Node, NodeSpec, Params, ParamSpec, ParamValue, Registry } from '../api/types'
+import type { Diagram, Edge, Group, GroupKind, Node, Shape, ShapeKind, NodeSpec, Params, ParamSpec, ParamValue, Registry } from '../api/types'
 import { GROUP_KIND_IDS, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize } from './groups'
+import { MAX_SHAPES, MAX_SHAPE_LABEL, SHAPE_KIND_IDS, clampShape } from './shapes'
 
 export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 4
@@ -180,7 +181,23 @@ export function sanitizeDiagram(reg: Reg, raw: unknown): { diagram: Diagram; adj
     label = [...label].slice(0, MAX_GROUP_LABEL).join('')
     groups.push({ id: g.id, kind: g.kind as GroupKind, label, x: g.x, y: g.y, w, h, ...(g.collapsed === true ? { collapsed: true } : {}) })
   }
-  return { diagram: { nodes, edges, notes, ...(groups.length ? { groups } : {}) }, adjusted }
+  const shapes: Shape[] = []
+  for (const s of Array.isArray(raw.shapes) ? raw.shapes : []) {
+    if (shapes.length >= MAX_SHAPES) {
+      adjusted = true
+      break
+    }
+    if (!isObj(s) || typeof s.kind !== 'string' || !SHAPE_KIND_IDS.includes(s.kind) || !num(s.x) || !num(s.y) || !num(s.w) || !num(s.h) || !claim(s.id)) {
+      adjusted = true
+      continue
+    }
+    const { w, h } = clampShape(s.kind, s.w, s.h)
+    let label = typeof s.label === 'string' ? s.label : ''
+    if (w !== s.w || h !== s.h || label.length > MAX_SHAPE_LABEL || (s.label !== undefined && typeof s.label !== 'string')) adjusted = true
+    label = [...label].slice(0, MAX_SHAPE_LABEL).join('')
+    shapes.push({ id: s.id, kind: s.kind as ShapeKind, label, x: s.x, y: s.y, w, h })
+  }
+  return { diagram: { nodes, edges, notes, ...(groups.length ? { groups } : {}), ...(shapes.length ? { shapes } : {}) }, adjusted }
 }
 
 /** Next free label: "Cache", "Cache 2", ... */
