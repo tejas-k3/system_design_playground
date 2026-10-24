@@ -10,6 +10,7 @@ export function Help() {
     ['Space', 'Play / pause'],
     ['V · C', 'Select tool · Connect tool'],
     ['Delete', 'Delete selection'],
+    ['Drag a component', 'It snaps to neighbours\' edges and centres, with a dashed guide; hold Alt to move freely'],
     ['Arrow keys', 'Move the selection (hold Shift for bigger steps)'],
     ['Tab, then Enter', 'Pick a component without a mouse; connect it from the inspector'],
     ['Pinch', 'Zoom and pan on a touch screen'],

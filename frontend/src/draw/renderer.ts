@@ -7,6 +7,7 @@ import { phaseChip } from '../model/phase'
 import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from '../model/rates'
 import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, HANDLE_R } from './geometry'
 import { GROUP_HEADER, groupInfo, groupsOf } from '../model/groups'
+import type { Guide } from '../model/snap'
 import { drawIcon } from './icons'
 import { FONT, type Palette, utilColor } from './theme'
 
@@ -32,6 +33,7 @@ export interface Scene {
   validTargets: Set<string>
   rewire?: { edge: string; end: 'from' | 'to'; to: Pt; target: string | null; valid: Set<string> } | null // a connection end being dragged elsewhere
   marquee: Rect | null
+  guides?: Guide[] // alignment lines while dragging
   particles: ActiveParticle[]
   now: number
   editingNote: string | null
@@ -543,6 +545,24 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
   drawEdgeEnds(ctx, sc, nodes)
   drawRewire(ctx, sc, nodes)
   drawNotes(ctx, sc)
+  if (sc.guides?.length) {
+    ctx.save()
+    ctx.strokeStyle = sc.palette.accent
+    ctx.lineWidth = 1.2 / sc.viewport.zoom
+    ctx.setLineDash([6 / sc.viewport.zoom, 4 / sc.viewport.zoom])
+    ctx.beginPath()
+    for (const g of sc.guides) {
+      if (g.axis === 'x') {
+        ctx.moveTo(g.pos, g.from - 12)
+        ctx.lineTo(g.pos, g.to + 12)
+      } else {
+        ctx.moveTo(g.from - 12, g.pos)
+        ctx.lineTo(g.to + 12, g.pos)
+      }
+    }
+    ctx.stroke()
+    ctx.restore()
+  }
   if (sc.marquee) {
     const m = sc.marquee
     ctx.fillStyle = sc.palette.accent
