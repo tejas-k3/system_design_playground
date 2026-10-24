@@ -235,6 +235,9 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	if n.kind == KStream {
 		s.streamCrashed(n)
 	}
+	if n.kind == KLLMServer {
+		s.llmCrashed(n)
+	}
 	if n.kind == KLog && n.f("leaderElectionSec") > 0 && n.s("ackMode") != "instant" {
 		ep := n.epoch
 		s.after(n.f("leaderElectionSec")*1000, func() { // a follower becomes the leader while the old one is still down

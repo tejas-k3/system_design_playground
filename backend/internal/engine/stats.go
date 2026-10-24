@@ -80,6 +80,8 @@ type RunStats struct {
 	HottestKeyShare      float64         `json:"hottestKeyShare,omitempty"`      // share of requests that go to the single busiest item
 	LateDropped          int             `json:"lateDropped,omitempty"`          // events a stream job dropped for arriving too late
 	ResultDelaySec       float64         `json:"resultDelaySec,omitempty"`       // seconds after a window ends before a stream job first emits it
+	TTFTMs               float64         `json:"ttftMs,omitempty"`               // time to first token of LLM answers, p95
+	ITLMs                float64         `json:"itlMs,omitempty"`                // gap between tokens of LLM answers, p95
 	TopKRecall           float64         `json:"topKRecall,omitempty"`           // share of the true ten most popular items a stream job found
 	StateKB              float64         `json:"stateKB,omitempty"`              // memory a stream job needs to count its different visitors
 	CountErrorPct        float64         `json:"countErrorPct,omitempty"`        // error of an approximate visitor count
@@ -214,6 +216,16 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.kind == KLLMServer && n.llm != nil && s.now > 0 {
+			st := n.llm
+			ex["tokensPerSec"] = float64(st.tokens) / (s.now / 1000)
+			if st.steps > 0 {
+				ex["avgBatch"] = float64(st.seqSum) / float64(st.steps)
+			}
+			ex["maxBatch"] = float64(st.maxB)
+			ex["gpuBusyPct"] = st.busyMs / (s.now * float64(len(st.gpus))) * 100
+			ex["waiting"] = float64(len(st.queue))
+		}
 		if n.kind == KStream && n.win != nil {
 			emitted := 0
 			for _, e := range n.win.Emitted {
@@ -338,7 +350,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, LateDropped: s.streamLate(), StateKB: s.stateKB(), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, LateDropped: s.streamLate(), StateKB: s.stateKB(), TTFTMs: s.ttftHist.Quantile(0.95), ITLMs: s.itlHist.Quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {

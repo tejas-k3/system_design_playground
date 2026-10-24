@@ -232,6 +232,7 @@ type node struct {
 	uniqHLL    *HLL             // stream job: the HyperLogLog sketch
 	hostTokens float64          // external service: calls it will still accept this second
 	hostAt     float64          // external service: when the tokens were last topped up
+	llm        *llmState        // LLM server: its GPUs and queue
 	topTruth   *ExactTopK       // stream job: every item counted exactly, the truth the top ten is judged against
 	topExact   *ExactTopK       // stream job: the exact top-ten tracker when it is the chosen method
 	topSketch  *SketchTopK      // stream job: the count-min top-ten tracker
@@ -339,6 +340,7 @@ type Sim struct {
 	runCustOK, runCustTotal                        int   // requests of clients that are not bots (only counted when a bot exists)
 	hasAbuse                                       bool
 	lightHist, heavyHist                           Hist // latencies of light and heavy requests when the users mix both
+	ttftHist, itlHist                              Hist // time to first token and gap between tokens of the LLM answers
 	jobHist, jobHistHigh                           Hist
 	hasQueue, hasBooking, hasFresh                 bool
 

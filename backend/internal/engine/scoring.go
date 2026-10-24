@@ -27,6 +27,7 @@ type Goals struct {
 	MinWorstTenant          *float64 `json:"minWorstTenant,omitempty"`          // the worst-served of the quiet tenants must still succeed at least this often
 	MaxInconsistent         *int     `json:"maxInconsistent,omitempty"`         // multi-step writes left half done
 	MaxInDoubt              *int     `json:"maxInDoubt,omitempty"`              // two-phase commits left waiting for a crashed coordinator
+	MaxTTFTMs               *float64 `json:"maxTTFTMs,omitempty"`               // time to first token (p95) of LLM answers
 	MinTopKRecall           *float64 `json:"minTopKRecall,omitempty"`           // share of the true top ten a stream job must find
 	MaxStateKB              *float64 `json:"maxStateKB,omitempty"`              // memory a stream job needs to count its visitors
 	MaxCountErrorPct        *float64 `json:"maxCountErrorPct,omitempty"`        // error of an approximate visitor count
@@ -88,7 +89,7 @@ func Unwired(d Diagram) []Node {
 	}
 	isData := func(k string) bool {
 		switch k {
-		case KDatabase, KReplica, KCache, KRedis, KQueue, KShardRouter, KObjectStore, KIndex, KTopic, KLog, KKVStore, KCoordinator, KStream:
+		case KDatabase, KReplica, KCache, KRedis, KQueue, KShardRouter, KObjectStore, KIndex, KTopic, KLog, KKVStore, KCoordinator, KStream, KLLMServer:
 			return true
 		}
 		return false
@@ -221,6 +222,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxInconsistent != nil {
 		checks = append(checks, Check{"Orders left half done", fmt.Sprintf("≤ %d", *g.MaxInconsistent), fmt.Sprint(run.Inconsistent), run.Inconsistent <= *g.MaxInconsistent})
+	}
+	if g.MaxTTFTMs != nil {
+		checks = append(checks, Check{"Time to first token (p95)", fmt.Sprintf("≤ %.0f ms", *g.MaxTTFTMs), fmt.Sprintf("%.0f ms", run.TTFTMs), run.TTFTMs <= *g.MaxTTFTMs+eps})
 	}
 	if g.MinTopKRecall != nil {
 		checks = append(checks, Check{"Top ten found", fmt.Sprintf("≥ %.0f of 10", *g.MinTopKRecall*10), fmt.Sprintf("%.0f of 10", run.TopKRecall*10), run.TopKRecall+eps >= *g.MinTopKRecall})
