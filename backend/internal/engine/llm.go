@@ -60,7 +60,11 @@ func (s *Sim) arriveLLM(n *node, c *call, cb func(Result)) {
 		}
 		return max(1, int(base*f))
 	}
-	sq := &llmSeq{arrived: s.now, prompt: spread(n.f("promptTokens"), 3), out: spread(n.f("outputTokens"), 5), counted: c.counted, cb: cb, n: n}
+	prompt := spread(n.f("promptTokens"), 3)
+	if c.tok > 0 { // the request says how long its prompt is
+		prompt = int(c.tok)
+	}
+	sq := &llmSeq{arrived: s.now, prompt: prompt, out: spread(n.f("outputTokens"), 5), counted: c.counted, cb: cb, n: n}
 	st.queue = append(st.queue, sq)
 	for _, g := range st.gpus {
 		s.llmKick(n, g)

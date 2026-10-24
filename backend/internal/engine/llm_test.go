@@ -108,3 +108,25 @@ func TestTimeToFirstTokenGrowsWithTheQueue(t *testing.T) {
 		t.Errorf("an overloaded server makes the first token wait in the queue: %.0f vs %.0f", a, b)
 	}
 }
+
+// A request carries its own prompt length when the users say so. One request in ten carrying 20 times as many
+// tokens (10,000 tokens = 2.5 s of prefill, during which that GPU writes nothing for anyone) makes everyone else's
+// first token wait.
+func TestHugePromptsStallTheGPUForEveryoneElse(t *testing.T) {
+	run := func(bigPct float64) float64 {
+		b := &builder{}
+		b.node("u", KClient, Params{"rps": 2.0, "readPct": 0.0, "keySpace": 1000.0, "keyDist": "uniform", "timeoutMs": 120000.0, "retries": 0.0, "requestTokens": 500.0, "bigRequestPct": bigPct})
+		b.node("a", KAppServer, Params{"threads": 64.0})
+		b.node("m", KLLMServer, Params{"batchSize": 16.0, "outputTokens": 50.0, "kvCacheTokens": 1000000.0})
+		b.edge("u", "a").edge("a", "m")
+		d, _ := Sanitize(b.d)
+		s := New(d, Options{Seed: 6})
+		s.Advance(300000)
+		return s.ttftHist.Quantile(0.95)
+	}
+	plain, huge := run(0), run(10)
+	t.Logf("p95 first token: %.0f ms when every prompt is 500 tokens, %.0f ms when one in ten is 10,000", plain, huge)
+	if plain > 500 || huge < 2000 {
+		t.Errorf("a 2.5 s prefill holds up the others: %.0f vs %.0f", plain, huge)
+	}
+}
