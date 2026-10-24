@@ -2,7 +2,10 @@
 // consecutive days on which it was solved. Pure functions over dates written YYYY-MM-DD (the player's local date); the
 // only storage is the small streak record, kept apart from the main save.
 
-const DAY_MS = 86_400_000
+import type { ScenarioSummary } from '../api/types'
+import { parseLevel, type LearnerLevel } from './level'
+
+const DAY_MS =86_400_000
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Days since 1970-01-01 for a YYYY-MM-DD date, or NaN when it is not one. */
@@ -45,6 +48,13 @@ export function dailyChallenge(date: string, ids: string[]): string | undefined 
   // when a round would start with yesterday's challenge, its first two days trade places
   if (n > 2 && r[0] === round(sorted, cycle - 1)[n - 1] && day % n <= 1) return r[1 - (day % n)]
   return r[day % n]
+}
+
+/** The daily challenge for a learner level: it rotates inside that level's challenges. "All", an unknown level, or a level with no challenges behaves exactly like dailyChallenge over every id. */
+export function dailyForLevel(date: string, list: ScenarioSummary[], level: LearnerLevel): string | undefined {
+  const l = parseLevel(level)
+  const own = l === 'all' ? [] : list.filter((s) => s.level === l)
+  return dailyChallenge(date, (own.length ? own : list).map((s) => s.id))
 }
 
 export interface Streak {

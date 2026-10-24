@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { fetchScenarios } from '../api/client'
 import type { ScenarioSummary } from '../api/types'
-import { dailyChallenge, loadStreak, localDate, shownStreak } from '../model/daily'
+import { dailyForLevel, loadStreak, localDate, shownStreak } from '../model/daily'
 import { exampleDiagram } from '../model/examples'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
+import { LevelSwitch } from './LevelSwitch'
 
 export function Welcome() {
   const show = useStore((s) => s.ui.welcome && !s.scenario && s.diagram.nodes.length === 0)
   const loadDiagram = useStore((s) => s.loadDiagram)
   const setUi = useStore((s) => s.setUi)
   const requestFit = useStore((s) => s.requestFit)
+  const level = useStore((s) => s.level)
   const startInterview = useStore((s) => s.startInterview)
   const [daily, setDaily] = useState<{ s: ScenarioSummary; streak: number } | null>(null)
   useEffect(() => {
@@ -18,12 +20,12 @@ export function Welcome() {
     const today = localDate()
     fetchScenarios()
       .then((list) => {
-        const id = dailyChallenge(today, list.map((x) => x.id))
+        const id = dailyForLevel(today, list, level)
         const s = list.find((x) => x.id === id)
         setDaily(s ? { s, streak: shownStreak(loadStreak(), today) } : null)
       })
       .catch(() => setDaily(null))
-  }, [show])
+  }, [show, level])
   if (!show) return null
   return (
     <div className="welcome">
@@ -35,6 +37,7 @@ export function Welcome() {
         <button onClick={() => setUi({ picker: true })}>Start a challenge</button>
         <button onClick={() => setUi({ welcome: false })}>Start blank</button>
       </div>
+      <LevelSwitch />
       {daily && (
         <div className="daily" role="group" aria-label="Daily challenge">
           <span><b>Today's challenge:</b> {daily.s.title}</span>

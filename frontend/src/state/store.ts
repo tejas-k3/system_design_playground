@@ -10,6 +10,8 @@ import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
 import { GROUP_DEFAULT, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize, groupLabel, groupsOf, withMembers } from '../model/groups'
 import { isCompact, isNarrow } from '../model/responsive'
+import { readLevel, writeLevel, type LearnerLevel } from '../model/level'
+import { noteAnswer, noteHint, noteRun, noteWrong, type ChallengeRecord } from '../model/record'
 
 export type Tool = 'select' | 'connect'
 export interface Viewport {
@@ -22,6 +24,8 @@ export interface ScenarioState {
   hintLevel: number
   hints: string[] // the hints revealed so far, each fetched when asked for
   debrief: string | null // fetched when the result is shown
+  deeper: string | null // the optional deeper paragraph that came with the debrief
+  answer: string | null // the full answer, fetched only when "Show the answer" is pressed
   result: Score | null
   predictions: Record<string, PredictionAnswer> // answered prediction questions, with what the server said
   solved: boolean
@@ -52,6 +56,8 @@ export interface State {
   viewport: Viewport
   theme: 'light' | 'dark'
   progress: Record<string, number>
+  records: Record<string, ChallengeRecord> // how each challenge went: wrong predictions, hints, attempts, answer used
+  level: LearnerLevel // the learner's level; "all" hides nothing
   sim: { status: SimStatus; speed: number; seed: number }
   stats: Stats
   nodeSeries: { nodeId: string; points: NodePoint[] } | null // latest per-second history of the selected component
@@ -138,14 +144,17 @@ export interface State {
   exitScenario(): void
   recordPrediction(p: Prediction, answer: PredictionAnswer): void
   addHint(text: string): void
-  setDebrief(text: string): void
+  showAnswer(text: string): void
+  setLevel(level: LearnerLevel): void
+  importProgress(progress: Record<string, number>, records: Record<string, ChallengeRecord>): void
+  setDebrief(text: string, deeper?: string): void
   showSolution(d: Diagram): void
   compareWithReference(reference: Diagram): void
   adoptDiagram(d: Diagram): void
   /** Replace the design with a template's, as one step that can be undone. */
   applyTemplate(d: Diagram): void
   setResult(score: Score): void
-  hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport; interview?: InterviewData }): void
+  hydrate(p: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; records?: Record<string, ChallengeRecord>; viewport?: Viewport; interview?: InterviewData }): void
 }
 
 let toastSeq = 1
@@ -186,6 +195,8 @@ export const useStore = create<State>()((set, get) => {
     viewport: { scrollX: 0, scrollY: 0, zoom: 1 },
     theme: typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
     progress: {},
+    records: {},
+    level: readLevel(),
     sim: { status: 'stopped', speed: 1, seed: 42 },
     stats: emptyStats(),
     nodeSeries: null,
@@ -487,7 +498,7 @@ export const useStore = create<State>()((set, get) => {
         selection: [],
         stats: emptyStats(),
         traces: null,
-        scenario: { def, hintLevel: 0, hints: [], debrief: null, result: null, predictions: {}, solved: false, compare: null },
+        scenario: { def, hintLevel: 0, hints: [], debrief: null, deeper: null, answer: null, result: null, predictions: {}, solved: false, compare: null },
         sim: { ...s.sim, status: 'stopped', speed: def.speed || 1 },
         ui: { ...s.ui, picker: false, welcome: false, result: false, library: !def.configOnly && !isNarrow() },
       })
@@ -508,10 +519,29 @@ export const useStore = create<State>()((set, get) => {
       })
     },
     recordPrediction: (p, answer) =>
-      set((s) => (s.scenario && !(p.id in s.scenario.predictions) ? { scenario: { ...s.scenario, predictions: { ...s.scenario.predictions, [p.id]: answer } } } : {})),
+      set((s) => {
+        if (!s.scenario || p.id in s.scenario.predictions) return {}
+        const id = s.scenario.def.id
+        return {
+          scenario: { ...s.scenario, predictions: { ...s.scenario.predictions, [p.id]: answer } },
+          records: answer.correct ? s.records : { ...s.records, [id]: noteWrong(s.records[id]) },
+        }
+      }),
     addHint: (text) =>
-      set((s) => (s.scenario && s.scenario.hints.length < s.scenario.def.hintCount ? { scenario: { ...s.scenario, hints: [...s.scenario.hints, text], hintLevel: s.scenario.hints.length + 1 } } : {})),
-    setDebrief: (text) => set((s) => (s.scenario ? { scenario: { ...s.scenario, debrief: text } } : {})),
+      set((s) => {
+        if (!s.scenario || s.scenario.hints.length >= s.scenario.def.hintCount) return {}
+        const id = s.scenario.def.id
+        const level = s.scenario.hints.length + 1
+        return { scenario: { ...s.scenario, hints: [...s.scenario.hints, text], hintLevel: level }, records: { ...s.records, [id]: noteHint(s.records[id], level) } }
+      }),
+    showAnswer: (text) =>
+      set((s) => (s.scenario ? { scenario: { ...s.scenario, answer: text }, records: { ...s.records, [s.scenario.def.id]: noteAnswer(s.records[s.scenario.def.id]) } } : {})),
+    setLevel: (level) => {
+      writeLevel(level)
+      set({ level })
+    },
+    importProgress: (progress, records) => set({ progress, records }),
+    setDebrief: (text, deeper) => set((s) => (s.scenario ? { scenario: { ...s.scenario, debrief: text, deeper: typeof deeper === 'string' && deeper.trim() ? deeper : null } } : {})),
     showSolution: (d) => {
       if (!get().scenario) return
       const mine = structuredClone(get().diagram)
@@ -533,7 +563,7 @@ export const useStore = create<State>()((set, get) => {
         if (!s.scenario) return {}
         const id = s.scenario.def.id
         const better = score.stars > (s.progress[id] ?? 0)
-        return { scenario: { ...s.scenario, result: score }, ui: { ...s.ui, result: true }, progress: better ? { ...s.progress, [id]: score.stars } : s.progress }
+        return { scenario: { ...s.scenario, result: score }, ui: { ...s.ui, result: true }, progress: better ? { ...s.progress, [id]: score.stars } : s.progress, records: { ...s.records, [id]: noteRun(s.records[id], score.pass) } }
       }),
 
     hydrate: (p) =>
@@ -541,6 +571,7 @@ export const useStore = create<State>()((set, get) => {
         diagram: p.sandbox ?? s.diagram,
         theme: p.theme ?? s.theme,
         progress: p.progress ?? s.progress,
+        records: p.records ?? s.records,
         viewport: p.viewport ?? s.viewport,
         interview: p.interview ?? s.interview,
         ui: { ...s.ui, welcome: !(p.sandbox?.nodes.length) },

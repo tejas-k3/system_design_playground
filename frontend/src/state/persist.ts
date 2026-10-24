@@ -1,5 +1,7 @@
 import type { Diagram } from '../api/types'
 import { Reg, sanitizeDiagram, MAX_ZOOM, MIN_ZOOM } from '../model/diagram'
+import { parseImport } from '../model/progressIO'
+import type { ChallengeRecord } from '../model/record'
 import { sanitizeInterview, type InterviewData } from '../model/interview'
 import { useStore, type Viewport } from './store'
 
@@ -14,6 +16,7 @@ interface Saved {
   sandbox: Diagram
   theme: 'light' | 'dark'
   progress: Record<string, number>
+  records: Record<string, ChallengeRecord>
   viewport: Viewport
 }
 
@@ -37,7 +40,7 @@ export function parseSaved(raw: string | null, reg: Reg) {
   }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {}
   const o = obj as Record<string, unknown>
-  const out: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; viewport?: Viewport; interview?: InterviewData } = {}
+  const out: { sandbox?: Diagram; theme?: 'light' | 'dark'; progress?: Record<string, number>; records?: Record<string, ChallengeRecord>; viewport?: Viewport; interview?: InterviewData } = {}
   const sd = sanitizeDiagram(reg, o.sandbox)
   if (sd) out.sandbox = sd.diagram
   if (o.theme === 'light' || o.theme === 'dark') out.theme = o.theme
@@ -45,6 +48,11 @@ export function parseSaved(raw: string | null, reg: Reg) {
     const p: Record<string, number> = {}
     for (const [k, v] of Object.entries(o.progress as Record<string, unknown>)) if (typeof v === 'number' && v >= 0 && v <= 3) p[k] = v
     out.progress = p
+  }
+  if (o.records && typeof o.records === 'object' && !Array.isArray(o.records)) {
+    // the same strict reader the import uses, so a damaged save cannot put odd values in the store
+    const r = parseImport(JSON.stringify({ format: 'sdp-progress', version: 1, progress: {}, records: o.records }))
+    if (r.ok) out.records = r.records
   }
   const iv = sanitizeInterview(o.interview)
   if (iv) out.interview = iv
@@ -74,6 +82,7 @@ export function startPersistence(reg: Reg): void {
       sandbox: s.scenario ? (s.sandbox ?? { nodes: [], edges: [], notes: [] }) : s.diagram,
       theme: s.theme,
       progress: s.progress,
+      records: s.records,
       viewport: s.viewport,
     }
     try {
@@ -83,7 +92,7 @@ export function startPersistence(reg: Reg): void {
     }
   }
   useStore.subscribe((s, p) => {
-    if (s.diagram !== p.diagram || s.theme !== p.theme || s.progress !== p.progress || s.viewport !== p.viewport || s.sandbox !== p.sandbox || s.interview !== p.interview) {
+    if (s.diagram !== p.diagram || s.theme !== p.theme || s.progress !== p.progress || s.records !== p.records || s.viewport !== p.viewport || s.sandbox !== p.sandbox || s.interview !== p.interview) {
       if (timer) clearTimeout(timer)
       timer = setTimeout(flush, 300)
     }

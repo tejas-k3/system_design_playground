@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { fetchQuestions, fetchScenarios } from '../api/client'
 import type { QuestionSummary, ScenarioSummary } from '../api/types'
+import { LEVEL_TAG, orderByLevel } from '../model/level'
 import { MODE_FILTERS, modeOfQuestion, modeOfScenario, showsMode, type ModeFilter } from '../model/questions'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
+import { LevelSwitch } from './LevelSwitch'
 import { Stars } from './Stars'
 import { useEscapeKey } from './useEscapeKey'
 
@@ -13,6 +15,7 @@ export function ScenarioPicker() {
   const open = useStore((s) => s.ui.picker)
   const setUi = useStore((s) => s.setUi)
   const progress = useStore((s) => s.progress)
+  const level = useStore((s) => s.level)
   const active = useStore((s) => s.scenario?.def.id)
   const exit = useStore((s) => s.exitScenario)
   const [list, setList] = useState<ScenarioSummary[] | null>(null)
@@ -27,6 +30,28 @@ export function ScenarioPicker() {
   useEscapeKey(open, () => setUi({ picker: false }))
   if (!open) return null
   const groups = ['Tutorial', 'Easy', 'Medium', 'Hard']
+  const ordered = orderByLevel(list ?? [], level)
+  const shelf = (items: ScenarioSummary[], prefix: string) => groups.map((g) => {
+    const rows = items.filter((s) => s.difficulty === g && showsMode(filter, modeOfScenario(s)))
+    if (!rows.length) return null
+    return (
+      <section key={prefix + g}>
+        <h3>{g}</h3>
+        <div className="cards">
+          {rows.map((s) => (
+            <button key={s.id} className={`card ${active === s.id ? 'active' : ''}`} onClick={() => loadScenario(s.id)}>
+              <span className="card-top"><b>{s.title}</b><Stars n={progress[s.id] ?? 0} size={14} /></span>
+              <small>{s.summary}</small>
+              {s.level && <em className="lvl" title={`Aimed at ${LEVEL_TAG[s.level]}`}>{LEVEL_TAG[s.level]}</em>}
+              {s.configOnly && <em title={CONFIG_ONLY_HELP}>config only</em>}
+              {s.open && <em title="Blank canvas, hidden traffic, no solution to reveal">open</em>}
+            </button>
+          ))}
+        </div>
+      </section>
+    )
+  })
+  const hasOther = ordered.other.some((s) => showsMode(filter, modeOfScenario(s)))
   return (
     <div className="modal-back" role="dialog" aria-modal aria-label="Challenges" onClick={() => setUi({ picker: false })}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
@@ -36,30 +61,15 @@ export function ScenarioPicker() {
           <button className="x" autoFocus onClick={() => setUi({ picker: false })} aria-label="Close">×</button>
         </header>
         <p className="muted small">Each challenge starts with a broken system. Change it until it meets the goals. Earn up to three stars. <em>config only</em> means {CONFIG_ONLY_HELP.charAt(0).toLowerCase() + CONFIG_ONLY_HELP.slice(1)}</p>
+        <LevelSwitch />
         <div className="seg" role="group" aria-label="Kind of exercise">
           {MODE_FILTERS.map((f) => <button key={f.id} aria-pressed={filter === f.id} className={filter === f.id ? 'on' : ''} onClick={() => setFilter(f.id)}>{f.label}</button>)}
         </div>
         {err && <p className="bad">{err}</p>}
         {!list && !err && <p className="muted">Loading…</p>}
-        {groups.map((g) => {
-          const items = list?.filter((s) => s.difficulty === g && showsMode(filter, modeOfScenario(s))) ?? []
-          if (!items.length) return null
-          return (
-            <section key={g}>
-              <h3>{g}</h3>
-              <div className="cards">
-                {items.map((s) => (
-                  <button key={s.id} className={`card ${active === s.id ? 'active' : ''}`} onClick={() => loadScenario(s.id)}>
-                    <span className="card-top"><b>{s.title}</b><Stars n={progress[s.id] ?? 0} size={14} /></span>
-                    <small>{s.summary}</small>
-                    {s.configOnly && <em title={CONFIG_ONLY_HELP}>config only</em>}
-                    {s.open && <em title="Blank canvas, hidden traffic, no solution to reveal">open</em>}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )
-        })}
+        {shelf(ordered.first, 'a')}
+        {hasOther && <h3 className="level-divider" role="separator" aria-label="Other levels">Other levels</h3>}
+        {shelf(ordered.other, 'b')}
         {questions.filter((q) => showsMode(filter, modeOfQuestion(q))).length > 0 && (
           <section aria-label="Questions">
             <h3>Questions</h3>
