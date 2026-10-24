@@ -31,6 +31,16 @@ Every setting is a flag or an environment variable (the flag wins).
 | `-origins` | `ALLOWED_ORIGINS` | `localhost:*,127.0.0.1:*` | Extra WebSocket origins to accept (comma-separated host patterns) |
 | `-healthcheck` | | | Probe a running server on `-addr` and exit 0 only if healthy |
 
+## Deploy on Render (free)
+
+The repository has a `render.yaml` blueprint. In the Render dashboard choose New, then Blueprint, connect this GitHub
+repository and apply; Render builds the `Dockerfile` and serves it on a `*.onrender.com` address with TLS. It sets
+`ADDR=:10000` (the port Render forwards to) and a low `MAX_SESSIONS`. The free plan sleeps after about 15 minutes
+without traffic (the next visit waits up to a minute) and has no persistent disk, so shared design links last only
+until the service restarts or redeploys. A paid plan with a disk mounted at `/data` keeps them. WebSockets work without
+extra settings, and Render keeps the original `Host` header, so no `ALLOWED_ORIGINS` is needed on the `onrender.com` address (add
+your own domain there if you attach one and the live simulation fails to connect).
+
 ## Behind a reverse proxy
 
 Put TLS, compression and any outer rate limiting in front of the app. Requirements:

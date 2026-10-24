@@ -1,0 +1,14 @@
+# Render blueprint: a free web service built from the Dockerfile.
+# Free instances sleep after about 15 minutes without traffic (the first visit then takes up to a minute) and have no
+# persistent disk, so shared design links are lost when the service restarts or redeploys.
+services:
+  - type: web
+    name: system-design-playground
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: ADDR
+        value: ":10000" # Render sends traffic to port 10000 unless told otherwise
+      - key: MAX_SESSIONS
+        value: "6" # a free instance has a fraction of a CPU core: keep concurrent live simulations low
