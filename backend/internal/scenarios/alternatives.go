@@ -155,6 +155,11 @@ var alternatives = map[string][]Alternative{
 		alt("Run 32 search cores instead of 4", false, 100.0, 174, 2.80, "Capacity is no longer the problem and all the recall is kept, but the cores cost $1.40 an hour more than the whole budget allows.", Change{"docs", "connections", 32.0}),
 		alt("Run 8 search cores instead of 4", true, 100.0, 177, 1.60, "Twice the cores finish the 30 ms searches fast enough and keep full recall, for $0.20 an hour more: a legitimate alternative to examining fewer candidates.", Change{"docs", "connections", 8.0}),
 	},
+	"the-gpu-budget": {
+		alt("Buy a second GPU", false, 100.0, 6143, 7.27, "Two GPUs spread the pasted documents and the first word comes after 2.5 s, but the second GPU is $2.50 an hour the budget does not have, and the first token is still slower than with a token limit.", Change{"model", "gpus", 2.0}),
+		alt("Count tokens but allow 90,000 a minute", false, 96.7, 15581, 4.77, "Generous enough that most of the huge prompts get through: the GPU still spends seconds reading them and the first token takes 5 s.", Change{"gate", "unit", "tokens"}, Change{"gate", "limitTokensPerMin", 90000.0}),
+		alt("Count tokens but allow only 45,000 a minute", false, 74.2, 2374, 4.77, "Protects the first token (0.25 s) but turns away a quarter of all requests, not just the huge ones: below the 78% that must be served.", Change{"gate", "unit", "tokens"}, Change{"gate", "limitTokensPerMin", 45000.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

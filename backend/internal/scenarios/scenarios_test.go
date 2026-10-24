@@ -327,6 +327,18 @@ func TestAlternateSolutions(t *testing.T) {
 			}
 		}
 	})
+	t.Run("the-gpu-budget: a second GPU is over budget and a loose or tight token limit fails", func(t *testing.T) {
+		sc := Get("the-gpu-budget")
+		for _, d := range []engine.Diagram{
+			withParam(sc.Diagram, "model", "gpus", 2.0),
+			withParam(withParam(sc.Diagram, "gate", "unit", "tokens"), "gate", "limitTokensPerMin", 90000.0),
+			withParam(withParam(sc.Diagram, "gate", "unit", "tokens"), "gate", "limitTokensPerMin", 45000.0),
+		} {
+			if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+				t.Fatalf("should fail: %+v", res.Checks)
+			}
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
