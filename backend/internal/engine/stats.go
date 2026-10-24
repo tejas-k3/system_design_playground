@@ -218,6 +218,11 @@ func (s *Sim) Snapshot() Stats {
 			// the average size over the next 365 days, charged by the month
 			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
 		}
+		if n.kind == KAppServer && n.guard != nil && n.guardChecked > 0 {
+			ex["bloomFalsePositivePct"] = float64(n.guardFalse) / float64(n.guardChecked) * 100
+			ex["bloomBlocked"] = float64(n.guardBlocked)
+			ex["bloomKB"] = float64(len(n.guard.bits)*8) / 1024
+		}
 		if n.kind == KVectorStore {
 			ef := n.f("efSearch")
 			ex["searchMs"] = n.f("searchBaseMs") + ef*n.f("perCandidateMs")

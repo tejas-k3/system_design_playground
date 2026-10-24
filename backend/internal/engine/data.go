@@ -201,6 +201,10 @@ func splitHotKey(n *node, c *call, read bool) *call {
 }
 
 func (s *Sim) appRead(n *node, c *call, done func(Result)) {
+	if n.b("bloomGuard") && c.lg != nil && s.bloomBlocks(n, c) {
+		s.after(0.05, func() { done(Result{OK: true, Ver: -1, Done: true, Src: n}) }) // not found, without asking anyone
+		return
+	}
 	c = splitHotKey(n, c, true)
 	// a page with a body: after the lookup, the body is fetched from the object store the app server is wired to
 	if oe := s.first(n, KObjectStore); oe != nil && c.lg != nil && (c.wl == wlKV || c.wl == wlFeed) && c.lg.client.f("respKB") > 0 {
