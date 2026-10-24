@@ -44,6 +44,7 @@ type call struct {
 	key      int
 	wl       int
 	hash     uint32
+	tok      int32 // tokens the request carries (0 = counts as one unit); packed beside hash to keep the call small
 	rid      int
 	idem     bool
 	counted  bool
@@ -58,7 +59,6 @@ type call struct {
 	job      *job
 	fan      float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
 	high     bool    // an urgent request
-	tok      int     // tokens the request carries (0 = counts as one unit)
 	heavy    bool    // an expensive request: it costs heavyMult times the CPU and database time
 	deadline float64 // when the client gives up (absolute ms, 0 = unknown)
 	honor    bool    // an app server on the path propagates the deadline: stations skip this call once it has passed
@@ -1302,7 +1302,7 @@ func (s *Sim) admitTokens(n *node, c *call) bool {
 	}
 	n.tokTokens = math.Min(rate, n.tokTokens+(s.now-n.tokAt)*rate/60000)
 	n.tokAt = s.now
-	w := float64(max(1, c.tok))
+	w := float64(max(1, int(c.tok)))
 	if n.tokTokens < w {
 		return false
 	}
