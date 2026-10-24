@@ -1587,6 +1587,35 @@ func init() {
 		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. Limiting by tokens (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
 	})
 
+	// Shed the cheap traffic: more arrives than the server can do, and a deep queue makes every request wait out its timeout
+	shedCheap := func(fixed bool) engine.Diagram {
+		app := P{"threads": 8.0, "queueCap": 2000.0}
+		if fixed {
+			app["shedAboveQueueMs"] = 100.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 400.0, "readPct": 100.0, "keySpace": 5000.0, "priorityPct": 20.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, app).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "shed-the-cheap-traffic", Title: "Shed the cheap traffic", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "More traffic than the server can do, and a long queue makes everyone give up.",
+		Story:   "Midday traffic is 400 requests a second and the app server can finish about 250. Excess requests wait in a queue that holds 2,000 of them, and a request that waited two seconds is abandoned by its user, so most of the work is spent on answers nobody is waiting for. One request in five is marked urgent (checkouts); the rest can be asked again later.",
+		Diagram: shedCheap(false), Solution: shedCheap(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.4, MaxP95Ms: f(500), MaxCostPerHour: f(0.65), StarCostPerHour: f(0.6), StarP95Ms: f(200)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the queue and at how long a request waits in it. Is the server busy with requests whose users are still there?",
+			"Past 250 a second a longer queue only makes every request older. Turning some requests away early keeps the queue short, so the ones that are admitted are answered in time.",
+			"Set 'Shed above' on the app server to a few hundred milliseconds: when the oldest waiting request is older than that, ordinary requests are turned away at the door and the urgent ones are still admitted.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Turning away some requests at the door will make the share of requests answered…", Options: []string{"Lower than it is now", "Higher, because the server stops wasting work on requests whose users gave up", "The same"}, Answer: 1,
+			Explain: "An overloaded server with a deep queue serves requests so late that their users have left: very little of its work counts. Shedding spends the same capacity on requests that are still wanted."}},
+		Debrief: "Overload is not fixed by queueing more. Bound the wait, shed the requests that can be retried, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

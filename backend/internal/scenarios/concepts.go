@@ -80,4 +80,5 @@ var conceptTags = map[string][]string{
 	"launch-day-capstone":    {"capacity", "caching", "failure-handling"},
 	"ten-thousand-students":  {"capacity", "autoscaling"},
 	"checkout-during-a-sale": {"consistency", "overload-control"},
+	"shed-the-cheap-traffic": {"overload-control", "capacity"},
 }

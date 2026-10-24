@@ -160,6 +160,12 @@ var alternatives = map[string][]Alternative{
 		alt("Count tokens but allow 90,000 a minute", false, 96.7, 15581, 4.77, "Generous enough that most of the huge prompts get through: the GPU still spends seconds reading them and the first token takes 5 s.", Change{"gate", "unit", "tokens"}, Change{"gate", "limitTokensPerMin", 90000.0}),
 		alt("Count tokens but allow only 45,000 a minute", false, 74.2, 2374, 4.77, "Protects the first token (0.25 s) but turns away a quarter of all requests, not just the huge ones: below the 78% that must be served.", Change{"gate", "unit", "tokens"}, Change{"gate", "limitTokensPerMin", 45000.0}),
 	},
+	"shed-the-cheap-traffic": {
+		alt("Shed above 500 ms instead of 100", false, 49.6, 1097, 0.56, "The server still works through a queue half a second deep, so answers that are admitted arrive late: the p95 is over a second. The age at which you start shedding is the latency you accept.", Change{"app", "shedAboveQueueMs", 500.0}),
+		alt("Cut the queue to 100 requests", false, 49.9, 655, 0.56, "A short queue also stops the pile-up, and most requests are answered, but 100 waiting requests still mean about half a second of waiting: the p95 is 655 ms, over the goal. It limits how many wait, not for how long.", Change{"app", "queueCap", 100.0}),
+		alt("Double the threads to 16", false, 100.0, 582, 0.74, "Enough capacity for all 400 a second, so nothing is turned away, but it costs $0.74 an hour against a $0.65 budget and the p95 is still 582 ms.", Change{"app", "threads", 16.0}),
+		alt("Shed above 50 ms", true, 50.3, 239, 0.56, "Passes with the lowest p95 of the lot (239 ms): a tighter bound keeps the queue shorter still. The price is that bursts get turned away more eagerly.", Change{"app", "shedAboveQueueMs", 50.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
