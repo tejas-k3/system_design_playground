@@ -1498,6 +1498,36 @@ func init() {
 		Debrief: "Politeness is a per-host rate limit on the crawler itself, usually with a queue per host so that waiting for one slow or strict site does not block the others. The average rate is what you plan capacity with, but the peak rate decides whether you get blocked.",
 	})
 
+	// Slow first token: a chat service on one GPU whose batch is far too small for the traffic
+	slowFirstToken := func(fixed bool) engine.Diagram {
+		llm := P{"gpus": 1.0, "batchSize": 4.0, "kvCacheTokens": 32000.0, "promptTokens": 500.0, "outputTokens": 150.0, "queueCap": 400.0}
+		if fixed {
+			llm["batchSize"] = 64.0
+			llm["kvCacheTokens"] = 64000.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 3.0, "readPct": 0.0, "keySpace": 1000.0, "keyDist": "uniform", "timeoutMs": 30000.0, "retries": 0.0}).
+			n("chat", engine.KAppServer, cols[1], rowMid, P{"threads": 64.0, "queueCap": 2000.0}).
+			n("model", engine.KLLMServer, cols[2], rowMid, llm).label("model", "Chat model").
+			e("users", "chat").e("chat", "model").done()
+	}
+	register(&Scenario{
+		ID: "slow-first-token", Title: "Slow first token", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Users stare at a blank chat for seconds before the first word appears.",
+		Story:   "A chat assistant runs on one GPU. Users do not mind the answer streaming in word by word, but they stare at a blank screen for many seconds before the first word appears: the time to first token is the whole problem. The GPU takes only four answers at a time, and three new requests arrive every second, each needing about one second of GPU time at that batch size. The budget is about six dollars an hour in all, which pays for one GPU, not two.",
+		Diagram: slowFirstToken(false), Solution: slowFirstToken(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxTTFTMs: f(2500), MaxCostPerHour: f(6.0), StarCostPerHour: f(5.5), StarP95Ms: f(100)},
+		DurationSec: 120, WarmupSec: 20, Speed: 1,
+		Hints: [3]string{
+			"Look at the model's queue and at how many answers it writes at once. Is the GPU keeping up with the requests?",
+			"At four answers at a time one GPU finishes about one request a second; three arrive every second. A GPU writes a whole batch of answers in about the time it takes to write one, so a bigger batch means far more answers per second.",
+			"Raise the number of answers at once: 32 or 64 is enough. Every answer in progress holds its prompt and answer tokens in the KV cache (about 650 each), so the cache caps the batch at roughly 49 whatever you ask for; raising the cache lifts that cap. Buying a second GPU would work but breaks the budget.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Writing 64 answers at once instead of 4 makes each answer…", Options: []string{"Sixteen times slower", "Somewhat slower, but many more answers are written per second", "Just as fast, for free"}, Answer: 1,
+			Explain: "Each decode step is a little longer with more answers sharing it, but a step produces a token for every answer in the batch. Batching trades a little speed per answer for a lot more answers per second."}},
+		Debrief: "A GPU's throughput comes from batching: decoding is limited by reading the model, which is shared by every answer in the batch. The limits are the KV cache (memory for every answer in progress) and the per-answer slowdown. Time to first token is mostly queueing, so fix the throughput, not the prompt reading.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

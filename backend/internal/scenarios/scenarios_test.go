@@ -311,6 +311,14 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("3 calls a second is below the crawler's own average: %+v", res.Checks)
 		}
 	})
+	t.Run("slow-first-token: a bigger cache alone or more GPUs alone do not fix it", func(t *testing.T) {
+		sc := Get("slow-first-token")
+		for _, d := range []engine.Diagram{withParam(sc.Diagram, "model", "kvCacheTokens", 64000.0), withParam(sc.Diagram, "model", "gpus", 2.0)} {
+			if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+				t.Fatalf("should fail: %+v", res.Checks)
+			}
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
