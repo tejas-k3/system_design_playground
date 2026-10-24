@@ -38,7 +38,7 @@ describe('Show the answer', () => {
   })
   it('on a 404 or empty reply records nothing and tells the learner', async () => {
     expect(await loadAnswer('s1', async () => { throw new Error('Not Found') })).toBe(false)
-    expect(await loadAnswer('s1', async () => ({}))).toBe(false)
+    expect(await loadAnswer('s1', async () => ({ hint: undefined }))).toBe(false)
     expect(st().scenario!.answer).toBeNull()
     expect(st().records.s1).toBeUndefined()
     expect(st().toasts.length).toBeGreaterThan(0)
