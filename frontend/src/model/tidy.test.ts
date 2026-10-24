@@ -88,4 +88,22 @@ describe('tidyDiagram with boxes', () => {
   it('is deterministic', () => {
     expect(tidyDiagram(two, size)).toEqual(tidyDiagram(two, size))
   })
+
+  it('an ellipse follows the components it circles; an arrow end follows what it touches; an unrelated shape stays', () => {
+    const d: Diagram = {
+      ...two,
+      shapes: [
+        { id: 'ring', kind: 'ellipse', label: '', x: 580, y: -40, w: 400, h: 160 }, // around w1/d1 (w1 at 300,0 d1 at 600,0 -> d1 centre in it)
+        { id: 'ptr', kind: 'arrow', label: '', x: 300, y: 436, w: 400, h: 0 }, // from w2 to something empty
+        { id: 'far', kind: 'ellipse', label: '', x: 5000, y: 5000, w: 100, h: 100 },
+      ],
+    }
+    const out = tidyDiagram(d, size)
+    const sh = (id: string) => out.shapes!.find((s) => s.id === id)!
+    expect(sh('far')).toMatchObject({ x: 5000, y: 5000 })
+    const w2 = out.nodes.find((n) => n.id === 'w2')!
+    expect(sh('ptr').x).toBeCloseTo(300 + (w2.x - 300))
+    expect(sh('ptr').y).toBeCloseTo(436 + (w2.y - 400))
+    expect(sh('ring').x).not.toBe(580)
+  })
 })
