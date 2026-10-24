@@ -629,11 +629,11 @@ func TestAlternativesEndpoint(t *testing.T) {
 	if resp.StatusCode != 200 || len(alts) != len(scenarios.Alternatives("retry-storm")) || len(alts) == 0 {
 		t.Fatalf("status %d, %d alternatives", resp.StatusCode, len(alts))
 	}
-	// a challenge with none stored answers with an empty list; an unknown one is a 404
-	resp, _ = http.Get(ts.URL + "/api/scenarios/hello-world/alternatives")
+	// a challenge with none stored (an open brief has no reference to compare with) answers with an empty list; an unknown one is a 404
+	resp, _ = http.Get(ts.URL + "/api/scenarios/ten-thousand-students/alternatives")
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 || strings.TrimSpace(string(body)) != "[]" {
-		t.Fatalf("hello-world: %d %q", resp.StatusCode, body)
+		t.Fatalf("ten-thousand-students: %d %q", resp.StatusCode, body)
 	}
 	resp, _ = http.Get(ts.URL + "/api/scenarios/nope/alternatives")
 	if resp.StatusCode != 404 {
