@@ -16,7 +16,7 @@ export const palettes: Record<'light' | 'dark', Palette> = {
   dark: { bg: '#0e1a2b', grid: '#1d3350', ink: '#e8eefc', muted: '#9fb0cc', card: '#16273f', accent: '#ffa94d', ok: '#69db7c', warn: '#ffd43b', bad: '#ff8787', noteBg: '#4a4220' },
 }
 
-export const FONT = '"Patrick Hand", "Segoe Print", "Comic Sans MS", cursive'
+export const FONT = '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
 
 export function utilColor(u: number, p: Palette): string {
   return u < 0.6 ? p.ok : u < 0.85 ? p.warn : p.bad

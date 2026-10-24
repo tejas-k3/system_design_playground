@@ -77,6 +77,7 @@ export function App() {
         </div>
         <Inspector />
       </div>
+      <footer className="app-credit">Made by <b>Tejas Kothari</b> · MIT licensed</footer>
       <ScenarioPicker />
       <ResultModal />
       <Help />

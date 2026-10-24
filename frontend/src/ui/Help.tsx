@@ -39,7 +39,6 @@ export function Help() {
         <h3>Shortcuts</h3>
         <dl className="kv keys">{keys.map(([k, v]) => (<><dt key={k}><kbd>{k}</kbd></dt><dd key={v}>{v}</dd></>))}</dl>
         <p className="muted small">Runs are deterministic: the same design and seed always produce the same result.</p>
-        <p className="muted small credit">Made by <b>Tejas Kothari</b> · MIT licensed · set in Fraunces, Bricolage Grotesque, JetBrains Mono and Patrick Hand</p>
       </div>
     </div>
   )

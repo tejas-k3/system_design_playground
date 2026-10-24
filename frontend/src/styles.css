@@ -3,10 +3,10 @@
   --bg: #f6f1e7; --panel: #fffdf8; --panel2: #f2ebdb; --ink: #1d2433; --muted: #645f52; --line: #d9cfb8;
   --accent: #b43a0a; --accent-ink: #fff; --ok: #1f6e31; --warn: #8f4c00; --bad: #b72424;
   --shadow: 0 6px 24px rgba(29, 36, 51, 0.14); --stamp: 3px 3px 0 rgba(29, 36, 51, 0.16);
-  --display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
-  --ui: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --hand: 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+  --display: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+  --ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --hand: var(--ui);
   color-scheme: light;
 }
 /* the same sheet at night: a blueprint */
@@ -20,7 +20,7 @@
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.4 var(--ui); overflow: hidden; }
 h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 650; letter-spacing: -0.01em; }
-h1 { font-style: italic; font-weight: 600; }
+h1 { font-weight: 600; }
 h2 { font-size: 20px; } h3 { font-size: 15px; margin: 14px 0 6px; color: var(--muted); text-transform: none; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
@@ -39,7 +39,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 
 .app { height: 100%; display: flex; flex-direction: column; }
 .toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 52px; }
-.brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; } .brand-name { font-family: var(--display); font-style: italic; font-weight: 650; font-size: 22px; letter-spacing: -0.02em; } .brand-by { font-family: var(--hand); font-size: 15px; color: var(--accent); margin-left: 2px; transform: rotate(-3deg); display: inline-block; }
+.brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; } .brand-name { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; }
 .group { display: flex; gap: 4px; align-items: center; padding: 3px; background: var(--panel2); border-radius: 10px; }
 .group button { padding: 6px 8px; border-color: transparent; background: transparent; }
 .group button.on, .group button.play.on { background: var(--accent); color: var(--accent-ink); }
@@ -247,7 +247,9 @@ button.primary:active, .card:active { box-shadow: 1px 1px 0 var(--line); transfo
 ::selection { background: var(--accent); color: var(--accent-ink); }
 input[type='range'], .scrub { accent-color: var(--accent); }
 .seg button, .charts-head button { white-space: nowrap; }
-.credit { font-family: var(--hand); font-size: 15px; border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 12px; }
+.credit { font-size: 12px; border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 12px; }
+.app-credit { flex: none; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 12px; padding: 3px 12px; text-align: right; }
+.app.present-mode .app-credit { display: none; }
 .candidate { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; } .candidate label { flex: 1; }
 .review-node.found { border-left-color: #2f9e44; } .review-node.missed { border-left-color: var(--bad); border-left-style: dashed; } .review-node.false { border-left-color: var(--warn); border-left-style: dotted; }
 .review-node details { margin: 2px 0 2px 24px; }
@@ -279,7 +281,6 @@ input[type='range'], .scrub { accent-color: var(--accent); }
 .present:not(.over-canvas) { position: fixed; inset: 0; z-index: 30; }
 .warn-note { border-left: 3px dashed var(--warn); padding-left: 8px; margin: 6px 0; }
 .toolbar { gap: 6px; } .scrub { width: 84px; margin-left: 4px; } .toolbar .pill { padding: 4px 8px; }
-@media (max-width: 1500px) { .brand-by { display: none; } }
 
 .arrange { display: grid; gap: 8px; }
 .arrange button { font: inherit; padding: 6px 10px; cursor: pointer; }
