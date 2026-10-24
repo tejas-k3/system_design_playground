@@ -207,3 +207,14 @@ export function nothingToRun(d: Diagram): string | null {
   if (!users.some((u) => d.edges.some((e) => e.from === u.id))) return 'Connect Users to something: they have nowhere to send requests yet.'
   return null
 }
+
+/** Give components that share a label distinct ones ("App Server", "App Server 2", ...), as the editor does for what you add, so a reference can be read against your canvas. */
+export function uniqueLabels<T extends { nodes: { label: string }[] }>(d: T): T {
+  const seen = new Map<string, number>()
+  const nodes = d.nodes.map((n) => {
+    const k = (seen.get(n.label) ?? 0) + 1
+    seen.set(n.label, k)
+    return k === 1 ? n : { ...n, label: `${n.label} ${k}` }
+  })
+  return { ...d, nodes }
+}

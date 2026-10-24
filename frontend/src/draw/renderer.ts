@@ -29,6 +29,7 @@ export interface Scene {
   traffic?: Record<string, [number, number][]> // the challenge's traffic curves, by client id
   connect: { from: string; to: Pt; target: string | null } | null
   validTargets: Set<string>
+  rewire?: { edge: string; end: 'from' | 'to'; to: Pt; target: string | null; valid: Set<string> } | null // a connection end being dragged elsewhere
   marquee: Rect | null
   particles: ActiveParticle[]
   now: number
@@ -454,6 +455,10 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
   // dim nodes that cannot accept the connection being dragged
   for (const n of sc.diagram.nodes) {
     if (sc.connect && n.id !== sc.connect.from && !sc.validTargets.has(n.id)) ctx.globalAlpha = 0.35
+    if (sc.rewire && !sc.rewire.valid.has(n.id)) {
+      const re = sc.diagram.edges.find((x) => x.id === sc.rewire!.edge)
+      if (re && n.id !== (sc.rewire.end === 'to' ? re.from : re.to)) ctx.globalAlpha = 0.35
+    }
     drawNode(ctx, rc, sc, n)
     ctx.globalAlpha = 1
   }
@@ -478,6 +483,8 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
       ctx.restore()
     }
   }
+  drawEdgeEnds(ctx, sc, nodes)
+  drawRewire(ctx, sc, nodes)
   drawNotes(ctx, sc)
   if (sc.marquee) {
     const m = sc.marquee
@@ -489,5 +496,47 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
     ctx.lineWidth = 1
     ctx.strokeRect(m.x, m.y, m.w, m.h)
   }
+  ctx.restore()
+}
+
+/** A selected connection shows a round grip at each end: drag one onto another component to move that end. */
+function drawEdgeEnds(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>) {
+  for (const e of sc.diagram.edges) {
+    if (!sc.selection.has(e.id) || sc.rewire?.edge === e.id) continue
+    const g = edgeGeom(e, nodes, sc.reg)
+    if (!g) continue
+    for (const pt of [g.a, g.b]) {
+      ctx.save()
+      ctx.fillStyle = sc.palette.card
+      ctx.strokeStyle = sc.palette.accent
+      ctx.lineWidth = 2.2
+      ctx.beginPath()
+      ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      ctx.restore()
+    }
+  }
+}
+
+/** While an end is being dragged: a dashed line from the end that stays to the pointer, or to the component it would land on. */
+function drawRewire(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>) {
+  const rw = sc.rewire
+  if (!rw) return
+  const e = sc.diagram.edges.find((x) => x.id === rw.edge)
+  const fixed = e ? nodes.get(rw.end === 'to' ? e.from : e.to) : undefined
+  if (!e || !fixed) return
+  const fr = nodeRect(fixed, sc.reg)
+  const target = rw.target ? nodes.get(rw.target) : undefined
+  const free = target ? boundaryPoint(nodeRect(target, sc.reg), center(fr), 6) : rw.to
+  const start = boundaryPoint(fr, free, 4)
+  ctx.save()
+  ctx.setLineDash([7, 6])
+  ctx.strokeStyle = target ? sc.palette.ok : sc.palette.accent
+  ctx.lineWidth = 2.2
+  ctx.beginPath()
+  ctx.moveTo(start.x, start.y)
+  ctx.lineTo(free.x, free.y)
+  ctx.stroke()
   ctx.restore()
 }

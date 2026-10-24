@@ -20,6 +20,7 @@ type Mode =
   | { k: 'pan'; sx: number; sy: number; moved: boolean }
   | { k: 'drag'; last: Pt; ids: string[] }
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
+  | { k: 'rewire'; edge: string; end: 'from' | 'to'; downAt: Pt; moved: boolean }
   | { k: 'marquee'; start: Pt; additive: boolean; base: string[] }
 
 type State = ReturnType<typeof useStore.getState>
@@ -40,6 +41,7 @@ export function Board() {
   const lastBurst = useRef(0)
   const pointer = useRef<Pt>({ x: 0, y: 0 })
   const connectTo = useRef<{ target: string | null; pending: string | null }>({ target: null, pending: null })
+  const rewireTo = useRef<string | null>(null) // the component a dragged connection end is over, if it could go there
   const marquee = useRef<Rect | null>(null)
   const touches = useRef(new Map<number, Pt>()) // active pointers in screen space, for pinch
   const pinch = useRef<PinchState | null>(null)
@@ -73,6 +75,13 @@ export function Board() {
       const src = byId.get(conn)
       if (src) for (const n of st.diagram.nodes) if (n.id !== conn && st.reg.canConnect(src.kind, n.kind)) valid.add(n.id)
     }
+    const rw = mode.current.k === 'rewire' ? mode.current : null
+    const rwEdge = rw ? st.diagram.edges.find((e) => e.id === rw.edge) : undefined
+    const rwValid = new Set<string>()
+    if (rw && rwEdge) {
+      const fixed = byId.get(rw.end === 'to' ? rwEdge.from : rwEdge.to)
+      if (fixed) for (const n of st.diagram.nodes) if (n.id !== fixed.id && (rw.end === 'to' ? st.reg.canConnect(fixed.kind, n.kind) : st.reg.canConnect(n.kind, fixed.kind))) rwValid.add(n.id)
+    }
     render(ctx, rc, size.current.w, size.current.h, size.current.dpr, {
       diagram: st.diagram,
       reg: st.reg,
@@ -86,6 +95,7 @@ export function Board() {
       traffic: st.scenario?.def.traffic,
       connect: conn ? { from: conn, to: screenToWorld(pointer.current, st.viewport), target: connectTo.current.target } : null,
       validTargets: valid,
+      rewire: rw && rwEdge ? { edge: rw.edge, end: rw.end, to: screenToWorld(pointer.current, st.viewport), target: rewireTo.current, valid: rwValid } : null,
       marquee: marquee.current,
       particles: particles.current,
       now,
@@ -126,7 +136,7 @@ export function Board() {
 
   const hitAt = (w: Pt) => {
     const st = useStore.getState()
-    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current))
+    return hitTest(w, st.diagram, st.reg!, st.viewport.zoom, measureText, handleSet(st, hover.current), new Set(st.selection.filter((id) => st.diagram.edges.some((e) => e.id === id))))
   }
 
   const finishConnect = (from: string, to: string | null) => {
@@ -173,6 +183,13 @@ export function Board() {
       if (hit && (hit.type === 'node' || hit.type === 'handle')) {
         mode.current = { k: 'connect', from: hit.id, downAt: sp, moved: false }
       } else mode.current = { k: 'pan', sx: sp.x, sy: sp.y, moved: false }
+      wake()
+      return
+    }
+    if (hit?.type === 'edgeEnd') {
+      if (useStore.getState().sim.status !== 'stopped' && !st.scenario?.def.configOnly) st.toast('Pause or reset the run to rewire a connection', 'info')
+      mode.current = { k: 'rewire', edge: hit.id, end: hit.end, downAt: sp, moved: false }
+      rewireTo.current = null
       wake()
       return
     }
@@ -244,6 +261,17 @@ export function Board() {
         wake()
         return
       }
+      case 'rewire': {
+        if (Math.hypot(sp.x - m.downAt.x, sp.y - m.downAt.y) > 4) m.moved = true
+        const e = st.diagram.edges.find((x) => x.id === m.edge)
+        const hit = hitAt(w)
+        const over = hit?.type === 'node' ? st.diagram.nodes.find((n) => n.id === hit.id) : undefined
+        const fixed = e ? st.diagram.nodes.find((n) => n.id === (m.end === 'to' ? e.from : e.to)) : undefined
+        const ok = !!(over && fixed && over.id !== fixed.id && (m.end === 'to' ? st.reg.canConnect(fixed.kind, over.kind) : st.reg.canConnect(over.kind, fixed.kind)))
+        rewireTo.current = ok ? over!.id : null
+        wake()
+        return
+      }
       case 'marquee': {
         const r: Rect = { x: Math.min(m.start.x, w.x), y: Math.min(m.start.y, w.y), w: Math.abs(w.x - m.start.x), h: Math.abs(w.y - m.start.y) }
         marquee.current = r
@@ -286,6 +314,15 @@ export function Board() {
     }
     if (m.k === 'drag') st.endGesture()
     if (m.k === 'pan' && !m.moved) st.setSelection([])
+    if (m.k === 'rewire') {
+      const target = rewireTo.current
+      rewireTo.current = null
+      mode.current = { k: 'idle' }
+      if (m.moved && target) st.rewireEdge(m.edge, m.end, target)
+      setCursor('default')
+      wake()
+      return
+    }
     if (m.k === 'connect') {
       if (m.moved) {
         finishConnect(m.from, connectTo.current.target)
