@@ -200,3 +200,13 @@ describe('vector search recall goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10, recall: 0.97 }), 1, true), 'Vector search recall').state).toBe('pass')
   })
 })
+
+describe('goals that need a measurement first', () => {
+  it('stay pending until the first token (or the search) has been measured', () => {
+    const g = { minSuccessRate: 0.5, maxTTFTMs: 500, minRecall: 0.9 }
+    const rows = goalRows(g, stats({ resolved: 0, ok: 0 }), 1, true)
+    expect(row(rows, 'Time to first token (p95)').state).toBe('pending')
+    expect(row(rows, 'Vector search recall').state).toBe('pending')
+    expect(row(rows, 'Time to first token (p95)').actual).toBe('—')
+  })
+})
