@@ -685,6 +685,12 @@ func TestAChallengeLoadsWithoutItsHintsAnswersOrDebrief(t *testing.T) {
 				t.Errorf("%s: a prediction answer or explanation is in the first load", sc.ID)
 			}
 		}
+		if a := sc.AnswerHint(); a != "" && strings.Contains(string(body), a[:min(len(a), 40)]) {
+			t.Errorf("%s: the answer hint is in the first load", sc.ID)
+		}
+		if _, leaked := raw["answer"]; leaked {
+			t.Errorf("%s: the first load carries %q", sc.ID, "answer")
+		}
 		if d := sc.Debrief; d != "" && strings.Contains(string(body), d[:min(len(d), 40)]) {
 			t.Errorf("%s: the debrief is in the first load", sc.ID)
 		}
@@ -714,6 +720,12 @@ func TestHintsPredictionsAndDebriefAreFetchedOnRequest(t *testing.T) {
 		if code, _ := get("/api/scenarios/slow-reads/hints/" + bad); code != 404 {
 			t.Errorf("hint %s should be 404, got %d", bad, code)
 		}
+	}
+	if code, m := get("/api/scenarios/slow-reads/answer-hint"); code != 200 || m["answer"] != sc.AnswerHint() || sc.AnswerHint() == "" {
+		t.Errorf("answer hint: %d %v", code, m)
+	}
+	if code, _ := get("/api/scenarios/no-such-challenge/answer-hint"); code != 404 {
+		t.Errorf("an unknown challenge's answer hint should be 404, got %d", code)
 	}
 	if code, m := get("/api/scenarios/slow-reads/debrief"); code != 200 || m["debrief"] != sc.Debrief {
 		t.Errorf("debrief: %d %v", code, m)

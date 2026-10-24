@@ -34,6 +34,7 @@ func init() {
 			"Most requests are reads of the same results: something in front of the database can absorb them. And a server can fail: how many do you need if one is gone?",
 			"Keep spending in check: every server you run costs money all day. If you pass the success goal but miss the budget, you have too many; if you miss success, too few.",
 		},
+		Answer:  "The answer: a load balancer, four 16-thread app servers with a call timeout of about 400 ms and a circuit breaker, and a cache with a 30 second TTL and some jitter in front of the database. That is the reference witness the tests use; other shapes can pass too.",
 		Debrief: "There is no single right answer, but the shape of one: a balancer, enough app servers that losing one still leaves headroom, a cache for the popular reads, and call timeouts so a failure stays a failure instead of a stall. Size by arithmetic (requests a second divided by what one server handles, plus one), then check it with a run.",
 	})
 
@@ -52,8 +53,9 @@ func init() {
 		Hints: [3]string{
 			"Writes cannot be served from a cache. Which part of your design has to do them, and how many can it do at once?",
 			"The database's 'Concurrent queries' setting decides how many writes it works on at the same time. The default is small.",
-			"Timeouts and a circuit breaker on the servers keep a slow database from taking the servers down with it. More of everything gets expensive quickly: check the budget.",
+			"What stops a slow database from taking the servers down with it? More of everything gets expensive quickly: check the budget.",
 		},
+		Answer:  "The answer: a load balancer, three 16-thread app servers with a call timeout of about 500 ms and a circuit breaker, a write-through cache, and the database's concurrent queries raised to 48. That is the reference witness the tests use; other shapes can pass too.",
 		Debrief: "Writes are the capacity question: a cache does not remove them, so the database's concurrency has to match the write rate, and the servers have to stay healthy while it stumbles. Raising the database's concurrent queries was worth more than adding servers.",
 	})
 }
