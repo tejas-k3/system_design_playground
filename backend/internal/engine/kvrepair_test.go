@@ -69,3 +69,26 @@ func TestDefaultsAreUnchangedByTheNewSwitches(t *testing.T) {
 		t.Errorf("switches off must equal the default: %d/%d vs %d/%d", a, fa, b, fb)
 	}
 }
+
+// Anti-entropy: every few seconds the nodes compare what they hold and the older copies are brought up to date,
+// whether or not anyone reads them and whether or not hints were kept. A node back from an outage is stale only
+// until the next round.
+func TestAntiEntropyHealsAReturnedNodeWithoutReadsOrHints(t *testing.T) {
+	plain, _, _ := staleAfterReturn(nil)
+	healed, _, s := staleAfterReturn(Params{"antiEntropySec": 1.0})
+	t.Logf("stale reads: %d with nothing, %d with a repair round every second; %.0f copies repaired", plain, healed, s.Snapshot().Nodes["kv"].Extra["antiEntropyRepairs"])
+	if healed >= plain/3 {
+		t.Errorf("a round a second should remove most of the staleness: %d vs %d", healed, plain)
+	}
+	if s.Snapshot().Nodes["kv"].Extra["antiEntropyRepairs"] == 0 {
+		t.Errorf("rounds should have repaired copies")
+	}
+}
+
+func TestAntiEntropyOffChangesNothing(t *testing.T) {
+	a, _, _ := staleAfterReturn(nil)
+	b, _, _ := staleAfterReturn(Params{"antiEntropySec": 0.0})
+	if a != b {
+		t.Errorf("off must equal the default: %d vs %d", a, b)
+	}
+}

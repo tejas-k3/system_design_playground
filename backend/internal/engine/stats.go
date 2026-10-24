@@ -277,6 +277,9 @@ func (s *Sim) Snapshot() Stats {
 		if n.kvRepairs > 0 {
 			ex["repairs"] = float64(n.kvRepairs)
 		}
+		if n.kvAERepairs > 0 {
+			ex["antiEntropyRepairs"] = float64(n.kvAERepairs)
+		}
 		if n.kvHintsReplayed > 0 {
 			ex["hintsReplayed"] = float64(n.kvHintsReplayed)
 		}

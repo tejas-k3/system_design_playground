@@ -55,6 +55,7 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 		need, ms = wq, n.f("writeMs")
 	}
 	first := int(Hash32(uint32(c.key)*2654435761+11) % uint32(nodes))
+	s.kvAntiEntropy(n)
 	hinted, sloppy, repair := n.b("hintedHandoff"), n.b("sloppyQuorum"), n.b("readRepair")
 	type reply struct {
 		node   int
@@ -184,4 +185,42 @@ func (s *Sim) kvReplayHints(n *node, i int) {
 		n.kvHintsReplayed++
 	}
 	delete(n.kvHints, i)
+}
+
+// kvAntiEntropy starts the periodic repair rounds (once): each round brings every copy of every key that a live node
+// holds up to the newest version among that key's copies.
+func (s *Sim) kvAntiEntropy(n *node) {
+	every := n.f("antiEntropySec") * 1000
+	if every <= 0 || n.kvAEOn {
+		return
+	}
+	n.kvAEOn = true
+	var round func()
+	round = func() {
+		nodes, copies, _, _ := kvShape(n)
+		keys := map[int]struct{}{}
+		for i := range n.kvVer {
+			for k := range n.kvVer[i] {
+				keys[k] = struct{}{}
+			}
+		}
+		for k := range keys {
+			first := int(Hash32(uint32(k)*2654435761+11) % uint32(nodes))
+			newest := 0
+			for j := 0; j < copies; j++ {
+				if v := n.kvVer[(first+j)%nodes][k]; v > newest {
+					newest = v
+				}
+			}
+			for j := 0; j < copies; j++ {
+				i := (first + j) % nodes
+				if n.kvDownUntil[i] <= s.now && n.kvVer[i][k] < newest { // a node that is down cannot be repaired yet
+					n.kvVer[i][k] = newest
+					n.kvAERepairs++
+				}
+			}
+		}
+		s.after(every, round)
+	}
+	s.after(every, round)
 }
