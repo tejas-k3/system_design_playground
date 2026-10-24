@@ -230,6 +230,9 @@ type node struct {
 	winDup    int              // stream job: outputs sent a second time after a crash
 	uniqExact map[int]struct{} // stream job: every visitor id seen, for the exact count and as the truth for the estimate
 	uniqHLL   *HLL             // stream job: the HyperLogLog sketch
+	topTruth  *ExactTopK       // stream job: every item counted exactly, the truth the top ten is judged against
+	topExact  *ExactTopK       // stream job: the exact top-ten tracker when it is the chosen method
+	topSketch *SketchTopK      // stream job: the count-min top-ten tracker
 	hjobs     []*job           // urgent jobs of a priority queue, served before jobs
 	hh        int
 	delayed   int // jobs held back by the queue's delivery delay
