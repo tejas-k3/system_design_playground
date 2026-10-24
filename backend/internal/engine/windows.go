@@ -97,3 +97,72 @@ func (w *WindowAgg) Flush() {
 		}
 	}
 }
+
+// StreamResult is what the sink received from a stream job that may have crashed once.
+type StreamResult struct {
+	Delivered      []Emission
+	Duplicates     int // outputs the sink received for a window it had already been given
+	Checkpoints    int
+	CheckpointCost float64 // relative cost: at-least-once only saves state, exactly-once also commits the outputs with it
+}
+
+func (w *WindowAgg) clone() *WindowAgg {
+	c := *w
+	c.Emitted = append([]Emission(nil), w.Emitted...)
+	c.open = make(map[int64]*winState, len(w.open))
+	for k, v := range w.open {
+		s := *v
+		c.open[k] = &s
+	}
+	return &c
+}
+
+// RunStream feeds events (their event times, in arrival order) to a windowed aggregation that checkpoints every
+// checkpointSec of event time and crashes once, just before event number crashAt (-1 = never). After a crash it
+// restores the last checkpoint and reads the input again from there. With atLeastOnce every output goes to the sink as
+// soon as it is produced, so the ones produced since the checkpoint are produced, and delivered, again. With
+// exactlyOnce outputs are held and handed over together with the next checkpoint, so a crash discards the held ones.
+func RunStream(events []float64, size, lateness, checkpointSec float64, delivery string, crashAt int) StreamResult {
+	var res StreamResult
+	w := NewWindowAgg(size, size, 0, lateness)
+	snap, snapIdx, delivered, nextCP := w.clone(), 0, 0, checkpointSec
+	flushOut := func() {
+		res.Delivered = append(res.Delivered, w.Emitted[delivered:]...)
+		delivered = len(w.Emitted)
+	}
+	crashed := false
+	for i := 0; i < len(events); i++ {
+		if i == crashAt && !crashed {
+			crashed = true
+			w = snap.clone()
+			delivered = len(w.Emitted) // what the checkpoint already handed over
+			i = snapIdx - 1
+			continue
+		}
+		w.Add(events[i])
+		if delivery == "atLeastOnce" {
+			flushOut()
+		}
+		if events[i] >= nextCP {
+			nextCP += checkpointSec
+			res.Checkpoints++
+			res.CheckpointCost++
+			if delivery == "exactlyOnce" {
+				flushOut()
+				res.CheckpointCost++
+			}
+			snap, snapIdx = w.clone(), i+1
+		}
+	}
+	w.Flush()
+	flushOut()
+	seen := map[[2]float64]bool{}
+	for _, e := range res.Delivered {
+		k := [2]float64{e.Start, map[bool]float64{true: 1}[e.Update]}
+		if seen[k] {
+			res.Duplicates++
+		}
+		seen[k] = true
+	}
+	return res
+}
