@@ -139,6 +139,7 @@ type logical struct {
 	hash      uint32
 	user      int  // the account sending the request (0 = identities not modelled)
 	heavy     bool // an expensive request (heavyPct), chosen from the request number
+	tok       int  // tokens the request carries, for a limiter that counts them
 	sawWrite  int  // per-client models: what the client knew of its own writes and reads of this key when it asked
 	sawRead   int
 	high      bool // an urgent request (priorityPct): chosen from the request number, no random draw
@@ -202,6 +203,12 @@ func (s *Sim) createLogical(c *node) *logical {
 	if lg.wl == wlTransfer || lg.wl == wlOnCall {
 		lg.write = true // a transfer is always a transaction
 	}
+	if tok := c.f("requestTokens"); tok > 0 {
+		lg.tok = int(tok)
+		if float64(Hash32(uint32(s.logicalSeq)*3266489917+41)%100) < c.f("bigRequestPct") {
+			lg.tok *= 20
+		}
+	}
 	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
 	if lg.counted {
 		s.countKey(lg.key)
@@ -247,7 +254,7 @@ func (s *Sim) startAttempt(lg *logical) {
 	lg.attempts++
 	s.attempts.Push(s.now, true, 0)
 	at := &attempt{lg: lg, at: s.now, n: lg.attempts}
-	call := &call{lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high, heavy: lg.heavy, user: lg.user, deadline: s.now + c.f("timeoutMs") - e.latency}
+	call := &call{tok: lg.tok, lg: lg, at: at, write: lg.write, key: lg.key, wl: lg.wl, hash: lg.hash, rid: lg.id, counted: lg.counted, ver: -1, tr: lg.tr, high: lg.high, heavy: lg.heavy, user: lg.user, deadline: s.now + c.f("timeoutMs") - e.latency}
 	s.hop(c, e, call, func(res Result) {
 		if at.done {
 			return

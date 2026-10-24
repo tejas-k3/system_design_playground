@@ -113,6 +113,8 @@ func init() {
 					opt("open", "Independent users (steady arrivals)"), opt("bursty", "Bursty: short rushes"), opt("closed", "A fixed crowd that waits and thinks"), opt("sessions", "Connected users (long-lived connections)")),
 				num("users", "Users", "Traffic", 50, 1, 5000, 10, "", "How many users there are; each has at most one request in flight.").showIf("arrival", "closed"),
 				num("thinkMs", "Think time", "Traffic", 1000, 0, 60000, 100, "ms", "Average pause between getting an answer and asking again.").showIf("arrival", "closed"),
+				num("requestTokens", "Tokens per request", "Request", 0, 0, 200000, 50, "tokens", "How many tokens a request carries (an LLM prompt), for limiters that count tokens. 0 = one unit each.").adv(),
+				num("bigRequestPct", "Huge requests", "Request", 0, 0, 100, 1, "%", "Share of requests that carry 20 times as many tokens.").adv().showIf("arrival", "open", "bursty", "closed"),
 				num("burstFactor", "Rush intensity", "Traffic", 4, 1.5, 5, 0.5, "x", "During a rush the rate is this many times the average (a rush covers a fifth of the time; the rest is quieter so the average stays put).").showIf("arrival", "bursty"),
 				num("burstSec", "Rush length", "Traffic", 2, 0.5, 30, 0.5, "s", "Average length of a rush.").showIf("arrival", "bursty"),
 				num("connections", "Connected users", "Traffic", 1000, 1, 100000, 100, "", "How many users keep a connection open. Each holds a slot on an app server while connected; when it ends, or the server dies, they connect again.").showIf("arrival", "sessions"),
@@ -425,6 +427,9 @@ func init() {
 			Lesson: "Shedding load early protects what is behind it.",
 			Accent: "#862e9c", Width: 160, Height: 72, CanConnect: []string{KLoadBalancer, KAppServer},
 			Params: []ParamSpec{
+				sel("unit", "Count", "Limit", "requests", "Requests: every request costs one. Tokens: a request costs as many units as it carries tokens (the size of its prompt), so a few huge requests use the allowance up faster than many small ones.",
+					opt("requests", "Requests"), opt("tokens", "Tokens (weighted)")).adv(),
+				num("limitTokensPerMin", "Allowance", "Limit", 60000, 1000, 100000000, 1000, "tokens/min", "Tokens allowed through per minute, refilled steadily; the burst is a full minute's worth.").showIf("unit", "tokens"),
 				num("limitRps", "Sustained rate", "Limit", 200, 1, 10000, 10, "rps", "Requests per second allowed through."),
 				num("burst", "Burst", "Limit", 50, 1, 5000, 10, "", "Extra requests allowed in a short burst."),
 				flag("shared", "Share the count", "Limit", false, "Several limiter instances normally each keep their own count, so a fleet of N admits N times the limit. With this on, every limiter that has it on counts into one shared allowance (as if the counters lived in a common store), so the fleet keeps to the limit. The store's own latency and races are not modelled.").adv(),

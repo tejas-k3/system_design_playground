@@ -196,8 +196,9 @@ type node struct {
 	fetching map[int][]func(Result) // cache: waiters sharing an in-flight miss fetch, by key (coalescing)
 
 	// rate limiter
-	tokens   float64
-	tokensAt float64
+	tokens           float64
+	tokensAt         float64
+	tokTokens, tokAt float64 // rate limiter counting tokens: the allowance left and when it was last topped up
 
 	// database
 	openConns int

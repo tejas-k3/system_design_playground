@@ -58,6 +58,7 @@ type call struct {
 	job      *job
 	fan      float64 // extra database work this request carries: timeline inserts or followed authors read (feed workload)
 	high     bool    // an urgent request
+	tok      int     // tokens the request carries (0 = counts as one unit)
 	heavy    bool    // an expensive request: it costs heavyMult times the CPU and database time
 	deadline float64 // when the client gives up (absolute ms, 0 = unknown)
 	honor    bool    // an app server on the path propagates the deadline: stations skip this call once it has passed
@@ -846,6 +847,9 @@ func (s *Sim) admit(n *node, c *call) bool {
 		}
 		n = s.sharedLimit
 	}
+	if n.s("unit") == "tokens" {
+		return s.admitTokens(n, c)
+	}
 	if n.s("algorithm") == "leakyBucket" {
 		ok, _ := s.leak(n, c)
 		return ok
@@ -1287,4 +1291,21 @@ func (s *Sim) canarySplit(lb *node, cand []*edge, pct float64) []*edge {
 		return v2
 	}
 	return v1
+}
+
+// admitTokens is a token bucket counted in tokens: the allowance (tokens a minute) refills steadily up to a minute's
+// worth, and a request is let through only if its whole weight is there.
+func (s *Sim) admitTokens(n *node, c *call) bool {
+	rate := n.f("limitTokensPerMin")
+	if n.tokAt == 0 {
+		n.tokTokens = rate
+	}
+	n.tokTokens = math.Min(rate, n.tokTokens+(s.now-n.tokAt)*rate/60000)
+	n.tokAt = s.now
+	w := float64(max(1, c.tok))
+	if n.tokTokens < w {
+		return false
+	}
+	n.tokTokens -= w
+	return true
 }
