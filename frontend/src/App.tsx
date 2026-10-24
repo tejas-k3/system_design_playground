@@ -2,20 +2,10 @@ import { useEffect } from 'react'
 import { Announcer } from './ui/Announcer'
 import { Board } from './ui/Board'
 import { Charts } from './ui/Charts'
-import { QuestionDialog } from './ui/QuestionDialog'
-import { PresentView } from './ui/interview/PresentView'
 import { InterviewBar } from './ui/interview/InterviewBar'
-import { CompareDialog } from './ui/CompareDialog'
-import { CapacityDialog } from './ui/CapacityDialog'
-import { SearchDialog } from './ui/SearchDialog'
-import { TemplatesDialog } from './ui/TemplatesDialog'
-import { SkillMap } from './ui/SkillMap'
 import { Inspector } from './ui/Inspector'
-import { Help } from './ui/Help'
 import { Library } from './ui/Library'
-import { ResultModal } from './ui/ResultModal'
 import { ScenarioPanel } from './ui/ScenarioPanel'
-import { ScenarioPicker } from './ui/ScenarioPicker'
 import { Toasts } from './ui/Toasts'
 import { Toolbar } from './ui/Toolbar'
 import { Welcome } from './ui/Welcome'
@@ -24,9 +14,14 @@ import { parseHash } from './model/links'
 import { openDesign } from './sim/designs'
 import { loadScenario } from './sim/loadScenario'
 import { useStore } from './state/store'
+import { Deferred, usePreloadSurfaces } from './lazySurfaces'
 
 export function App() {
   const registryReady = useStore((s) => !!s.reg)
+  usePreloadSurfaces()
+  const ui = useStore((s) => s.ui)
+  const hasResult = useStore((s) => !!s.scenario?.result)
+  const hasSession = useStore((s) => !!s.interview?.session)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target
@@ -56,13 +51,13 @@ export function App() {
     return () => window.removeEventListener('hashchange', open)
   }, [registryReady])
 
-  const present = useStore((s) => s.ui.present && !!s.interview?.session)
+  const present = ui.present && hasSession
   return (
     <div className={`app ${present ? 'present-mode' : ''}`}>
       <a className="skip" href="#canvas-area" onClick={(e) => { e.preventDefault(); document.getElementById('canvas-area')?.focus() }}>Skip to the canvas</a>
       <Toolbar />
       <InterviewBar />
-      <PresentView />
+      <Deferred name="present" open={present} />
       <div className="main">
         <Library />
         <div className="center-col">
@@ -78,15 +73,15 @@ export function App() {
         <Inspector />
       </div>
       <footer className="app-credit">Made by <b>Tejas Kothari</b> · MIT licensed</footer>
-      <ScenarioPicker />
-      <ResultModal />
-      <Help />
-      <CapacityDialog />
-      <SearchDialog />
-      <TemplatesDialog />
-      <SkillMap />
-      <CompareDialog />
-      <QuestionDialog />
+      <Deferred name="picker" open={ui.picker} />
+      <Deferred name="result" open={ui.result && hasResult} />
+      <Deferred name="help" open={ui.help} />
+      <Deferred name="capacity" open={ui.capacity} />
+      <Deferred name="search" open={ui.search} />
+      <Deferred name="templates" open={ui.templates} />
+      <Deferred name="skills" open={ui.skills} />
+      <Deferred name="compare" open={ui.compare} />
+      <Deferred name="question" open={ui.question !== null} />
       <Toasts />
       <Announcer />
     </div>
