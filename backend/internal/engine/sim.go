@@ -124,6 +124,7 @@ type node struct {
 	kvHintsReplayed int
 	kvAEOn          bool // the anti-entropy rounds have been scheduled
 	kvAERepairs     int  // copies brought up to date by anti-entropy
+	kx              *kvExtra
 	kvRepairs       int
 	coordDown       []float64 // coordinator: when each cluster node comes back (0 = up)
 	coordLeader     int       // coordinator: the leader, -1 while there is none
