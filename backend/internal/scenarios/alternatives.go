@@ -239,6 +239,37 @@ var alternatives = map[string][]Alternative{
 		alt("Repeatable read, and let clients retry twice", false, 98.4, 783, 0.48, "Retrying the aborted transfers brings the success rate up, but each retry waits and the p95 (783 ms) misses the 600 ms goal. Serializable takes a lock and waits instead of aborting.", Change{"db", "isolation", "repeatableRead"}, Change{"users", "retries", 2.0}),
 		alt("Turn on row locks", false, 100.0, 258, 0.48, "Row locks serialise single-row writes like a booking; a transfer reads two rows and writes them back, so the lost updates (470) are untouched.", Change{"db", "rowLocks", true}),
 	},
+	"write-flood": {
+		alt("Give the database 20 connections", true, 100.0, 208, 0.78, "Passes without a queue: twice the connections take the burst in parallel, for $0.78 an hour against $0.87 for the queue and worker. It works while the burst fits the database; a queue also survives a burst that does not.", Change{"db", "connections", 20.0}),
+		alt("Give the app server 64 threads", false, 88.6, 571, 2.38, "More threads put more writes at the database at once, and the database was the limit: nothing improves and the bill triples.", Change{"app", "threads", 64.0}),
+		alt("Let clients retry twice", false, 89.6, 831, 0.63, "Retries add to a flood that already exceeds the database: the tail is longer and the success rate hardly moves.", Change{"users", "retries", 2.0}),
+	},
+	"server-down": {
+		alt("Check server health every half second", false, 78.9, 408, 0.42, "The balancer already notices the dead server within a couple of seconds. The failures come from the one server left being unable to carry 350 requests a second, not from the detection delay.", Change{"lb", "healthCheckSec", 0.5}),
+		alt("Give both servers 32 threads", false, 98.0, 158, 1.82, "Each server alone can then carry the load, so the crash is survived (98% succeed), but the bill is $1.82 against the $1.00 budget. Spare servers are cheaper than oversized ones.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}),
+		alt("Let clients retry twice", false, 79.3, 848, 0.42, "A retry is sent to the one server that is left, which is already full: no more succeed and the tail gets slower.", Change{"users", "retries", 2.0}),
+	},
+	"cut-off": {
+		alt("Give up on the database after 300 ms, nothing else", true, 86.9, 167, 0.87, "Passes: a call to the unreachable database fails fast instead of holding a thread for the full timeout, so the cache-served requests keep flowing. The circuit breaker is not needed here; it stops the attempts altogether.", Change{"app1", "callTimeoutMs", 300.0}, Change{"app2", "callTimeoutMs", 300.0}),
+		alt("Turn on the circuit breaker, nothing else", false, 67.2, 171, 0.87, "On its own it changes nothing (67% succeed, as at the start): a breaker counts failed calls, and without a call timeout each failure still holds its thread for the whole wait first.", Change{"app1", "circuitBreaker", true}, Change{"app2", "circuitBreaker", true}),
+		alt("Give the app servers 64 threads", false, 69.0, 171, 4.83, "More threads to wait with is not the same as not waiting: the writes still fail and the bill is five times higher.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}),
+	},
+	"flaky-neighbour": {
+		alt("Send each request to the least busy server", true, 100.0, 174, 0.52, "Passes: the stalled server collects a queue, so it looks busy and gets fewer requests, with no health check involved. It is a gentler fix than ejecting the server.", Change{"lb", "algorithm", "leastConn"}),
+		alt("Give every server 16 threads", true, 100.0, 497, 1.07, "Passes with room to spare for the stalls, but only just on the tail (p95 497 ms against 500) and twice the cost; the stalled server is still sent its share.", Change{"app1", "threads", 16.0}, Change{"app2", "threads", 16.0}, Change{"app3", "threads", 16.0}),
+		alt("Let clients retry twice", false, 99.8, 1506, 0.52, "The retry usually finds a healthy server, so almost everything succeeds, but each rescued request has waited out its timeout: the p95 is 1.5 seconds.", Change{"users", "retries", 2.0}),
+	},
+	"cache-stampede": {
+		alt("Share concurrent misses, nothing else", false, 99.8, 1187, 1.79, "One request per key goes to the database instead of hundreds, but all the entries still expire together, so every key has to be refetched in the same second and the p95 is 1.2 s.", Change{"cache", "coalesce", true}),
+		alt("Spread expiry times by 50%, nothing else", true, 100.0, 264, 1.79, "Passes: with lifetimes spread over a range the keys no longer expire in the same second, so there is no stampede to share. Coalescing is a second line of defence for a popular key that does expire.", Change{"cache", "ttlJitterPct", 50.0}),
+		alt("Give the database 32 connections", true, 100.0, 234, 2.16, "Passes by brute force: the database can absorb the stampede, for $0.37 an hour more, every hour, to cover a spike that happens once every ten seconds.", Change{"db", "connections", 32.0}),
+		alt("Keep entries for 60 seconds", false, 100.0, 146, 1.79, "Stampedes become rare and everything is fast, but 47% of reads are older than the 15 seconds the users tolerate.", Change{"cache", "ttlSec", 60.0}),
+	},
+	"sync-or-async": {
+		alt("Cut the replica's lag to 100 ms", true, 73.9, 185, 0.94, "Passes: with only 100 ms of writes in flight the crash loses a handful, inside the allowance. It is cheaper than waiting for the replica on every write, but any lag at all is a window of loss.", Change{"replica", "replicationLagMs", 100.0}),
+		alt("Promote the replica in 2 seconds", false, 87.7, 185, 0.94, "The outage is shorter (88% succeed), but the 3 seconds of unreplicated writes are still lost: 253 of them. Speed of recovery and loss of data are different dials.", Change{"db", "promoteSec", 2.0}),
+		alt("Notice the failure in 1 second", false, 81.0, 185, 0.94, "Quicker detection shortens the outage but not the data lost: the replica was still 3 seconds behind when the primary died.", Change{"db", "detectSec", 1.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
