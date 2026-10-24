@@ -22,6 +22,7 @@ const (
 	KKVStore      = "kvStore"
 	KCoordinator  = "coordinator"
 	KStream       = "stream"
+	KLLMServer    = "llmServer"
 )
 
 // Params holds user-editable settings: numbers, strings (select) and booleans.

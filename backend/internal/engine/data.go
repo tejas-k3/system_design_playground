@@ -140,6 +140,10 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 				s.appRead(n, &cc, done)
 			}
 		}
+		if le := s.first(n, KLLMServer); le != nil { // the answer is written by the LLM server
+			s.callCmd(n, le, &cc, cmdEnqueue, 0, done)
+			return
+		}
 		// claim check: a write with a body goes to the object store first; from then on only a pointer travels
 		if oe := s.first(n, KObjectStore); oe != nil && cc.write && cc.lg != nil && cc.lg.client.f("reqKB") > 0 {
 			s.callCmd(n, oe, &cc, cmdPut, 0, func(res Result) {
