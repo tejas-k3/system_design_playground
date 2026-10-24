@@ -3,7 +3,8 @@ import { emptyInterview, type InterviewData } from '../model/interview'
 import { newSession, pause, resume, switchStage, type StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
-import { alignNodes, autoLayout, distributeNodes, type AlignMode } from '../model/arrange'
+import { alignNodes, distributeNodes, type AlignMode } from '../model/arrange'
+import { tidyDiagram } from '../model/tidy'
 import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
 import { GROUP_DEFAULT, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize, groupLabel, groupsOf, withMembers } from '../model/groups'
@@ -340,7 +341,7 @@ export const useStore = create<State>()((set, get) => {
     tidyLayout: () => {
       const reg = get().reg
       if (!reg || get().diagram.nodes.length === 0) return
-      mutate((d) => autoLayout(d, (n) => nodeRect(n, reg)))
+      mutate((d) => tidyDiagram(d, (n) => nodeRect(n, reg)))
       get().requestFit()
     },
 
