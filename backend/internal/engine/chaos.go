@@ -295,7 +295,24 @@ func (s *Sim) replicaLag(r *node) float64 {
 	if r.s("replication") == "sync" {
 		return 0
 	}
-	return r.f("replicationLagMs")
+	return r.f("replicationLagMs") + s.primaryDistanceMs(r)
+}
+
+// primaryDistanceMs is the round trip between a replica and the database it copies from (the first database of the
+// design): nothing in the same zone, 2 x 1.5 ms across zones, twice the one-way distance across regions. The changes
+// have to travel that far before the replica can have them.
+func (s *Sim) primaryDistanceMs(r *node) float64 {
+	for _, n := range s.order {
+		if n.kind != KDatabase || n.removed {
+			continue
+		}
+		d := 0.0
+		if n.zone != r.zone {
+			d += 2 * crossZoneMs
+		}
+		return d + 2*regionMs(n.region, r.region)
+	}
+	return 0
 }
 
 // syncReplicaCost is the extra time a write to this primary spends waiting for its synchronous replicas
