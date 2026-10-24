@@ -347,7 +347,13 @@ func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
 
 func (s *Sim) dbWrite(n *node, c *call, done func(Result)) {
 	e := s.primaryEdge(n)
-	if e == nil {
+	if e == nil { // no database of its own: a cache wired to one takes the write and passes it on
+		for _, ce := range s.outOf(n, KCache) {
+			if s.primaryEdge(ce.to) != nil {
+				s.callCmd(n, ce, c, cmdWrite, 0, done)
+				return
+			}
+		}
 		done(fail(RNoRoute))
 		return
 	}
@@ -463,6 +469,18 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 		case cmdCacheSet:
 			n.c.evict += n.store.Set(s.now, c.key, c.ver)
 			s.okAt(n, Result{Ver: -1, Done: true}, cb)
+		case cmdWrite: // a write that came through the cache: on to the database, keeping this copy current (write-through)
+			e := s.primaryEdge(n)
+			if e == nil {
+				s.failAt(n, RNoRoute, cb)
+				return
+			}
+			s.callCmd(n, e, c, cmdWrite, 0, func(res Result) {
+				if res.OK && res.Ver >= 0 {
+					n.c.evict += n.store.Set(s.now, c.key, res.Ver)
+				}
+				s.passBack(n, res, cb)
+			})
 		case cmdCacheGet:
 			ver, hit, expired := n.store.Get(s.now, c.key)
 			if expired {
