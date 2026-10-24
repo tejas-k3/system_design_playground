@@ -1,3 +1,4 @@
+import { llmTiles } from '../model/llmTiles'
 import { useEffect, useRef, useState } from 'react'
 import type { LatencyBucket, SeriesPoint, SimEvent } from '../api/types'
 import { palettes } from '../draw/theme'
@@ -257,6 +258,7 @@ export function Charts() {
           <Tile term="p50" label="p50" value={run.ok ? `${Math.round(run.p50)} ms` : '—'} />
           <Tile term="p95" label="p95" value={run.ok ? `${Math.round(run.p95)} ms` : '—'} />
           <Tile term="p99" label="p99" value={run.ok ? `${Math.round(run.p99)} ms` : '—'} />
+          {llmTiles(run).map((m) => <Tile key={m.label} label={m.label} value={m.value} hint={m.hint} />)}
           <Tile label="Failures took" value={failedAfter(run)} hint="Median time a failed request took, from the user's first attempt. p50 and p95 count successes only." />
           <Tile label="In flight" value={String(inFlight)} />
           <BudgetTile run={run} series={series} />
