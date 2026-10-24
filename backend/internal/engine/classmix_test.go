@@ -54,3 +54,20 @@ func TestNoHeavyMixChangesNothing(t *testing.T) {
 		t.Fatal("heavyPct 0 must equal a design that never mentions classes")
 	}
 }
+
+// Serving the newest request first (LIFO) under this load: the light requests that are served are the ones that have
+// waited least, so their p95 falls; the ones left at the back of the queue time out instead of being served late.
+func TestNewestFirstQueueingCutsTheLightRequestsWait(t *testing.T) {
+	fifo, lifo := mixDesign(5), mixDesign(5)
+	for i := range lifo.Nodes {
+		if lifo.Nodes[i].Kind == KAppServer {
+			lifo.Nodes[i].Params["queueOrder"] = "lifo"
+			lifo.Nodes[i].Params["queueTimeoutMs"] = 2000.0
+		}
+	}
+	a, b := run(fifo, Options{Seed: 3}, 60).RunSnapshot(), run(lifo, Options{Seed: 3}, 60).RunSnapshot()
+	t.Logf("light p95: %.0f ms first-in-first-out, %.0f ms newest first (success %.3f vs %.3f)", a.LightP95, b.LightP95, float64(a.OK)/float64(a.OK+a.Failed), float64(b.OK)/float64(b.OK+b.Failed))
+	if b.LightP95 > a.LightP95/2 {
+		t.Errorf("newest first should at least halve the light requests' p95: %.0f vs %.0f", b.LightP95, a.LightP95)
+	}
+}

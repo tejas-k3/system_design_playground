@@ -81,3 +81,50 @@ func TestMoreMembersThanPartitionsAddNothing(t *testing.T) {
 		t.Fatalf("with four members each takes one partition: %v", a.Nodes["w0"].Ok)
 	}
 }
+
+// A log whose consumers cannot keep up grows its lag at the producer rate minus the consumer capacity. Four
+// partitions read one message at a time at 40 ms each can do 100 a second; 160 a second arrive, so after 40 s the
+// lag is about (160 - 100) x 40 = 2,400 messages.
+func TestLagGrowsAtTheProducerRateMinusTheConsumerCapacity(t *testing.T) {
+	d := logDesign(1, "roundRobin", nil)
+	for i := range d.Nodes {
+		if d.Nodes[i].Kind == KClient {
+			d.Nodes[i].Params["rps"] = 160.0
+		}
+		if d.Nodes[i].Kind == KWorker {
+			d.Nodes[i].Params["variability"] = "steady"
+		}
+	}
+	j := run(d, Options{Seed: 2}, 40).RunSnapshot().Jobs
+	t.Logf("lag after 40 s: %d (expected about 2,400)", j.Backlog)
+	if j.Backlog < 2000 || j.Backlog > 2800 {
+		t.Errorf("lag should be near 2,400: %d", j.Backlog)
+	}
+}
+
+// A consumer crashes, the group pauses and rebalances, and the other member takes its partitions: every message
+// that was produced is either done, waiting or lost, and with the default acknowledgement none is lost.
+func TestMessagesAreConservedThroughAConsumerCrashAndRebalance(t *testing.T) {
+	d := logDesign(2, "key", nil)
+	for i := range d.Nodes {
+		if d.Nodes[i].Kind == KLog {
+			d.Nodes[i].Params["rebalanceSec"] = 3.0
+		}
+	}
+	s := New(d, Options{Seed: 2, Chaos: []ChaosEvent{{Type: "crash", NodeID: "w0", AtSec: 10, DownSec: 10}}})
+	s.Advance(60000)
+	j := s.RunSnapshot().Jobs
+	t.Logf("enqueued %d = completed %d + waiting %d + lost %d + parked %d; %d rebalances", j.Enqueued, j.Completed, j.Backlog, j.Lost, j.Dead, int(s.Snapshot().Nodes["l"].Extra["rebalances"]))
+	if j.Enqueued != j.Completed+j.Backlog+j.Lost+j.Dead {
+		t.Errorf("messages are not conserved: %d != %d + %d + %d + %d", j.Enqueued, j.Completed, j.Backlog, j.Lost, j.Dead)
+	}
+	if j.Lost != 0 {
+		t.Errorf("nothing is lost by a rebalance: %d", j.Lost)
+	}
+	if s.Snapshot().Nodes["l"].Extra["rebalances"] == 0 {
+		t.Errorf("a crashed member should trigger a rebalance")
+	}
+	if v := s.RunSnapshot().Jobs.OrderViolations; v != 0 {
+		t.Errorf("per-key order holds even across the crash and the hand-over: %d violations", v)
+	}
+}

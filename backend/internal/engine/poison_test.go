@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"math"
 	"reflect"
 	"testing"
 )
@@ -66,4 +67,17 @@ func plainQueueDesign() Diagram {
 	b.edge("u", "a").edge("a", "q").edge("q", "w").edge("w", "db")
 	d, _ := Sanitize(b.d)
 	return d
+}
+
+// Poison jobs are a fixed share of the work, so their count is binomial: parked jobs = poisonPct x produced, within
+// three standard deviations sqrt(n p (1 - p)) (plus the handful still mid-backoff when the run ends).
+func TestTheDeadLetterCountMatchesThePoisonShareWithinThreeSigma(t *testing.T) {
+	j := jobs(poisonDesign(3, true, 10))
+	n, p := float64(j.Enqueued), 0.10
+	sigma := math.Sqrt(n * p * (1 - p))
+	want := n * p
+	t.Logf("%d jobs, %d parked in the dead-letter queue; expected %.0f, sigma %.1f", j.Enqueued, j.Dead, want, sigma)
+	if math.Abs(float64(j.Dead)-want) > 3*sigma+8 {
+		t.Errorf("parked %d, expected %.0f within 3 sigma (%.1f)", j.Dead, want, 3*sigma)
+	}
 }

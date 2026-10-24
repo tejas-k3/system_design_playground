@@ -130,3 +130,17 @@ func TestHugePromptsStallTheGPUForEveryoneElse(t *testing.T) {
 		t.Errorf("a 2.5 s prefill holds up the others: %.0f vs %.0f", plain, huge)
 	}
 }
+
+// Time to first token for a request alone is its prompt read plus one step: promptTokens / prefillTokPerSec + 20.5 ms
+// (4,000 tokens a second, a step of 20 + 0.5 x 1). Longer prompts wait proportionally longer, to within 10% (at a request a second a 3,200-token prompt keeps the GPU busy 90% of the time, so requests queue behind each other and that case is left out).
+func TestFirstTokenWaitsInProportionToThePromptLength(t *testing.T) {
+	for _, prompt := range []float64{100, 400, 1600} {
+		s, _ := llmRun(Params{"promptTokens": prompt, "outputTokens": 5.0}, 1, 300)
+		got := s.ttftHist.Quantile(0.5)
+		want := prompt/4000*1000 + 20.5
+		t.Logf("prompt %4.0f tokens: first token %.1f ms (hand: %.1f)", prompt, got, want)
+		if math.Abs(got-want)/want > 0.10 {
+			t.Errorf("prompt %.0f: %.1f ms is more than 10%% from %.1f", prompt, got, want)
+		}
+	}
+}

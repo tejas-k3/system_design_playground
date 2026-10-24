@@ -72,3 +72,24 @@ func TestRowLocksOffChangeNothing(t *testing.T) {
 		t.Errorf("off must equal the default: %v vs %v", a, b)
 	}
 }
+
+// A counter split over 8 rows: each write goes to the row its request's hash picks, so over a long run the busiest
+// row takes about 1/8 of the writes, within 1.3 of the mean row. (The hash is the one every request carries.)
+func TestASplitCounterSpreadsItsWritesEvenly(t *testing.T) {
+	const rows, writes = 8, 20000
+	n := &node{p: Params{"hotKeyMode": "split", "splitShards": float64(rows)}}
+	count := map[int]int{}
+	for i := 0; i < writes; i++ {
+		c := splitHotKey(n, &call{key: 0, hash: Hash32(uint32(i))}, false)
+		count[c.key]++
+	}
+	most := 0
+	for _, c := range count {
+		most = max(most, c)
+	}
+	ratio := float64(most) / (float64(writes) / rows)
+	t.Logf("%d rows used; busiest row over the mean: %.3f", len(count), ratio)
+	if len(count) != rows || ratio > 1.3 {
+		t.Errorf("writes should spread over all %d rows within 1.3 of the mean: %d rows, %.3f", rows, len(count), ratio)
+	}
+}

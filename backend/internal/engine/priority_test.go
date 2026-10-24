@@ -60,3 +60,25 @@ func TestPriorityAndDelayOffChangeNothing(t *testing.T) {
 		t.Fatal("priorityQueue off and delayMs 0 must equal a design that never mentions them")
 	}
 }
+
+// With nine requests in ten urgent against workers that do 80 jobs a second of 100 offered, the urgent work alone
+// fills the workers and the ordinary jobs wait behind it; once the traffic stops, everything drains: nothing waits
+// for ever and nothing is lost.
+func TestStrictPriorityDelaysOrdinaryJobsButDrainsOnceTheLoadDrops(t *testing.T) {
+	d := prioDesign(true, 0)
+	for i := range d.Nodes {
+		if d.Nodes[i].Kind == KClient {
+			d.Nodes[i].Params["priorityPct"] = 90.0
+		}
+	}
+	over := run(d, Options{Seed: 5}, 40).RunSnapshot().Jobs
+	s := run(d, Options{Seed: 5, StopTrafficAtMs: 40000}, 200)
+	end := s.RunSnapshot().Jobs
+	t.Logf("after 40 s of overload %d jobs wait (%d enqueued, %d done); 160 s after the traffic stops: %d wait, %d of %d done", over.Backlog, over.Enqueued, over.Completed, end.Backlog, end.Completed, end.Enqueued)
+	if over.Backlog < 500 {
+		t.Errorf("100 offered against 80 a second leaves a backlog: %d", over.Backlog)
+	}
+	if end.Backlog != 0 || end.Completed != end.Enqueued {
+		t.Errorf("once the load drops the backlog drains completely: %d waiting, %d of %d done", end.Backlog, end.Completed, end.Enqueued)
+	}
+}
