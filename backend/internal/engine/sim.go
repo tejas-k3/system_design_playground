@@ -218,19 +218,21 @@ type node struct {
 	rwRecent    []float64 // times of counted writes in the last second (what an append-only file could still lose)
 
 	// queue
-	jobs    []*job
-	jh      int
-	lanes   []*lane // a log: one line per (partition, consumer group), in creation order
-	laneIdx map[[2]int]*lane
-	rrNext  int            // round-robin partition choice
-	lastSeq map[[2]int]int // per (group, key): the newest message a consumer has finished
-	win     *WindowAgg     // stream job: the windows it keeps
-	winCP   int            // stream job: how many outputs had been emitted at the last checkpoint
-	winCPAt float64        // stream job: when that checkpoint was taken
-	winDup  int            // stream job: outputs sent a second time after a crash
-	hjobs   []*job         // urgent jobs of a priority queue, served before jobs
-	hh      int
-	delayed int // jobs held back by the queue's delivery delay
+	jobs      []*job
+	jh        int
+	lanes     []*lane // a log: one line per (partition, consumer group), in creation order
+	laneIdx   map[[2]int]*lane
+	rrNext    int              // round-robin partition choice
+	lastSeq   map[[2]int]int   // per (group, key): the newest message a consumer has finished
+	win       *WindowAgg       // stream job: the windows it keeps
+	winCP     int              // stream job: how many outputs had been emitted at the last checkpoint
+	winCPAt   float64          // stream job: when that checkpoint was taken
+	winDup    int              // stream job: outputs sent a second time after a crash
+	uniqExact map[int]struct{} // stream job: every visitor id seen, for the exact count and as the truth for the estimate
+	uniqHLL   *HLL             // stream job: the HyperLogLog sketch
+	hjobs     []*job           // urgent jobs of a priority queue, served before jobs
+	hh        int
+	delayed   int // jobs held back by the queue's delivery delay
 
 	rr map[string]int
 
