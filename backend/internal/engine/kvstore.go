@@ -54,9 +54,26 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 	if write {
 		need, ms = wq, n.f("writeMs")
 	}
-	first := int(Hash32(uint32(c.key)*2654435761+11) % uint32(nodes))
+	first := kvModFirst(c.key, nodes)
 	s.kvAntiEntropy(n)
 	hinted, sloppy, repair := n.b("hintedHandoff"), n.b("sloppyQuorum"), n.b("readRepair")
+	kx, siblings := n.kvX(), n.b("siblings")
+	who := kx.writer(c)
+	var base, nvv kvVV
+	if write && siblings {
+		base, nvv = kx.nextVV(who, c.key)
+	}
+	pref := kx.place(n, nodes, copies, c.key, write && (hinted || sloppy))
+	at := func(j int) int {
+		if pref != nil {
+			return pref[j]
+		}
+		return (first + j) % nodes
+	}
+	var sets []map[int][]kvSib
+	if siblings {
+		sets = kx.copies(nodes)
+	}
 	type reply struct {
 		node   int
 		target int // a stand-in's reply: the node it holds the write for (-1 = a real copy)
@@ -79,7 +96,7 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 	next := copies // where stand-ins are looked for: the nodes after the preference list
 	counting := 0
 	for j := 0; j < copies; j++ {
-		i := (first + j) % nodes
+		i := at(j)
 		if n.kvDownUntil[i] <= s.now {
 			replies = append(replies, reply{i, -1, slot(i, ms), true})
 			counting++
@@ -89,7 +106,7 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 			continue
 		}
 		for ; next < nodes; next++ { // a stand-in keeps the write as a hint for the node that is down
-			if st := (first + next) % nodes; n.kvDownUntil[st] <= s.now {
+			if st := at(next); n.kvDownUntil[st] <= s.now {
 				replies = append(replies, reply{st, i, slot(st, ms), sloppy})
 				if sloppy {
 					counting++
@@ -110,14 +127,26 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 	apply := func(r reply, ver int) {
 		if r.target >= 0 {
 			n.kvHints[r.target] = append(n.kvHints[r.target], [2]int{c.key, ver})
-		} else if ver > n.kvVer[r.node][c.key] {
-			n.kvVer[r.node][c.key] = ver
+			if siblings {
+				if kx.hintSibs == nil {
+					kx.hintSibs = map[int][]kvHintSib{}
+				}
+				kx.hintSibs[r.target] = append(kx.hintSibs[r.target], kvHintSib{c.key, kvSib{nvv, ver, who}})
+			}
+		} else {
+			if ver > n.kvVer[r.node][c.key] {
+				n.kvVer[r.node][c.key] = ver
+			}
+			if siblings {
+				sets[r.node][c.key] = kvAddSibling(sets[r.node][c.key], kvSib{nvv, ver, who})
+			}
 		}
 	}
 	// A write becomes visible (gets its version) when it is acknowledged, that is when W copies have it; the copies
 	// that finished earlier hold it from that moment, the rest as each of them finishes.
 	var pending []reply
 	acked, counted, seen, newest, wver := false, 0, 0, 0, 0
+	var got []kvSib
 	for _, rp := range replies {
 		rp := rp
 		s.at(rp.at, func() {
@@ -134,6 +163,7 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 				if counted == need {
 					acked = true
 					wver = s.commit(n, c)
+					kx.committed(siblings, who, c.key, wver, base, nvv)
 					for _, e := range pending {
 						apply(e, wver)
 					}
@@ -144,10 +174,35 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 			if v := n.kvVer[rp.node][c.key]; v > newest {
 				newest = v
 			}
+			if siblings && seen <= need {
+				got = kvUnion(got, sets[rp.node][c.key])
+			}
 			if seen == need {
+				if siblings {
+					if len(got) > 1 {
+						kx.sibReads++
+						kx.seenSibs += len(got)
+					}
+					for _, g := range got {
+						kx.learn(who, c.key, g.vv)
+					}
+				} else {
+					kx.sawVersion(who, c.key, newest)
+				}
 				s.okAt(n, Result{Ver: newest, Done: true, Src: n}, cb)
 			}
 			if repair && seen == len(replies) { // every copy has answered: bring the old ones up to date
+				if siblings {
+					var all []kvSib
+					for _, e := range replies {
+						all = kvUnion(all, sets[e.node][c.key])
+					}
+					for _, e := range replies {
+						if e.target < 0 {
+							sets[e.node][c.key] = all
+						}
+					}
+				}
 				for _, e := range replies {
 					if n.kvVer[e.node][c.key] < newest {
 						n.kvVer[e.node][c.key] = newest
@@ -185,6 +240,13 @@ func (s *Sim) kvReplayHints(n *node, i int) {
 		n.kvHintsReplayed++
 	}
 	delete(n.kvHints, i)
+	if kx := n.kx; kx != nil && len(kx.hintSibs[i]) > 0 {
+		sets := kx.copies(len(n.kvVer))
+		for _, h := range kx.hintSibs[i] {
+			sets[i][h.key] = kvAddSibling(sets[i][h.key], h.s)
+		}
+		delete(kx.hintSibs, i)
+	}
 }
 
 // kvAntiEntropy starts the periodic repair rounds (once): each round brings every copy of every key that a live node
@@ -198,6 +260,7 @@ func (s *Sim) kvAntiEntropy(n *node) {
 	var round func()
 	round = func() {
 		nodes, copies, _, _ := kvShape(n)
+		kx, siblings := n.kvX(), n.b("siblings")
 		keys := map[int]struct{}{}
 		for i := range n.kvVer {
 			for k := range n.kvVer[i] {
@@ -205,18 +268,32 @@ func (s *Sim) kvAntiEntropy(n *node) {
 			}
 		}
 		for k := range keys {
-			first := int(Hash32(uint32(k)*2654435761+11) % uint32(nodes))
+			first := kvModFirst(k, nodes)
+			pref := kx.place(n, nodes, copies, k, false)
+			at := func(j int) int {
+				if pref != nil {
+					return pref[j]
+				}
+				return (first + j) % nodes
+			}
 			newest := 0
+			var all []kvSib
 			for j := 0; j < copies; j++ {
-				if v := n.kvVer[(first+j)%nodes][k]; v > newest {
+				if v := n.kvVer[at(j)][k]; v > newest {
 					newest = v
+				}
+				if siblings {
+					all = kvUnion(all, kx.copies(nodes)[at(j)][k])
 				}
 			}
 			for j := 0; j < copies; j++ {
-				i := (first + j) % nodes
+				i := at(j)
 				if n.kvDownUntil[i] <= s.now && n.kvVer[i][k] < newest { // a node that is down cannot be repaired yet
 					n.kvVer[i][k] = newest
 					n.kvAERepairs++
+				}
+				if siblings && n.kvDownUntil[i] <= s.now {
+					kx.copies(nodes)[i][k] = all
 				}
 			}
 		}

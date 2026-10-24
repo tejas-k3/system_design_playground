@@ -281,6 +281,9 @@ func (s *Sim) Snapshot() Stats {
 		if n.kvRepairs > 0 {
 			ex["repairs"] = float64(n.kvRepairs)
 		}
+		if n.kx != nil && n.kind == KKVStore {
+			n.kx.extras(ex, n.b("siblings"))
+		}
 		if n.kvAERepairs > 0 {
 			ex["antiEntropyRepairs"] = float64(n.kvAERepairs)
 		}
