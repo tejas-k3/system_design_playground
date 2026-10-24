@@ -343,6 +343,33 @@ var alternatives = map[string][]Alternative{
 		alt("Give every server 16 threads", true, 100.0, 321, 1.35, "Passes by giving the slow server enough threads to absorb its share, for more than twice the cost; the slow server is still sent a quarter of the traffic.", Change{"app1", "threads", 16.0}, Change{"app2", "threads", 16.0}, Change{"app3", "threads", 16.0}, Change{"app4", "threads", 16.0}),
 		alt("Let clients retry twice", false, 99.8, 1476, 0.62, "A retry usually lands on another server, so nearly all succeed, but each rescued request has already waited out its timeout: the p95 is almost 1.5 seconds.", Change{"users", "retries", 2.0}),
 	},
+	"primary-dies": {
+		alt("Promote the replica with the default timings", false, 72.4, 174, 0.94, "A replica now takes over, but only after 10 seconds of noticing and 20 of promoting, and it is 3 seconds behind: 72% succeed and 199 acknowledged writes are lost.", Change{"db", "onFailure", "promote"}),
+		alt("Promote in 8 seconds in total, nothing else", false, 92.9, 177, 0.94, "The outage is short enough (93% succeed), but the replica is still 3 seconds behind, so 199 acknowledged writes are lost against the 100 allowed.", Change{"db", "onFailure", "promote"}, Change{"db", "detectSec", 3.0}, Change{"db", "promoteSec", 5.0}),
+		alt("Promote in 8 seconds and make the replica synchronous", true, 92.8, 204, 0.94, "Passes: with a synchronous replica nothing acknowledged is lost, at the price of every write waiting for it (p95 204 ms against 177 ms). The reference narrows the loss with a small lag instead.", Change{"db", "onFailure", "promote"}, Change{"db", "detectSec", 3.0}, Change{"db", "promoteSec", 5.0}, Change{"replica", "replication", "sync"}),
+		alt("Give the app servers 64 threads", false, 53.8, 171, 4.90, "The servers are not the problem: the database they write to is gone. Nothing changes and the bill is five times higher.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}),
+	},
+	"fence-the-old-primary": {
+		alt("Promote the replica in 3 seconds instead of 10", false, 86.6, 185, 0.94, "A shorter outage (87% succeed), but the new primary takes writes for longer before the old one returns and discards them: 2,534 are lost.", Change{"db", "promoteSec", 3.0}),
+		alt("Remove the replica's lag", false, 73.8, 185, 0.94, "Lag was never the loss: the writes vanish because the old primary returns and clients go back to it, not because the replica was behind (1,931 lost).", Change{"replica", "replicationLagMs", 0.0}),
+		alt("Make the replica synchronous", false, 73.7, 234, 0.94, "A synchronous replica protects the writes the old primary took, but the loss here is the new primary's writes, thrown away when the old one returns: 1,931 are still lost and every write is slower (p95 234 ms).", Change{"replica", "replication", "sync"}),
+	},
+	"morning-rush": {
+		alt("Turn on autoscaling, nothing else", false, 91.9, 392, 0.66, "Servers are added, but the rush arrives faster than a server boots and the scaler waits until the threads are busier than 60%: 92% succeed.", Change{"app1", "autoscale", true}),
+		alt("Autoscale and scale up at 40% busy", true, 99.9, 177, 0.78, "Passes by starting the new servers sooner. The fleet is allowed to grow to 8, so the bill is $0.78 against the reference's $0.54, which caps it at 4.", Change{"app1", "autoscale", true}, Change{"app1", "targetUtilPct", 40.0}),
+		alt("Give the one server 24 threads", false, 95.3, 239, 0.74, "A bigger server absorbs more of the rush, but not all of it, and it pays for the capacity all day.", Change{"app1", "threads", 24.0}),
+	},
+	"search-tail": {
+		alt("Answer on the first 14 of 16 shards", true, 100.0, 216, 1.60, "Passes: a reply is sent as soon as 14 shards have answered, so the two slowest are ignored. A little slower than 12 of 16, with fewer results dropped.", Change{"app", "gather", "firstK"}, Change{"app", "k", 14.0}),
+		alt("Answer on the first 8 of 16 shards", true, 100.0, 143, 1.60, "Passes with the lowest p95, but each answer is built from only half of the index: the speed is bought by returning less.", Change{"app", "gather", "firstK"}, Change{"app", "k", 8.0}),
+		alt("Wait for all 16 shards, with 64 threads", false, 99.8, 559, 3.06, "The slowest of sixteen decides each answer, and more threads do not make it faster: same p95, twice the bill.", Change{"app", "threads", 64.0}),
+		alt("Let clients retry twice", false, 100.0, 571, 1.60, "A retry asks the same sixteen shards again; the slowest one still sets the time.", Change{"users", "retries", 2.0}),
+	},
+	"nobody-on-call": {
+		alt("Use repeatable read", false, 96.6, 200, 1.00, "Repeatable read stops lost updates but not write skew: each doctor reads a snapshot where the other is still on call. 39 pairs end with nobody, and some requests abort.", Change{"db", "isolation", "repeatableRead"}),
+		alt("Turn on row locks", false, 100.0, 200, 1.00, "A row lock protects the row each transaction writes; the two doctors write different rows after reading each other's, so the rule is still broken 39 times.", Change{"db", "rowLocks", true}),
+		alt("Let clients retry twice", false, 100.0, 200, 1.00, "Nothing fails, so there is nothing to retry; the rule is still broken.", Change{"users", "retries", 2.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
