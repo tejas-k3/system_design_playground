@@ -196,11 +196,13 @@ type node struct {
 	fetching map[int][]func(Result) // cache: waiters sharing an in-flight miss fetch, by key (coalescing)
 
 	// rate limiter
-	tokens           float64
-	tokensAt         float64
-	tokTokens, tokAt float64          // rate limiter counting tokens: the allowance left and when it was last topped up
-	seenIds          map[int]struct{} // queue, topic or log fed by an event publisher: the ids it has accepted, to find repeats
-	watchIds         bool             // the node is the target of an event publisher
+	tokens                                 float64
+	tokensAt                               float64
+	tokTokens, tokAt                       float64          // rate limiter counting tokens: the allowance left and when it was last topped up
+	guard                                  *Bloom           // app server: a Bloom filter of every id that exists
+	guardChecked, guardBlocked, guardFalse int              // lookups of absent ids: all, stopped by the filter, let through by mistake
+	seenIds                                map[int]struct{} // queue, topic or log fed by an event publisher: the ids it has accepted, to find repeats
+	watchIds                               bool             // the node is the target of an event publisher
 
 	// database
 	openConns int

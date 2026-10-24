@@ -197,6 +197,9 @@ func (s *Sim) hostEdge(n *node, key int) *edge {
 	if len(hosts) == 0 {
 		return nil
 	}
+	if key < 0 {
+		key = -key
+	}
 	return hosts[key%len(hosts)]
 }
 
@@ -228,4 +231,27 @@ func (s *Sim) vectorRecall() float64 {
 		return 0
 	}
 	return r
+}
+
+// bloomBlocks is whether the app server's Bloom filter of existing ids says this request's id is not there. The filter
+// is built on first use from the users' id range; ids the users ask for that are not in that range are the absent ones.
+func (s *Sim) bloomBlocks(n *node, c *call) bool {
+	ks := int(c.lg.client.f("keySpace"))
+	if n.guard == nil {
+		bits := max(64, int(n.f("bloomBitsPerKey"))*(ks+1))
+		n.guard = NewBloom(bits, int(n.f("bloomHashes")))
+		for id := 0; id <= ks; id++ {
+			n.guard.Add(uint32(id))
+		}
+	}
+	if c.key >= 0 {
+		return false // a real id always passes: the filter never forgets what it holds
+	}
+	n.guardChecked++
+	if n.guard.Has(uint32(-c.key)) {
+		n.guardFalse++
+		return false
+	}
+	n.guardBlocked++
+	return true
 }

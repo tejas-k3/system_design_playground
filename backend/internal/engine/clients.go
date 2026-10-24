@@ -213,6 +213,10 @@ func (s *Sim) createLogical(c *node) *logical {
 	if lg.counted {
 		s.countKey(lg.key)
 	}
+	if pct := c.f("missingPct"); pct > 0 && float64(Hash32(uint32(s.logicalSeq)*2891336453+53)%100) < pct {
+		ks := int(c.f("keySpace")) // an id outside the real ones: negative, so it can never match a stored item
+		lg.key = -(ks + 1 + int(Hash32(uint32(s.logicalSeq)*374761393+59)%uint32(10*ks)))
+	}
 	lg.sawWrite, lg.sawRead = c.sessWrite[lg.key], c.sessRead[lg.key] // nil maps read as 0
 	if n := int(c.f("identities")); n > 0 {
 		dist := "uniform"
