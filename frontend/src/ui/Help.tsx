@@ -23,6 +23,7 @@ export function Help() {
     ['Shift + drag', 'Box-select'],
     ['Double-click empty', 'Add a note'],
     ['Boxes (library)', 'Add a region, zone or network box; drag its header to move it and what is inside, drag its corner to resize, name it in the inspector'],
+    ['Shapes (library)', 'Add an ellipse or a free arrow to circle or point at something; drag the outline to move, the corner (ellipse) or either end (arrow) to resize, or pick it from the keyboard list and use the arrow keys and the inspector'],
     ['Esc', 'Clear selection / cancel connecting'],
   ]
   return (
