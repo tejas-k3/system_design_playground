@@ -205,6 +205,40 @@ var alternatives = map[string][]Alternative{
 		alt("Give the database 64 connections", false, 66.1, 408, 1.38, "The servers, not the database, were saturated, so nothing improves and the bill goes up.", Change{"db", "connections", 64.0}),
 		alt("Make a database read take 5 ms", false, 75.3, 369, 0.52, "A faster store helps (75% succeed) but every request still travels to the origin, and the servers are still the limit.", Change{"db", "readMs", 5.0}),
 	},
+	"connection-crunch": {
+		alt("Shrink each server's pool to 20 connections", false, 88.2, 244, 5.56, "Six servers at 20 are still 120 connections asked of a database that accepts 64, so the surplus is refused exactly as before. The sum of the pools, not each pool, has to fit under the limit.", Change{"app1", "dbPool", 20.0}, Change{"app2", "dbPool", 20.0}, Change{"app3", "dbPool", 20.0}, Change{"app4", "dbPool", 20.0}, Change{"app5", "dbPool", 20.0}, Change{"app6", "dbPool", 20.0}),
+		alt("Raise the database's connection limit to 1000", true, 100.0, 244, 5.56, "Passes: nothing is refused any more. The model does not charge for the memory a thousand connections take on a real database, so this is a bet that the database copes with them.", Change{"db", "maxConnections", 1000.0}),
+		alt("Let clients retry twice", false, 97.5, 643, 5.56, "A retry usually finds a free connection, so nearly everything succeeds, but each rescued request has waited and the tail is over the goal (643 ms against 600).", Change{"users", "retries", 2.0}),
+	},
+	"retry-pileup": {
+		alt("Serve the newest requests first", true, 88.3, 369, 0.52, "Passes with the best p95 of any fix: when the queue is long it answers the people still waiting and leaves the oldest, whose callers have already given up, to expire. One setting does most of the work of the reference solution.", Change{"app1", "queueOrder", "lifo"}, Change{"app2", "queueOrder", "lifo"}, Change{"app3", "queueOrder", "lifo"}),
+		alt("Stop retrying", false, 75.2, 229, 0.52, "The storm is gone and the system recovers, but every request that hits the slow patch is a failure for good: 75% succeed against the 85% needed.", Change{"users", "retries", 0.0}),
+		alt("Back off exponentially, nothing else", false, 18.8, 181, 0.52, "The retries come later, but with four of them each and no limit on the queue, the servers are still busy with requests nobody is waiting for.", Change{"users", "backoff", "exponential"}),
+		alt("Give each app server 32 threads", false, 82.6, 181, 2.62, "More threads soak up part of the storm, but a slow database makes each one wait longer: still under 85% and the bill is more than double.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}, Change{"app3", "threads", 32.0}),
+	},
+	"stale-prices": {
+		alt("Read by freshness, nothing else", true, 100.0, 158, 0.69, "Passes: reads that need fresh data go to the primary, which also skips the stale cache. The cache and the replica still serve anything that does not, and it costs nothing extra.", Change{"app", "readRouting", "byConsistency"}),
+		alt("Send every read to the primary", true, 100.0, 158, 0.69, "Always fresh, and the primary has the room here. It would stop being fine as the reads grew: it gives up everything the cache and the replica were added for.", Change{"app", "readRouting", "primary"}),
+		alt("Clear cache entries on writes, nothing else", false, 100.0, 158, 0.69, "The cache is now right, but the replica is two seconds behind and 'nearest' still sends reads to it: 83% of reads are too stale.", Change{"cache", "writePolicy", "invalidate"}),
+		alt("Shorten the cache lifetime to 1 second", false, 100.0, 158, 0.69, "Fewer stale answers (31% instead of 89%), but a second is longer than the half a second users tolerate, and the replica is still in the way.", Change{"cache", "ttlSec", 1.0}),
+		alt("Cut the replica's lag to 100 ms", false, 100.0, 148, 0.69, "The replica is nearly current, but the cache can still hand out a 30-second-old price: 84% of reads are too stale.", Change{"replica", "replicationLagMs", 100.0}),
+	},
+	"double-booked": {
+		alt("Raise the isolation level to serializable", false, 100.0, 146, 0.98, "The isolation level only governs the transfer workload; two bookings of the same seat are not transactions that conflict, so the same 5 double bookings happen.", Change{"db", "isolation", "serializable"}),
+		alt("Give the database only 8 connections", false, 100.0, 151, 0.61, "Fewer concurrent writes make collisions rarer (8 double bookings are still found) but not impossible, and it only works by throttling everything.", Change{"db", "connections", 8.0}),
+		alt("Run the app server with a single thread", false, 0.3, 1910, 0.46, "No two bookings can overlap in time, but nothing finishes either: 250 a second through one thread is hopeless.", Change{"app", "threads", 1.0}),
+	},
+	"charged-twice": {
+		alt("Wait 2 seconds before a client retries", true, 100.0, 497, 0.72, "Passes here because the slow reply (about 0.8 seconds) now arrives before the client gives up, so no retry is sent. It works only while the server stays that quick: one slow day brings the duplicates back, where an idempotency key does not.", Change{"users", "timeoutMs", 2000.0}),
+		alt("Turn retries off", false, 90.9, 424, 0.72, "No request is repeated, so no charge is, but 9% of the customers whose request was slow now fail and never get their order.", Change{"users", "retries", 0.0}),
+		alt("Make the database write 30 ms instead of 130 ms", false, 100.0, 334, 0.72, "A faster write finishes inside the client's timeout almost always, so only 3 duplicates remain, but any one is a customer charged twice.", Change{"db", "writeMs", 30.0}),
+		alt("Back off exponentially between retries", false, 100.0, 900, 0.72, "The retries are spaced out, but each one still repeats the charge: 129 duplicates.", Change{"users", "backoff", "exponential"}),
+	},
+	"disappearing-money": {
+		alt("Use repeatable read", false, 79.0, 248, 0.48, "No more lost updates: the second of two conflicting transfers is aborted instead. But about one transfer in five is aborted, below the 97% needed.", Change{"db", "isolation", "repeatableRead"}),
+		alt("Repeatable read, and let clients retry twice", false, 98.4, 783, 0.48, "Retrying the aborted transfers brings the success rate up, but each retry waits and the p95 (783 ms) misses the 600 ms goal. Serializable takes a lock and waits instead of aborting.", Change{"db", "isolation", "repeatableRead"}, Change{"users", "retries", 2.0}),
+		alt("Turn on row locks", false, 100.0, 258, 0.48, "Row locks serialise single-row writes like a booking; a transfer reads two rows and writes them back, so the lost updates (470) are untouched.", Change{"db", "rowLocks", true}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
