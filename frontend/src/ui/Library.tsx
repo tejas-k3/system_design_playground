@@ -40,7 +40,15 @@ export function Library() {
     const r = canvas?.getBoundingClientRect()
     const cx = ((r?.width ?? 800) / 2 - viewport.scrollX) / viewport.zoom
     const cy = ((r?.height ?? 500) / 2 - viewport.scrollY) / viewport.zoom
-    useStore.getState().addGroup(kind, Math.round(cx - GROUP_DEFAULT.w / 2), Math.round(cy - GROUP_DEFAULT.h / 2))
+    let x = Math.round(cx - GROUP_DEFAULT.w / 2)
+    let y = Math.round(cy - GROUP_DEFAULT.h / 2)
+    // a new box never lands exactly on top of another
+    const have = useStore.getState().diagram.groups ?? []
+    while (have.some((g) => g.x === x && g.y === y)) {
+      x += 24
+      y += 24
+    }
+    useStore.getState().addGroup(kind, x, y)
   }
 
   return (

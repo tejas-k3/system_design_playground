@@ -45,6 +45,17 @@ describe('groups in the store', () => {
     expect(st().diagram.nodes[0].x).toBe(60)
   })
 
+  it('with an explicit list a box moves only what is listed, so a drag cannot pick up things it passes over', () => {
+    const inside = st().addNode('appServer', 50, 50)!
+    const other = st().addNode('database', 900, 50)!
+    const g = st().addGroup('az', 0, 0)!
+    st().moveNodes([g, inside], 400, 0, true) // the box now covers `other`
+    st().moveNodes([g, inside], 500, 0, true)
+    const x = (id: string) => st().diagram.nodes.find((n) => n.id === id)!.x
+    expect(x(other)).toBe(900)
+    expect(x(inside)).toBe(950)
+  })
+
   it('moving a member leaves the group where it is', () => {
     const inside = st().addNode('appServer', 50, 50)!
     st().addGroup('az', 0, 0)

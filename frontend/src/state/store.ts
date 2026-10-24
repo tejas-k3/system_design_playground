@@ -73,7 +73,8 @@ export interface State {
   focusNode(id: string): void
   clearRun(): void
   addNode(kind: string, x: number, y: number): string | null
-  moveNodes(ids: string[], dx: number, dy: number): void
+  /** Move pieces; boxes among them take what is inside along, unless `exact` says the list already says everything to move. */
+  moveNodes(ids: string[], dx: number, dy: number, exact?: boolean): void
   updateNode(id: string, patch: Partial<Pick<Node, 'label'>>): void
   setParam(id: string, key: string, value: number | string | boolean): void
   addEdge(from: string, to: string): string | null
@@ -219,11 +220,11 @@ export const useStore = create<State>()((set, get) => {
       return id
     },
 
-    moveNodes: (ids, dx, dy) => {
+    moveNodes: (ids, dx, dy, exact) => {
       const reg = get().reg
       mutate((d) => {
         // moving a box takes what is inside it
-        const set_ = new Set(reg && groupsOf(d).length ? withMembers(d, ids, (n) => nodeRect(n, reg)) : ids)
+        const set_ = new Set(!exact && reg && groupsOf(d).length ? withMembers(d, ids, (n) => nodeRect(n, reg)) : ids)
         return {
           ...d,
           nodes: d.nodes.map((n) => (set_.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)),

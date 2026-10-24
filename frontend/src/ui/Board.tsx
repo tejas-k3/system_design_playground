@@ -20,7 +20,7 @@ import { Minimap } from './board/Minimap'
 type Mode =
   | { k: 'idle' }
   | { k: 'pan'; sx: number; sy: number; moved: boolean }
-  | { k: 'drag'; ids: string[]; start: Pt; applied: Pt; moving: Rect | null; others: Rect[] } // applied: how far the pieces have been moved so far, snapping included
+  | { k: 'drag'; ids: string[]; carry: string[]; start: Pt; applied: Pt; moving: Rect | null; others: Rect[] } // applied: how far the pieces have been moved so far, snapping included
   | { k: 'connect'; from: string; downAt: Pt; moved: boolean }
   | { k: 'rewire'; edge: string; end: 'from' | 'to'; downAt: Pt; moved: boolean }
   | { k: 'resize'; id: string; last: Pt }
@@ -227,10 +227,12 @@ export function Board() {
         const g = groupsOf(d).find((x) => x.id === id)
         return g ? groupRect(g) : null
       }
-      const carried = new Set(withMembers(d, ids, (n) => nodeRect(n, st.reg!)))
+      // what a box holds is settled when the drag starts, so passing over other components on the way does not pick them up
+      const carry = withMembers(d, ids, (n) => nodeRect(n, st.reg!))
+      const carried = new Set(carry)
       const moving = unionRect(ids.map(rectOf).filter((r): r is Rect => !!r))
       const others = [...d.nodes.map((n) => n.id), ...d.notes.map((n) => n.id), ...groupsOf(d).map((g) => g.id)].filter((id) => !carried.has(id)).map(rectOf).filter((r): r is Rect => !!r)
-      mode.current = { k: 'drag', ids, start: w, applied: { x: 0, y: 0 }, moving, others }
+      mode.current = { k: 'drag', ids, carry, start: w, applied: { x: 0, y: 0 }, moving, others }
       setCursor('grabbing')
       return
     }
@@ -284,7 +286,7 @@ export function Board() {
           ty += s.dy
           guides.current = s.guides
         }
-        st.moveNodes(m.ids, tx - m.applied.x, ty - m.applied.y)
+        st.moveNodes(m.carry, tx - m.applied.x, ty - m.applied.y, true)
         m.applied = { x: tx, y: ty }
         return
       }
