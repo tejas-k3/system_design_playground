@@ -30,6 +30,18 @@ export interface Note {
   text: string
   fontSize?: number
 }
+export type GroupKind = 'az' | 'region' | 'vpc' | 'service' | 'note'
+/** A labelled box drawn behind the components. Visual only: the simulation ignores it. Members are decided by geometry. */
+export interface Group {
+  id: string
+  kind: GroupKind
+  label: string
+  x: number
+  y: number
+  w: number
+  h: number
+  collapsed?: boolean // reserved; the editor does not collapse yet
+}
 export interface SweepPoint {
   value: number // load multiple, or the setting's value as used
   rps: number
@@ -57,6 +69,7 @@ export interface Diagram {
   nodes: Node[]
   edges: Edge[]
   notes: Note[]
+  groups?: Group[] // absent in older designs
 }
 
 export interface ParamSpec {

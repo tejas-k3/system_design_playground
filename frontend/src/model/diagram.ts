@@ -1,4 +1,5 @@
-import type { Diagram, Edge, Node, NodeSpec, Params, ParamSpec, ParamValue, Registry } from '../api/types'
+import type { Diagram, Edge, Group, GroupKind, Node, NodeSpec, Params, ParamSpec, ParamValue, Registry } from '../api/types'
+import { GROUP_KIND_IDS, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize } from './groups'
 
 export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 4
@@ -162,7 +163,24 @@ export function sanitizeDiagram(reg: Reg, raw: unknown): { diagram: Diagram; adj
     }
     notes.push({ id: n.id as string, x: n.x, y: n.y, text: String(n.text ?? ''), ...(num(n.fontSize) && n.fontSize > 0 ? { fontSize: n.fontSize } : {}) })
   }
-  return { diagram: { nodes, edges, notes }, adjusted }
+  const groups: Group[] = []
+  for (const g of Array.isArray(raw.groups) ? raw.groups : []) {
+    if (groups.length >= MAX_GROUPS) {
+      adjusted = true
+      break
+    }
+    if (!isObj(g) || typeof g.kind !== 'string' || !GROUP_KIND_IDS.includes(g.kind) || !num(g.x) || !num(g.y) || !num(g.w) || !num(g.h) || !claim(g.id)) {
+      adjusted = true
+      continue
+    }
+    const w = clampGroupSize(g.w)
+    const h = clampGroupSize(g.h)
+    let label = typeof g.label === 'string' ? g.label : ''
+    if (w !== g.w || h !== g.h || label.length > MAX_GROUP_LABEL || (g.label !== undefined && typeof g.label !== 'string')) adjusted = true
+    label = [...label].slice(0, MAX_GROUP_LABEL).join('')
+    groups.push({ id: g.id, kind: g.kind as GroupKind, label, x: g.x, y: g.y, w, h, ...(g.collapsed === true ? { collapsed: true } : {}) })
+  }
+  return { diagram: { nodes, edges, notes, ...(groups.length ? { groups } : {}) }, adjusted }
 }
 
 /** Next free label: "Cache", "Cache 2", ... */
