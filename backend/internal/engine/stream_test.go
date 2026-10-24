@@ -87,3 +87,33 @@ func TestHyperLogLogCountsVisitorsInAFractionOfTheMemory(t *testing.T) {
 		t.Errorf("sixteen registers are less accurate than 1,024: %.2f%% vs %.2f%%", tiny["countErrorPct"], hll["countErrorPct"])
 	}
 }
+
+// The ten most popular items of a Zipf crowd, found by a stream job: counting every item exactly, or with a
+// count-min sketch and a short candidate list in a fixed table. Recall is how many of the true top ten it finds.
+func topKRun(mode string, width, depth float64) map[string]float64 {
+	b := &builder{}
+	b.node("u", KClient, Params{"rps": 300.0, "readPct": 0.0, "keySpace": 200000.0, "keyDist": "zipf", "zipfS": 1.1, "timeoutMs": 2000.0})
+	b.node("a", KAppServer, Params{"threads": 32.0})
+	b.node("st", KStream, Params{"topK": mode, "sketchWidth": width, "sketchDepth": depth})
+	b.edge("u", "a").edge("a", "st")
+	d, _ := Sanitize(b.d)
+	s := New(d, Options{Seed: 12})
+	s.Advance(60000)
+	return s.Snapshot().Nodes["st"].Extra
+}
+
+func TestASketchFindsTheTopTenInFarLessMemory(t *testing.T) {
+	exact := topKRun("exact", 0, 0)
+	sk := topKRun("countMin", 1000, 3)
+	tiny := topKRun("countMin", 40, 2)
+	t.Logf("exact: recall %.0f/10, %.1f KB; count-min 1000x3: recall %.0f/10, %.1f KB; 40x2: recall %.0f/10, %.1f KB", exact["topKRecall"]*10, exact["stateKB"], sk["topKRecall"]*10, sk["stateKB"], tiny["topKRecall"]*10, tiny["stateKB"])
+	if exact["topKRecall"] != 1 {
+		t.Errorf("counting every item finds the true top ten: %v", exact["topKRecall"])
+	}
+	if sk["topKRecall"] < 0.9 || sk["stateKB"]*3 > exact["stateKB"] {
+		t.Errorf("the sketch should find at least 9 of 10 in a third of the memory: %v, %.1f vs %.1f KB", sk["topKRecall"], sk["stateKB"], exact["stateKB"])
+	}
+	if tiny["topKRecall"] >= sk["topKRecall"] {
+		t.Errorf("less memory should cost recall: %v vs %v", tiny["topKRecall"], sk["topKRecall"])
+	}
+}

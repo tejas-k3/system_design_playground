@@ -23,6 +23,7 @@ func (s *Sim) arriveStream(n *node, c *call, cb func(Result)) {
 	}
 	n.win.Add(at)
 	s.countVisitor(n, c.key)
+	s.trackTop(n, c.key)
 	if s.now-n.winCPAt >= n.f("checkpointSec")*1000 {
 		n.winCPAt, n.winCP = s.now, len(n.win.Emitted)
 	}
@@ -109,9 +110,14 @@ func (s *Sim) visitorStats(n *node) (uniques, stateKB, errPct float64, ok bool) 
 func (s *Sim) streamCounting() (stateKB, errPct float64) {
 	for _, nd := range s.order {
 		if nd.kind == KStream && !nd.removed {
-			if _, kb, e, ok := s.visitorStats(nd); ok {
-				stateKB, errPct = max(stateKB, kb), max(errPct, e)
+			kb := 0.0
+			if _, k, e, ok := s.visitorStats(nd); ok {
+				kb, errPct = k, max(errPct, e)
 			}
+			if _, k, ok := s.topStats(nd); ok {
+				kb += k
+			}
+			stateKB = max(stateKB, kb)
 		}
 	}
 	return
@@ -119,3 +125,64 @@ func (s *Sim) streamCounting() (stateKB, errPct float64) {
 
 func (s *Sim) stateKB() float64  { kb, _ := s.streamCounting(); return kb }
 func (s *Sim) countErr() float64 { _, e := s.streamCounting(); return e }
+
+// trackTop feeds an item to the job's top-ten tracker, and to an exact table that serves as the truth.
+func (s *Sim) trackTop(n *node, id int) {
+	switch n.s("topK") {
+	case "exact":
+		if n.topExact == nil {
+			n.topExact = NewExactTopK()
+		}
+		n.topExact.Add(uint32(id))
+	case "countMin":
+		if n.topSketch == nil {
+			n.topSketch = NewSketchTopK(10, int(n.f("sketchWidth")), int(n.f("sketchDepth")), 7)
+			n.topTruth = NewExactTopK()
+		}
+		n.topSketch.Add(uint32(id))
+		n.topTruth.Add(uint32(id))
+	}
+}
+
+// topStats is how many of the true ten most popular items the tracker found, and the memory it needs.
+func (s *Sim) topStats(n *node) (recall, kb float64, ok bool) {
+	switch n.s("topK") {
+	case "exact":
+		if n.topExact == nil {
+			return 0, 0, false
+		}
+		return 1, float64(n.topExact.Counters()) * 16 / 1024, true
+	case "countMin":
+		if n.topSketch == nil {
+			return 0, 0, false
+		}
+		in := map[uint32]bool{}
+		for _, x := range n.topTruth.Top(10) {
+			in[x] = true
+		}
+		hit := 0
+		for _, x := range n.topSketch.Top(10) {
+			if in[x] {
+				hit++
+			}
+		}
+		return float64(hit) / 10, (float64(n.topSketch.Counters())*4 + float64(n.topSketch.Candidates())*16) / 1024, true
+	}
+	return 0, 0, false
+}
+
+// topRecall is the lowest recall among the stream jobs that track their top ten (1 when none does).
+func (s *Sim) topRecall() float64 {
+	r, any := 1.0, false
+	for _, nd := range s.order {
+		if nd.kind == KStream && !nd.removed {
+			if v, _, ok := s.topStats(nd); ok {
+				r, any = min(r, v), true
+			}
+		}
+	}
+	if !any {
+		return 0
+	}
+	return r
+}
