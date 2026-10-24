@@ -64,6 +64,7 @@ var conceptTags = map[string][]string{
 	"launch-day":             {"sharding", "capacity"},
 	"count-the-clicks":       {"queues", "consistency"},
 	"unique-visitors":        {"storage-and-payload", "capacity"},
+	"top-ten":                {"storage-and-payload", "caching"},
 	"bad-deploy":             {"failure-handling"},
 	"zone-outage":            {"failure-handling", "replication"},
 	"retry-storm":            {"overload-control", "failure-handling"},

@@ -1436,6 +1436,35 @@ func init() {
 		Debrief: "Approximate structures trade a bounded, known error for memory that does not grow with the data: HyperLogLog counts distinct items, a Bloom filter answers 'seen before?', a count-min sketch counts how often. They are the answer whenever the exact version will not fit.",
 	})
 
+	// Top ten: the ten most popular items out of a huge catalogue, in a small amount of memory
+	topTen := func(fixed bool) engine.Diagram {
+		st := P{"topK": "exact"}
+		if fixed {
+			st = P{"topK": "countMin", "sketchWidth": 1000.0, "sketchDepth": 3.0}
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 300.0, "readPct": 0.0, "keySpace": 200000.0, "keyDist": "zipf", "zipfS": 1.1, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0, "queueCap": 500.0}).
+			n("trending", engine.KStream, cols[2], rowMid, st).label("trending", "Trending items").
+			e("users", "app").e("app", "trending").done()
+	}
+	register(&Scenario{
+		ID: "top-ten", Title: "The top ten", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Find the ten most popular items out of 200,000 without a counter for each.",
+		Story:   "The shop shows a trending list: the ten most viewed items out of a catalogue of 200,000. The stream job keeps an exact counter for every item it has seen, and the table keeps growing: it already needs far more memory than the 16 KB the job is allowed (in this small run; the real catalogue and traffic are far bigger). The list does not have to be perfect, but at least eight of the ten must be right.",
+		Diagram: topTen(false), Solution: topTen(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MinTopKRecall: f(0.8), MaxStateKB: f(16), MaxCostPerHour: f(1.0)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the memory the stream job needs and at what it is counting. Does every item need its own counter?",
+			"Most of the 200,000 items are seen once or never. Only the few very popular ones matter for a top ten, and a structure can estimate counts for all items in a fixed table, at the cost of items sharing counters.",
+			"Switch the job to the count-min sketch. Its width and depth set the table (width x depth counters of 4 bytes each): a table too narrow mixes everything together and misses the top ten, one too big breaks the memory budget.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "A count-min sketch estimates how often an item occurred. It can be wrong by…", Options: []string{"Counting too few: it can miss occurrences", "Counting too many: other items share its counters, but never too few", "Either way, equally"}, Answer: 1,
+			Explain: "Every occurrence of an item adds to all of its counters, so an estimate is never too low. Other items sharing a counter can only inflate it, and taking the smallest counter keeps that small."}},
+		Debrief: "Heavy hitters are few, and a structure that only needs to be right about them can be tiny. A count-min sketch plus a short candidate list finds the top items in a fixed table; the width bounds the overcount and the depth bounds the chance of it. Exactness costs memory in proportion to the number of different items.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"
