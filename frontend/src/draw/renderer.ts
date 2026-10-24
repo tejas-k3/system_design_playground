@@ -556,12 +556,16 @@ function drawShapes(ctx: CanvasRenderingContext2D, sc: Scene) {
         const r = 5 / Math.min(1, zoom)
         ctx.fillStyle = p.card
         ctx.lineWidth = 2
-        for (const e of [a, b]) {
-          ctx.beginPath()
-          ctx.arc(e.x, e.y, r, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.stroke()
-        }
+        // the start is a solid dot; the tip is a ring around the head so the arrowhead stays visible
+        ctx.beginPath()
+        ctx.arc(a.x, a.y, r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(b.x - Math.cos(ang) * head * 0.5, b.y - Math.sin(ang) * head * 0.5, head * 0.75, 0, Math.PI * 2)
+        ctx.lineWidth = 1.4
+        ctx.setLineDash([4, 3])
+        ctx.stroke()
       }
     } else {
       ctx.beginPath()
