@@ -192,3 +192,11 @@ describe('time to first token goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10, ttftMs: 300 }), 1, true), 'Time to first token (p95)').state).toBe('pass')
   })
 })
+
+describe('vector search recall goal', () => {
+  it('compares the recall of the search', () => {
+    const g = { minSuccessRate: 0.5, minRecall: 0.9 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, recall: 0.75 }), 1, true), 'Vector search recall')).toMatchObject({ actual: '75%', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, recall: 0.97 }), 1, true), 'Vector search recall').state).toBe('pass')
+  })
+})
