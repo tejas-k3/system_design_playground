@@ -505,6 +505,7 @@ func init() {
 				num("concurrency", "Requests per node", "Capacity", 8, 1, 1024, 1, "", "How many requests one node works on at once; the rest wait.").adv(),
 				flag("sloppyQuorum", "Sloppy quorum", "Repair", false, "When nodes that should hold a key are down, the next healthy nodes take its writes so they still succeed. Those stand-ins hold the write for the down node; reads of the key do not see it until it is handed back.").adv(),
 				flag("hintedHandoff", "Hinted handoff", "Repair", false, "A stand-in keeps the writes meant for a node that is down and hands them over when it returns, so it is not left holding old data.").adv(),
+				num("antiEntropySec", "Repair round every", "Repair", 0, 0, 3600, 1, "s", "Every this many seconds the nodes compare what they hold (cheaply, with hash trees) and bring older copies up to date, so a node back from an outage catches up even if nobody reads its keys and no hints were kept. 0 = off.").adv(),
 				flag("readRepair", "Read repair", "Repair", false, "A read that finds a copy older than the newest it saw writes the newest back to it.").adv(),
 				variability("Speed"),
 			},

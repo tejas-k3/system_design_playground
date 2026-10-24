@@ -122,6 +122,8 @@ type node struct {
 	kvDownUntil     []float64        // quorum store: when each cluster node comes back (0 = up)
 	kvHints         map[int][][2]int // quorum store: writes held for a node that is down (key, version), by that node
 	kvHintsReplayed int
+	kvAEOn          bool // the anti-entropy rounds have been scheduled
+	kvAERepairs     int  // copies brought up to date by anti-entropy
 	kvRepairs       int
 	coordDown       []float64 // coordinator: when each cluster node comes back (0 = up)
 	coordLeader     int       // coordinator: the leader, -1 while there is none
