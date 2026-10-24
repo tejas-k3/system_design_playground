@@ -17,6 +17,10 @@ type ChaosRecord struct {
 }
 
 func (s *Sim) fireChaos(ev ChaosEvent) {
+	if ev.Type == "configPush" {
+		s.configPush(ev)
+		return
+	}
 	if ev.Type == "linkDown" {
 		s.linkDown(ev)
 		return
@@ -477,5 +481,37 @@ func (s *Sim) changeEvent(ev ChaosEvent) {
 				}
 			})
 		}
+	}
+}
+
+// configPush gives one setting a new value on every component of a kind (or on one component) at once, as a
+// configuration rollout does, and puts the old values back DurationSec later (0 = it stays).
+func (s *Sim) configPush(ev ChaosEvent) {
+	type old struct {
+		n   *node
+		v   any
+		had bool
+	}
+	var saved []old
+	for _, n := range s.order {
+		if n.removed || n.kind == KClient || (ev.Kind != "" && n.kind != ev.Kind) || (ev.NodeID != "" && ev.Kind == "" && n.id != ev.NodeID) {
+			continue
+		}
+		v, had := n.p[ev.Key]
+		saved = append(saved, old{n, v, had})
+		n.p[ev.Key] = ev.Value
+		s.chaosLog = append(s.chaosLog, ChaosRecord{T: s.now, Type: "configPush", NodeID: n.id, Label: n.label})
+		s.logEvent("configPush", n, 0)
+	}
+	if ev.DurationSec > 0 {
+		s.after(ev.DurationSec*1000, func() {
+			for _, o := range saved {
+				if o.had {
+					o.n.p[ev.Key] = o.v
+				} else {
+					delete(o.n.p, ev.Key)
+				}
+			}
+		})
 	}
 }

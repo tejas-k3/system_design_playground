@@ -139,7 +139,7 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown | replay (a log's consumer groups read the last Factor seconds again) | addNode (a shard router gets one more shard, a copy of its first) | regionDown
+	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown | configPush (Key of every component of Kind, or of NodeID, is set to Value; DurationSec > 0 pushes the old value back) | replay (a log's consumer groups read the last Factor seconds again) | addNode (a shard router gets one more shard, a copy of its first) | regionDown
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`
@@ -153,6 +153,8 @@ type ChaosEvent struct {
 	Zone        string  `json:"zone,omitempty"`        // zoneDown only: every node placed in this zone crashes for DurationSec
 	ToID        string  `json:"toId,omitempty"`        // linkDown only: the connection from NodeID to this node
 	Mode        string  `json:"mode,omitempty"`        // linkDown only: both | replies (requests arrive, answers are lost) | requests
+	Key         string  `json:"key,omitempty"`         // configPush only: the setting to change
+	Value       any     `json:"value,omitempty"`       // configPush only: the value to give it (a number, a text or true/false)
 	PulseSec    float64 `json:"pulseSec,omitempty"`    // slow only: alternate slow and normal every PulseSec until DurationSec is over
 }
 
