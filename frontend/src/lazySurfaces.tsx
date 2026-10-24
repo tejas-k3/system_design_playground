@@ -84,8 +84,10 @@ export function usePreloadSurfaces(): void {
     }
     document.addEventListener('pointerover', hint)
     document.addEventListener('focusin', hint)
-    preloadAllWhenIdle()
+    // let the first screen and its API calls settle before background preloading starts
+    const start = window.setTimeout(preloadAllWhenIdle, 2000)
     return () => {
+      window.clearTimeout(start)
       document.removeEventListener('pointerover', hint)
       document.removeEventListener('focusin', hint)
     }
