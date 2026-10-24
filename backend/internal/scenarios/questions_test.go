@@ -111,6 +111,67 @@ func TestShippedEstimatesMatchHandCalculation(t *testing.T) {
 	}
 }
 
+func TestNewEasyEstimatesMatchTheirPrompts(t *testing.T) {
+	cases := []struct {
+		id     string
+		key    string
+		answer float64
+		facts  []string
+	}{
+		{"daily-storage-estimate", "storageGBPerDay", 20e6 * 500 / 1e9, []string{"20 million", "500 bytes", "1,000,000,000 bytes"}},
+		{"daily-users-rps", "requestsPerSecond", 8.64e6 * 10 / 86400, []string{"8.64 million", "10 requests", "86,400 seconds"}},
+		{"image-egress-bandwidth", "bandwidthGbps", 2500 * 500e3 * 8 / 1e9, []string{"2,500 images", "500 KB", "1,000 bytes per KB", "8 bits per byte"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.id, func(t *testing.T) {
+			q := Q(tc.id)
+			if q == nil {
+				t.Fatal("question is not registered")
+			}
+			if q.Difficulty != "Easy" {
+				t.Errorf("difficulty = %q, want Easy", q.Difficulty)
+			}
+			for _, fact := range tc.facts {
+				if !strings.Contains(q.Prompt, fact) {
+					t.Errorf("prompt does not state %q: %s", fact, q.Prompt)
+				}
+			}
+			if len(q.Fields) != 1 {
+				t.Fatalf("has %d fields, want one", len(q.Fields))
+			}
+			f := q.Fields[0]
+			if f.Key != tc.key {
+				t.Errorf("field key = %q, want %q", f.Key, tc.key)
+			}
+			if math.Abs(f.Expected-tc.answer) > 1e-9 {
+				t.Errorf("answer = %v, arithmetic from the prompt says %v", f.Expected, tc.answer)
+			}
+			if f.Explain == "" {
+				t.Error("field needs to show the working")
+			}
+		})
+	}
+}
+
+func TestNewEstimateUsesExistingGradingRule(t *testing.T) {
+	q := Q("daily-users-rps")
+	if q == nil {
+		t.Fatal("missing daily-users-rps")
+	}
+	for _, c := range []struct {
+		answer  float64
+		verdict string
+	}{{1000, VerdictGood}, {1500, VerdictClose}, {3000, VerdictOff}} {
+		r, err := q.GradeEstimate(map[string]float64{"requestsPerSecond": c.answer})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := r.Fields[0].Verdict; got != c.verdict {
+			t.Errorf("answer %v: verdict %s, want %s", c.answer, got, c.verdict)
+		}
+	}
+}
+
 func TestQuestionJSONNeverCarriesTheAnswerKey(t *testing.T) {
 	for _, q := range AllQuestions() {
 		b, err := json.Marshal(q)
