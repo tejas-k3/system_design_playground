@@ -260,7 +260,7 @@ func (s *Server) getDebrief(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "no such scenario")
 		return
 	}
-	writeJSON(w, 200, map[string]string{"debrief": sc.Debrief})
+	writeJSON(w, 200, map[string]string{"debrief": sc.Debrief, "deeper": sc.Deeper})
 }
 
 func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {

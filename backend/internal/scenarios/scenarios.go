@@ -105,6 +105,7 @@ type Scenario struct {
 	Answer      string                           `json:"-"` // what hint 3 used to say outright; served only by the answer-hint endpoint, behind an extra click
 	Predictions []Prediction                     `json:"predictions,omitempty"`
 	Debrief     string                           `json:"debrief"`
+	Deeper      string                           `json:"-"`                  // optional longer debrief for an experienced engineer, served with the debrief on request
 	Concepts    []string                         `json:"concepts,omitempty"` // ideas it practises, from the fixed Concepts list
 }
 
