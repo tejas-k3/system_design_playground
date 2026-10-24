@@ -128,6 +128,10 @@ var alternatives = map[string][]Alternative{
 		alt("Allow only 15 seconds of lateness", false, 100.0, 132, 0.38, "Clicks that are 20 seconds late still miss the window for part of the time (550 dropped on this seed instead of 1,788): a partial fix, because lateness has to cover the latest click you want to count.", Change{"clicks", "allowedLatenessSec", 15.0}),
 		alt("Make the windows 60 seconds long", false, 100.0, 132, 0.38, "Longer windows catch more late clicks (536 dropped), but the totals are now per minute, not per ten seconds, and the dashboard waits longer for each.", Change{"clicks", "windowSec", 60.0}),
 	},
+	"unique-visitors": {
+		alt("HyperLogLog with 16 bits of precision", false, 100.0, 132, 0.38, "Almost exact (0.04% off), but its 65,536 registers take 64 KB: more than the 16 KB budget, and nearly as much as the exact table. Precision you do not need is memory you pay for.", Change{"visitors", "counting", "hyperLogLog"}, Change{"visitors", "hllPrecision", 16.0}),
+		alt("HyperLogLog with 10 bits of precision", true, 100.0, 132, 0.38, "1 KB and about 3% off on this seed: inside both the memory and the 6% limits. A legitimate cheaper answer; a smaller sketch passes on some seeds and not others, so it is not a safe choice.", Change{"visitors", "counting", "hyperLogLog"}, Change{"visitors", "hllPrecision", 10.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
