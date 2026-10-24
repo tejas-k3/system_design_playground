@@ -55,7 +55,7 @@ export function ScenarioPicker() {
   return (
     <div className="modal-back" role="dialog" aria-modal aria-label="Challenges" onClick={() => setUi({ picker: false })}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-        <header className="modal-head">
+        <header className="modal-head picker-head">
           <h2>Challenges</h2>
           <button onClick={() => setUi({ picker: false, skills: true })}>Skill map</button>
           <button className="x" autoFocus onClick={() => setUi({ picker: false })} aria-label="Close">×</button>
