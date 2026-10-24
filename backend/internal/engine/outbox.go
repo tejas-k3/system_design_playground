@@ -19,6 +19,7 @@ func (s *Sim) eventWrite(n *node, c *call, mode string, done func(Result)) bool 
 		return false
 	}
 	ec := *c
+	qe.to.watchIds = true
 	s.dbWrite(n, c, func(res Result) {
 		if !res.OK {
 			done(res)
@@ -48,4 +49,25 @@ func (s *Sim) eventWrite(n *node, c *call, mode string, done func(Result)) bool 
 		})
 	})
 	return true
+}
+
+// eventRepeat is whether a queue, topic or log has already accepted this message id. It only watches the targets of an
+// event publisher. With dedupeIds the repeat is acknowledged without being stored again; without it the repeat is
+// counted and stored like any other message.
+func (s *Sim) eventRepeat(n *node, c *call) (repeat, drop bool) {
+	if !n.watchIds || c.rid == 0 {
+		return false, false
+	}
+	if n.seenIds == nil {
+		n.seenIds = map[int]struct{}{}
+	}
+	if _, seen := n.seenIds[c.rid]; seen {
+		drop := n.b("dedupeIds")
+		if c.counted && !drop {
+			s.runEventDups++ // stored a second time: the consumers will see it twice
+		}
+		return true, drop
+	}
+	n.seenIds[c.rid] = struct{}{}
+	return false, false
 }

@@ -837,6 +837,10 @@ func (s *Sim) loseRedisData(n *node) {
 // ---- queue + workers ----------------------------------------------------------------
 
 func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
+	if _, drop := s.eventRepeat(n, c); drop {
+		s.after(0.2, func() { s.okAt(n, Result{Ver: -1, Done: true}, cb) })
+		return
+	}
 	if !c.write {
 		s.failAt(n, RNoRoute, cb)
 		return
@@ -1141,6 +1145,10 @@ func (s *Sim) gather(n *node, c *call, es []*edge, need int, partial bool, done 
 // is acknowledged at once: it never waits for, or hears about, a slow subscriber. A subscriber whose backlog is
 // full loses its copy (counted as a lost delivery).
 func (s *Sim) arriveTopic(n *node, c *call, cb func(Result)) {
+	if _, drop := s.eventRepeat(n, c); drop {
+		s.after(0.2, func() { s.okAt(n, Result{Ver: -1, Done: true}, cb) })
+		return
+	}
 	if !c.write {
 		s.failAt(n, RNoRoute, cb)
 		return
@@ -1248,6 +1256,10 @@ func (s *Sim) workerLag(q, w *node) int {
 }
 
 func (s *Sim) arriveLog(n *node, c *call, cb func(Result)) {
+	if _, drop := s.eventRepeat(n, c); drop {
+		s.after(0.2, func() { s.okAt(n, Result{Ver: -1, Done: true}, cb) })
+		return
+	}
 	if !c.write {
 		s.failAt(n, RNoRoute, cb)
 		return

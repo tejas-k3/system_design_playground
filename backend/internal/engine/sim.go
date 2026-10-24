@@ -198,7 +198,9 @@ type node struct {
 	// rate limiter
 	tokens           float64
 	tokensAt         float64
-	tokTokens, tokAt float64 // rate limiter counting tokens: the allowance left and when it was last topped up
+	tokTokens, tokAt float64          // rate limiter counting tokens: the allowance left and when it was last topped up
+	seenIds          map[int]struct{} // queue, topic or log fed by an event publisher: the ids it has accepted, to find repeats
+	watchIds         bool             // the node is the target of an event publisher
 
 	// database
 	openConns int
@@ -319,6 +321,7 @@ type Sim struct {
 	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
 	runInconsistent, runCompensated, runStuck int   // multi-step writes left half done, rolled back, and rolled back unsuccessfully
 	runEventsLost                             int
+	runEventDups                              int     // events accepted a second time by a queue (the producer retried after a timeout)
 	runInDoubt                                int     // two-phase commits left waiting for a crashed coordinator
 	runBlockedSec                             float64 // lock-seconds those waited
 	inDoubt                                   []inDoubtRec
