@@ -4,6 +4,7 @@ import { describeDiff, diffDiagrams } from '../model/diff'
 import { goalCost, goalRows, starTargets } from '../model/goals'
 import { isNarrow } from '../model/responsive'
 import { reset } from '../sim/bridge'
+import { loadAnswer } from '../state/learning'
 import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
 import { Rich } from './Term'
@@ -93,6 +94,7 @@ export function ScenarioPanel() {
               {sc.hints.map((h, i) => <li key={i}><Rich text={h} /></li>)}
             </ol>
           )}
+          {sc.answer && <p className="answer" role="note"><b>The answer:</b> <Rich text={sc.answer} /></p>}
           {sc.result?.pass && !sc.compare && !def.open && (
             <p>
               <button onClick={async () => {
@@ -116,6 +118,20 @@ export function ScenarioPanel() {
                 setAsking(false)
               }
             }}>{sc.hintLevel === 0 ? 'Give me a hint' : sc.hintLevel < def.hintCount ? 'Another hint' : 'No more hints'}</button>
+            {sc.hintLevel >= def.hintCount && !sc.answer && <button
+              disabled={asking}
+              title="Show the full answer. The challenge will be marked for review on the skill map."
+              onClick={async () => {
+                setAsking(true)
+                try {
+                  await loadAnswer(def.id)
+                } finally {
+                  setAsking(false)
+                }
+              }}
+            >
+              Show the answer
+            </button>}
             {!def.open && <button
               disabled={sc.hintLevel < def.hintCount}
               title={sc.hintLevel < def.hintCount ? 'Use all three hints first' : 'Replace your design with the reference solution'}

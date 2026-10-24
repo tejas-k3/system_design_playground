@@ -1,4 +1,6 @@
 import type { ScenarioSummary } from '../api/types'
+import type { LearnerLevel } from './level'
+import { needsReview, type ChallengeRecord } from './record'
 
 /** The concepts the backend tags challenges with, in the order the skill map lists them, with their names. */
 export const CONCEPT_LABELS: Record<string, string> = {
@@ -23,11 +25,12 @@ export interface SkillRow {
   solved: number // of those, with at least one star
   stars: number
   maxStars: number
+  review: string[] // passed challenges here that needed the answer or had a wrong prediction
   next?: string // the challenge to try next: lowest stars, easiest first; none once all have three
 }
 
 /** One row for each concept some challenge is tagged with. A pure function of the challenge list and the stars earned. */
-export function skillMap(list: ScenarioSummary[], progress: Record<string, number>): SkillRow[] {
+export function skillMap(list: ScenarioSummary[], progress: Record<string, number>, level: LearnerLevel = 'all', records: Record<string, ChallengeRecord> = {}): SkillRow[] {
   const by = new Map<string, ScenarioSummary[]>()
   for (const s of list) for (const c of s.concepts ?? []) by.set(c, [...(by.get(c) ?? []), s])
   const known = Object.keys(CONCEPT_LABELS)
@@ -35,7 +38,8 @@ export function skillMap(list: ScenarioSummary[], progress: Record<string, numbe
   return order.map((concept) => {
     const items = by.get(concept)!
     const stars = (s: ScenarioSummary) => progress[s.id] ?? 0
-    const candidates = items.filter((s) => stars(s) < 3).sort((a, b) => stars(a) - stars(b) || DIFFICULTY.indexOf(a.difficulty) - DIFFICULTY.indexOf(b.difficulty))
+    const mine = (s: ScenarioSummary) => (level !== 'all' && s.level === level ? 0 : 1) // the chosen level first, then the old rule
+    const candidates = items.filter((s) => stars(s) < 3).sort((a, b) => mine(a) - mine(b) || stars(a) - stars(b) || DIFFICULTY.indexOf(a.difficulty) - DIFFICULTY.indexOf(b.difficulty))
     return {
       concept,
       label: CONCEPT_LABELS[concept] ?? concept,
@@ -44,6 +48,7 @@ export function skillMap(list: ScenarioSummary[], progress: Record<string, numbe
       stars: items.reduce((n, s) => n + stars(s), 0),
       maxStars: items.length * 3,
       next: candidates[0]?.id,
+      review: items.filter((s) => needsReview(records[s.id])).map((s) => s.id),
     }
   })
 }

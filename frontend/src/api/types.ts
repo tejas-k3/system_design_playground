@@ -209,7 +209,10 @@ export interface ScenarioSummary {
   configOnly?: boolean
   open?: boolean // a blank canvas with requirements; the load is hidden and there is no solution to show
   concepts?: string[] // the ideas it practises (see model/skills.ts)
+  level?: Level // who it is aimed at; absent from an older server
 }
+
+export type Level = 'sde1' | 'sde2' | 'sde3'
 
 export interface Scenario extends ScenarioSummary {
   story: string

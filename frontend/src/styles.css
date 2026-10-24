@@ -315,3 +315,10 @@ ul.templates button { display: grid; gap: 6px; text-align: left; width: 100%; pa
 .term-tip.open { visibility: visible; }
 .term-try { display: block; margin-top: 6px; }
 .alts th { text-align: left; font-weight: 600; padding: 4px 6px; } .alts td { vertical-align: top; }
+.level-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; } .welcome .level-switch { justify-content: center; }
+.card em.lvl { font-weight: 600; letter-spacing: .02em; color: var(--text, inherit); border: 1px solid var(--border, #888); border-radius: 4px; padding: 0 5px; align-self: flex-start; }
+.level-divider { margin-top: 18px; padding-top: 8px; border-top: 2px dashed var(--border, #888); color: var(--muted); }
+.review { font-size: 11px; font-weight: 600; border: 1px dashed var(--warn); border-radius: 999px; padding: 1px 8px; color: var(--warn); cursor: help; }
+.review::before { content: '\21BB\00a0'; }
+.answer { border-left: 3px solid var(--accent); padding-left: 8px; }
+.deeper { margin: 8px 0; }
