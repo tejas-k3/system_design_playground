@@ -239,6 +239,8 @@ function nodeSubtitle(n: Node, sc: Scene): string {
       return `${rp.nodes} nodes, ${rp.electionTimeoutMs} ms election`
     case 'kvStore':
       return `N=${rp.replicas} R=${rp.readQuorum} W=${rp.writeQuorum}`
+    case 'vectorStore':
+      return `${rp.vectors} M vectors, ef ${rp.efSearch}`
     case 'llmServer':
       return `${rp.gpus} GPU, batch ${rp.batchSize}`
     case 'stream':
