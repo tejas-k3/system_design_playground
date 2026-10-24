@@ -132,6 +132,11 @@ var alternatives = map[string][]Alternative{
 		alt("HyperLogLog with 16 bits of precision", false, 100.0, 132, 0.38, "Almost exact (0.04% off), but its 65,536 registers take 64 KB: more than the 16 KB budget, and nearly as much as the exact table. Precision you do not need is memory you pay for.", Change{"visitors", "counting", "hyperLogLog"}, Change{"visitors", "hllPrecision", 16.0}),
 		alt("HyperLogLog with 10 bits of precision", true, 100.0, 132, 0.38, "1 KB and about 3% off on this seed: inside both the memory and the 6% limits. A legitimate cheaper answer; a smaller sketch passes on some seeds and not others, so it is not a safe choice.", Change{"visitors", "counting", "hyperLogLog"}, Change{"visitors", "hllPrecision", 10.0}),
 	},
+	"top-ten": {
+		alt("A sketch only 40 counters wide", false, 100.0, 132, 0.38, "Under a kilobyte, but with 200,000 items sharing 80 counters every counter is inflated by thousands of other items and the top ten is mostly wrong (2 of 10 found).", Change{"trending", "topK", "countMin"}, Change{"trending", "sketchWidth", 40.0}, Change{"trending", "sketchDepth", 2.0}),
+		alt("A sketch 4,000 counters wide and 4 deep", false, 100.0, 132, 0.38, "Finds the whole top ten, but its 16,000 counters take 63 KB: nearly as much as the exact table and far over the 16 KB budget.", Change{"trending", "topK", "countMin"}, Change{"trending", "sketchWidth", 4000.0}, Change{"trending", "sketchDepth", 4.0}),
+		alt("A sketch 300 counters wide and 3 deep", true, 100.0, 132, 0.38, "4 KB, and it finds 9 or 10 of the top ten on every seed tried: a cheaper answer that still passes. The head of a Zipf crowd is so far ahead of the rest that it survives a lot of sharing.", Change{"trending", "topK", "countMin"}, Change{"trending", "sketchWidth", 300.0}, Change{"trending", "sketchDepth", 3.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

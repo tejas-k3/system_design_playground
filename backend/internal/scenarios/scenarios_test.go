@@ -293,6 +293,15 @@ func TestAlternateSolutions(t *testing.T) {
 			t.Fatalf("65,536 registers are 64 KB, over the 16 KB budget: %+v kb %.1f", res.Checks, res.Run.StateKB)
 		}
 	})
+	t.Run("top-ten: a tiny sketch misses the top ten, a huge one breaks the memory", func(t *testing.T) {
+		sc := Get("top-ten")
+		for _, c := range []struct{ w, d float64 }{{40, 2}, {4000, 4}} {
+			d := withParam(withParam(withParam(sc.Diagram, "trending", "topK", "countMin"), "trending", "sketchWidth", c.w), "trending", "sketchDepth", c.d)
+			if res := engine.RunToEnd(d, sc.Options(42), sc.Goals); res.Pass {
+				t.Fatalf("width %.0f depth %.0f should fail: %+v", c.w, c.d, res.Checks)
+			}
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram
