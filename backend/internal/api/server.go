@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -132,9 +133,31 @@ func logRequests(next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, code: 200}
 		next.ServeHTTP(sw, r)
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/healthz" {
-			log.Printf("%s %s %d %s", r.Method, r.URL.Path, sw.code, time.Since(start).Round(time.Millisecond))
+			log.Printf("%s %s %d %s", r.Method, routeLabel(r), sw.code, time.Since(start).Round(time.Millisecond))
 		}
 	})
+}
+
+// routeLabel is the mux pattern that served the request without its method ("/api/designs/{id}"),
+// never the raw path, which can carry a design id. Unmatched requests and 405s have no pattern.
+func routeLabel(r *http.Request) string {
+	if _, route, ok := strings.Cut(r.Pattern, " "); ok {
+		return route
+	}
+	if r.Pattern != "" {
+		return r.Pattern
+	}
+	return "(unmatched)"
+}
+
+// pathFreeErr drops the file path from an *fs.PathError (it holds the design id) and keeps the
+// operation and the underlying cause.
+func pathFreeErr(err error) string {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return pe.Op + ": " + pe.Err.Error()
+	}
+	return err.Error()
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -359,15 +382,11 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 		}
 		opts.StopTrafficAtMs = dur * 1000
 	}
-	select {
-	case s.runSlots <- struct{}{}:
-		defer func() { <-s.runSlots }()
-	default:
-		s.metrics.runsRefused.Add(1)
-		w.Header().Set("Retry-After", "2")
-		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+	release, ok := s.acquireRunSlot(w)
+	if !ok {
 		return
 	}
+	defer release()
 	sim := engine.New(d, opts)
 	deadline := time.Now().Add(10 * time.Second)
 	limit := opts.StopTrafficAtMs + 60000
@@ -385,6 +404,21 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 		resp.Score = &sc
 	}
 	writeJSON(w, 200, resp)
+}
+
+// acquireRunSlot takes one of the headless-run slots. When all are busy it counts the refusal, writes
+// the 503 (Retry-After 2) and returns ok=false, and the caller just returns. Otherwise the caller
+// must call release when the run is over (defer it).
+func (s *Server) acquireRunSlot(w http.ResponseWriter) (release func(), ok bool) {
+	select {
+	case s.runSlots <- struct{}{}:
+		return func() { <-s.runSlots }, true
+	default:
+		s.metrics.runsRefused.Add(1)
+		w.Header().Set("Retry-After", "2")
+		writeErr(w, http.StatusServiceUnavailable, "too many simulations running, try again shortly")
+		return nil, false
+	}
 }
 
 // saveDesign stores a diagram (sanitized first) and returns the id that opens it.
@@ -412,7 +446,7 @@ func (s *Server) saveDesign(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := s.designs.Put(d)
 	if err != nil {
-		log.Printf("save design: %v", err)
+		log.Printf("save design: %s", pathFreeErr(err))
 		writeErr(w, http.StatusInternalServerError, "could not save the design")
 		return
 	}
