@@ -306,6 +306,43 @@ var alternatives = map[string][]Alternative{
 		alt("Serve 100 KB images instead of 300 KB", false, 100.0, 229, 4.38, "A third of the bytes is a third of the egress, but it is still $4.38 an hour against the $2.50 budget.", Change{"users", "respKB", 100.0}),
 		alt("Give the app server only 8 threads", false, 69.2, 955, 7.08, "Saving on the server does not help: the bill is the bandwidth, and slowing the server only makes requests fail.", Change{"app", "threads", 8.0}),
 	},
+	"disk-writes": {
+		alt("Keep one secondary index instead of none", true, 100.0, 212, 1.26, "Passes: one index costs one more disk write per row and the disk has room for it (p95 212 ms against 177 ms without any). Keep an index only if something reads by that field.", Change{"db", "indexes", 1.0}),
+		alt("Keep two secondary indexes", false, 100.0, 738, 1.26, "Each index is another disk write per row, and with two the disk queue builds up: the p95 is 738 ms. The limit is the disk's operations per second, not the connections.", Change{"db", "indexes", 2.0}),
+		alt("Give the disk 400 operations a second instead of 200", true, 100.0, 244, 1.26, "Passes with all three indexes kept: a faster disk is the other way to afford the writes. The model does not charge for disk speed; a real fast disk does.", Change{"db", "diskIops", 400.0}),
+		alt("Give the database 64 connections", false, 80.7, 1536, 1.86, "The connections were never the limit: the disk is. More of them only queue more writes at the same disk, and the bill goes up.", Change{"db", "connections", 64.0}),
+	},
+	"pick-the-store": {
+		alt("Use a wide-column store", true, 100.0, 146, 2.46, "Passes, as the time-series preset does: writes cost 40% of the baseline. A wide-column store gives up lookups by anything but the partition key, which a sensor firehose that is never read back does not need.", Change{"db", "model", "wideColumn"}),
+		alt("Use a document store", false, 85.8, 1075, 2.46, "A document store only makes single-key writes about 20% cheaper. Better (86% succeed) but not enough: the saving is too small for this volume of writes.", Change{"db", "model", "document"}),
+		alt("Give the database 64 connections", false, 74.2, 1260, 3.32, "More connections let more of the expensive inserts run at once on the same relational engine; it is over budget and barely better.", Change{"db", "connections", 64.0}),
+	},
+	"poison-pill": {
+		alt("Park failed jobs in a dead-letter queue, nothing else", false, 100.0, 129, 1.14, "No job is lost any more, but each bad job is still tried ten times first, and those retries hold the workers: the processing delay is 5.7 seconds against the 1.5 allowed.", Change{"q", "deadLetter", true}),
+		alt("Give up after 3 attempts, nothing else", false, 100.0, 132, 1.14, "The bad jobs stop wasting workers, but with nowhere to go they vanish: 226 jobs are lost. Fewer attempts and somewhere to put the failures go together.", Change{"q", "maxAttempts", 3.0}),
+		alt("Run 16 workers instead of 8", false, 100.0, 129, 1.24, "More workers get through the retries faster, but the bad jobs are still dropped after ten tries (92 lost) and the bill rises.", Change{"w", "concurrency", 16.0}),
+	},
+	"consumer-lag": {
+		alt("Split the log into 8 partitions", false, 100.0, 129, 1.26, "Now all eight consumers have work, and the delay falls from 37 seconds to 9.9, but that is still five times the 2 seconds allowed.", Change{"log", "partitions", 8.0}),
+		alt("Split the log into 32 partitions", true, 100.0, 132, 1.44, "Passes: more partitions than consumers is fine, each consumer takes several, and it leaves room to add consumers later. The extra partitions cost $0.12 an hour more here.", Change{"log", "partitions", 32.0}),
+		alt("Give each of the first four consumers 4 threads", false, 100.0, 129, 1.33, "Four partitions can feed only four consumers at once, and giving those four more threads changes nothing (the delay stays at 37 seconds). The partitions, not the threads, set the parallelism.", Change{"c1", "concurrency", 4.0}, Change{"c2", "concurrency", 4.0}, Change{"c3", "concurrency", 4.0}, Change{"c4", "concurrency", 4.0}),
+	},
+	"bad-deploy": {
+		alt("Send 25% of requests to the new version", false, 84.7, 154, 2.21, "A bigger canary exposes more users to the bad release before it is noticed: 85% succeed, under the 92% needed.", Change{"lb", "canaryPct", 25.0}),
+		alt("Send only 1% of requests to the new version", true, 99.3, 154, 2.21, "Passes with the fewest failures. The price is not visible in this run: a canary this small sees very few requests, so a real regression would take longer to show up.", Change{"lb", "canaryPct", 1.0}),
+		alt("Eject servers that error a lot", false, 78.6, 154, 2.21, "Helps a little (79% against 69%), but the balancer has to see the errors before it reacts, and by then many requests have failed; a canary limits the exposure from the start.", Change{"lb", "outlierEjection", true}),
+		alt("Let clients retry twice", false, 92.5, 582, 2.21, "A retry usually reaches a good server, so the success rate is just enough, but every rescued request waited out its timeout and the p95 is 582 ms.", Change{"users", "retries", 2.0}),
+	},
+	"upload-500kb": {
+		alt("Raise the queue's message limit to 1 MB", true, 100.0, 132, 0.62, "Passes by letting the queue carry the whole 500 KB body. It works here; a managed queue usually caps messages near 256 KB, and carrying bodies through a queue is the slow path the claim-check pattern avoids.", Change{"q", "maxMessageKB", 1024.0}),
+		alt("Compress uploads to 200 KB", true, 100.0, 132, 0.62, "Passes by getting under the 256 KB limit: a legitimate fix when the data compresses, but a limit on what the product can accept.", Change{"users", "reqKB", 200.0}),
+		alt("Run 32 workers instead of 8", false, 0.0, 0, 0.92, "Every upload is still refused at the queue, before any worker sees it: nothing succeeds, and the bill goes up.", Change{"w", "concurrency", 32.0}),
+	},
+	"one-slow-server": {
+		alt("Eject servers that are much slower than their peers", true, 100.0, 161, 0.62, "Passes with a lower p95 than the reference: the slow server is taken out of rotation until it recovers. The reference's least-connections routing avoids it without removing it.", Change{"lb", "outlierEjection", true}),
+		alt("Give every server 16 threads", true, 100.0, 321, 1.35, "Passes by giving the slow server enough threads to absorb its share, for more than twice the cost; the slow server is still sent a quarter of the traffic.", Change{"app1", "threads", 16.0}, Change{"app2", "threads", 16.0}, Change{"app3", "threads", 16.0}, Change{"app4", "threads", 16.0}),
+		alt("Let clients retry twice", false, 99.8, 1476, 0.62, "A retry usually lands on another server, so nearly all succeed, but each rescued request has already waited out its timeout: the p95 is almost 1.5 seconds.", Change{"users", "retries", 2.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
