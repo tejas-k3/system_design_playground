@@ -29,7 +29,7 @@ func init() {
 			"Drag from the app server's edge handle to the database to draw a connection.",
 			"Use the connect tool, click the app server, then click the database.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "With one app server and one database, what limits throughput first?", Options: []string{"App server threads", "Database disk", "The network"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "With one app server and one database, what limits throughput first?", Options: []string{"The app server's threads", "The database's disk speed", "Bandwidth between the two boxes"}, Answer: 0,
 			Explain: "Each request holds a thread for CPU plus the database wait; 8 threads at ~40 ms each serve about 200 requests per second."}},
 		Debrief: "Every request travels users → app → database and back. Latency is the sum of the hops plus the time spent waiting for a free thread. Keep that picture in mind: every later challenge is about where the waiting happens.",
 	})
@@ -94,7 +94,7 @@ func init() {
 			"Put a cache between the app servers and the database.",
 			"Connect each app server to a cache, and the cache to the database so misses are fetched for you.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A skewed workload with a cache holding the hottest 40% of items will hit roughly...", Options: []string{"40% of the time", "Far more than 40%", "Almost never"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A skewed workload with a cache holding the hottest 40% of items will hit roughly...", Options: []string{"About 40%: hit rate follows cache size", "Far above 40%: the hot items are in it", "Under 40%: hot items get evicted first"}, Answer: 1,
 			Explain: "Popularity is skewed, so a small fraction of items accounts for most requests. A modest cache absorbs most reads."}},
 		Debrief: "Caches work because access is skewed. The {{cache-hit-rate|hit rate}} is not the cache size over the data size, it is the share of requests that land on the items you kept.",
 	})
@@ -119,7 +119,7 @@ func init() {
 			"Pools should add up to less than the database limit, leaving headroom.",
 			"Six servers × a pool of 10 is 60 connections, under the limit of 64.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "If you shrink the pool, what happens to requests that cannot get a connection?", Options: []string{"They are refused immediately", "They wait for a free connection", "They are retried by the database"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "If you shrink the pool, what happens to requests that cannot get a connection?", Options: []string{"They are refused with an error at once", "They wait for a free connection", "They open a temporary extra connection"}, Answer: 1,
 			Explain: "A pool makes callers wait for a free connection instead of opening a new one, which keeps the database healthy."}},
 		Debrief: "Connection pools protect the database from the fleet in front of it. Pool size is a budget shared by every server: per-server pool × number of servers must stay under the database's limit.",
 	})
@@ -151,7 +151,7 @@ func init() {
 			"Back off exponentially, retry less, and make servers drop work nobody is waiting for.",
 			"Try: exponential backoff, 2 retries, newest-first queue, a short max queue wait, and a call timeout with a circuit breaker.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "With oldest-first queues under overload, who gets served?", Options: []string{"Users still waiting", "Users who already gave up", "Nobody"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "With oldest-first queues under overload, who gets served?", Options: []string{"Users who are still waiting for an answer", "Users who have already given up", "Whoever sent the cheapest request"}, Answer: 1,
 			Explain: "The oldest requests are the ones whose callers have likely timed out. Serving them wastes capacity; newest-first or a queue timeout avoids it."}},
 		Debrief: "A {{retry-storm|retry storm}} is a feedback loop: slowness causes timeouts, timeouts cause retries, retries cause slowness. Break it with backoff and jitter, bounded retries, {{load-shedding|load shedding}} and {{circuit-breaker|circuit breakers}}.",
 	})
@@ -184,7 +184,7 @@ func init() {
 			"Reads that need freshness should go to the primary, and writes should clear stale cache entries.",
 			"Set the app server's read routing to 'By freshness' and the cache to invalidate on writes.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why does a 2 second replication lag matter even though the replica is 'a copy'?", Options: []string{"Reads may return versions older than a recent write", "Writes get slower", "The replica refuses connections"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "Why does a 2 second replication lag matter even though the replica is 'a copy'?", Options: []string{"Reads may return versions older than a recent write", "Writes take longer because they wait for the replica", "The replica refuses reads until it catches up"}, Answer: 0,
 			Explain: "A replica applies writes after a delay, so a read right after a write can miss it."}},
 		Debrief: "Caches and replicas trade freshness for speed. Decide per read how stale is acceptable, route accordingly, and invalidate on writes so the cache does not outlive the truth.",
 	})
@@ -214,7 +214,7 @@ func init() {
 			"The database can serialize writes per item, or Redis can hand out a lock.",
 			"Turn on row locks in the database, or add Redis and give the app server a lock wait.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A fail-fast Redis lock (no wait) will…", Options: []string{"Reject some honest bookings that collide", "Never double book and never reject", "Make the database slower"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "A fail-fast Redis lock (no wait) will…", Options: []string{"Reject some honest bookings that collide", "Allow a few double bookings under load", "Queue colliding bookings until the lock frees"}, Answer: 0,
 			Explain: "Failing fast avoids double bookings but turns every collision into an error unless you wait a little for the lock."}},
 		Debrief: "Correctness under concurrency needs an explicit mechanism: row locks, optimistic version checks, or a distributed lock with a lease. Locks have costs: contention, waiting, and expiry races.",
 	})
@@ -240,7 +240,7 @@ func init() {
 			"The server needs a way to recognise a retry of the same request.",
 			"Enable idempotency keys on the app server.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "What does an idempotency key guarantee?", Options: []string{"The write is applied at most once per key", "The write is faster", "The client never retries"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "What does an idempotency key guarantee?", Options: []string{"The write is applied at most once per key", "The request is sent to the server only once", "The request can never be lost on the way"}, Answer: 0,
 			Explain: "The server remembers the key and returns the earlier outcome instead of applying the write again."}},
 		Debrief: "Retries are only safe for idempotent operations. Make writes idempotent with a client-supplied key, then retry freely.",
 	})
@@ -269,7 +269,7 @@ func init() {
 			"The database has an isolation level. The default lets overlapping read-modify-write transfers overwrite each other.",
 			"Raise the isolation level on the database to serializable and watch what it costs under contention.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Moving to a stronger isolation level will…", Options: []string{"Never change throughput", "Make overlapping transfers wait for each other or abort", "Make every read slower"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Moving to a stronger isolation level will…", Options: []string{"Make every transfer slower, overlapping or not", "Make overlapping transfers wait or abort", "Stop transfers from ever being aborted"}, Answer: 1,
 			Explain: "Stronger isolation turns silent overwrites into waiting (locks) or errors (aborts and deadlocks): correctness is paid for with latency under contention."}},
 		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how hot the shared rows are.",
 	})
@@ -305,7 +305,7 @@ func init() {
 			"Decouple the slow call: acknowledge the request now, do the vendor work later.",
 			"Move the vendor call off the request path: app servers → queue → worker → vendor.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "If the vendor's latency doubles, what happens to the user once the vendor call is behind a queue?", Options: []string{"User latency doubles", "User latency is unchanged; the backlog grows", "Requests fail"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "If the vendor's latency doubles, what happens to the user once the vendor call is behind a queue?", Options: []string{"User latency doubles, since the vendor is still called", "Users see no change; the backlog grows instead", "Requests fail, as the queue cannot hold them"}, Answer: 1,
 			Explain: "The queue absorbs the slowness. Users get a quick acknowledgement while workers fall behind."}},
 		Debrief: "Anything slow, unreliable or non-essential for the response belongs behind a queue. You trade immediacy for resilience and must watch the backlog.",
 	})
@@ -338,7 +338,7 @@ func init() {
 			"A queue plus workers lets the database work at its own pace.",
 			"Insert a message queue and a worker between the app server and the database.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "What do you lose by putting a queue in front of the database?", Options: []string{"Nothing", "Immediate consistency: data lands a little later", "The ability to scale"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "What do you lose by putting a queue in front of the database?", Options: []string{"Throughput: each write takes an extra hop through it", "Immediate consistency: data lands a little later", "Atomicity: a write may be left half applied"}, Answer: 1,
 			Explain: "The write is acknowledged before it is applied, so readers may briefly not see it."}},
 		Debrief: "A queue is a shock absorber: it converts a rate spike into a delay. It must be big enough for the spike and workers must eventually catch up.",
 	})
@@ -365,7 +365,7 @@ func init() {
 			"Capacity planning is 'N+1': survive losing one node.",
 			"Run enough servers that the survivors can carry 350 rps, for example four 8-thread servers.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why do a few requests still fail even in a well-sized system?", Options: []string{"The balancer takes a moment to notice the failure", "The database is slow", "Caches are cold"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "Why do a few requests still fail even in a well-sized system?", Options: []string{"The balancer takes a moment to notice the failure", "The database drops connections when a peer dies", "Clients keep the dead server's address cached"}, Answer: 0,
 			Explain: "Health checks run periodically, so for a couple of seconds the balancer still sends traffic to a dead server."}},
 		Debrief: "Redundancy only helps if the survivors have headroom. Shorter health-check intervals shrink the blip, at the price of more checking.",
 	})
@@ -399,7 +399,7 @@ func init() {
 			"An in-memory store with sorted sets answers rank queries in microseconds.",
 			"Add Redis and connect every app server to it.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Redis runs commands on one thread. Is that a problem at 300 requests per second?", Options: []string{"Yes, it will queue", "No, each command takes microseconds", "Only for writes"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Redis runs commands on one thread. Is that a problem at 300 requests per second?", Options: []string{"Yes: commands are queued one at a time", "No: each command takes only microseconds", "Only for writes, as reads run in parallel"}, Answer: 1,
 			Explain: "Cheap commands finish in about a tenth of a millisecond, so one thread handles thousands per second."}},
 		Debrief: "Use the data structure that matches the question. Sorted sets make 'who is in the top 10' cheap where a relational sort is not.",
 	})
@@ -426,7 +426,7 @@ func init() {
 			"A spatial index lets the database jump to the neighbourhood instead of scanning.",
 			"Turn on the spatial index in the database settings.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A spatial index mainly improves…", Options: []string{"Write speed", "Proximity searches", "Network latency"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A spatial index mainly improves…", Options: []string{"Write throughput", "Proximity searches", "Network latency"}, Answer: 1,
 			Explain: "Spatial indexes organise points by location so a proximity query touches only nearby entries."}},
 		Debrief: "The cheapest scaling fix is often a better index. Measure first: the database was doing 25× the work for every search.",
 	})
@@ -453,7 +453,7 @@ func init() {
 			"Open the Redis settings and look at what it says about persistence.",
 			"Switch Redis persistence to the append-only file: a crash then loses at most the last second of writes.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "With an append-only file, what is the most you can lose in a crash?", Options: []string{"Nothing at all", "About the last second of writes", "Everything since the last backup"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "With an append-only file, what is the most you can lose in a crash?", Options: []string{"Nothing at all, as every write is logged first", "About the last second of writes", "Everything since the last backup was taken"}, Answer: 1,
 			Explain: "The file is flushed about once a second, so writes acknowledged since the last flush can still be lost."}},
 		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose how many seconds of data you can afford to lose, then pick the setting that guarantees it.",
 	})
@@ -481,7 +481,7 @@ func init() {
 			"The database can promote a replica when it fails. Look at its 'If it fails' setting, and at how long it takes to notice and to switch.",
 			"Promote a replica, shorten the detection and promotion times, and shrink the replica's replication lag: whatever it had not copied yet is lost.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "The replica is 3 seconds behind and gets promoted. What happens to the writes from the last 3 seconds before the crash?", Options: []string{"They are safe: the primary saved them", "They are lost: the replica never received them", "They are replayed when the old primary returns"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "The replica is 3 seconds behind and gets promoted. What happens to the writes from the last 3 seconds before the crash?", Options: []string{"They are safe: the primary had saved them", "They are lost: the replica never received them", "They are replayed when the old primary returns"}, Answer: 1,
 			Explain: "Asynchronous replication acknowledges a write before the replica has it, so a failover keeps only what had already been copied."}},
 		Debrief: "Failover has two costs. Time: while the failure is noticed and a replica takes over, nothing can write. Data: with asynchronous replication, whatever the replica had not yet copied is gone. Both are settings you choose: faster detection risks false alarms, and a smaller lag costs the primary more work.",
 	})
@@ -508,7 +508,7 @@ func init() {
 			"Open the App Server's settings, choose 'Show advanced' and look at the Scaling group.",
 			"Turn on autoscaling, then lower the target busy level: new servers take 20 seconds to boot, so they must be ordered while the old ones still have room.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A new server takes 20 seconds to boot and traffic climbs for a minute. When should the scaler start adding servers?", Options: []string{"As late as possible, to save money", "Early, while the existing servers still have spare room", "Only once requests start failing"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A new server takes 20 seconds to boot and traffic climbs for a minute. When should the scaler start adding servers?", Options: []string{"As late as possible, to keep the monthly bill low", "Early, while servers still have spare room", "Only once requests have actually started failing"}, Answer: 1,
 			Explain: "Capacity ordered now only arrives in 20 seconds. A scaler that waits until the servers are full has already started failing requests by the time help arrives."}},
 		Debrief: "Autoscaling trades money for time. A low target busy level orders servers early and costs more; a high one is cheap and late. Boot time sets how far ahead you must look, and a wait before removing servers stops the fleet flapping. The very large fixed fleet works too, but costs all day what you only need at the peak.",
 	})
@@ -535,7 +535,7 @@ func init() {
 			"Every waiting request holds a thread. Look at the app server's 'Call timeout': zero means wait forever.",
 			"Give calls to the database a timeout of a few hundred milliseconds so threads come back, and turn on the circuit breaker so servers stop trying while the database is unreachable.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A server calls a database that is cut off, and 'Call timeout' is 0 (wait forever). What happens to the server?", Options: []string{"Its threads fail fast and are reused", "Its threads all end up stuck waiting, so it stops answering even requests that never needed the database", "The load balancer notices and takes over"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A server calls a database that is cut off, and 'Call timeout' is 0 (wait forever). What happens to the server?", Options: []string{"Calls to the database fail, but every other request is answered normally", "All its threads get stuck waiting, so even cache hits go unanswered", "The load balancer sees the stuck calls and stops sending to it"}, Answer: 1,
 			Explain: "Each waiting request holds a thread for good. Within a second or two none are left, and cache hits queue behind them."}},
 		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up threads until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a circuit breaker stops you spending a thread on every attempt.",
 	})
@@ -561,7 +561,7 @@ func init() {
 			"Open the load balancer's settings and look at the health group.",
 			"Turn on 'Eject outliers' (servers much slower than their peers leave rotation for a while), or switch to least connections: a stalling server piles up unfinished requests, so it is given fewer new ones.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A server is slow half the time but never fails a health check. Which balancing rule protects users best?", Options: []string{"Round robin: everyone gets a fair share", "Dropping servers whose latency is far above their peers'", "Sending more traffic to the slow one so it catches up"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A server is slow half the time but never fails a health check. Which balancing rule protects users best?", Options: []string{"Round robin, so that every server gets its fair share", "Dropping servers whose latency is far above their peers'", "Weighting traffic towards the slow server so it catches up"}, Answer: 1,
 			Explain: "A slow server is worse than a dead one: a dead one is skipped, a slow one keeps being given work it cannot finish."}},
 		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because a sick server is the one with the most unfinished work.",
 	})
@@ -588,7 +588,7 @@ func init() {
 			"Open the cache's settings: look at Freshness and at 'Show advanced'. You need the entries to stop expiring together, and concurrent misses for one item to stop piling onto the database.",
 			"Add TTL jitter so entries expire at different times, and turn on 'Share concurrent misses'. Do not simply raise the TTL: the data would go stale.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "The cache is warm and the hit rate is near 100%. Why can the database still be overwhelmed after ten seconds?", Options: []string{"The cache fills up and evicts popular items", "Every entry expires at the same instant, so almost every request misses at once", "The database slows down over time"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "The cache is warm and the hit rate is near 100%. Why can the database still be overwhelmed after ten seconds?", Options: []string{"The cache fills up and begins evicting the popular items", "All entries expire together, so nearly all requests miss", "The database slows down over time as its tables grow"}, Answer: 1,
 			Explain: "A warm start gives every entry the same creation time, so they share one expiry time. Misses arrive as a wave, not a trickle."}},
 		Debrief: "A cache hides load until the moment it cannot. Synchronised {{ttl|expiry}} turns a 99% hit rate into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the stampede, but it trades it for stale data, which is why this challenge limits staleness.",
 	})
@@ -617,7 +617,7 @@ func init() {
 			"Open the replica's settings and read the Replication help text: who waits for whom?",
 			"Switch the replica to synchronous replication: the primary only acknowledges once the replica has the write, so nothing acknowledged is lost. Check what it does to write latency.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "What is the price of synchronous replication?", Options: []string{"Nothing: it is strictly better", "Every write also waits for the replica, and writes stop if the replica is down", "Reads become stale"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "What is the price of synchronous replication?", Options: []string{"Reads from the replica become slower and staler than before", "Every write waits for the replica, and stops if it is down", "Nothing: it is strictly better than asynchronous"}, Answer: 1,
 			Explain: "Synchronous replication buys zero data loss with latency, and with a dependency: the primary cannot acknowledge what its replica has not confirmed."}},
 		Debrief: "Replication lag is your data-loss window in a failover. Synchronous replication closes it, at the cost of slower writes and a new way to be unavailable (a dead replica blocks writes). Shrinking the lag also helps; in this simulator lag is free to configure, but in a real system a tiny lag costs primary throughput or is simply unachievable across regions.",
 	})
@@ -637,7 +637,7 @@ func init() {
 			"Look at the database's Failover settings: there is one that decides whether a recovered old primary is allowed back in.",
 			"Turn on 'Fence the old primary'. Without it the old primary rejoins as primary and everything written to the replacement since promotion is lost. Do not just disable failover: writes would fail for the whole outage.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "The old primary restarts and nothing stops it. What happens to writes made to the new primary in the meantime?", Options: []string{"They are merged into the old primary", "They exist only on the new primary, and clients go back to the old one: they are lost", "Nothing, both stay in sync"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "The old primary restarts and nothing stops it. What happens to writes made to the new primary in the meantime?", Options: []string{"Merged into the old primary once it rejoins the cluster", "Lost: they exist only on the new primary, which clients abandon", "Kept: both primaries replicate to each other, so nothing is lost"}, Answer: 1,
 			Explain: "Two nodes that both believe they are the primary diverge. Without fencing, the survivor of the confusion silently drops the other's writes."}},
 		Debrief: "Failover is only half the job: you also have to make sure the old primary cannot come back as one. Fencing (a token, a lease, or simply keeping the node out until it is reconciled) is what prevents split brain. Staying down avoids the problem but costs the whole outage.",
 	})
@@ -673,7 +673,7 @@ func init() {
 			"Open the app server's settings, 'Show advanced', Scaling group. Waiting longer before removing servers is not the whole story: think about the floor and about when the scaler decides to act.",
 			"Keep a floor of servers that covers the wave (minimum servers 3), or make the scaler act earlier with a lower target busy level. Compare the cost of each.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A wave arrives every 40 seconds and a server takes 10 seconds to boot. Which setting helps most?", Options: []string{"Remove idle servers sooner, to save money", "Keep a floor of servers (or a lower target), because help arrives after the damage is done", "A longer boot time"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A wave arrives every 40 seconds and a server takes 10 seconds to boot. Which setting helps most?", Options: []string{"Remove idle servers sooner so the monthly bill stays low", "Keep a floor of servers: reactive help comes too late", "Make the scaler wait longer before removing servers"}, Answer: 1,
 			Explain: "Reactive scaling always lags demand by the measuring window plus the boot time. When waves are shorter than that lag, only capacity that is already running helps."}},
 		Debrief: "Autoscaling is reactive, so it suits changes slower than its own reaction time. For predictable, fast waves, pre-provision a floor (or scale on a schedule); a lower target busy level buys earlier action at a higher cost. Waiting longer before scaling down avoids flapping but would not have fixed the wave start.",
 	})
@@ -699,7 +699,7 @@ func init() {
 			"Staff wait for each answer, so a slow server slows them down. The public keeps arriving regardless. Compare what each crowd does to the queue.",
 			"The public crowd is open-loop: its load does not fall when the server struggles. Give the server the capacity for it: look at the app server's threads.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why can a closed-loop load test pass at a load that breaks the system in production?", Options: []string{"Test machines are faster", "Users who wait for answers slow themselves down as the system slows, so the queue never explodes", "Production has more data"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Why can a closed-loop load test pass at a load that breaks the system in production?", Options: []string{"Production has more data, so queries are slower", "Users who wait for answers slow down as the system does", "Load tests run from inside the data centre"}, Answer: 1,
 			Explain: "A fixed crowd that waits is self-limiting: latency rises, arrivals fall. Real internet traffic keeps coming at the same rate however slow you are."}},
 		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so size for the arrival rate, not for the number of testers.",
 	})
@@ -725,7 +725,7 @@ func init() {
 			"A queue turns a spike into a delay, as long as it is big enough and the wait stays acceptable. The rate limiter rejects traffic: a rejected request is still a failed request.",
 			"Make the queue big enough to hold a rush (about a hundred) and give the server a few more threads so the queue drains quickly. A huge queue alone pushes the slowest requests past 0.7 s; sixteen threads cost too much.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Average load is 70% of capacity. Why do users still see errors?", Options: []string{"The average is wrong", "Traffic comes in rushes well above capacity, and a short queue overflows during them", "The database is slow"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Average load is 70% of capacity. Why do users still see errors?", Options: []string{"The average is miscalculated, and load is really higher", "Rushes well above capacity overflow a short queue", "The database slows down once the cache fills up"}, Answer: 1,
 			Explain: "Utilisation is an average over time; failures happen in the moments when arrivals exceed capacity. Queues and headroom absorb those moments."}},
 		Debrief: "Provision for the burst, not the mean. A queue absorbs a burst only if it is large enough and drains fast enough; it trades errors for waiting time. Rate limiting protects a system from overload but does not make rejected users succeed, so it is the wrong tool when the burst is short enough to wait out.",
 	})
@@ -758,7 +758,7 @@ func init() {
 			"More shards will not spread one item: it still maps to a single shard. What could answer the popular reads without touching that shard at all?",
 			"Put a cache in front of the shard router (connect the app servers to it and the cache to the router). A tiny cache is enough: the hot item stays in it.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "One item gets 35% of reads. What does going from 4 shards to 8 do?", Options: []string{"Halves the hot shard's load", "Helps a little, but the hot item still lives on one shard", "Nothing at all"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "One item gets 35% of reads. What does going from 4 shards to 8 do?", Options: []string{"Halves the hot shard's load, as the keys split across eight", "Helps a little, but the hot item still lives on one shard", "Nothing at all, because the router ignores new shards"}, Answer: 1,
 			Explain: "Resharding spreads the other keys thinner, but a single key cannot be split by hashing: its load stays on whichever shard owns it."}},
 		Debrief: "Sharding balances many keys, not one. A hot key needs a different tool: a cache in front, a replica set for that key, or splitting the key (for example, a counter sharded into N sub-counters). Check the load per shard, not the average.",
 	})
@@ -785,7 +785,7 @@ func init() {
 			"Open the cache's eviction setting. Which policy decides by how recently an item was used, and which by how often?",
 			"Switch eviction to LFU (least frequently used): an item read once has a count of one and is the first to go, so the popular items stay. LRU is better than FIFO here but still lets a long scan push things out; a much bigger cache also works but is the expensive answer.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Which eviction policy best protects a small popular set from a one-pass scan?", Options: []string{"FIFO: oldest out first", "LFU: least frequently used out first", "Random"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Which eviction policy best protects a small popular set from a one-pass scan?", Options: []string{"FIFO: the oldest item goes first", "LFU: least frequently used out first", "Random: no item is favoured by the scan"}, Answer: 1,
 			Explain: "A scan produces many items with a count of one. LFU evicts those first and keeps the items that are read again and again."}},
 		Debrief: "Eviction policy is a bet about the future. LRU assumes recent means useful, which a scan breaks; FIFO ignores use altogether; LFU assumes frequent means useful, which resists scans (but can hold stale favourites). Real systems often add scan-resistant variants or keep crawler traffic out of the cache.",
 	})
@@ -816,7 +816,7 @@ func init() {
 			"A request that waits for all 16 answers is as slow as the slowest of 16. Do you really need all of them?",
 			"Set the app server's fan-out to answer on the first K shards (try 12 of 16), or hedge: ask a slow shard again. More threads will not help.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Adding more app-server threads will…", Options: []string{"Cut the p95 a lot", "Barely change it: the wait is on the shards, not on threads", "Make the shards faster"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Adding more app-server threads will…", Options: []string{"Cut the p95 a lot, as requests get served sooner", "Barely change it: the wait is on the shards", "Make each shard answer faster than before"}, Answer: 1,
 			Explain: "The threads are not the bottleneck: each request is waiting for the slowest of 16 shards. Fewer required answers or a second try attacks that wait."}},
 		Debrief: "Waiting for all N answers makes latency the maximum of N draws, so tail latency grows with fan-out. Answering on the first K, hedging slow calls, or allowing partial results trade completeness or extra load for a much shorter tail.",
 	})
@@ -846,7 +846,7 @@ func init() {
 			"Pushing a post costs one insert per follower. For an account with 30,000 followers that is 30,000 inserts for a single post.",
 			"Set the app server's feed strategy to hybrid: push for ordinary accounts, pull celebrities when a timeline is read. More connections or threads only cost money.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Where does the work go if celebrities are pulled instead of pushed?", Options: []string{"Nowhere, it disappears", "To readers: each timeline read also fetches a few celebrities' posts", "To the author, who waits longer to post"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Where does the work go if celebrities are pulled instead of pushed?", Options: []string{"Nowhere: the posts are simply never delivered to anyone", "To readers: each timeline read fetches a few celebrity posts", "To the author, who waits much longer for the post to publish"}, Answer: 1,
 			Explain: "Fan-out on write spends effort once per follower; fan-out on read spends it once per reader. A hybrid pays the cheap side for each kind of account."}},
 		Debrief: "Push makes reads cheap and writes proportional to the audience; pull makes writes cheap and reads proportional to who you follow. With heavy skew a hybrid wins: push for the many small accounts and pull the few giants.",
 	})
@@ -878,7 +878,7 @@ func init() {
 			"Which component can answer a popular picture without going back to the image store?",
 			"Put a CDN in front of the app server and give it room for the popular pictures (there are about 2,000 distinct ones).",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A CDN that can only hold a quarter of the pictures will…", Options: []string{"Cut the bill to nearly nothing", "Cut it somewhat: popular pictures hit, the rest still pay egress", "Make no difference"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A CDN that can only hold a quarter of the pictures will…", Options: []string{"Cut the bill to almost nothing, as the CDN is free", "Cut it somewhat: popular pictures hit, the rest still pay", "Make no difference, since a quarter is too few"}, Answer: 1,
 			Explain: "Views are skewed, so a small cache catches the popular ones, but every miss still downloads from the store and pays for it."}},
 		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN sized to the popular set turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest.",
 	})
@@ -913,7 +913,7 @@ func init() {
 			"6 x 10 MB x 8 bits = 480 Mbit/s, and the link to the store carries 200. Uploads queue behind each other on it until they time out.",
 			"Select the connection from the app server to the video store and raise its bandwidth above what the peak needs (1,000 Mbit/s leaves room).",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "More app-server threads will…", Options: []string{"Fix it: more uploads in parallel", "Not help: they all share the same saturated link", "Make the uploads smaller"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "More app-server threads will…", Options: []string{"Fix it, since more uploads then run in parallel", "Not help: they all share the same saturated link", "Lower the bandwidth each upload needs, as work is shared"}, Answer: 1,
 			Explain: "Parallel uploads still squeeze through one link. When a link is the limit, adding workers only adds more bytes waiting for it."}},
 		Debrief: "Bandwidth is a capacity like any other: bytes per second in must be less than the link can carry. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones.",
 	})
@@ -947,7 +947,7 @@ func init() {
 			"The failure breakdown and the events on the chart show GC pauses. Retries or more servers hide some of the damage but cost latency or money.",
 			"Open an app server's advanced settings: shorten the GC pause (a smaller heap or a different collector). A pause shorter than the client's patience costs nothing.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Letting clients retry twice will…", Options: []string{"Fix it completely", "Recover most requests but make the slow ones very slow", "Do nothing"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Letting clients retry twice will…", Options: []string{"Fix it completely, since a retry never meets a pause", "Recover most requests, but make the slow ones very slow", "Make it worse, because retries double the load"}, Answer: 1,
 			Explain: "A retry reaches a healthy server, so more requests succeed, but each rescued request has already waited out its timeout: the tail gets worse."}},
 		Debrief: "A stop-the-world pause is invisible in averages and brutal at the tail. Retries and extra servers mask it at a cost; the real fix is a shorter pause. Watch {{p99}} and the timeouts, not the mean.",
 	})
@@ -976,7 +976,7 @@ func init() {
 			"64 writes a second x (1 + 3 indexes) is about 256 operations a second against a disk that does 200, so the queue never drains.",
 			"Nobody queries by those fields (the lookups share is zero), so drop the indexes. A faster disk would also work, but removing the waste is cheaper.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Removing the three unused indexes will…", Options: []string{"Slow reads down a lot", "Cut the disk operations per write from four to one", "Change nothing"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Removing the three unused indexes will…", Options: []string{"Slow reads down a lot, since lookups lose their index", "Cut the disk operations per write from four to one", "Free memory, but leave the disk work as it was"}, Answer: 1,
 			Explain: "Each write must update every index as well as the table. With no reads using them, they only cost disk writes."}},
 		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
 	})
@@ -1005,7 +1005,7 @@ func init() {
 			"12 requests a second x 0.8 s is about 10 threads busy with heavy work alone, out of 16, so the 238 light requests a second have almost nothing left and queue behind them.",
 			"Give the server enough threads that the heavy requests cannot take them all. The inspector shows p95 for light and heavy requests separately.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "The heavy requests are 5% of traffic. Their effect on the light ones is…", Options: []string{"About 5% slower", "Far worse than 5%: they hold threads the light ones need", "None, they are separate requests"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "The heavy requests are 5% of traffic. Their effect on the light ones is…", Options: []string{"About 5% slower, in line with their share of traffic", "Far worse: they hold threads the light ones need", "None at all, since they are separate requests"}, Answer: 1,
 			Explain: "Every request shares the same threads. A few long requests occupy a large share of thread-time, so the quick ones wait behind them."}},
 		Debrief: "Throughput is not the only budget: a small share of expensive requests can take most of the worker time and make the cheap majority slow. Look at latency by request type, and keep heavy work from sharing the pool the light work needs.",
 	})
@@ -1034,7 +1034,7 @@ func init() {
 			"Moving to repeatable read (snapshot isolation) catches two writers of the SAME row, but these write different rows. Look at the numbers after you try it.",
 			"Only serializable makes the two requests take turns on the pair. Set the database's isolation level to serializable and check the aborts it brings.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Will repeatable read (snapshot isolation) stop both doctors leaving?", Options: []string{"Yes: it aborts anything that conflicts", "No: they write different rows, so nothing conflicts", "Only at low load"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Will repeatable read (snapshot isolation) stop both doctors leaving?", Options: []string{"Yes: snapshot isolation aborts anything that conflicts", "No: they write different rows, so nothing clashes", "Only when load is low and few requests overlap"}, Answer: 1,
 			Explain: "Snapshot isolation only detects two writes to the same row. Write skew is two writes to different rows justified by the same stale read, which only serializable execution rules out."}},
 		Debrief: "Write skew is the anomaly snapshot isolation misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
 	})
@@ -1063,7 +1063,7 @@ func init() {
 			"Without an index on the field being searched, the database reads the whole table (see 'lookups by another field' on the users).",
 			"Give the database a secondary index. It costs a little on every write, but this service is 90% reads.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "An index on email makes writes…", Options: []string{"Faster", "Slightly slower: the index must be updated too", "Unchanged"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "An index on email makes writes…", Options: []string{"Faster, because every write finds its row more quickly", "Slightly slower, as the index must be updated too", "Unchanged, as an index only helps queries, not writes"}, Answer: 1,
 			Explain: "Every write also updates each index, so a read speed-up is paid for with a small write cost. Worth it when reads dominate."}},
 		Debrief: "A lookup on an unindexed field is a full scan. An index trades a little write cost and storage for turning that scan into a seek. Check the access paths your queries really use.",
 	})
@@ -1092,7 +1092,7 @@ func init() {
 			"More database connections do not help here: the pool each app server may open to the database is the limit.",
 			"Change the database's data model (advanced settings) to one built for append-heavy writes: time-series, or wide-column.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "What makes a time-series store cheaper per insert?", Options: []string{"It skips durability", "Append-optimised storage avoids updating in place", "It has no queue"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "What makes a time-series store cheaper per insert?", Options: []string{"It skips durability, so nothing is written to disk", "Append-optimised storage avoids updating in place", "It keeps everything in memory instead of on disk"}, Answer: 1,
 			Explain: "Appending to the end of a log-structured layout avoids random in-place updates, so each write costs a fraction of a general-purpose engine's."}},
 		Debrief: "Match the store to the access pattern. Append-heavy, rarely-read data fits an append-optimised layout; paying a general-purpose engine's cost per row for a firehose is how a database becomes the bottleneck.",
 	})
@@ -1123,7 +1123,7 @@ func init() {
 			"Retrying something that can never succeed only burns worker time. How many attempts does a job deserve, and where should the failures go instead of vanishing?",
 			"On the queue (advanced settings): lower the attempts per job and turn on the dead-letter queue so the failed jobs are kept for inspection.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Lowering the attempts alone (no dead-letter queue) will…", Options: []string{"Fix everything", "Free the workers but lose the bad messages silently", "Make workers slower"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Lowering the attempts alone (no dead-letter queue) will…", Options: []string{"Fix everything, since the bad jobs are then gone", "Free the workers but lose the bad messages silently", "Keep the bad messages, just with fewer attempts each"}, Answer: 1,
 			Explain: "Fewer retries stop the waste, but a job that used up its attempts is gone. A dead-letter queue keeps it where someone can look at it."}},
 		Debrief: "Retries help against transient failures and hurt against permanent ones. Bound the attempts, back off, and route what still fails to a dead-letter queue so it is visible and recoverable instead of lost.",
 	})
@@ -1158,7 +1158,7 @@ func init() {
 			"A partition is read by one member of a group at a time, and one message after another to keep order. How many partitions are there?",
 			"Raise the number of partitions on the log (16 gives every consumer two). More consumers would not help: they would sit idle.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "With 4 partitions, what do consumers 5 to 8 do?", Options: []string{"Share the load equally", "Nothing: a partition has one reader per group", "Take the slowest messages"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "With 4 partitions, what do consumers 5 to 8 do?", Options: []string{"Share the load equally with consumers 1 to 4", "Nothing: a partition has one reader per group", "Take over the slowest partitions from the others"}, Answer: 1,
 			Explain: "Within a consumer group each partition is assigned to exactly one member, so parallelism is capped by the partition count."}},
 		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the throughput you will need, since changing it later also changes how keys map to partitions.",
 	})
@@ -1192,7 +1192,7 @@ func init() {
 			"Each shard can take about 250 updates a second (4 ms each). The shard that owns the busy cell is asked for roughly three quarters of 500 a second.",
 			"Change how the shard router chooses a shard: by the request itself rather than the cell, so the busy cell is spread over all four. (A real system pays for that on reads, which then have to ask every shard.)",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth and sixth shard, still split by cell, will…", Options: []string{"Fix the hot shard", "Leave the hot cell on one shard, so nothing improves", "Make it worse"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth and sixth shard, still split by cell, will…", Options: []string{"Fix the hot shard, as the cell spreads out", "Leave the hot cell on one shard, so nothing improves", "Make it worse, since the data must move first"}, Answer: 1,
 			Explain: "One cell maps to one shard however many shards there are. A hot key cannot be spread by adding more partitions of the same key."}},
 		Debrief: "Partitioning by a key that is itself skewed concentrates the skew. Spread hot keys (by sender, by a suffix, or by splitting the cell), and remember the price: reads of one key must then query every shard.",
 	})
@@ -1222,7 +1222,7 @@ func init() {
 			"A restore goes back to the last backup before the damage, so the data lost is the time since that backup: with no backups it is everything. And the time to restore is the data size divided by the restore speed: 10 GB at 200 MB/s is over 50 seconds.",
 			"Turn on backups every few seconds on the database, and raise the restore speed. Each costs a little: a restore bandwidth that is higher than you need is wasted money.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Backing up every five seconds (and nothing else) will…", Options: []string{"Fix both the data lost and the time to restore", "Cut the data lost but leave the restore as slow as before", "Cut the time to restore"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Backing up every five seconds (and nothing else) will…", Options: []string{"Fix both the data lost and the time taken to restore", "Cut the data lost but leave the restore as slow", "Cut the time to restore but keep the same data loss"}, Answer: 1,
 			Explain: "How often you back up sets how much you can lose; how fast a backup streams back sets how long you wait. They are separate levers."}},
 		Debrief: "RPO and RTO are different dials: backup frequency sets the recovery point, restore bandwidth and data size set the recovery time. Pick them from what the business can bear, and then practise the restore.",
 	})
@@ -1251,7 +1251,7 @@ func init() {
 			"A write to a cart at one leader and another write to the same cart at the other leader within 300 ms are concurrent: neither leader has seen the other's. With last-writer-wins one of them is thrown away.",
 			"Choose what happens on a conflict: a merging data type (a counter or a set that adds) keeps both. Shortening the delay only makes conflicts rarer, and one leader would avoid them altogether at the cost of a slow region.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "If the leaders passed writes on in 50 ms instead of 300, lost updates would…", Options: []string{"Disappear", "Become rarer but still happen", "Double"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "If the leaders passed writes on in 50 ms instead of 300, lost updates would…", Options: []string{"Disappear altogether once writes cross quickly", "Become rarer but still happen", "Double, as more writes cross each other"}, Answer: 1,
 			Explain: "The window in which two writes can be concurrent shrinks, so fewer collide, but any two writes inside it still conflict."}},
 		Debrief: "With more than one writer, concurrent writes to the same item are normal, and the conflict rule decides who loses. Last-writer-wins is easy and loses data silently; data types that merge keep every update.",
 	})
@@ -1280,7 +1280,7 @@ func init() {
 			"With three copies, a write acknowledged by one copy and a read answered by a different one need not meet: the read can reach copies the write has not got to yet.",
 			"Make every read overlap every acknowledged write: the read quorum plus the write quorum must be more than the number of copies (3). Two and two does it; the price is waiting for the second-fastest copy.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "With three copies, a read quorum of 1 and a write quorum of 3 would…", Options: []string{"Still show old data", "Never show an old value, but make writes slower and fail if any copy is down", "Be exactly as fast as 2 and 2"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "With three copies, a read quorum of 1 and a write quorum of 3 would…", Options: []string{"Still show old data, because a single read can miss the new write", "Never show old data, but make writes slower and fragile", "Be exactly as fast as 2 and 2, just reversed"}, Answer: 1,
 			Explain: "1 + 3 is more than 3, so the read always meets a copy with the write, but a write now waits for the slowest copy and needs all of them to be up."}},
 		Debrief: "R + W > N makes reads overlap writes, so a client sees its own writes and never goes backwards. You buy it with latency (the kth fastest copy instead of the fastest) and with availability (fewer failures tolerated). Choose R and W for the workload: read-heavy systems often pick a cheap read and an expensive write.",
 	})
@@ -1311,7 +1311,7 @@ func init() {
 			"It still thinks it holds the lock, but the lease ran out while it was frozen. Nothing the lock service does can reach into a process that is not running: the check has to happen where the write lands.",
 			"Make the database book a seat only if it is still free (a conditional write, like a unique constraint). A fencing token from a lock service helps only when the stale write arrives after the newer one; the conditional write does not depend on order.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why is a lock with an expiry not enough to guarantee that only one process acts at a time?", Options: []string{"The expiry is always too short", "A paused process can act after its lock has expired and been given to someone else", "Redis loses locks"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Why is a lock with an expiry not enough to guarantee that only one process acts at a time?", Options: []string{"The expiry is always set too short to be safe", "A paused process can act after its lease has been reissued", "Redis loses locks whenever it restarts"}, Answer: 1,
 			Explain: "A lease bounds how long a dead holder blocks others, but a live holder that is frozen does not know its lease ended. Only the resource being written can refuse the stale write."}},
 		Debrief: "Treat a lock as an optimisation, not a guarantee. Make the write itself safe: a conditional write (compare-and-set, unique constraint) refuses whatever arrives late, and a fencing token does the same when the resource can compare tokens.",
 	})
@@ -1343,7 +1343,7 @@ func init() {
 			"The coordination service needs a majority of its machines to elect anyone. Count how many it has and how many it lost.",
 			"With 3 machines, losing 2 leaves no majority. Run 5 (a majority is 3): the same two failures leave a working quorum and the promotion goes ahead on schedule.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A 3-machine cluster loses two machines. Can the survivor keep serving as leader?", Options: []string{"Yes, one machine is enough", "No: a majority (2 of 3) is needed, otherwise two halves could each elect a leader", "Yes, but only for reads"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A 3-machine cluster loses two machines. Can the survivor keep serving as leader?", Options: []string{"Yes: one machine is enough to lead alone", "No: a majority (2 of 3) is needed for a leader", "Yes, but only for reads, not writes"}, Answer: 1,
 			Explain: "A majority is what makes two leaders impossible: two groups cannot both hold more than half. The price is that the cluster stops when it loses its majority."}},
 		Debrief: "Quorums trade availability for safety. N machines tolerate (N-1)/2 failures: 3 tolerate one, 5 tolerate two. Size the cluster for the failures you expect together, and spread it across failure domains so they do not happen together.",
 	})
@@ -1373,7 +1373,7 @@ func init() {
 			"A row lock lets one write at a time through. With 20 ms per write one row takes 50 writes a second whatever you do to the database around it; more connections only give the waiting writes somewhere to wait.",
 			"Stop writing to a single row: in the app server's hot-key setting, split the counter over several rows, so the writes go to different rows in parallel. Reading the total then costs adding the rows up.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Doubling the database connections will…", Options: []string{"Double the writes the hot row can take", "Not change what one row can take: the lock, not the connections, is the limit", "Halve the latency of every write"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Doubling the database connections will…", Options: []string{"Double the writes the hot row can take", "Not change what one row can take: the lock is the limit", "Halve the latency of every write to the row"}, Answer: 1,
 			Explain: "A lock serialises the writes to its row. More connections let more of them wait at once, which does not make the row faster."}},
 		Debrief: "A hot row is a throughput ceiling of one over the write time, however big the database. Split the counter (several sub-rows added up on read), batch the updates, or queue them so they are applied in order without making buyers wait.",
 	})
@@ -1402,7 +1402,7 @@ func init() {
 			"A window is published when the watermark (the newest click time minus a delay) passes its end. A click that arrives after that is dropped, unless the job is told to accept late ones for a while.",
 			"Waiting longer before publishing (the watermark delay) would catch them, but the dashboard must not wait more than three seconds. Instead, allow lateness: publish on time, then update the window when a late click arrives.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "To count clicks that arrive 20 seconds late, the dashboard must…", Options: []string{"Wait 20 seconds before showing anything", "Show the window on time and correct it when the late clicks arrive", "Ignore late clicks, they are rare"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "To count clicks that arrive 20 seconds late, the dashboard must…", Options: []string{"Wait 20 seconds before showing anything at all, to be safe", "Show the window on time and correct it when late clicks arrive", "Ignore late clicks, since they are rare and make little difference"}, Answer: 1,
 			Explain: "A longer watermark delay trades freshness for completeness. Allowed lateness gives both, at the price of results that change after they were shown."}},
 		Debrief: "Event time is when something happened, not when you heard about it. The watermark is a guess about how late data can be: too tight and you drop data, too loose and you answer slowly. Allowed lateness, with updates to published windows, lets you answer early and still end up correct.",
 	})
@@ -1431,7 +1431,7 @@ func init() {
 			"An exact count needs to remember every id to know whether it was seen before. If a number that is slightly off is acceptable, there are structures that count distinct items in a fixed, tiny amount of memory.",
 			"Switch the job's visitor counting to HyperLogLog. Its precision sets the number of registers: more registers, less error, more memory. Pick one that fits both the 16 KB budget and the 6% error.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A HyperLogLog with twice the registers has…", Options: []string{"Half the error, twice the memory", "About 30% less error for twice the memory", "The same error, it only helps with more visitors"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A HyperLogLog with twice the registers has…", Options: []string{"Half the error for twice the memory", "About 30% less error for twice the memory", "The same error, but it handles more visitors"}, Answer: 1,
 			Explain: "The error falls with the square root of the registers: doubling them divides it by about 1.4, while memory doubles. Accuracy gets expensive quickly."}},
 		Debrief: "Approximate structures trade a bounded, known error for memory that does not grow with the data: HyperLogLog counts distinct items, a Bloom filter answers 'seen before?', a count-min sketch counts how often. They are the answer whenever the exact version will not fit.",
 	})
@@ -1460,7 +1460,7 @@ func init() {
 			"Most of the 200,000 items are seen once or never. Only the few very popular ones matter for a top ten, and a structure can estimate counts for all items in a fixed table, at the cost of items sharing counters.",
 			"Switch the job to the count-min sketch. Its width and depth set the table (width x depth counters of 4 bytes each): a table too narrow mixes everything together and misses the top ten, one too big breaks the memory budget.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A count-min sketch estimates how often an item occurred. It can be wrong by…", Options: []string{"Counting too few: it can miss occurrences", "Counting too many: other items share its counters, but never too few", "Either way, equally"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A count-min sketch estimates how often an item occurred. It can be wrong by…", Options: []string{"Counting too few: it can miss occurrences", "Counting too many: other items share its counters", "Either way, equally, depending on the table"}, Answer: 1,
 			Explain: "Every occurrence of an item adds to all of its counters, so an estimate is never too low. Other items sharing a counter can only inflate it, and taking the smallest counter keeps that small."}},
 		Debrief: "Heavy hitters are few, and a structure that only needs to be right about them can be tiny. A count-min sketch plus a short candidate list finds the top items in a fixed table; the width bounds the overcount and the depth bounds the chance of it. Exactness costs memory in proportion to the number of different items.",
 	})
@@ -1493,7 +1493,7 @@ func init() {
 			"The sites count calls per second, not per minute. During a rush the crawler asks for twice what a site allows.",
 			"Give the crawler server a limit on calls per second to any one site (its 'Calls per second to one service' setting, under Show advanced), equal to what the sites allow. The excess waits its turn instead of being refused.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Limiting the crawler to 8 calls a second per site (what the sites allow) will…", Options: []string{"Make it slower on average, since it can never go faster than 7", "Leave its speed unchanged", "Make every fetch faster"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "Limiting the crawler to 8 calls a second per site (what the sites allow) will…", Options: []string{"Make it slower on average, since it cannot exceed 8", "Leave its speed unchanged, since the average is under 8", "Make each fetch faster, as sites then reply quicker"}, Answer: 0,
 			Explain: "A limit is a ceiling: a rush that used to be refused now queues. Nothing is lost, but pages wait their turn, and a limit below the average load would make the queue grow without end."}},
 		Debrief: "Politeness is a per-host rate limit on the crawler itself, usually with a queue per host so that waiting for one slow or strict site does not block the others. The average rate is what you plan capacity with, but the peak rate decides whether you get blocked.",
 	})
@@ -1523,7 +1523,7 @@ func init() {
 			"At four answers at a time one GPU finishes about one request a second; three arrive every second. A GPU writes a whole batch of answers in about the time it takes to write one, so a bigger batch means far more answers per second.",
 			"Raise the number of answers at once: 32 or 64 is enough. Every answer in progress holds its prompt and answer tokens in the KV cache (about 650 each), so the cache caps the batch at roughly 49 whatever you ask for; raising the cache lifts that cap. Buying a second GPU would work but breaks the budget.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Writing 64 answers at once instead of 4 makes each answer…", Options: []string{"Sixteen times slower", "Somewhat slower, but many more answers are written per second", "Just as fast, for free"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Writing 64 answers at once instead of 4 makes each answer…", Options: []string{"Sixteen times slower, since the GPU is shared sixteen ways", "Somewhat slower, but many more answers per second", "Just as fast, as GPUs run batches in parallel for free"}, Answer: 1,
 			Explain: "Each decode step is a little longer with more answers sharing it, but a step produces a token for every answer in the batch. Batching trades a little speed per answer for a lot more answers per second."}},
 		Debrief: "A GPU's throughput comes from batching: decoding is limited by reading the model, which is shared by every answer in the batch. The limits are the KV cache (memory for every answer in progress) and the per-answer slowdown. Time to first token is mostly queueing, so fix the throughput, not the prompt reading.",
 	})
@@ -1552,7 +1552,7 @@ func init() {
 			"Four searches at once, each taking about 30 ms, is about 135 a second: less than 150. A search takes a fixed time plus time for every candidate it examines.",
 			"Examine fewer candidates. Recall falls as you do (it is about 94% at 128 and 75% at 64), so stay above the 90% line. More search cores would also work, but they cost money and the budget is tight.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Halving the candidates examined will…", Options: []string{"Halve the recall", "Cost a little recall and save a lot of time", "Make no difference"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Halving the candidates examined will…", Options: []string{"Halve the recall, as it halves the candidates", "Cost a little recall and save a lot of time", "Make no difference, since search time is fixed"}, Answer: 1,
 			Explain: "Recall climbs steeply at first and then flattens: the last candidates add little. Time grows steadily with every candidate, so the extra recall at the top is the most expensive part."}},
 		Debrief: "Approximate nearest-neighbour search is a dial between recall and latency, and the top of the dial is steep: 99% recall costs far more than 94%. Pick the recall the application needs, not the maximum, and spend the saved time on capacity.",
 	})
@@ -1582,7 +1582,7 @@ func init() {
 			"The limiter counts requests, and all requests look alike to it. The cost of a request to the GPU is its prompt: a limiter that counts tokens would charge a pasted document for what it takes.",
 			"Switch the limiter's count to tokens and give it an allowance of about 56,000 tokens a minute: the short prompts fit easily, and the document-sized ones run the allowance dry and are turned away (roughly one request in ten is refused by design).",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A limiter that counts tokens instead of requests will mostly refuse…", Options: []string{"Everyone a little", "The few huge requests that use most of the tokens", "The newest users"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A limiter that counts tokens instead of requests will mostly refuse…", Options: []string{"Everyone a little, to stay under the cap", "The few huge requests that use most of the tokens", "The newest users, who have no history yet"}, Answer: 1,
 			Explain: "A request is let through only if its whole weight fits in what is left. A small one almost always does; a huge one needs far more than the bucket usually holds, so the heavy few are refused and the many light ones carry on."}},
 		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. Limiting by tokens (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
 	})
@@ -1611,7 +1611,7 @@ func init() {
 			"Past 250 a second a longer queue only makes every request older. Turning some requests away early keeps the queue short, so the ones that are admitted are answered in time.",
 			"Set 'Shed above' on the app server to a few hundred milliseconds: when the oldest waiting request is older than that, ordinary requests are turned away at the door and the urgent ones are still admitted.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Turning away some requests at the door will make the share of requests answered…", Options: []string{"Lower than it is now", "Higher, because the server stops wasting work on requests whose users gave up", "The same"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Turning away some requests at the door will make the share of requests answered…", Options: []string{"Lower, as every request turned away at the door is a failure by itself", "Higher, as work is no longer wasted on requests users abandoned", "Unchanged, since the server still does the same total work"}, Answer: 1,
 			Explain: "An overloaded server with a deep queue serves requests so late that their users have left: very little of its work counts. Shedding spends the same capacity on requests that are still wanted."}},
 		Debrief: "Overload is not fixed by queueing more. Bound the wait, shed the requests that can be retried, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
 	})
@@ -1648,7 +1648,7 @@ func init() {
 			"Reads: a few links are followed again and again, so a cache in front of the database answers most of them. Writes: one counter row is a ceiling of one write per 20 ms however big the database.",
 			"Add a cache between the app server and the database, and in the app server's hot-key setting split the counter over several rows (or hand each server its own range of numbers).",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A cache in front of the database would fix…", Options: []string{"The slow reads, but not the counter", "Both the reads and the counter", "Only the counter"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "A cache in front of the database would fix…", Options: []string{"The slow reads, but not the counter", "Both the reads and the counter", "Only the counter, which is hit most"}, Answer: 0,
 			Explain: "A cache absorbs repeated reads. Creating a link is a write, and every write to the counter row still has to take its turn at the database."}},
 		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and the database is left with the misses. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
 	})
@@ -1681,7 +1681,7 @@ func init() {
 			"A fixed window forgets everything at its edge. A burst that straddles the edge is admitted twice, once in each window, so up to twice the limit gets through in a fraction of a second.",
 			"Change the limiter's algorithm to one that never lets more than the limit through in any window-length span: the sliding window log is exact, the sliding window counter is a cheap approximation.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A burst straddling the edge of a fixed one-second window with a limit of 300 lets through up to…", Options: []string{"300 requests", "600 requests", "It depends on the burst size"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A burst straddling the edge of a fixed one-second window with a limit of 300 lets through up to…", Options: []string{"At most 300 requests, exactly the limit", "Up to 600 requests, double the limit", "Between 300 and 450, depending on timing"}, Answer: 1,
 			Explain: "Each window has its own count: the last moments of one window and the first moments of the next can each admit the whole allowance."}},
 		Debrief: "Every rate-limiting algorithm makes a different promise at the boundary. A fixed window is cheap but allows up to twice the limit across its edge; a sliding log is exact and costs memory per request; a sliding counter is cheap and close; a token bucket allows a burst up to its size and then a steady rate. Pick the one whose worst case your backend can survive.",
 	})
@@ -1718,7 +1718,7 @@ func init() {
 			"Every read from Europe crosses to the US and back, about 90 ms of distance before the database does anything; Asia pays 150 ms. The app servers are already close, so the data has to come closer too.",
 			"Put a read replica in Europe and one in Asia, in their regions, and wire each region's app server to its replica. Reads are answered locally, writes still go to the US primary, and a replica runs a little behind, which a read that may be a second old can live with.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A read replica in Asia will make reads there faster, and writes from Asia…", Options: []string{"Faster too", "No faster: they still go to the primary", "Slower"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "A read replica in Asia will make reads there faster, and writes from Asia…", Options: []string{"Faster as well, since the replica is closer", "No faster: they still go to the primary", "Slower, as the replica must also copy them"}, Answer: 1,
 			Explain: "A replica serves reads only. Every write still has to reach the one primary, so a write from Asia keeps paying the distance."}},
 		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add replication lag that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or sharding users by home region.",
 	})
@@ -1753,7 +1753,7 @@ func init() {
 			"Placing a key by hash mod n changes the home of about four keys in five when n goes from 4 to 5. About 80% of requests wait for data that is still moving.",
 			"Place keys on a consistent-hashing ring instead (key placement on the shard router): a new shard takes over only about a fifth of the keys, so only about a fifth of the requests are slowed, and for a shorter time than the p95 notices.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth shard to a router that places keys by hash mod 4 moves about…", Options: []string{"A fifth of the keys", "Four fifths of the keys", "None, the new shard starts empty"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth shard to a router that places keys by hash mod 4 moves about…", Options: []string{"About a fifth of the keys", "About four fifths of the keys", "None: the new shard starts empty"}, Answer: 1,
 			Explain: "Changing the divisor changes the remainder for almost every key. A ring only reassigns the arc the new shard takes over, about one key in five."}},
 		Debrief: "Hash mod n makes resizing a cluster as expensive as rebuilding it. Consistent hashing moves only about 1/n of the keys when a node joins or leaves, which is why caches and key-value stores use it.",
 	})
@@ -1787,7 +1787,7 @@ func init() {
 			"Adding capacity does not shorten a slow read, because the slow read is slow by itself. But the other two replicas are fine: the same read would almost certainly be quick if asked of another.",
 			"Hedge the reads (advanced setting on the app server): if a read has not been answered after a short wait, ask another replica too and take the first answer. Wait about the time a normal read takes; hedging too early doubles the load for nothing.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Hedging reads after 80 ms sends a second request for…", Options: []string{"Every read", "Only the slow ones, a small share of reads", "None, it only works when a replica is down"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Hedging reads after 80 ms sends a second request for…", Options: []string{"Every read, so the load roughly doubles", "Only the slow ones, a small share of reads", "None, as it only works when a replica is down"}, Answer: 1,
 			Explain: "Most reads finish before the wait is over, so only the few that are still waiting get a second request, a modest increase in load for a large cut in the tail."}},
 		Debrief: "Hedged requests trade a little extra load for a much shorter tail: the chance that two independent replicas are both slow is the square of the chance that one is. Wait about the p95 of a normal request before hedging, or you simply double your traffic.",
 	})
@@ -1817,7 +1817,7 @@ func init() {
 			"One limit for all traffic together is first come, first served: whoever sends the most takes the most. A higher shared limit helps the quiet tenants only by also letting the noisy one send even more.",
 			"Make the rate limiter count per tenant (Limit per: each tenant): every tenant gets its own allowance, so the noisy one runs out without turning anyone else away.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Doubling the shared limit to 200 requests a second would…", Options: []string{"Fix it for the quiet tenants", "Help a little, but the noisy tenant still takes the larger share", "Make no difference"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Doubling the shared limit to 200 requests a second would…", Options: []string{"Fix it for the quiet tenants, who get twice the room", "Help a little, but the noisy tenant still takes more", "Make no difference, since the noisy tenant is capped"}, Answer: 1,
 			Explain: "A shared limit divides capacity in proportion to demand, so the loudest tenant keeps getting the most. A limit per tenant divides it fairly."}},
 		Debrief: "A global rate limit protects the servers but not the tenants from each other. Limit per customer so one customer's burst runs into its own allowance, and add a shared limit on top if the total must be bounded too.",
 	})
@@ -1852,7 +1852,7 @@ func init() {
 			"A queue hands each message to exactly one of the workers reading it, so the three workers share the work instead of each doing their own. Adding more workers makes the shared work faster, not wider.",
 			"Replace the queue with a topic (publish/subscribe): every worker connected to it is a subscriber and gets its own copy of every message.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "If email, push and SMS are three workers on one queue, an order produces…", Options: []string{"Three notifications", "One notification, from whichever worker took it", "No notification"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "If email, push and SMS are three workers on one queue, an order produces…", Options: []string{"Three notifications, one from each worker", "One notification, from whichever worker took it", "None until all three workers have finished"}, Answer: 1,
 			Explain: "Workers on a queue compete for messages: each message is processed once. To give every consumer its own copy you need publish/subscribe."}},
 		Debrief: "A queue is for sharing work among identical workers; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
 	})
@@ -1893,7 +1893,7 @@ func init() {
 			"Distance. A request from Asia to the US pays about 75 ms each way before any work is done. More capacity cannot shorten that: the stack has to be closer to the users.",
 			"Run a stack (balancer, app, database) in each region, connect every user group to all of them, and turn on 'Send users to the nearest region' for the users. Remember the stacks cost money too.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Adding more servers in the US would make users in Asia…", Options: []string{"Much faster", "No faster: the delay is the distance, not the load", "Slower"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Adding more servers in the US would make users in Asia…", Options: []string{"Much faster, as the queues in the US shrink", "No faster: the delay is the distance, not the load", "Slower, since the US servers then take more of the traffic"}, Answer: 1,
 			Explain: "Latency to a far region is dominated by the distance each way. Capacity helps when servers are busy, not when the wait is the speed of light."}},
 		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to keeping their data consistent (which the multi-region database challenges are about).",
 	})
@@ -1924,7 +1924,7 @@ func init() {
 			"Nothing undoes the reservation, because the steps are just run in a row. Retrying the whole order does not help: it would reserve more stock each time.",
 			"Run the checkout as a saga (the app server's setting for writes that span services): when a later step fails, compensating calls undo the earlier steps, newest first. A few percent of orders still fail (declines are real), but none are left half done.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "With a saga, will fewer orders fail?", Options: []string{"Yes, it retries them", "No: the same orders fail, but each one is cleanly rolled back", "Yes, the card processor declines less"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "With a saga, will fewer orders fail?", Options: []string{"Yes: the failed steps are retried until they pass", "No: the same orders fail, but each is cleanly rolled back", "Yes: the card processor declines fewer orders"}, Answer: 1,
 			Explain: "A saga does not make steps succeed. It makes a failure safe by running the opposite of every earlier step, so the system ends up consistent."}},
 		Debrief: "Without a distributed transaction, consistency across services comes from compensation: every step has an undo, and a failure runs the undos backwards. Compensations must be possible, repeatable (idempotent), and watched: one that fails leaves a stuck order for a person.",
 	})
@@ -1956,7 +1956,7 @@ func init() {
 			"The services voted yes and promised to wait for the decision. If the coordinator dies, nobody can tell them to commit or abort. Waiting costs locks held on the stock rows.",
 			"Run the checkout as a saga instead (the app server's setting for writes that span services): no service holds anything across steps, and a failure is undone by compensating calls.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Two-phase commit guarantees nothing is ever half done. What does it cost?", Options: []string{"Nothing, it is strictly better than a saga", "A second round of calls, and a stall while locked when the coordinator dies", "Lost data"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Two-phase commit guarantees nothing is ever half done. What does it cost?", Options: []string{"Nothing: it is strictly better than a saga", "A second round of calls, and a stall if the coordinator dies", "Lost data, since a crash discards the votes"}, Answer: 1,
 			Explain: "It buys atomicity with latency and blocking: every service holds its part until the decision arrives, and a coordinator that dies between the votes and the decision leaves them all stuck."}},
 		Debrief: "Two-phase commit is atomic but blocking: its weak point is the coordinator. Production systems replicate the coordinator, or avoid distributed transactions and accept eventual consistency with sagas, where each step is a small local transaction and failures are compensated.",
 	})
@@ -1986,7 +1986,7 @@ func init() {
 			"16 threads at 30 ms a handshake is about 500 connections a second, and 1,500 clients arrive in one go. Those that time out try again at the same moment.",
 			"Spread the reconnects: give clients a random wait before they come back (the reconnect spread on the client). More servers would also work but cost more.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Spreading reconnects over 30 seconds will…", Options: []string{"Make the outage 30 seconds longer for everyone", "Turn one huge spike into a steady trickle the server can handle", "Do nothing, the same clients reconnect"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Spreading reconnects over 30 seconds will…", Options: []string{"Make the outage 30 seconds longer for everyone", "Turn one huge spike into a steady trickle", "Do nothing, as the same clients reconnect"}, Answer: 1,
 			Explain: "The same number of connections are set up, but the peak rate falls from the whole population at once to about fifty a second."}},
 		Debrief: "A restart is not the end of the incident: every client retrying in lockstep can keep the server down. Add random jitter (and backoff) to reconnects so the herd arrives as a stream.",
 	})
@@ -2025,7 +2025,7 @@ func init() {
 			"The load balancer sends each server its fair share. Version 2 holds two servers out of four, so it gets half of the traffic.",
 			"Give the load balancer a canary share (advanced settings): a small percentage of requests goes to version 2 until you trust it.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "With a 5% canary, roughly how many requests meet the bug?", Options: []string{"About half", "About 5% of them, during the bad period", "None"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "With a 5% canary, roughly how many requests meet the bug?", Options: []string{"About half, as the canary is checked first", "About 5% of them, during the bad period", "Almost none, as a canary is always tested"}, Answer: 1,
 			Explain: "A canary sends the new version only its small share, so a broken release hurts only that share until it is rolled back."}},
 		Debrief: "Release safety is about blast radius. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
 	})
@@ -2058,7 +2058,7 @@ func init() {
 			"Redundancy only helps if the copies do not fail together. Spreading the servers is not enough if the balancer or the database stays in the zone that fails.",
 			"Set each component's availability zone (advanced settings): keep the balancer and the database out of zone A and spread the servers over different zones.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why does the design survive when the balancer is moved to another zone but the servers stay put?", Options: []string{"It does not: all three servers are still in the failed zone", "The balancer caches responses", "The database takes over"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "Why does the design survive when the balancer is moved to another zone but the servers stay put?", Options: []string{"It does not: all three servers are still in the failed zone", "The balancer caches responses from the servers", "The database takes over when the zone fails"}, Answer: 0,
 			Explain: "A balancer in a healthy zone has nothing to send traffic to if every server it knows is in the failed zone. All the pieces a request needs must survive."}},
 		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
 	})
@@ -2088,7 +2088,7 @@ func init() {
 			"Every timeout becomes up to three more requests, so the load is several times what the users really send. The database cannot ever catch up.",
 			"Limit the damage retries can do: give the users a retry budget (advanced settings), or reduce the retries. A retry budget keeps retrying cheap failures but stops a storm.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why does adding exponential backoff to the retries not fix it here?", Options: []string{"It does: backoff always prevents storms", "The load is still several times the real traffic when the backoff delays are short compared with the timeouts", "Backoff makes the database slower"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Why does adding exponential backoff to the retries not fix it here?", Options: []string{"It does: backoff always prevents retry storms", "The load stays several times the real traffic", "Backoff makes the database slower to answer"}, Answer: 1,
 			Explain: "Backoff spreads retries out but does not reduce how many there are. A cap on the total (a budget) is what keeps the extra load bounded."}},
 		Debrief: "Retries multiply load exactly when a dependency is weakest. Keep them bounded: a retry budget as a share of normal traffic, backoff with jitter, and a limit on attempts. Without that, a short blip turns into a long outage.",
 	})
@@ -2120,7 +2120,7 @@ func init() {
 			"The scraper sends 600 requests a second from three accounts; a customer sends about one every ten seconds. One shared allowance cannot tell them apart.",
 			"Make the limiter count per user (advanced settings) and set the allowance to what a customer plausibly needs, a few requests a second.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why does raising the shared limit not fix it?", Options: []string{"It does", "The database is overloaded again, because the scraper's extra requests also get through", "The customers become slower"}, Answer: 1,
+		Predictions: []Prediction{{ID: "p1", Question: "Why does raising the shared limit not fix it?", Options: []string{"The customers become slower because limits add delay", "The bot's extra requests also get through to the database", "The bot just opens more accounts to get around it"}, Answer: 1,
 			Explain: "A shared limit that is high enough for the customers lets most of the bot through too. The two have to be told apart by who they are."}},
 		Debrief: "A global limit protects the system but not the people. Limit per identity so a heavy or abusive account runs out of allowance on its own, and size the per-user rate to legitimate use rather than to total capacity.",
 	})
@@ -2150,7 +2150,7 @@ func init() {
 			"A queue is for small messages (managed queues commonly stop at 256 KB). Where should a 500 KB body live instead?",
 			"Add an Object Store and connect the app server to it. The app uploads the body there and queues only a pointer (the claim-check pattern).",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A queue accepts messages up to 256 KB. Users upload 500 KB files. What is the standard fix?", Options: []string{"Raise the queue's size limit", "Retry the failed uploads", "Store the file elsewhere and queue a pointer to it"}, Answer: 2,
+		Predictions: []Prediction{{ID: "p1", Question: "A queue accepts messages up to 256 KB. Users upload 500 KB files. What is the standard fix?", Options: []string{"Raise the queue's size limit past 500 KB", "Retry the failed uploads in smaller pieces", "Store the file elsewhere and queue a pointer to it"}, Answer: 2,
 			Explain: "Queues and databases are built for small records. Large bodies go to an object store; what travels through the queue is a reference to it."}},
 		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes retries cheap, because a retry re-sends a pointer, not 500 KB.",
 	})
@@ -2180,7 +2180,7 @@ func init() {
 			"A CDN keeps copies close to the users and only forwards what it does not have.",
 			"Put a CDN between the users and the load balancer.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A CDN with a 60 second TTL serves a page that changes every few seconds. What is the catch?", Options: []string{"Users may see stale copies until the TTL expires", "The page loads slower", "Writes stop working"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "A CDN with a 60 second TTL serves a page that changes every few seconds. What is the catch?", Options: []string{"Users may see stale copies until the TTL expires", "The CDN cannot serve pages that change at all", "Every request still has to reach the origin"}, Answer: 0,
 			Explain: "Cached copies are served until they expire, so freshness is traded for speed unless writes invalidate them."}},
 		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is freshness, which is why caching suits content that changes slowly.",
 	})
@@ -2206,7 +2206,7 @@ func init() {
 			"The balancer can send new work to whichever server has the fewest requests in flight, or stop using a server that misbehaves.",
 			"Switch the load balancer to least connections, or turn on outlier ejection.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "Why does a least-connections balancer help when one server is slow?", Options: []string{"A slow server accumulates open requests, so it is picked less often", "It makes the slow server faster", "It restarts the slow server"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "Why does a least-connections balancer help when one server is slow?", Options: []string{"A slow server accumulates open requests, so it is picked less", "It makes the slow server faster by easing its load", "It restarts the slow server automatically"}, Answer: 0,
 			Explain: "Requests pile up on the slow server, so its in-flight count is high and new requests go elsewhere."}},
 		Debrief: "Balancing is not about equal shares, it is about equal outcomes. Least connections adapts to slowness automatically; ejecting outliers goes further and rests a sick server entirely.",
 	})
@@ -2241,7 +2241,7 @@ func init() {
 			"Shard the data: a router sends each key to one of several databases.",
 			"Put a shard router between the servers and two databases, and connect each server to the router.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "A shard router picks the database from the item's key. What goes wrong if a few keys are far hotter than the rest?", Options: []string{"One shard can get most of the traffic", "Nothing, sharding balances load perfectly", "Writes become reads"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "A shard router picks the database from the item's key. What goes wrong if a few keys are far hotter than the rest?", Options: []string{"One shard can get most of the traffic", "Nothing: sharding balances load perfectly", "Writes slow down because they become reads"}, Answer: 0,
 			Explain: "Hashing spreads keys, not requests. If a handful of keys dominate, whichever shard owns them becomes the bottleneck again."}},
 		Debrief: "Sharding multiplies write capacity by splitting the data, at the price of complexity: queries across shards get hard and skew can recreate the hotspot you were escaping.",
 	})
@@ -2274,7 +2274,7 @@ func init() {
 			"A cache takes load off the database, spare servers survive a crash, and timeouts with a short queue stop a slow dependency from tying up every thread.",
 			"Try a load balancer, five servers with call timeouts and a short newest-first queue, and a cache in front of the database.",
 		},
-		Predictions: []Prediction{{ID: "p1", Question: "The database becomes four times slower for twelve seconds. Which setting stops the slowdown from taking the whole system down?", Options: []string{"A call timeout on the app servers", "More threads", "Longer client timeouts"}, Answer: 0,
+		Predictions: []Prediction{{ID: "p1", Question: "The database becomes four times slower for twelve seconds. Which setting stops the slowdown from taking the whole system down?", Options: []string{"A call timeout on the app servers", "More threads on each app server", "Longer timeouts on the clients"}, Answer: 0,
 			Explain: "A timeout frees the thread instead of leaving it stuck behind the slow database, so servers keep answering what they can (from cache, for example)."}},
 		Debrief: "Real outages stack: capacity, a slow dependency and a failure arrive together. The designs that survive layer defences: caches to cut load, redundancy for failures, and timeouts and short queues so slowness cannot spread.",
 	})
