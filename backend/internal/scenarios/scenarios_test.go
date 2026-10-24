@@ -319,6 +319,14 @@ func TestAlternateSolutions(t *testing.T) {
 			}
 		}
 	})
+	t.Run("rag-under-load: too few candidates misses recall, too many misses the deadline", func(t *testing.T) {
+		sc := Get("rag-under-load")
+		for _, ef := range []float64{64, 448} {
+			if res := engine.RunToEnd(withParam(sc.Diagram, "docs", "efSearch", ef), sc.Options(42), sc.Goals); res.Pass {
+				t.Fatalf("efSearch %.0f should fail: %+v", ef, res.Checks)
+			}
+		}
+	})
 	t.Run("gc-storm: retries and extra servers do not pass, a 400 ms pause does", func(t *testing.T) {
 		sc := Get("gc-storm")
 		retry := sc.Diagram

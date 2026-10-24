@@ -1528,6 +1528,35 @@ func init() {
 		Debrief: "A GPU's throughput comes from batching: decoding is limited by reading the model, which is shared by every answer in the batch. The limits are the KV cache (memory for every answer in progress) and the per-answer slowdown. Time to first token is mostly queueing, so fix the throughput, not the prompt reading.",
 	})
 
+	// RAG under load: document search that finds everything but cannot keep up
+	ragSearch := func(fixed bool) engine.Diagram {
+		ef := 512.0
+		if fixed {
+			ef = 160
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 150.0, "readPct": 100.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 3000.0, "retries": 0.0}).
+			n("api", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0, "queueCap": 500.0}).
+			n("docs", engine.KVectorStore, cols[2], rowMid, P{"vectors": 20.0, "dims": 768.0, "efSearch": ef, "connections": 4.0, "queueCap": 300.0}).label("docs", "Document search").
+			e("users", "api").e("api", "docs").done()
+	}
+	register(&Scenario{
+		ID: "rag-under-load", Title: "Search under load", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The document search finds everything, and answers nobody in time.",
+		Story:   "An assistant looks up documents in a vector index before it answers: twenty million passages, searched approximately. Whoever set it up asked for the best recall they could get, so every search examines hundreds of candidates and finds nearly all the true neighbours. At 150 searches a second the four search cores cannot keep up, the queue grows and users time out. Retrieval should still find at least nine of every ten true neighbours.",
+		Diagram: ragSearch(false), Solution: ragSearch(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(250), MinRecall: f(0.9), MaxCostPerHour: f(2.0), StarP95Ms: f(100)},
+		DurationSec: 60, WarmupSec: 10, Speed: 1,
+		Hints: [3]string{
+			"Look at the search component: how long does one search take, and how many can it run at once?",
+			"Four searches at once, each taking about 30 ms, is about 135 a second: less than 150. A search takes a fixed time plus time for every candidate it examines.",
+			"Examine fewer candidates. Recall falls as you do (it is about 94% at 128 and 75% at 64), so stay above the 90% line. More search cores would also work, but they cost money and the budget is tight.",
+		},
+		Predictions: []Prediction{{ID: "p1", Question: "Halving the candidates examined will…", Options: []string{"Halve the recall", "Cost a little recall and save a lot of time", "Make no difference"}, Answer: 1,
+			Explain: "Recall climbs steeply at first and then flattens: the last candidates add little. Time grows steadily with every candidate, so the extra recall at the top is the most expensive part."}},
+		Debrief: "Approximate nearest-neighbour search is a dial between recall and latency, and the top of the dial is steep: 99% recall costs far more than 94%. Pick the recall the application needs, not the maximum, and spend the saved time on capacity.",
+	})
+
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"

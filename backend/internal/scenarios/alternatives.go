@@ -148,6 +148,13 @@ var alternatives = map[string][]Alternative{
 		alt("Two GPUs with the big batch", false, 100.0, 5348, 7.26, "The first token is fast (285 ms) and the answers stream quickly, but a second GPU is $2.50 an hour the budget does not have.", Change{"model", "gpus", 2.0}, Change{"model", "batchSize", 64.0}, Change{"model", "kvCacheTokens", 64000.0}),
 		alt("Write 32 answers at once", true, 100.0, 10695, 4.76, "Enough for the load: the first token takes 1.5 s on this seed, inside the 2.5 s goal, though with less room than a batch of 64.", Change{"model", "batchSize", 32.0}, Change{"model", "kvCacheTokens", 64000.0}),
 	},
+	"rag-under-load": {
+		alt("Examine 448 candidates instead of 512", false, 100.0, 768, 1.40, "A search still takes about 26 ms, so four cores manage about 150 a second against 150 asked for: no room at all, the queue builds and the p95 is three times the goal, for recall you do not need.", Change{"docs", "efSearch", 448.0}),
+		alt("Examine only 64 candidates", false, 100.0, 137, 1.40, "Fast, but it finds only 75% of the true neighbours, under the 90% the application needs.", Change{"docs", "efSearch", 64.0}),
+		alt("Examine 104 candidates", false, 100.0, 140, 1.40, "89% recall: a fraction under the line. Recall rises about 5 points for every 20 candidates here, so this is one step short.", Change{"docs", "efSearch", 104.0}),
+		alt("Run 32 search cores instead of 4", false, 100.0, 174, 2.80, "Capacity is no longer the problem and all the recall is kept, but the cores cost $1.40 an hour more than the whole budget allows.", Change{"docs", "connections", 32.0}),
+		alt("Run 8 search cores instead of 4", true, 100.0, 177, 1.60, "Twice the cores finish the 30 ms searches fast enough and keep full recall, for $0.20 an hour more: a legitimate alternative to examining fewer candidates.", Change{"docs", "connections", 8.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},
