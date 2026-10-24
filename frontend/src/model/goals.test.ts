@@ -153,3 +153,15 @@ describe('transactions waiting on a dead coordinator goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Transactions waiting on a dead coordinator').state).toBe('pass')
   })
 })
+
+describe('stream goals', () => {
+  it('counts late events dropped and the wait for a first result', () => {
+    const g = { minSuccessRate: 0.5, maxLateDropped: 20, maxResultDelaySec: 3 }
+    const rows = goalRows(g, stats({ resolved: 10, ok: 10, lateDropped: 400, resultDelaySec: 25 }), 1, true)
+    expect(row(rows, 'Late events dropped')).toMatchObject({ actual: '400', state: 'fail' })
+    expect(row(rows, "Wait for a window's first result")).toMatchObject({ actual: '25 s', state: 'fail' })
+    const ok = goalRows(g, stats({ resolved: 10, ok: 10, lateDropped: 0, resultDelaySec: 2 }), 1, true)
+    expect(row(ok, 'Late events dropped').state).toBe('pass')
+    expect(row(ok, "Wait for a window's first result").state).toBe('pass')
+  })
+})
