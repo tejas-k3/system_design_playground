@@ -65,6 +65,30 @@ func init() {
 		},
 	})
 
+	registerQuestion(&Question{
+		ID: "daily-storage-estimate", Title: "How much storage arrives each day?", Mode: ModeEstimate, Difficulty: "Easy",
+		Summary: "Turn a daily record count into storage per day.",
+		Prompt:  "A service stores 20 million small records each day. Each record uses 500 bytes. How many gigabytes of new data does it store per day? Use 1,000,000,000 bytes per gigabyte.",
+		Facts:   []Fact{{"Records stored each day", "20 million"}, {"Size per record", "500 bytes"}},
+		Fields:  []EstimateField{{Key: "storageGBPerDay", Label: "New storage per day", Unit: "GB per day", Expected: 10, Explain: "20 million records x 500 bytes = 10,000,000,000 bytes; divide by 1,000,000,000 bytes per GB = 10 GB per day."}},
+	})
+
+	registerQuestion(&Question{
+		ID: "daily-users-rps", Title: "How many requests arrive each second?", Mode: ModeEstimate, Difficulty: "Easy",
+		Summary: "Turn daily users and their actions into an average request rate.",
+		Prompt:  "A service has 8.64 million users each day, and each user makes 10 requests. Spread requests evenly across the day and use 86,400 seconds per day. How many requests arrive per second?",
+		Facts:   []Fact{{"Daily users", "8.64 million"}, {"Requests per user per day", "10"}},
+		Fields:  []EstimateField{{Key: "requestsPerSecond", Label: "Requests per second", Unit: "per second", Expected: 1000, Explain: "8.64 million users x 10 requests = 86.4 million requests per day; divide by 86,400 seconds = 1,000 requests per second."}},
+	})
+
+	registerQuestion(&Question{
+		ID: "image-egress-bandwidth", Title: "How much bandwidth do image views use?", Mode: ModeEstimate, Difficulty: "Easy",
+		Summary: "Convert image views per second and image size into outbound bandwidth.",
+		Prompt:  "A service sends 2,500 images each second. Each image is 500 KB. Use 1,000 bytes per KB and 8 bits per byte. How many gigabits per second does it send?",
+		Facts:   []Fact{{"Image views", "2,500 per second"}, {"Average image size", "500 KB"}},
+		Fields:  []EstimateField{{Key: "bandwidthGbps", Label: "Outbound bandwidth", Unit: "Gbit/s", Expected: 10, Explain: "2,500 images/s x 500 KB x 1,000 bytes/KB x 8 bits/byte = 10,000,000,000 bits/s; divide by 1,000,000,000 = 10 Gbit/s."}},
+	})
+
 	registerDiagnose("cut-off-threads", diagSource{"cut-off", 1, 60}, &Question{
 		Title: "Everything slows, then stops", Difficulty: "Medium",
 		Summary: "Success falls off a cliff and the latency chart goes blank. What is going on?",
