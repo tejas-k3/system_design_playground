@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { GroupKind, NodeStats, ParamSpec } from '../api/types'
-import { nodeRect } from '../draw/geometry'
-import { MAX_SHAPE, MAX_SHAPE_LABEL, MIN_SHAPE, shapeInfo } from '../model/shapes'
-import { GROUP_KINDS, MAX_GROUP, MAX_GROUP_LABEL, MIN_GROUP, groupInfo, groupMembers } from '../model/groups'
+import type { NodeStats, ParamSpec } from '../api/types'
 import { palettes } from '../draw/theme'
 import type { AlignMode } from '../model/arrange'
 import { copySelection } from '../model/clipboard'
@@ -15,6 +12,9 @@ import { sparkPoints, sparkSummary } from '../model/spark'
 import { crashNode, requestNodeSeries, restartNode } from '../sim/bridge'
 import { ReviewPanel } from './ReviewPanel'
 import { useStore } from '../state/store'
+import { NotePanel } from './inspector/NotePanel'
+import { GroupPanel } from './inspector/GroupPanel'
+import { ShapePanel } from './inspector/ShapePanel'
 import { plain } from '../model/glossary'
 import { Rich } from './Term'
 
@@ -537,88 +537,6 @@ function EdgePanel({ id }: { id: string }) {
         </dl>
       )}
       <button className="danger-outline" onClick={() => del([id])}>Delete connection</button>
-    </div>
-  )
-}
-
-function NotePanel({ id }: { id: string }) {
-  const note = useStore((s) => s.diagram.notes.find((n) => n.id === id))!
-  const updateNote = useStore((s) => s.updateNote)
-  const del = useStore((s) => s.deleteIds)
-  return (
-    <div className="panel">
-      <h2>Note</h2>
-      <textarea className="note-input" value={note.text} onChange={(e) => updateNote(id, { text: e.target.value })} rows={5} aria-label="Note text" />
-      <div className="field">
-        <label htmlFor="fs">Text size</label>
-        <input id="fs" type="range" min={12} max={40} value={note.fontSize ?? 18} onChange={(e) => updateNote(id, { fontSize: Number(e.target.value) })} />
-      </div>
-      <button className="danger-outline" onClick={() => del([id])}>Delete note</button>
-    </div>
-  )
-}
-
-function GroupPanel({ id }: { id: string }) {
-  const group = useStore((s) => s.diagram.groups?.find((g) => g.id === id))
-  const diagram = useStore((s) => s.diagram)
-  const reg = useStore((s) => s.reg)
-  const updateGroup = useStore((s) => s.updateGroup)
-  const del = useStore((s) => s.deleteIds)
-  if (!group || !reg) return null
-  const inside = groupMembers(diagram, id, (n) => nodeRect(n, reg))
-  const comps = inside.filter((i) => diagram.nodes.some((n) => n.id === i)).length
-  const other = inside.length - comps
-  return (
-    <div className="panel">
-      <h2>{groupInfo(group.kind).name} box</h2>
-      <div className="field">
-        <label htmlFor="gl">Name</label>
-        <input id="gl" type="text" value={group.label} maxLength={MAX_GROUP_LABEL} onChange={(e) => updateGroup(id, { label: e.target.value })} />
-      </div>
-      <div className="field">
-        <label htmlFor="gk">Kind</label>
-        <select id="gk" value={group.kind} onChange={(e) => updateGroup(id, { kind: e.target.value as GroupKind })}>
-          {GROUP_KINDS.map((k) => (<option key={k.kind} value={k.kind}>{k.name}</option>))}
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor="gw">Width</label>
-        <input id="gw" type="number" min={MIN_GROUP} max={MAX_GROUP} step={20} value={Math.round(group.w)} onChange={(e) => Number.isFinite(e.target.valueAsNumber) && updateGroup(id, { w: e.target.valueAsNumber })} />
-      </div>
-      <div className="field">
-        <label htmlFor="gh">Height</label>
-        <input id="gh" type="number" min={MIN_GROUP} max={MAX_GROUP} step={20} value={Math.round(group.h)} onChange={(e) => Number.isFinite(e.target.valueAsNumber) && updateGroup(id, { h: e.target.valueAsNumber })} />
-      </div>
-      <p className="muted small">Holds {comps} component{comps === 1 ? '' : 's'}{other > 0 ? ` and ${other} other item${other === 1 ? '' : 's'}` : ''}. Moving the box moves them. The simulation ignores boxes.</p>
-      <button className="danger-outline" onClick={() => del([id])}>Delete box (keeps what is inside)</button>
-    </div>
-  )
-}
-
-function ShapePanel({ id }: { id: string }) {
-  const shape = useStore((s) => s.diagram.shapes?.find((g) => g.id === id))
-  const updateShape = useStore((s) => s.updateShape)
-  const del = useStore((s) => s.deleteIds)
-  if (!shape) return null
-  const arrow = shape.kind === 'arrow'
-  const num = (set: (n: number) => void) => (e: React.ChangeEvent<HTMLInputElement>) => Number.isFinite(e.target.valueAsNumber) && set(e.target.valueAsNumber)
-  return (
-    <div className="panel">
-      <h2>{shapeInfo(shape.kind).name}</h2>
-      <div className="field">
-        <label htmlFor="sl">Caption (optional)</label>
-        <input id="sl" type="text" value={shape.label} maxLength={MAX_SHAPE_LABEL} onChange={(e) => updateShape(id, { label: e.target.value })} />
-      </div>
-      <div className="field">
-        <label htmlFor="sw">{arrow ? 'Tip: across (px, negative = left)' : 'Width'}</label>
-        <input id="sw" type="number" min={arrow ? -MAX_SHAPE : MIN_SHAPE} max={MAX_SHAPE} step={20} value={Math.round(shape.w)} onChange={num((w) => updateShape(id, { w }))} />
-      </div>
-      <div className="field">
-        <label htmlFor="sh">{arrow ? 'Tip: down (px, negative = up)' : 'Height'}</label>
-        <input id="sh" type="number" min={arrow ? -MAX_SHAPE : MIN_SHAPE} max={MAX_SHAPE} step={20} value={Math.round(shape.h)} onChange={num((h) => updateShape(id, { h }))} />
-      </div>
-      <p className="muted small">{arrow ? 'A free arrow for pointing at something; drag either end, or use the arrow keys to move it. It is not a connection.' : 'An ellipse to circle part of the design; drag its outline to move it and its corner to resize.'} The simulation ignores it.</p>
-      <button className="danger-outline" onClick={() => del([id])}>Delete {shapeInfo(shape.kind).name.toLowerCase()}</button>
     </div>
   )
 }
