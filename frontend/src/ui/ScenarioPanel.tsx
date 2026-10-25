@@ -7,6 +7,7 @@ import { reset } from '../sim/bridge'
 import { loadAnswer } from '../state/learning'
 import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
+import { plain } from '../model/glossary'
 import { Rich } from './Term'
 
 export function ScenarioPanel() {
@@ -57,6 +58,7 @@ export function ScenarioPanel() {
             ))}
           </ul>
           {stars && <p className="muted small">{stars}</p>}
+          {sc.dailySeed !== undefined && <p className="muted small">Today's run: seed {sc.dailySeed}</p>}
           {sc.result && !ui.result && (
             <p className="result-again">
               <button onClick={() => setUi({ result: true })}>Show the result{sc.result.pass ? ' (passed)' : ''}</button>
@@ -69,7 +71,7 @@ export function ScenarioPanel() {
           {pred && status === 'stopped' && (
             <div className="predict">
               <h3>Predict first</h3>
-              <p>{pred.question}</p>
+              <p><Rich text={pred.question} /></p>
               <div className="choices">
                 {pred.options.map((o, i) => (
                   <button key={o} disabled={picked !== undefined || asking} className={picked === undefined ? '' : i === picked.answer ? 'right' : i === picked.choice ? 'wrong' : ''} onClick={async () => {
@@ -82,11 +84,11 @@ export function ScenarioPanel() {
                       setAsking(false)
                     }
                   }}>
-                    {o}
+                    {plain(o)}{/* a button cannot hold another focusable control, so an option shows its plain words */}
                   </button>
                 ))}
               </div>
-              {picked !== undefined && <p className="muted small">{picked.explain}</p>}
+              {picked !== undefined && <p className="muted small"><Rich text={picked.explain} /></p>}
             </div>
           )}
           {sc.hintLevel > 0 && (
