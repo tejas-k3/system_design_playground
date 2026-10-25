@@ -1015,7 +1015,14 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 		}
 		n.osRequests++
 		if body > 0 {
-			ms += body / (n.f("throughputMBps") * 1000) // bytes / (MB/s x 1000 bytes per ms)
+			per := n.f("throughputMBps") * 1000 // bytes per ms for one stream
+			if chunk := n.f("multipartKB") * 1000; chunk > 0 && c.cmd == cmdPut && body > chunk {
+				// multipart upload: parts of `chunk` bytes, `parallel` of them at once, each at the per-stream rate
+				rounds := math.Ceil(math.Ceil(body/chunk) / math.Max(1, n.f("multipartParallel")))
+				ms += rounds * chunk / per
+			} else {
+				ms += body / per // bytes / (MB/s x 1000 bytes per ms)
+			}
 		}
 		s.hold(n, s.service(n, ms)*n.slow, release, cb, func() {
 			release()

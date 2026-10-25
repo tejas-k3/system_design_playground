@@ -501,6 +501,8 @@ func init() {
 				num("firstByteMs", "Time to first byte", "Speed", 30, 1, 2000, 5, "ms", "How long before an upload starts being accepted."),
 				num("throughputMBps", "Throughput per upload", "Speed", 50, 1, 2000, 5, "MB/s", "How fast one upload's body is written once it has started."),
 				num("maxConcurrent", "Uploads at once", "Capacity", 1000, 1, 100000, 10, "", "Uploads it handles at the same time; beyond it, new ones are refused.").adv(),
+				num("multipartKB", "Multipart chunk", "Speed", 0, 0, 102400, 100, "KB", "Upload big bodies in parts of this size, several at a time: the store's part of an upload takes the time to first byte plus the number of rounds (parts divided by uploads in parallel, rounded up) times one part's transfer time. The link in front of the store still carries every byte, so it stays the floor. 0 = one upload; a body no bigger than a part is not split.").adv(),
+				num("multipartParallel", "Parts in parallel", "Speed", 4, 1, 64, 1, "", "How many parts of one upload are in flight at once.").adv(),
 				num("egressPerGB", "Download price", "Cost", 0.09, 0, 1, 0.01, "$/GB", "What each GB served to users costs. Charged from the rate seen so far, so it appears in the hourly cost once downloads run.").adv(),
 				num("requestPer1k", "Request price", "Cost", 0.0004, 0, 0.1, 0.0001, "$/1k", "Price per 1,000 requests, uploads and downloads alike.").adv(),
 				num("dataGB", "Data stored", "Cost", 0, 0, 10000000, 100, "GB", "How much is kept in the store; charged per GB per month.").adv(),
