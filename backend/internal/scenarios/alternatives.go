@@ -401,6 +401,11 @@ var alternatives = map[string][]Alternative{
 		alt("Make a database read take 5 ms instead of 15", false, 53.1, 936, 0.42, "Faster reads are not enough: only 53.1% succeed and the p95 is 936 ms, with the same two servers having to carry the ramp to 800 requests a second.", Change{"db", "readMs", 5.0}),
 		alt("Turn clients' retries off", false, 44.7, 783, 0.42, "Fewer duplicate requests, but nothing is rescued either: 44.7% succeed and the p95 is 783 ms.", Change{"users", "retries", 0.0}),
 	},
+	"restore-window": {
+		alt("Read the bucket with eight parts at once", false, 17.9, 167, 0.99, "Eight streams could carry 400 MB a second, but the 400 Mbit/s link behind them carries 50: the restore still takes about 246 seconds. The link is now the limit.", Change{"bucket", "multipartKB", 1000.0}, Change{"bucket", "multipartParallel", 8.0}),
+		alt("Let the database write 10,000 MB a second", false, 17.9, 167, 2.79, "The database was never the slow part, so the restore takes exactly as long, and the faster restore speed is paid for every hour: $2.79 against a budget of $1.30.", Change{"db", "restoreMBps", 10000.0}),
+		alt("Keep only 3 GB in the database", true, 58.9, 167, 0.99, "Passes: a quarter of the data restores in about 61 seconds even through the narrow link and the single stream. It changes what the business keeps online rather than how fast it can restore, so it is a different answer from the one the challenge is after.", Change{"db", "dataGB", 3.0}),
+	},
 	"video-upload": {
 		alt("Give the app server 64 threads", false, 4.9, 3744, 2.50, "The uploads share one saturated link; more threads only add more uploads to the same link.", Change{"app", "threads", 64.0}),
 	},

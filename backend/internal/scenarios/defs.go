@@ -11,4 +11,5 @@ func init() {
 	registerServicePatterns()
 	registerScaleOut()
 	registerResilienceAndCapstones()
+	registerStorage()
 }

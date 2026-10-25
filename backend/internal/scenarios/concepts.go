@@ -39,6 +39,7 @@ var conceptTags = map[string][]string{
 	"celebrity-post":         {"sharding", "caching"},
 	"image-egress":           {"storage-and-payload", "caching"},
 	"video-upload":           {"storage-and-payload"},
+	"restore-window":         {"storage-and-payload", "failure-handling"},
 	"gc-storm":               {"failure-handling"},
 	"disk-writes":            {"storage-and-payload"},
 	"one-heavy-query":        {"capacity", "overload-control"},
