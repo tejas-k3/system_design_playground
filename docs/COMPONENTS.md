@@ -38,6 +38,10 @@ Defaults are the values a component starts with; every number is a setting you c
 
 The advanced setting *Network card* (`nicMbps`, 0 = unlimited) makes all traffic leaving a machine, its requests to other components and its answers to callers alike, share one first-in-first-out transmitter, the same mechanism as a link's bandwidth. It only has an effect once the users set request or response sizes. With 100 KB answers and 80 Mbit/s the machine sends at most 80e6 / 8 / 100,000 = 100 a second whatever the links beyond it can carry (measured 99.2; 99.0 when 40 KB of requests to the database plus 60 KB of answers share the card). While the card is the bottleneck the server's threads wait on it and its queue fills, so the failure shows as queue-full on that server.
 
+### Backups in an object store
+
+A database wired to an object store restores from it: the backup streams back at the slowest of the link (bandwidth / 8), the store's streams (*Throughput per upload*, times *Parts in parallel* when *Multipart chunk* is on, else one stream) and the database's own *Restore speed*, after the store's time to first byte, and the database answers nothing for that long (the recovery time, RTO). A 20 GB database over one 50 MB/s stream takes 409.6 s whatever the link; four parts at once need a link of at least 1,600 Mbit/s to reach 200 MB/s and take 102.4 s (measured equal to the hand figures). Without a store behind the database, *Restore speed* alone sets the time, as before. The download is not billed as egress.
+
 ### Failure reasons you will see
 
 Timeouts, Queue full (503), Node down, No route, No healthy backend, Rate limited (429), Call timeouts (504), Circuit open, Vendor errors, Lock busy, Waited too long in queue, DB connections refused, No primary: failing over, Sync replica unreachable, Message too large, Connection lost (six packets in a row lost on a lossy link), Transaction aborted, Poison job, Not enough copies for a quorum, No leader (election or lost quorum). The chart shows them in "Why requests failed", and the Request traces tab explains one request at a time.

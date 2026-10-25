@@ -45,6 +45,9 @@ func (s *Sim) restore(n *node) {
 	rto := 0.0
 	if mbps := n.f("restoreMBps"); mbps > 0 {
 		rto = n.f("dataGB") * 1024 / mbps
+		if oe := s.first(n, KObjectStore); oe != nil {
+			rto = s.restoreFromStore(n, oe, mbps)
+		}
 	}
 	s.runRTO = rto
 	n.corruptAt = 0

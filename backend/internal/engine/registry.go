@@ -296,7 +296,7 @@ func init() {
 			// range queries by time with downsampling for time-series. The engine has no join or range-query concept yet.
 			Kind: KDatabase, Name: "Database", Description: "The primary data store. Handles reads and writes.",
 			Lesson: "Connections and query time cap throughput long before disks do.",
-			Accent: "#e8590c", Width: 160, Height: 72, CanConnect: []string{KCoordinator},
+			Accent: "#e8590c", Width: 160, Height: 72, CanConnect: []string{KCoordinator, KObjectStore},
 			Params: []ParamSpec{
 				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it can work on at once."),
 				num("readMs", "Read time", "Speed", 10, 1, 500, 1, "ms", "Time for one read."),
