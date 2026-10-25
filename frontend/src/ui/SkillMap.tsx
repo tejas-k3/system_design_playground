@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import { fetchScenarios } from '../api/client'
-import type { ScenarioSummary } from '../api/types'
+import { useRef } from 'react'
 import { downloadText } from './download'
 import { exportProgress, mergeProgress, parseImport, MAX_FILE_BYTES } from '../model/progressIO'
 import { REVIEW_EXPLAIN, reviewReason } from '../model/record'
-import { skillMap } from '../model/skills'
+import { levelSummary, skillMap } from '../model/skills'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
 import { LevelSwitch } from './LevelSwitch'
 import { useEscapeKey } from './useEscapeKey'
+import { useScenarioList } from './useScenarioList'
 
 /** One row for each idea the challenges practise: how many stars you have there and what to try next. */
 export function SkillMap() {
@@ -18,21 +17,34 @@ export function SkillMap() {
   const records = useStore((s) => s.records)
   const level = useStore((s) => s.level)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [list, setList] = useState<ScenarioSummary[] | null>(null)
-  const [err, setErr] = useState('')
-  useEffect(() => {
-    if (open) fetchScenarios().then(setList).catch((e: Error) => setErr(e.message))
-  }, [open])
+  const { list, fromCache, pending, error } = useScenarioList(open)
+  const err = list ? '' : error
   const close = () => setUi({ skills: false })
   useEscapeKey(open, close)
   if (!open) return null
   const rows = list ? skillMap(list, progress, level, records) : []
+  const levels = list ? levelSummary(list, progress) : []
   const title = (id: string) => list?.find((s) => s.id === id)?.title ?? id
   return (
     <div className="modal-back" role="dialog" aria-modal aria-label="Skill map" onClick={close}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head"><h2>Skill map</h2><button className="x" autoFocus onClick={close} aria-label="Close">×</button></header>
         <p className="muted small">Each row is an idea the challenges practise. The bar shows stars earned out of the stars available there; the button starts the one to try next (fewest stars first, easiest first).</p>
+        {fromCache && !pending && <p className="muted small" role="status">Showing the last known list. Challenges still open through the server.</p>}
+        {levels.length > 0 && (
+          <section aria-label="Stars by level">
+            <h3>Stars by level</h3>
+            <ul className="skills levels">
+              {levels.map((l) => (
+                <li key={l.level}>
+                  <b>{l.label}</b>
+                  <span className="muted small">{l.text}</span>
+                  <progress max={l.maxStars || 1} value={l.stars} aria-label={`${l.label}: ${l.stars} of ${l.maxStars} stars`} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <LevelSwitch />
         <div className="row-btns">
           <button onClick={() => { downloadText('sdp-progress.json', exportProgress({ progress, records })); useStore.getState().toast('Progress exported', 'info') }}>Export progress</button>
