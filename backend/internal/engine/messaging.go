@@ -13,7 +13,7 @@ func (s *Sim) arriveQueue(n *node, c *call, cb func(Result)) {
 		s.failAt(n, RNoRoute, cb)
 		return
 	}
-	if c.lg != nil && !c.claim && c.lg.client.f("reqKB") > n.f("maxMessageKB") { // sizes are 0 (not modelled) unless the users set them; a claim check carries a pointer
+	if c.lg != nil && !c.claim && s.reqBytes(c.lg) > n.f("maxMessageKB")*1000 { // sizes are 0 (not modelled) unless the users set them; a claim check carries a pointer
 		s.failAt(n, RMessageTooLarge, cb)
 		return
 	}

@@ -198,7 +198,7 @@ func (s *Sim) sizes(c *call) (req, resp float64) {
 	if c.lg == nil {
 		return 0, 0
 	}
-	req, resp = c.lg.client.f("reqKB")*1000, c.lg.client.f("respKB")*1000
+	req, resp = s.lgSizes(c.lg)
 	if c.bodyB > 0 {
 		resp = float64(c.bodyB)
 	}

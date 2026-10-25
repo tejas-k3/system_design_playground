@@ -20,7 +20,7 @@ func (s *Sim) rangeOf(n *node, c *call) (pieces int, size, piece float64) {
 	if kb <= 0 || c.lg == nil {
 		return 0, 0, 0
 	}
-	size = c.lg.client.f("respKB") * 1000
+	_, size = s.lgSizes(c.lg)
 	piece = kb * 1000
 	if size <= piece {
 		return 0, 0, 0
