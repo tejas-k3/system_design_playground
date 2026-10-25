@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
-import { fetchScenarios } from '../api/client'
-import type { ScenarioSummary } from '../api/types'
-import { dailyForLevel, loadStreak, localDate, shownStreak } from '../model/daily'
+import { useMemo } from 'react'
+import { dailyForLevel, dailySeed, loadStreak, localDate, shownStreak } from '../model/daily'
 import { exampleDiagram } from '../model/examples'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
 import { LevelSwitch } from './LevelSwitch'
+import { useScenarioList } from './useScenarioList'
 
 export function Welcome() {
   const show = useStore((s) => s.ui.welcome && !s.scenario && s.diagram.nodes.length === 0)
@@ -14,18 +13,12 @@ export function Welcome() {
   const requestFit = useStore((s) => s.requestFit)
   const level = useStore((s) => s.level)
   const startInterview = useStore((s) => s.startInterview)
-  const [daily, setDaily] = useState<{ s: ScenarioSummary; streak: number } | null>(null)
-  useEffect(() => {
-    if (!show) return
-    const today = localDate()
-    fetchScenarios()
-      .then((list) => {
-        const id = dailyForLevel(today, list, level)
-        const s = list.find((x) => x.id === id)
-        setDaily(s ? { s, streak: shownStreak(loadStreak(), today) } : null)
-      })
-      .catch(() => setDaily(null))
-  }, [show, level])
+  const { list, fromCache, pending } = useScenarioList(show)
+  const today = localDate()
+  const daily = useMemo(() => {
+    const s = list?.find((x) => x.id === dailyForLevel(today, list, level))
+    return s ? { s, streak: shownStreak(loadStreak(), today) } : null
+  }, [list, level, today])
   if (!show) return null
   return (
     <div className="welcome">
@@ -42,7 +35,9 @@ export function Welcome() {
         <div className="daily" role="group" aria-label="Daily challenge">
           <span><b>Today's challenge:</b> {daily.s.title}</span>
           <span className="muted small">{daily.streak > 0 ? `${daily.streak}-day streak` : 'Solve it to start a streak'}</span>
-          <button onClick={() => { setUi({ welcome: false }); loadScenario(daily.s.id) }}>Start today's challenge</button>
+          <span className="muted small">Today's run: seed {dailySeed(today)}</span>
+          {fromCache && !pending && <span className="muted small" role="status">Showing the last known list</span>}
+          <button onClick={() => { setUi({ welcome: false }); loadScenario(daily.s.id, { dailySeed: dailySeed(today) }) }}>Start today's challenge</button>
         </div>
       )}
       <div className="row-btns center">

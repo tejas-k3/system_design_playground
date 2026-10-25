@@ -1,5 +1,7 @@
 import type { Alternative, BuildResult, ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, PredictionAnswer, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
+import { loadSummaries, saveSummaries } from '../model/summaries'
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let msg = res.statusText
@@ -14,7 +16,26 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export const fetchRegistry = () => fetch('/api/registry').then((r) => json<Registry>(r))
-export const fetchScenarios = () => fetch('/api/scenarios').then((r) => json<ScenarioSummary[]>(r))
+/** The challenge list. A good answer is also kept in this browser (see fetchScenariosOrCached). */
+export const fetchScenarios = () => fetch('/api/scenarios').then((r) => json<ScenarioSummary[]>(r)).then((l) => { saveSummaries(l); return l })
+
+/** The list from the server, or, when the server is slow (over `timeoutMs`) or fails, the last good copy kept in this browser. Rejects only when there is no copy either. The copy is for display; open a challenge through the server. */
+export async function fetchScenariosOrCached(timeoutMs = 4000): Promise<{ list: ScenarioSummary[]; cached: boolean }> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const list = await Promise.race([
+      fetchScenarios(),
+      new Promise<never>((_, no) => { timer = setTimeout(() => no(new Error('The server is slow to answer')), timeoutMs) }),
+    ])
+    return { list, cached: false }
+  } catch (e) {
+    const list = loadSummaries()
+    if (list) return { list, cached: true }
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
+}
 export const fetchScenario = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}`).then((r) => json<Scenario>(r))
 export const fetchAlternatives = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/alternatives`).then((r) => json<Alternative[]>(r))
 export const fetchHint = (id: string, level: number) => fetch(`/api/scenarios/${encodeURIComponent(id)}/hints/${level}`).then((r) => json<{ level: number; hint: string }>(r))
