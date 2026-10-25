@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { viewOf } from '../draw/geometry'
+import { groupTitle } from '../model/groups'
 import { searchNodes } from '../model/search'
 import { useStore } from '../state/store'
 import { useEscapeKey } from './useEscapeKey'
@@ -20,6 +22,8 @@ export function SearchDialog() {
     if (open) setQuery('')
   }, [open])
   if (!open) return null
+  const view = reg ? viewOf(diagram, reg) : null
+  const boxOf = (id: string) => diagram.groups?.find((g) => g.id === view?.owner.get(id))
   const pick = (i: number) => {
     const n = found[i]
     if (!n) return
@@ -49,6 +53,7 @@ export function SearchDialog() {
           {found.map((n, i) => (
             <li key={n.id} id={`search-${n.id}`} role="option" aria-selected={i === at} className={i === at ? 'on' : ''} onMouseEnter={() => setAt(i)} onClick={() => pick(i)}>
               <span>{n.label}</span> <span className="muted small">{reg?.spec(n.kind)?.name ?? n.kind}</span>
+              {boxOf(n.id) && <span className="muted small"> · inside collapsed {groupTitle(boxOf(n.id)!)} (opens it)</span>}
             </li>
           ))}
         </ul>

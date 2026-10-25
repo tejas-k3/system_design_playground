@@ -107,6 +107,14 @@ describe('collapsing a box in the store', () => {
     expect(hiddenFlag(zone)).toBe(true) // opening it was one undoable step
   })
 
+  it('selecting a hidden component by any route (outline, a lint finding) opens its box', () => {
+    const { zone, app1 } = build()
+    st().toggleCollapsed(zone, true)
+    st().setSelection([app1])
+    expect(hiddenFlag(zone)).toBeUndefined()
+    expect(st().selection).toEqual([app1])
+  })
+
   it('adding a component inside a collapsed box opens the box, so it does not vanish', () => {
     const { zone } = build()
     st().toggleCollapsed(zone, true)

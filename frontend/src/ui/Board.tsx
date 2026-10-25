@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { type ActiveParticle, PARTICLE_MS, createRough, measureText, render } from '../draw/renderer'
-import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld } from '../draw/geometry'
+import { type Pt, type Rect, hitTest, nodeRect, noteRect, rectsIntersect, screenToWorld, viewOf } from '../draw/geometry'
 import { palettes } from '../draw/theme'
 import { openOutputs } from '../model/diagram'
-import { groupRect, groupsOf, withMembers } from '../model/groups'
+import { groupDisplayRect, isHidden } from '../model/collapse'
+import { groupsOf, withMembers } from '../model/groups'
 import { shapeRect, shapesOf } from '../model/shapes'
 import { type Guide, snapMove, unionRect } from '../model/snap'
 import { drainParticles, spawnTimes } from '../sim/particles'
@@ -17,6 +18,7 @@ import { useFitView } from './board/useFitView'
 import { useWheelZoom } from './board/useWheelZoom'
 import { ZoomBadge } from './board/ZoomBadge'
 import { Minimap } from './board/Minimap'
+import { GroupToggles } from './board/GroupToggles'
 
 type Mode =
   | { k: 'idle' }
@@ -37,6 +39,8 @@ function handleSet(st: State, hover: string | null): Set<string> {
   const ids = new Set<string>(st.selection.filter((id) => st.diagram.nodes.some((n) => n.id === id)))
   if (hover && st.diagram.nodes.some((n) => n.id === hover)) ids.add(hover)
   if (st.sim.status === 'stopped') for (const id of openOutputs(st.reg!, st.diagram)) ids.add(id)
+  const view = viewOf(st.diagram, st.reg!)
+  for (const id of ids) if (view.hiddenNodes.has(id)) ids.delete(id) // a component inside a collapsed box has no handle
   return ids
 }
 
@@ -226,13 +230,14 @@ export function Board() {
       const ids = useStore.getState().selection.filter((id) => st.diagram.nodes.some((n) => n.id === id) || st.diagram.notes.some((n) => n.id === id) || !!st.diagram.groups?.some((g) => g.id === id) || !!st.diagram.shapes?.some((s) => s.id === id))
       st.beginGesture()
       const d = st.diagram
+      const view = viewOf(d, st.reg!)
       const rectOf = (id: string): Rect | null => {
         const n = d.nodes.find((x) => x.id === id)
         if (n) return nodeRect(n, st.reg!)
         const t = d.notes.find((x) => x.id === id)
         if (t) return noteRect(t, measureText)
         const g = groupsOf(d).find((x) => x.id === id)
-        if (g) return groupRect(g)
+        if (g) return groupDisplayRect(view, g)
         const sh = shapesOf(d).find((x) => x.id === id)
         return sh ? shapeRect(sh) : null
       }
@@ -240,7 +245,8 @@ export function Board() {
       const carry = withMembers(d, ids, (n) => nodeRect(n, st.reg!))
       const carried = new Set(carry)
       const moving = unionRect(ids.map(rectOf).filter((r): r is Rect => !!r))
-      const others = [...d.nodes.map((n) => n.id), ...d.notes.map((n) => n.id), ...groupsOf(d).map((g) => g.id), ...shapesOf(d).map((s) => s.id)].filter((id) => !carried.has(id)).map(rectOf).filter((r): r is Rect => !!r)
+      // snap only to what is on screen: members of a collapsed box are not
+      const others = [...d.nodes.map((n) => n.id), ...d.notes.map((n) => n.id), ...groupsOf(d).map((g) => g.id), ...shapesOf(d).map((s) => s.id)].filter((id) => !carried.has(id) && !isHidden(view, id)).map(rectOf).filter((r): r is Rect => !!r)
       mode.current = { k: 'drag', ids, carry, start: w, applied: { x: 0, y: 0 }, moving, others }
       setCursor('grabbing')
       return
@@ -335,11 +341,15 @@ export function Board() {
       case 'marquee': {
         const r: Rect = { x: Math.min(m.start.x, w.x), y: Math.min(m.start.y, w.y), w: Math.abs(w.x - m.start.x), h: Math.abs(w.y - m.start.y) }
         marquee.current = r
+        const view = viewOf(st.diagram, st.reg)
         const ids = [
-          ...st.diagram.nodes.filter((n) => rectsIntersect(r, nodeRect(n, st.reg!))).map((n) => n.id),
-          ...st.diagram.notes.filter((n) => rectsIntersect(r, noteRect(n, measureText))).map((n) => n.id),
-          ...shapesOf(st.diagram).filter((s) => rectsIntersect(r, shapeRect(s))).map((s) => s.id),
-          ...(st.diagram.groups ?? []).filter((g) => g.x >= r.x && g.y >= r.y && g.x + g.w <= r.x + r.w && g.y + g.h <= r.y + r.h).map((g) => g.id), // a box needs to be wholly inside
+          ...st.diagram.nodes.filter((n) => !view.hiddenNodes.has(n.id) && rectsIntersect(r, nodeRect(n, st.reg!))).map((n) => n.id),
+          ...st.diagram.notes.filter((n) => !view.hiddenNotes.has(n.id) && rectsIntersect(r, noteRect(n, measureText))).map((n) => n.id),
+          ...shapesOf(st.diagram).filter((s) => !view.hiddenShapes.has(s.id) && rectsIntersect(r, shapeRect(s))).map((s) => s.id),
+          ...(st.diagram.groups ?? []).filter((g) => {
+            const b = groupDisplayRect(view, g)
+            return !view.hiddenGroups.has(g.id) && b.x >= r.x && b.y >= r.y && b.x + b.w <= r.x + r.w && b.y + b.h <= r.y + r.h // a box needs to be wholly inside
+          }).map((g) => g.id),
         ]
         st.setSelection(Array.from(new Set([...(m.additive ? m.base : []), ...ids])))
         wake()
@@ -375,6 +385,16 @@ export function Board() {
       return
     }
     if (m.k === 'drag' || m.k === 'resize') st.endGesture()
+    if (m.k === 'drag' && st.reg) {
+      // a component dropped inside a collapsed box disappears from view: say where it went
+      const d = useStore.getState().diagram
+      const view = viewOf(d, st.reg)
+      const lost = d.nodes.filter((n) => m.ids.includes(n.id) && view.hiddenNodes.has(n.id))
+      if (lost.length) {
+        const box = d.groups?.find((g) => g.id === view.owner.get(lost[0].id))
+        st.toast(`${lost.map((n) => n.label).join(', ')} ${lost.length === 1 ? 'is' : 'are'} now inside the collapsed box ${box?.label || 'box'}; expand it to see ${lost.length === 1 ? 'it' : 'them'}`, 'info', 5000)
+      }
+    }
     guides.current = []
     if (m.k === 'pan' && !m.moved) st.setSelection([])
     if (m.k === 'rewire') {
@@ -423,6 +443,7 @@ export function Board() {
     const w = world(local(e))
     const hit = hitAt(w)
     if (hit?.type === 'note') beginNoteEdit(hit.id)
+    else if (hit?.type === 'group') st.toggleCollapsed(hit.id)
     else if (!hit) {
       const id = st.addNote(w.x - 20, w.y - 14)
       setTimeout(() => beginNoteEdit(id), 0)
@@ -480,6 +501,7 @@ export function Board() {
       {noteEdit && (
         <NoteEditor edit={noteEdit} initialText={useStore.getState().diagram.notes.find((n) => n.id === noteEdit.id)?.text ?? ''} onCommit={commitNote} />
       )}
+      <GroupToggles />
       <NodeOutline />
       <ZoomBadge fit={fitView} by={zoomBy} />
       <Minimap wrap={wrap} />

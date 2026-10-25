@@ -5,7 +5,7 @@ import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, Shape, Shape
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
 import { alignNodes, distributeNodes, type AlignMode } from '../model/arrange'
 import { tidyDiagram } from '../model/tidy'
-import { collapseView, expandFor, setCollapsed, visibleIds } from '../model/collapse'
+import { collapseView, expandFor, isHidden, setCollapsed, visibleIds } from '../model/collapse'
 import { MAX_SHAPES, MAX_SHAPE_LABEL, clampShape, newShape, shapesOf } from '../model/shapes'
 import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
@@ -474,7 +474,16 @@ export const useStore = create<State>()((set, get) => {
       set({ selection: [], ui: { ...get().ui, welcome: false } })
     },
 
-    setSelection: (ids) => set({ selection: ids }),
+    setSelection: (ids) => {
+      // selecting something that sits hidden in a collapsed box (a lint finding, the outline, a search) opens that box
+      const { reg, diagram } = get()
+      if (reg && diagram.groups?.some((g) => g.collapsed)) {
+        const rect = (n: Node) => nodeRect(n, reg)
+        const v = collapseView(diagram, rect)
+        if (ids.some((id) => isHidden(v, id))) mutate((d) => expandFor(d, ids, rect))
+      }
+      set({ selection: ids })
+    },
     setTool: (tool) => set({ tool }),
     setViewport: (v) => set((s) => ({ viewport: { ...s.viewport, ...v } })),
     zoomAt: (factor, cx, cy) =>

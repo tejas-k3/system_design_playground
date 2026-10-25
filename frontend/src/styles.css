@@ -69,6 +69,8 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 .board-main { position: relative; flex: 1; min-width: 0; }
 .board { position: absolute; inset: 0; overflow: hidden; }
 .board canvas { display: block; }
+.group-toggle { position: absolute; z-index: 4; padding: 0; background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.group-toggle:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .note-edit { position: absolute; background: #fff3bf; color: #1f1f1f; border: 2px solid var(--accent); border-radius: 4px; padding: 6px 8px; font-family: var(--hand); resize: none; min-height: 40px; z-index: 5; }
 .zoom-badge { position: absolute; left: 12px; bottom: 12px; display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
 .zoom-badge button { border: none; border-radius: 0; padding: 6px 10px; } .zoom-val { min-width: 56px; justify-content: center; font-variant-numeric: tabular-nums; }
