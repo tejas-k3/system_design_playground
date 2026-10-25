@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { fmtCost } from '../model/goals'
 import { APP_TITLE, designName, pageTitle } from '../model/designName'
-import { DesignName } from './DesignName'
 import { scrubTarget } from '../model/scrub'
 import { reset, seek, step, togglePlay } from '../sim/bridge'
 import { shareCurrentDesign } from '../sim/designs'
@@ -57,7 +56,6 @@ export function Toolbar() {
         <span className="brand-name">System Design Playground</span>
       </div>
 
-      {!scenarioTitle && <DesignName />}
 
       <div className="group" role="group" aria-label="Tools">
         <button className={tool === 'select' ? 'on' : ''} onClick={() => setTool('select')} title="Select / move (V)" aria-pressed={tool === 'select'}>

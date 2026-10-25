@@ -138,7 +138,8 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
   .inspector { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
   .inspector-tab { top: 8px; }
 }
-@media (max-width: 1400px) { .brand-name { display: none; } } /* the design's name takes its place in the toolbar */
+@media (max-width: 1400px) { .brand-name { font-size: 16px; } .brand { margin-right: 0; gap: 6px; } .toolbar { gap: 4px; padding-inline: 8px; } } /* keep one toolbar row down to 1280 px without hiding the name */
+@media (max-width: 1320px) { .toolbar .pill { display: none; } } /* the cost is also in the inspector's overview */
 @media (max-width: 1100px) { .brand-name { display: none; } } /* keep the toolbar on one row at tablet widths */
 @media (max-width: 980px) { /* keep in step with NARROW_PX in model/responsive.ts */
   .toolbar { gap: 6px; padding: 6px 8px; } .brand-name, .clock { display: none; } .spacer { display: none; }
@@ -256,7 +257,7 @@ button.primary:active, .card:active { box-shadow: 1px 1px 0 var(--line); transfo
 input[type='range'], .scrub { accent-color: var(--accent); }
 .seg button, .charts-head button { white-space: nowrap; }
 .credit { font-size: 12px; border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 12px; }
-.app-credit { flex: none; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 12px; padding: 3px 12px; text-align: right; }
+.app-credit { flex: none; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 12px; padding: 2px 12px; } .app-credit .credit-text { margin-left: auto; } .app-credit .design-name { flex: 0 1 260px; padding: 0 6px; font-size: 12px; } .app-credit .design-name input { font-size: 13px; }
 .app.present-mode .app-credit { display: none; }
 .candidate { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; } .candidate label { flex: 1; }
 .review-node.found { border-left-color: #2f9e44; } .review-node.missed { border-left-color: var(--bad); border-left-style: dashed; } .review-node.false { border-left-color: var(--warn); border-left-style: dotted; }

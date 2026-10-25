@@ -15,6 +15,7 @@ import { openDesign } from './sim/designs'
 import { loadScenario } from './sim/loadScenario'
 import { useStore } from './state/store'
 import { Deferred, usePreloadSurfaces } from './lazySurfaces'
+import { DesignName } from './ui/DesignName'
 
 export function App() {
   const registryReady = useStore((s) => !!s.reg)
@@ -52,6 +53,7 @@ export function App() {
   }, [registryReady])
 
   const present = ui.present && hasSession
+  const scenarioOpen = useStore((s) => !!s.scenario)
   return (
     <div className={`app ${present ? 'present-mode' : ''}`}>
       <a className="skip" href="#canvas-area" onClick={(e) => { e.preventDefault(); document.getElementById('canvas-area')?.focus() }}>Skip to the canvas</a>
@@ -72,7 +74,7 @@ export function App() {
         </div>
         <Inspector />
       </div>
-      <footer className="app-credit">Made by <b>Tejas Kothari</b> · MIT licensed</footer>
+      <footer className="app-credit">{!scenarioOpen && <DesignName />}<span className="credit-text">Made by <b>Tejas Kothari</b> · MIT licensed</span></footer>
       <Deferred name="picker" open={ui.picker} />
       <Deferred name="result" open={ui.result && hasResult} />
       <Deferred name="help" open={ui.help} />
