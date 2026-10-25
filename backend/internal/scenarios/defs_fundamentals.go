@@ -222,7 +222,7 @@ func registerFundamentals() {
 		Answer: "The answer: turn on row locks in the database, or add Redis and give the app server a lock wait.",
 		Predictions: []Prediction{{ID: "p1", Question: "A fail-fast Redis lock (no wait) will…", Options: []string{"Reject some honest bookings that collide", "Allow a few double bookings under load", "Queue colliding bookings until the lock frees"}, Answer: 0,
 			Explain: "Failing fast avoids double bookings but turns every collision into an error unless you wait a little for the lock."}},
-		Debrief: "Correctness under concurrency needs an explicit mechanism: row locks, optimistic version checks, or a distributed lock with a lease. Locks have costs: contention, waiting, and {{fencing|expiry races}}.",
+		Debrief: "Correctness under concurrency needs an explicit mechanism: row locks, optimistic version checks, or a distributed lock with a lease. Locks have costs: contention, waiting, and expiry races.",
 	})
 
 	// 8 ─ Medium ──────────────────────────────────────────────────────────────────────
@@ -279,6 +279,6 @@ func registerFundamentals() {
 		Answer: "The answer: raise the isolation level on the database to serializable and watch what it costs under contention.",
 		Predictions: []Prediction{{ID: "p1", Question: "Moving to a stronger isolation level will…", Options: []string{"Make every transfer slower, overlapping or not", "Make overlapping transfers wait or abort", "Stop transfers from ever being aborted"}, Answer: 1,
 			Explain: "Stronger isolation turns silent overwrites into waiting (locks) or errors (aborts and deadlocks): correctness is paid for with latency under contention."}},
-		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how {{hot-key|hot}} the shared rows are.",
+		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how hot the shared rows are.",
 	})
 }

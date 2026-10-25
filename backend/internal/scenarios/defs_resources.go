@@ -203,7 +203,7 @@ func registerResourceLimits() {
 		Answer: "The answer: nobody queries by those fields (the lookups share is zero), so drop the indexes. A faster disk would also work, but removing the waste is cheaper.",
 		Predictions: []Prediction{{ID: "p1", Question: "Removing the three unused indexes will…", Options: []string{"Slow reads down a lot, since lookups lose their index", "Cut the disk operations per write from four to one", "Free memory, but leave the disk work as it was"}, Answer: 1,
 			Explain: "Each write must update every index as well as the table. With no reads using them, they only cost disk writes."}},
-		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with {{utilisation|the disk's budget}}.",
+		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
 	})
 
 	// A few expensive requests hold every thread: head-of-line blocking. Config only: give the server more threads.
@@ -263,7 +263,7 @@ func registerResourceLimits() {
 		Answer: "The answer: only serializable makes the two requests take turns on the pair. Set the database's isolation level to serializable and check the aborts it brings.",
 		Predictions: []Prediction{{ID: "p1", Question: "Will repeatable read (snapshot isolation) stop both doctors leaving?", Options: []string{"Yes: snapshot isolation aborts anything that conflicts", "No: they write different rows, so nothing clashes", "Only when load is low and few requests overlap"}, Answer: 1,
 			Explain: "Snapshot isolation only detects two writes to the same row. Write skew is two writes to different rows justified by the same stale read, which only serializable execution rules out."}},
-		Debrief: "Write skew is the anomaly {{consistency-levels|snapshot isolation}} misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
+		Debrief: "Write skew is the anomaly snapshot isolation misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
 		Deeper:  "Write skew happens when two transactions read an overlapping set of rows, each decides it is safe, and each writes a different row, so snapshot isolation sees no conflict even though the rule across the rows is broken. You have three fixes: run the transactions serializably and accept aborts that the client must retry, lock the rows the rule reads, or turn the rule into something the database enforces, for example by making both writers touch one row that represents the pair. At larger scale the rule gets harder when the rows live on {{sharding|different shards}}, which is a reason to keep an invariant inside one partition. An interviewer will ask for other examples such as booking the same room or spending from two accounts, and what your database really means by repeatable read, because the name does not guarantee the same behaviour everywhere. The failure is silent: nothing errors and the broken invariant is noticed by a person, as in this story.",
 	})
 

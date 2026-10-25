@@ -119,7 +119,7 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: turn on 'Eject outliers' (servers much slower than their peers leave rotation for a while), or switch to least connections: a stalling server piles up unfinished requests, so it is given fewer new ones.",
 		Predictions: []Prediction{{ID: "p1", Question: "A server is slow half the time but never fails a health check. Which balancing rule protects users best?", Options: []string{"Round robin, so that every server gets its fair share", "Dropping servers whose latency is far above their peers'", "Weighting traffic towards the slow server so it catches up"}, Answer: 1,
 			Explain: "A slow server is worse than a dead one: a dead one is skipped, a slow one keeps being given work it cannot finish."}},
-		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because {{littles-law|a sick server is the one with the most unfinished work}}.",
+		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because a sick server is the one with the most unfinished work.",
 	})
 
 	// 14f ─ Medium, config only: every cache entry expires at the same instant ────────────
@@ -263,7 +263,7 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: size the server for the public crowd, which is open-loop (its load does not fall when the server struggles): raise the app server's {{thread-pool|threads}}.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why can a closed-loop load test pass at a load that breaks the system in production?", Options: []string{"Production has more data, so queries are slower", "Users who wait for answers slow down as the system does", "Load tests run from inside the data centre"}, Answer: 1,
 			Explain: "A fixed crowd that waits is self-limiting: latency rises, arrivals fall. Real internet traffic keeps coming at the same rate however slow you are."}},
-		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so {{littles-law|size for the arrival rate}}, not for the number of testers.",
+		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so size for the arrival rate, not for the number of testers.",
 	})
 
 	// 14k ─ Medium, config only: short intense rushes at a modest average ───────────────────

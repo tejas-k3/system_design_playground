@@ -76,7 +76,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: give the load balancer a canary share (advanced settings): a small percentage of requests goes to version 2 until you trust it.",
 		Predictions: []Prediction{{ID: "p1", Question: "With a 5% canary, roughly how many requests meet the bug?", Options: []string{"About half, as the canary is checked first", "About 5% of them, during the bad period", "Almost none, as a canary is always tested"}, Answer: 1,
 			Explain: "A canary sends the new version only its small share, so a broken release hurts only that share until it is rolled back."}},
-		Debrief: "Release safety is about {{bulkhead|blast radius}}. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
+		Debrief: "Release safety is about blast radius. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
 	})
 
 	// Zone outage: every component sits in the default zone, so one zone failing is a total outage
@@ -110,7 +110,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: set each component's availability zone (advanced settings): keep the balancer and the database out of zone A and spread the servers over different zones.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why does the design survive when the balancer is moved to another zone but the servers stay put?", Options: []string{"It does not: all three servers are still in the failed zone", "The balancer caches responses from the servers", "The database takes over when the zone fails"}, Answer: 0,
 			Explain: "A balancer in a healthy zone has nothing to send traffic to if every server it knows is in the failed zone. All the pieces a request needs must survive."}},
-		Debrief: "{{bulkhead|Failure domains}} are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
+		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
 	})
 
 	// Retry storm: a five-second slowdown that never ends, because the clients' retries keep the database saturated
@@ -206,7 +206,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: add an Object Store and connect the app server to it. The app uploads the body there and queues only a pointer (the claim-check pattern).",
 		Predictions: []Prediction{{ID: "p1", Question: "A queue accepts messages up to 256 KB. Users upload 500 KB files. What is the standard fix?", Options: []string{"Raise the queue's size limit past 500 KB", "Retry the failed uploads in smaller pieces", "Store the file elsewhere and queue a pointer to it"}, Answer: 2,
 			Explain: "Queues and databases are built for small records. Large bodies go to an object store; what travels through the queue is a reference to it."}},
-		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes {{retry-storm|retries cheap}}, because a retry re-sends a pointer, not 500 KB.",
+		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes retries cheap, because a retry re-sends a pointer, not 500 KB.",
 	})
 
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: put a CDN between the users and the load balancer.",
 		Predictions: []Prediction{{ID: "p1", Question: "A CDN with a 60 second TTL serves a page that changes every few seconds. What is the catch?", Options: []string{"Users may see stale copies until the TTL expires", "The CDN cannot serve pages that change at all", "Every request still has to reach the origin"}, Answer: 0,
 			Explain: "Cached copies are served until they expire, so freshness is traded for speed unless writes invalidate them."}},
-		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is {{ttl|freshness}}, which is why caching suits content that changes slowly.",
+		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is freshness, which is why caching suits content that changes slowly.",
 	})
 
 	// 16 ─ Medium, config only ─────────────────────────────────────────────────────────

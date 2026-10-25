@@ -126,7 +126,7 @@ func registerLoadAndLiveData() {
 	register(&Scenario{
 		ID: "live-scoreboard", Title: "Live scoreboard", Difficulty: "Hard",
 		Summary: "Ranking millions of scores with a SQL query is slow.",
-		Story:   "Every rank lookup sorts scores in the database and costs ten times a normal read. The database is {{utilisation|the bottleneck}}.",
+		Story:   "Every rank lookup sorts scores in the database and costs ten times a normal read. The database is the bottleneck.",
 		Diagram: board(false), Solution: board(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(200), MaxCostPerHour: f(1.2)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
@@ -167,7 +167,7 @@ func registerLoadAndLiveData() {
 		Answer: "The answer: turn on the spatial index in the database settings.",
 		Predictions: []Prediction{{ID: "p1", Question: "A spatial index mainly improves…", Options: []string{"Write throughput", "Proximity searches", "Network latency"}, Answer: 1,
 			Explain: "Spatial indexes organise points by location so a proximity query touches only nearby entries."}},
-		Debrief: "The cheapest scaling fix is often a better index. Measure first: the database was {{utilisation|doing 25× the work}} for every search.",
+		Debrief: "The cheapest scaling fix is often a better index. Measure first: the database was doing 25× the work for every search.",
 		Deeper:  "A spatial index (a grid, geohash prefixes, a quadtree or an R-tree) lets a proximity query visit only the cells around the rider instead of every row, which is why the work falls by an order of magnitude here. Moving drivers make the write side the real cost: every location update must maintain the index, so many systems keep live positions in memory grouped by cell and store history separately. A query near a cell edge has to look at the neighbouring cells too, and a dense cell such as a stadium exit becomes a {{hot-key|hot spot}} that needs splitting. An interviewer will ask how fresh the results must be, how often drivers report, and how you {{sharding|shard}} by geography. The failure pattern is a skewed city centre: sharding by region balances the map but not the demand.",
 	})
 
@@ -196,7 +196,7 @@ func registerLoadAndLiveData() {
 		Answer: "The answer: switch Redis persistence to the append-only file: a crash then loses at most the last second of writes.",
 		Predictions: []Prediction{{ID: "p1", Question: "With an append-only file, what is the most you can lose in a crash?", Options: []string{"Nothing at all, as every write is logged first", "About the last second of writes", "Everything since the last backup was taken"}, Answer: 1,
 			Explain: "The file is flushed about once a second, so writes acknowledged since the last flush can still be lost."}},
-		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose {{slo|how many seconds of data you can afford to lose}}, then pick the setting that guarantees it.",
+		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose how many seconds of data you can afford to lose, then pick the setting that guarantees it.",
 		Deeper:  "Persistence is a choice of how much you are willing to lose: an append-only file flushed about once a second bounds the loss to roughly that window, flushing on every write shrinks it at a latency cost, and periodic snapshots lose everything since the last one. A replica adds availability, not durability, because asynchronous replication can lose the same last moments. The first question is whether Redis is the source of truth at all; if the scores can be rebuilt from the database, a restart that comes back empty plus a rebuild may be the cheaper answer. An interviewer will ask for your recovery point and recovery time and how you would test them. A real failure pattern is the empty restart: the cache returns cold, every request falls through to the database, and {{metastable-failure|the recovery causes a second outage}}.",
 	})
 }

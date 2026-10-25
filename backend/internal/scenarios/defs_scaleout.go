@@ -182,7 +182,7 @@ func registerScaleOut() {
 		Answer: "The answer: replace the queue with a topic (publish/subscribe): every worker connected to it is a subscriber and gets its own copy of every message.",
 		Predictions: []Prediction{{ID: "p1", Question: "If email, push and SMS are three workers on one queue, an order produces…", Options: []string{"Three notifications, one from each worker", "One notification, from whichever worker took it", "None until all three workers have finished"}, Answer: 1,
 			Explain: "Workers on a queue compete for messages: each message is processed once. To give every consumer its own copy you need publish/subscribe."}},
-		Debrief: "A queue is for {{thread-pool|sharing work among identical workers}}; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
+		Debrief: "A queue is for sharing work among identical workers; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
 	})
 
 	// Go global: users on three continents, one stack in one region

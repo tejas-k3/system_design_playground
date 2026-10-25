@@ -36,7 +36,7 @@ func registerConsistencyAndStreams() {
 		Answer: "The answer: turn on backups every few seconds on the database, and raise the restore speed. Each costs a little: a restore bandwidth that is higher than you need is wasted money.",
 		Predictions: []Prediction{{ID: "p1", Question: "Backing up every five seconds (and nothing else) will…", Options: []string{"Fix both the data lost and the time taken to restore", "Cut the data lost but leave the restore as slow", "Cut the time to restore but keep the same data loss"}, Answer: 1,
 			Explain: "How often you back up sets how much you can lose; how fast a backup streams back sets how long you wait. They are separate levers."}},
-		Debrief: "RPO and RTO are different dials: backup frequency sets the recovery point, restore bandwidth and data size set the recovery time. Pick them from {{slo|what the business can bear}}, and then practise the restore.",
+		Debrief: "RPO and RTO are different dials: backup frequency sets the recovery point, restore bandwidth and data size set the recovery time. Pick them from what the business can bear, and then practise the restore.",
 	})
 
 	// Lost cart: two leaders accept writes for the same cart; last-writer-wins silently drops one of them
@@ -215,7 +215,7 @@ func registerConsistencyAndStreams() {
 	register(&Scenario{
 		ID: "count-the-clicks", Title: "Count the clicks", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The click counts are wrong because some clicks arrive late.",
-		Story:   "A dashboard shows clicks per ten seconds, counted by a stream job by the time each click happened. About one click in seven comes from a phone that was offline and reaches the server twenty seconds after it happened. The job has already published the window by then and throws the click away, so the totals are always a little low. The dashboard must still show each window {{slo|within three seconds of it ending}}.",
+		Story:   "A dashboard shows clicks per ten seconds, counted by a stream job by the time each click happened. About one click in seven comes from a phone that was offline and reaches the server twenty seconds after it happened. The job has already published the window by then and throws the click away, so the totals are always a little low. The dashboard must still show each window within three seconds of it ending.",
 		Diagram: countClicks(false), Solution: countClicks(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxLateDropped: i(20), MaxResultDelaySec: f(3), MaxCostPerHour: f(1.0)},
 		DurationSec: 60, WarmupSec: 5, Speed: 1,
@@ -245,7 +245,7 @@ func registerConsistencyAndStreams() {
 	register(&Scenario{
 		ID: "unique-visitors", Title: "Unique visitors", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Counting each visitor exactly needs a table that grows with the audience.",
-		Story:   "The marketing dashboard shows how many different people visited. The stream job keeps every visitor id it has seen, so the table grows with the audience, and the job has a memory budget of 16 KB for it (in this small run; a real audience is thousands of times larger and so is the table). Marketing is happy with {{slo|a number that is right to within a few percent}}.",
+		Story:   "The marketing dashboard shows how many different people visited. The stream job keeps every visitor id it has seen, so the table grows with the audience, and the job has a memory budget of 16 KB for it (in this small run; a real audience is thousands of times larger and so is the table). Marketing is happy with a number that is right to within a few percent.",
 		Diagram: uniqueVisitors(false), Solution: uniqueVisitors(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxStateKB: f(16), MaxCountErrorPct: f(6), MaxCostPerHour: f(1.0)},
 		DurationSec: 60, WarmupSec: 5, Speed: 1,

@@ -86,7 +86,7 @@ func registerServicePatterns() {
 	register(&Scenario{
 		ID: "rag-under-load", Title: "Search under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The document search finds everything, and answers nobody in time.",
-		Story:   "An assistant looks up documents in a vector index before it answers: twenty million passages, searched approximately. Whoever set it up asked for the best recall they could get, so every search examines hundreds of candidates and finds nearly all the true neighbours. At 150 searches a second the four {{thread-pool|search cores}} cannot keep up, the queue grows and users time out. Retrieval should still find at least nine of every ten true neighbours.",
+		Story:   "An assistant looks up documents in a vector index before it answers: twenty million passages, searched approximately. Whoever set it up asked for the best recall they could get, so every search examines hundreds of candidates and finds nearly all the true neighbours. At 150 searches a second the four search cores cannot keep up, the queue grows and users time out. Retrieval should still find at least nine of every ten true neighbours.",
 		Diagram: ragSearch(false), Solution: ragSearch(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(250), MinRecall: f(0.9), MaxCostPerHour: f(2.0), StarP95Ms: f(100)},
 		DurationSec: 60, WarmupSec: 10, Speed: 1,
