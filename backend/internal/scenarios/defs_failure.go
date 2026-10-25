@@ -20,7 +20,7 @@ func registerFailureAndElasticity() {
 	register(&Scenario{
 		ID: "primary-dies", Title: "The primary dies", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "The database server is gone for a minute. A replica is sitting right there.",
-		Story:       "Six in ten requests write to the database. At 20 seconds the primary crashes and stays down for a minute. There is a read replica, three seconds behind. Keep most requests succeeding and lose as few acknowledged writes as you can. The architecture is fixed: fix it with configuration.",
+		Story:       "Six in ten requests write to the database. At 20 seconds the primary crashes and stays down for a minute. There is a read replica, {{replication-lag|three seconds behind}}. Keep most requests succeeding and lose as few acknowledged writes as you can. The architecture is fixed: fix it with configuration.",
 		Diagram:     failover(P{}, P{"replicationLagMs": 3000.0}),
 		Solution:    failover(P{"onFailure": "promote", "detectSec": 3.0, "promoteSec": 5.0}, P{"replicationLagMs": 500.0}),
 		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "db", AtSec: 20, DownSec: 60}},
@@ -28,14 +28,14 @@ func registerFailureAndElasticity() {
 		DurationSec: 70, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
 			"For a minute every write fails. Is there another machine that already has most of the data?",
-			"The database can promote a replica when it fails. Look at its 'If it fails' setting, and at how long it takes to notice and to switch.",
+			"The database can {{failover|promote a replica}} when it fails. Look at its 'If it fails' setting, and at how long it takes to notice and to switch.",
 			"Three things set the outage and the loss: what the database does on failure, how quickly it notices and switches, and how far behind the replica is. Which have you not touched?",
 		},
-		Answer: "The answer: promote a replica, shorten the detection and promotion times, and shrink the replica's replication lag: whatever it had not copied yet is lost.",
+		Answer: "The answer: {{failover|promote a replica}}, shorten the detection and promotion times, and shrink the replica's {{replication-lag|replication lag}}: whatever it had not copied yet is lost.",
 		Predictions: []Prediction{{ID: "p1", Question: "The replica is 3 seconds behind and gets promoted. What happens to the writes from the last 3 seconds before the crash?", Options: []string{"They are safe: the primary had saved them", "They are lost: the replica never received them", "They are replayed when the old primary returns"}, Answer: 1,
 			Explain: "Asynchronous replication acknowledges a write before the replica has it, so a failover keeps only what had already been copied."}},
-		Debrief: "Failover has two costs. Time: while the failure is noticed and a replica takes over, nothing can write. Data: with asynchronous replication, whatever the replica had not yet copied is gone. Both are settings you choose: faster detection risks false alarms, and a smaller lag costs the primary more work.",
-		Deeper:  "A failover costs time and data, and they are separate dials: time is detection plus promotion, data is whatever the replica had not yet received when the primary died. Detecting faster risks promoting on a blip, which creates an outage that did not need to happen, and a smaller replication lag costs the primary more work or, if you make replication synchronous, makes every write wait for the replica. At larger scale you promote the most caught-up replica rather than any replica and let clients find the new primary through a service name instead of a cached address. An interviewer will ask what happens to the old primary when it returns, which is a later challenge in this set, and how you would reconcile writes it accepted that were never copied. The usual failure is promoting a lagging replica and then silently discarding the unreplicated tail.",
+		Debrief: "{{failover|Failover}} has two costs. Time: while the failure is noticed and a replica takes over, nothing can write. Data: with asynchronous replication, whatever the replica had not yet copied is gone. Both are settings you choose: faster detection risks false alarms, and a smaller {{replication-lag|lag}} costs the primary more work.",
+		Deeper:  "A {{failover|failover}} costs time and data, and they are separate dials: time is detection plus promotion, data is whatever the replica had not yet received when the primary died. Detecting faster risks promoting on a blip, which creates an outage that did not need to happen, and a smaller {{replication-lag|replication lag}} costs the primary more work or, if you make replication synchronous, makes every write wait for the replica. At larger scale you promote the most caught-up replica rather than any replica and let clients find the new primary through a service name instead of a cached address. An interviewer will ask what happens to the old primary when it returns, which is a later challenge in this set, and how you would reconcile writes it accepted that were never copied. The usual failure is promoting a lagging replica and then silently discarding the unreplicated tail.",
 	})
 
 	// 14c ─ Hard, config only: the traffic ramps and the fleet is fixed ─────────────────────
@@ -56,15 +56,15 @@ func registerFailureAndElasticity() {
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(600), MaxCostPerHour: f(0.85)},
 		DurationSec: 150, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
-			"One server has a fixed number of threads. What if the number of servers could follow the traffic?",
+			"One server has {{thread-pool|a fixed number of threads}}. What if {{autoscaling|the number of servers could follow the traffic}}?",
 			"Open the App Server's settings, choose 'Show advanced' and look at the Scaling group.",
 			"A new server needs time to boot. Which setting makes the scaler order servers while the existing ones still have room?",
 		},
-		Answer: "The answer: turn on autoscaling, then lower the target busy level: new servers take 20 seconds to boot, so they must be ordered while the old ones still have room.",
+		Answer: "The answer: turn on {{autoscaling|autoscaling}}, then lower the target busy level: new servers take 20 seconds to boot, so they must be ordered while the old ones still have room.",
 		Predictions: []Prediction{{ID: "p1", Question: "A new server takes 20 seconds to boot and traffic climbs for a minute. When should the scaler start adding servers?", Options: []string{"As late as possible, to keep the monthly bill low", "Early, while servers still have spare room", "Only once requests have actually started failing"}, Answer: 1,
 			Explain: "Capacity ordered now only arrives in 20 seconds. A scaler that waits until the servers are full has already started failing requests by the time help arrives."}},
-		Debrief: "Autoscaling trades money for time. A low target busy level orders servers early and costs more; a high one is cheap and late. Boot time sets how far ahead you must look, and a wait before removing servers stops the fleet flapping. The very large fixed fleet works too, but costs all day what you only need at the peak.",
-		Deeper:  "Reactive autoscaling always lags demand by the measuring window plus the boot time, which here is 20 seconds, so the target busy level is really a decision about how far ahead you pay for capacity: lower means earlier and dearer, higher means cheaper and late. When the wave is predictable, scheduled or predictive scaling and a pool of servers kept ready beat any threshold, and scaling on queue depth or latency reacts to the symptom that users feel rather than to CPU. The downstream side matters too, because every new server opens its own connections, so a fleet that grows quickly can overload the database that was fine a minute earlier. An interviewer will ask what the maximum should be and what happens when the cloud cannot supply the servers you ordered. The failure pattern is flapping: scaling in too eagerly removes the capacity the next wave needs.",
+		Debrief: "{{autoscaling|Autoscaling}} trades money for time. A low target busy level orders servers early and costs more; a high one is cheap and late. Boot time sets how far ahead you must look, and a wait before removing servers stops the fleet flapping. The very large fixed fleet works too, but costs all day what you only need at the peak.",
+		Deeper:  "Reactive {{autoscaling|autoscaling}} always lags demand by the measuring window plus the boot time, which here is 20 seconds, so the target busy level is really a decision about how far ahead you pay for capacity: lower means earlier and dearer, higher means cheaper and late. When the wave is predictable, scheduled or predictive scaling and a pool of servers kept ready beat any threshold, and scaling on queue depth or latency reacts to the symptom that users feel rather than to CPU. The downstream side matters too, because every new server {{connection-pool|opens its own connections}}, so a fleet that grows quickly can overload the database that was fine a minute earlier. An interviewer will ask what the maximum should be and what happens when the cloud cannot supply the servers you ordered. The failure pattern is flapping: scaling in too eagerly removes the capacity the next wave needs.",
 	})
 
 	// 14d ─ Medium, config only: the database is cut off (a partition, not a crash) ─────────
@@ -85,14 +85,14 @@ func registerFailureAndElasticity() {
 		Goals:       engine.Goals{MinSuccessRate: 0.82, MaxP95Ms: f(1000)},
 		DurationSec: 80, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
-			"A crashed database refuses connections at once. A cut-off one never answers. What does a server thread do while it waits?",
+			"A crashed database refuses connections at once. A cut-off one never answers. What does a server {{thread-pool|thread}} do while it waits?",
 			"Every waiting request holds a thread. Look at the app server's 'Call timeout': zero means wait forever.",
 			"Which setting limits how long a call may hold a thread, and what would stop the servers trying at all while the database is unreachable?",
 		},
-		Answer: "The answer: give calls to the database a timeout of a few hundred milliseconds so threads come back, and turn on the circuit breaker so servers stop trying while the database is unreachable.",
+		Answer: "The answer: give calls to the database a timeout of a few hundred milliseconds so threads come back, and turn on the {{circuit-breaker|circuit breaker}} so servers stop trying while the database is unreachable.",
 		Predictions: []Prediction{{ID: "p1", Question: "A server calls a database that is cut off, and 'Call timeout' is 0 (wait forever). What happens to the server?", Options: []string{"Calls to the database fail, but every other request is answered normally", "All its threads get stuck waiting, so even cache hits go unanswered", "The load balancer sees the stuck calls and stops sending to it"}, Answer: 1,
 			Explain: "Each waiting request holds a thread for good. Within a second or two none are left, and cache hits queue behind them."}},
-		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up threads until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a circuit breaker stops you spending a thread on every attempt.",
+		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up {{thread-pool|threads}} until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a {{circuit-breaker|circuit breaker}} stops you spending a thread on every attempt.",
 	})
 
 	// 14e ─ Medium, config only: one server keeps stalling (a gray failure that pulses) ────
@@ -119,7 +119,7 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: turn on 'Eject outliers' (servers much slower than their peers leave rotation for a while), or switch to least connections: a stalling server piles up unfinished requests, so it is given fewer new ones.",
 		Predictions: []Prediction{{ID: "p1", Question: "A server is slow half the time but never fails a health check. Which balancing rule protects users best?", Options: []string{"Round robin, so that every server gets its fair share", "Dropping servers whose latency is far above their peers'", "Weighting traffic towards the slow server so it catches up"}, Answer: 1,
 			Explain: "A slow server is worse than a dead one: a dead one is skipped, a slow one keeps being given work it cannot finish."}},
-		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because a sick server is the one with the most unfinished work.",
+		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because {{littles-law|a sick server is the one with the most unfinished work}}.",
 	})
 
 	// 14f ─ Medium, config only: every cache entry expires at the same instant ────────────
@@ -134,7 +134,7 @@ func registerFailureAndElasticity() {
 	register(&Scenario{
 		ID: "cache-stampede", Title: "Everything expires at once", Difficulty: "Medium", ConfigOnly: true,
 		Summary:     "The cache starts full, every entry lives exactly ten seconds, and then they all die together.",
-		Story:       "You warmed the cache before launch, so the database sees almost nothing. Entries live ten seconds, because prices change and users must not see data older than about fifteen. At the first expiry the whole popular set misses at the same moment and four hundred reads a second land on a database that can answer eighty. Keep it standing without letting data go stale. The architecture is fixed: fix it with configuration.",
+		Story:       "You warmed the cache before launch, so the database sees almost nothing. Entries {{ttl|live ten seconds}}, because prices change and users must not see data older than about fifteen. At the first expiry {{stampede|the whole popular set misses at the same moment}} and four hundred reads a second land on a database that can answer eighty. Keep it standing without letting data go stale. The architecture is fixed: fix it with configuration.",
 		Diagram:     stampede(P{"capacityItems": 2000.0, "ttlSec": 10.0, "startWarm": true}),
 		Solution:    stampede(P{"capacityItems": 2000.0, "ttlSec": 10.0, "startWarm": true, "ttlJitterPct": 50.0, "coalesce": true}),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(500), MaxStaleReadPct: f(0.12)},
@@ -142,12 +142,12 @@ func registerFailureAndElasticity() {
 		Hints: [3]string{
 			"Every entry was created at the same moment with the same lifetime. What happens when the lifetime ends?",
 			"Open the cache's settings: look at Freshness and at 'Show advanced'. You need the entries to stop expiring together, and concurrent misses for one item to stop piling onto the database.",
-			"Two problems, two settings: what makes every entry expire at the same moment, and what lets many misses for one item all reach the database at once?",
+			"Two problems, two settings: what makes every entry expire at the same moment, and what lets {{thundering-herd|many misses for one item all reach the database at once}}?",
 		},
 		Answer: "The answer: add TTL jitter so entries expire at different times, and turn on 'Share concurrent misses'. Do not simply raise the TTL: the data would go stale.",
 		Predictions: []Prediction{{ID: "p1", Question: "The cache is warm and the hit rate is near 100%. Why can the database still be overwhelmed after ten seconds?", Options: []string{"The cache fills up and begins evicting the popular items", "All entries expire together, so nearly all requests miss", "The database slows down over time as its tables grow"}, Answer: 1,
 			Explain: "A warm start gives every entry the same creation time, so they share one expiry time. Misses arrive as a wave, not a trickle."}},
-		Debrief: "A cache hides load until the moment it cannot. Synchronised {{ttl|expiry}} turns a 99% hit rate into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the stampede, but it trades it for stale data, which is why this challenge limits staleness.",
+		Debrief: "A cache hides load until the moment it cannot. Synchronised {{ttl|expiry}} turns a 99% {{cache-hit-rate|hit rate}} into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the {{stampede|stampede}}, but it trades it for stale data, which is why this challenge limits staleness.",
 	})
 
 	// 14g ─ Medium, config only: how much data may a failover lose? ─────────────────────
@@ -163,7 +163,7 @@ func registerFailureAndElasticity() {
 	register(&Scenario{
 		ID: "sync-or-async", Title: "Sync or async?", Difficulty: "Medium", ConfigOnly: true,
 		Summary:     "The primary dies. How many acknowledged writes does the replica know about?",
-		Story:       "Every request is a write that users were told succeeded. At 20 seconds the primary database dies and the replica is promoted. The replica is three seconds behind, so it never saw the last three seconds of writes. Lose at most twenty acknowledged writes and keep the slowest ten percent of writes under about a quarter of a second. The architecture is fixed: fix it with configuration.",
+		Story:       "Every request is a write that users were told succeeded. At 20 seconds the primary database dies and {{failover|the replica is promoted}}. The replica is {{replication-lag|three seconds behind}}, so it never saw the last three seconds of writes. Lose at most twenty acknowledged writes and keep the slowest ten percent of writes under about a quarter of a second. The architecture is fixed: fix it with configuration.",
 		Diagram:     replicas(promote, P{"replicationLagMs": 3000.0}),
 		Solution:    replicas(promote, P{"replicationLagMs": 3000.0, "replication": "sync"}),
 		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "db", AtSec: 20, DownSec: 300}},
@@ -177,14 +177,14 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: switch the replica to synchronous replication: the primary only acknowledges once the replica has the write, so nothing acknowledged is lost. Check what it does to write latency.",
 		Predictions: []Prediction{{ID: "p1", Question: "What is the price of synchronous replication?", Options: []string{"Reads from the replica become slower and staler than before", "Every write waits for the replica, and stops if it is down", "Nothing: it is strictly better than asynchronous"}, Answer: 1,
 			Explain: "Synchronous replication buys zero data loss with latency, and with a dependency: the primary cannot acknowledge what its replica has not confirmed."}},
-		Debrief: "Replication lag is your data-loss window in a failover. Synchronous replication closes it, at the cost of slower writes and a new way to be unavailable (a dead replica blocks writes). Shrinking the lag also helps; in this simulator lag is free to configure, but in a real system a tiny lag costs primary throughput or is simply unachievable across regions.",
+		Debrief: "{{replication-lag|Replication lag}} is your data-loss window in a {{failover|failover}}. Synchronous replication closes it, at the cost of slower writes and a new way to be unavailable (a dead replica blocks writes). Shrinking the lag also helps; in this simulator lag is free to configure, but in a real system a tiny lag costs primary throughput or is simply unachievable across regions.",
 	})
 
 	// 14h ─ Hard, config only: the old primary comes back ────────────────────────────────
 	register(&Scenario{
 		ID: "fence-the-old-primary", Title: "Fence the old primary", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "The failover worked. Then the dead primary woke up.",
-		Story:       "The primary dies at 10 seconds and a replica is promoted by 25 seconds. At 50 seconds the old primary restarts. Nobody told it that it was replaced. Keep the data: lose at most a hundred acknowledged writes, and keep most requests succeeding. The architecture is fixed: fix it with configuration.",
+		Story:       "The primary dies at 10 seconds and {{failover|a replica is promoted}} by 25 seconds. At 50 seconds the old primary restarts. Nobody told it that it was replaced. Keep the data: lose at most a hundred acknowledged writes, and keep most requests succeeding. The architecture is fixed: fix it with configuration.",
 		Diagram:     replicas(P{"onFailure": "promote", "detectSec": 5.0, "promoteSec": 10.0, "fencing": false}, P{"replicationLagMs": 500.0}),
 		Solution:    replicas(promote, P{"replicationLagMs": 500.0}),
 		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "db", AtSec: 10, DownSec: 40}},
@@ -198,8 +198,8 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: turn on 'Fence the old primary'. Without it the old primary rejoins as primary and everything written to the replacement since promotion is lost. Do not just disable failover: writes would fail for the whole outage.",
 		Predictions: []Prediction{{ID: "p1", Question: "The old primary restarts and nothing stops it. What happens to writes made to the new primary in the meantime?", Options: []string{"Merged into the old primary once it rejoins the cluster", "Lost: they exist only on the new primary, which clients abandon", "Kept: both primaries replicate to each other, so nothing is lost"}, Answer: 1,
 			Explain: "Two nodes that both believe they are the primary diverge. Without fencing, the survivor of the confusion silently drops the other's writes."}},
-		Debrief: "Failover is only half the job: you also have to make sure the old primary cannot come back as one. Fencing (a token, a lease, or simply keeping the node out until it is reconciled) is what prevents split brain. Staying down avoids the problem but costs the whole outage.",
-		Deeper:  "Failover without fencing creates two nodes that both believe they are the primary, and whichever the clients reach next wins while the other side's writes are quietly lost. Fencing has to be enforced where the data lives: a monotonically increasing term or token that the storage layer checks, a lease the old primary must renew, or simply keeping the node out until it has been reconciled, because a node cannot be trusted to know it was replaced. Staying down is the safe answer and costs the whole outage; fencing keeps both safety and availability but needs a source of truth for who the current primary is, which leads to the coordination service in a later challenge. An interviewer will push on the harder case where the old primary never crashed and was only partitioned, so it keeps serving writes it believes are valid. That is the real split-brain failure, and it is why the check must come from the resource and not from the process.",
+		Debrief: "{{failover|Failover}} is only half the job: you also have to make sure the old primary cannot come back as one. {{fencing|Fencing}} (a token, a lease, or simply keeping the node out until it is reconciled) is what prevents {{split-brain|split brain}}. Staying down avoids the problem but costs the whole outage.",
+		Deeper:  "{{failover|Failover}} without {{fencing|fencing}} creates {{split-brain|two nodes that both believe they are the primary}}, and whichever the clients reach next wins while the other side's writes are quietly lost. Fencing has to be enforced where the data lives: a monotonically increasing term or token that the storage layer checks, a lease the old primary must renew, or simply keeping the node out until it has been reconciled, because a node cannot be trusted to know it was replaced. Staying down is the safe answer and costs the whole outage; fencing keeps both safety and availability but needs {{leader-election|a source of truth for who the current primary is}}, which leads to the coordination service in a later challenge. An interviewer will push on the harder case where the old primary never crashed and was only partitioned, so it keeps serving writes it believes are valid. That is the real split-brain failure, and it is why the check must come from the resource and not from the process.",
 	})
 
 	// 14i ─ Medium, config only: demand swings faster than a new server boots ─────────────
@@ -223,7 +223,7 @@ func registerFailureAndElasticity() {
 	register(&Scenario{
 		ID: "wave-rider", Title: "Waves faster than boot time", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Autoscaling is on, and users still get errors at the start of every wave.",
-		Story:   "Every forty seconds traffic jumps from 40 to 180 requests a second for twenty seconds and drops again. Autoscaling is switched on, yet each wave starts with a burst of failures: a new server takes ten seconds to boot, and the scaler only looks at the last thirty seconds of load. Keep success high and the slowest requests fast without buying a big fleet for the whole run. The architecture is fixed: fix it with configuration.",
+		Story:   "Every forty seconds traffic jumps from 40 to 180 requests a second for twenty seconds and drops again. {{autoscaling|Autoscaling}} is switched on, yet each wave starts with a burst of failures: a new server takes ten seconds to boot, and the scaler only looks at the last thirty seconds of load. Keep success high and the slowest requests fast without buying a big fleet for the whole run. The architecture is fixed: fix it with configuration.",
 		Diagram: waveFleet(nil), Solution: waveFleet(P{"minInstances": 3.0}),
 		Traffic:     map[string][]engine.TrafficPoint{"users": waves},
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(500), MaxCostPerHour: f(0.5)},
@@ -236,7 +236,7 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: keep a floor of servers that covers the wave (minimum servers 3), or make the scaler act earlier with a lower target busy level. Compare the cost of each.",
 		Predictions: []Prediction{{ID: "p1", Question: "A wave arrives every 40 seconds and a server takes 10 seconds to boot. Which setting helps most?", Options: []string{"Remove idle servers sooner so the monthly bill stays low", "Keep a floor of servers: reactive help comes too late", "Make the scaler wait longer before removing servers"}, Answer: 1,
 			Explain: "Reactive scaling always lags demand by the measuring window plus the boot time. When waves are shorter than that lag, only capacity that is already running helps."}},
-		Debrief: "Autoscaling is reactive, so it suits changes slower than its own reaction time. For predictable, fast waves, pre-provision a floor (or scale on a schedule); a lower target busy level buys earlier action at a higher cost. Waiting longer before scaling down avoids flapping but would not have fixed the wave start.",
+		Debrief: "{{autoscaling|Autoscaling}} is reactive, so it suits changes slower than its own reaction time. For predictable, fast waves, pre-provision a floor (or scale on a schedule); a lower target busy level buys earlier action at a higher cost. Waiting longer before scaling down avoids flapping but would not have fixed the wave start.",
 	})
 
 	// 14j ─ Medium, config only: the load test passed, the launch did not ─────────────────
@@ -260,10 +260,10 @@ func registerFailureAndElasticity() {
 			"Staff wait for each answer, so a slow server slows them down. The public keeps arriving regardless. Compare what each crowd does to the queue.",
 			"Which crowd keeps sending however the server is doing? Size the server for that crowd, not for the one that waits politely.",
 		},
-		Answer: "The answer: size the server for the public crowd, which is open-loop (its load does not fall when the server struggles): raise the app server's threads.",
+		Answer: "The answer: size the server for the public crowd, which is open-loop (its load does not fall when the server struggles): raise the app server's {{thread-pool|threads}}.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why can a closed-loop load test pass at a load that breaks the system in production?", Options: []string{"Production has more data, so queries are slower", "Users who wait for answers slow down as the system does", "Load tests run from inside the data centre"}, Answer: 1,
 			Explain: "A fixed crowd that waits is self-limiting: latency rises, arrivals fall. Real internet traffic keeps coming at the same rate however slow you are."}},
-		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so size for the arrival rate, not for the number of testers.",
+		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so {{littles-law|size for the arrival rate}}, not for the number of testers.",
 	})
 
 	// 14k ─ Medium, config only: short intense rushes at a modest average ───────────────────
@@ -283,14 +283,14 @@ func registerFailureAndElasticity() {
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(700), MaxCostPerHour: f(0.45), StarCostPerHour: f(0.42), StarP95Ms: f(500)},
 		DurationSec: 90, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
-			"Average load and peak load are different numbers. What does the server do during a rush, and what happens to the requests that arrive while all threads are busy?",
+			"Average load and peak load are different numbers. What does the server do during a rush, and what happens to the requests that arrive while {{thread-pool|all threads are busy}}?",
 			"A queue turns a spike into a delay, as long as it is big enough and the wait stays acceptable. The rate limiter rejects traffic: a rejected request is still a failed request.",
 			"One setting on the queue and one on the threads: how long a queue can you afford before the slowest requests are too late, and how fast must the threads drain it?",
 		},
 		Answer: "The answer: make the queue big enough to hold a rush (about a hundred) and give the server a few more threads so the queue drains quickly. A huge queue alone pushes the slowest requests past 0.7 s; sixteen threads cost too much.",
 		Predictions: []Prediction{{ID: "p1", Question: "Average load is 70% of capacity. Why do users still see errors?", Options: []string{"The average is miscalculated, and load is really higher", "Rushes well above capacity overflow a short queue", "The database slows down once the cache fills up"}, Answer: 1,
 			Explain: "Utilisation is an average over time; failures happen in the moments when arrivals exceed capacity. Queues and headroom absorb those moments."}},
-		Debrief: "Provision for the burst, not the mean. A queue absorbs a burst only if it is large enough and drains fast enough; it trades errors for waiting time. Rate limiting protects a system from overload but does not make rejected users succeed, so it is the wrong tool when the burst is short enough to wait out.",
+		Debrief: "Provision for the burst, not the mean. A queue absorbs a burst only if it is large enough and drains fast enough; it trades errors for waiting time. {{load-shedding|Rate limiting}} protects a system from overload but does not make rejected users succeed, so it is the wrong tool when the burst is short enough to wait out.",
 	})
 
 	// 14l ─ Medium: a hot key overloads one shard; more shards do not help ────────────────
@@ -312,7 +312,7 @@ func registerFailureAndElasticity() {
 	register(&Scenario{
 		ID: "hot-shard", Title: "One shard on fire", Difficulty: "Medium",
 		Summary: "The data is split four ways, and one celebrity item gets a third of all reads.",
-		Story:   "You sharded the database four ways so no shard sees more than a quarter of the traffic. Then one item went viral: 35% of all requests ask for it, and it lives on exactly one shard, which now takes half the load and falls over while the other three idle. Fix it. You may add and connect components.",
+		Story:   "You {{sharding|sharded}} the database four ways so no shard sees more than a quarter of the traffic. Then {{hot-key|one item went viral}}: 35% of all requests ask for it, and it lives on exactly one shard, which now takes half the load and falls over while the other three idle. Fix it. You may add and connect components.",
 		Diagram: hotShard(4, false), Solution: hotShard(4, true),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(500), MaxCostPerHour: f(1.7), StarCostPerHour: f(1.65)},
 		DurationSec: 50, WarmupSec: 3, Speed: 1,
@@ -321,10 +321,10 @@ func registerFailureAndElasticity() {
 			"More shards will not spread one item: it still maps to a single shard. What could answer the popular reads without touching that shard at all?",
 			"What could answer the hot item's reads before they reach the shard, and where in the path would it have to sit?",
 		},
-		Answer: "The answer: put a cache in front of the shard router (connect the app servers to it and the cache to the router). A tiny cache is enough: the hot item stays in it.",
+		Answer: "The answer: put a cache in front of the shard router (connect the app servers to it and the cache to the router). A tiny cache is enough: the {{hot-key|hot item}} stays in it.",
 		Predictions: []Prediction{{ID: "p1", Question: "One item gets 35% of reads. What does going from 4 shards to 8 do?", Options: []string{"Halves the hot shard's load, as the keys split across eight", "Helps a little, but the hot item still lives on one shard", "Nothing at all, because the router ignores new shards"}, Answer: 1,
 			Explain: "Resharding spreads the other keys thinner, but a single key cannot be split by hashing: its load stays on whichever shard owns it."}},
-		Debrief: "Sharding balances many keys, not one. A hot key needs a different tool: a cache in front, a replica set for that key, or splitting the key (for example, a counter sharded into N sub-counters). Check the load per shard, not the average.",
+		Debrief: "{{sharding|Sharding}} balances many keys, not one. A {{hot-key|hot key}} needs a different tool: a cache in front, a replica set for that key, or splitting the key (for example, a counter sharded into N sub-counters). Check the load per shard, not the average.",
 	})
 
 	// 14m ─ Medium, config only: a scan flushes the useful part of the cache ────────────────
@@ -340,7 +340,7 @@ func registerFailureAndElasticity() {
 	register(&Scenario{
 		ID: "scan-pollution", Title: "The crawler that ate the cache", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Real users ask for the same few hundred items. A crawler reads every item exactly once.",
-		Story:   "Users keep asking for the same 500 popular items, and the cache holds 600. A search-engine crawler is walking your whole catalogue of 100,000 items, once each, at 150 requests a second. Every item the crawler touches goes into the cache and pushes out something users want. The database can only do 200 reads a second. Keep users fast. The architecture is fixed: fix it with configuration.",
+		Story:   "Users keep asking for the same 500 popular items, and the cache holds 600. A search-engine crawler is walking your whole catalogue of 100,000 items, once each, at 150 requests a second. Every item the crawler touches goes into the cache and {{eviction|pushes out something users want}}. The database can only do 200 reads a second. Keep users fast. The architecture is fixed: fix it with configuration.",
 		Diagram: scanned(P{"capacityItems": 600.0, "eviction": "fifo"}), Solution: scanned(P{"capacityItems": 600.0, "eviction": "lfu"}),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(400)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
@@ -352,6 +352,6 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: switch eviction to LFU (least frequently used): an item read once has a count of one and is the first to go, so the popular items stay. LRU is better than FIFO here but still lets a long scan push things out; a much bigger cache also works but is the expensive answer.",
 		Predictions: []Prediction{{ID: "p1", Question: "Which eviction policy best protects a small popular set from a one-pass scan?", Options: []string{"FIFO: the oldest item goes first", "LFU: least frequently used out first", "Random: no item is favoured by the scan"}, Answer: 1,
 			Explain: "A scan produces many items with a count of one. LFU evicts those first and keeps the items that are read again and again."}},
-		Debrief: "Eviction policy is a bet about the future. LRU assumes recent means useful, which a scan breaks; FIFO ignores use altogether; LFU assumes frequent means useful, which resists scans (but can hold stale favourites). Real systems often add scan-resistant variants or keep crawler traffic out of the cache.",
+		Debrief: "{{eviction|Eviction}} policy is a bet about the future. LRU assumes recent means useful, which a scan breaks; FIFO ignores use altogether; LFU assumes frequent means useful, which resists scans (but can hold stale favourites). Real systems often add scan-resistant variants or keep crawler traffic out of the cache.",
 	})
 }
