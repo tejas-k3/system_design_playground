@@ -73,7 +73,7 @@ export function SkillMap() {
         <ul className="skills">
           {rows.map((r) => (
             <li key={r.concept}>
-              <b>{r.label}{r.review.length > 0 && <>{' '}<span className="review" tabIndex={0} role="note" title={REVIEW_EXPLAIN} aria-label={`Needs review. ${REVIEW_EXPLAIN} ${r.review.map((id) => `${title(id)}: ${reviewReason(records[id])}.`).join(' ')}`}>needs review</span></>}</b>
+              <b>{r.label}{r.review.length > 0 && <>{' '}<span className="needs-review" tabIndex={0} role="note" title={REVIEW_EXPLAIN} aria-label={`Needs review. ${REVIEW_EXPLAIN} ${r.review.map((id) => `${title(id)}: ${reviewReason(records[id])}.`).join(' ')}`}>needs review</span></>}</b>
               <span className="muted small">{r.solved} of {r.total} challenges solved · {r.stars} of {r.maxStars} stars</span>
               <progress max={r.maxStars} value={r.stars} aria-label={`${r.label}: ${r.stars} of ${r.maxStars} stars`} />
               {r.next ? <button onClick={() => { setUi({ skills: false, picker: false }); loadScenario(r.next!) }}>Next: {title(r.next)}</button> : <span className="muted small">All at three stars</span>}
