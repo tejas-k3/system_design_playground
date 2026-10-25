@@ -24,6 +24,8 @@ export function Help() {
     ['Double-click empty', 'Add a note'],
     ['Boxes (library)', 'Add a region, zone or network box; drag its header to move it and what is inside, drag its corner to resize, name it in the inspector'],
     ['Shapes (library)', 'Add an ellipse or a free arrow to circle or point at something; drag the outline to move, the corner (ellipse) or either end (arrow) to resize, or pick it from the keyboard list and use the arrow keys and the inspector'],
+    ['Collapse a box', 'Press the chevron on a box header (Tab to it, then Space or Enter), double-click the header, or tick Collapse in its panel: only the header shows, with the busiest utilisation inside. The simulation is unchanged, and Ctrl/Cmd+K still finds hidden components and opens their box.'],
+    ['Design name', 'Type a name at the bottom left (Enter saves, Escape cancels). It shows in the tab title, the exports and shared designs.'],
     ['Esc', 'Clear selection / cancel connecting'],
   ]
   return (
