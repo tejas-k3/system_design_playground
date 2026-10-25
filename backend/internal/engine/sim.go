@@ -222,6 +222,8 @@ type node struct {
 	locks       map[int]redisLock
 	egressBytes float64   // object store: bytes served to downloads (billed)
 	osRequests  int       // object store: requests served (billed per 1,000)
+	nicFree     float64   // network card limit (nicMbps): when its transmitter is next free
+	fillBytes   float64   // ranged cache or CDN: bytes fetched from the origin to fill missing pieces
 	rwTotal     int       // counted writes since the process last started
 	rwRecent    []float64 // times of counted writes in the last second (what an append-only file could still lose)
 
@@ -412,6 +414,10 @@ func New(d Diagram, opts Options) *Sim {
 	}
 	for _, n := range s.order {
 		if n.store != nil && n.b("startWarm") {
+			if pieces := s.rangePiecesOf(n); pieces > 0 {
+				s.preloadRanged(n, keySpace, pieces)
+				continue
+			}
 			n.store.Preload(keySpace, 0)
 		}
 	}

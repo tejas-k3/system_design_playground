@@ -464,9 +464,17 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 		release()
 		switch c.cmd {
 		case cmdCacheInv:
+			if pieces, _, _ := s.rangeOf(n, c); pieces > 0 {
+				s.rangeDeleteAll(n, c, pieces)
+			}
 			n.store.Delete(c.key)
 			s.okAt(n, Result{Ver: -1, Done: true}, cb)
 		case cmdCacheSet:
+			if pieces, _, _ := s.rangeOf(n, c); pieces > 0 {
+				s.rangeSetAll(n, c, pieces, c.ver)
+				s.okAt(n, Result{Ver: -1, Done: true}, cb)
+				return
+			}
 			n.c.evict += n.store.Set(s.now, c.key, c.ver)
 			s.okAt(n, Result{Ver: -1, Done: true}, cb)
 		case cmdWrite: // a write that came through the cache: on to the database, keeping this copy current (write-through)
@@ -477,11 +485,33 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 			}
 			s.callCmd(n, e, c, cmdWrite, 0, func(res Result) {
 				if res.OK && res.Ver >= 0 {
-					n.c.evict += n.store.Set(s.now, c.key, res.Ver)
+					if pieces, _, _ := s.rangeOf(n, c); pieces > 0 {
+						s.rangeSetAll(n, c, pieces, res.Ver)
+					} else {
+						n.c.evict += n.store.Set(s.now, c.key, res.Ver)
+					}
 				}
 				s.passBack(n, res, cb)
 			})
 		case cmdCacheGet:
+			if pieces, size, piece := s.rangeOf(n, c); pieces > 0 {
+				missing, ver, expired := s.rangeLookup(n, c, pieces)
+				if expired {
+					n.c.expired++
+				}
+				if len(missing) == 0 {
+					n.c.hit++
+					s.okAt(n, Result{Ver: ver, Hit: true, Done: true, Src: n}, cb)
+					return
+				}
+				n.c.miss++
+				if e := s.readThroughEdge(n); e != nil {
+					s.rangeMiss(n, c, missing, pieces, size, piece, func(cc *call, done func(Result)) { s.callCmd(n, e, cc, cmdRead, 0, done) }, cb)
+					return
+				}
+				s.okAt(n, Result{Ver: -1}, cb)
+				return
+			}
 			ver, hit, expired := n.store.Get(s.now, c.key)
 			if expired {
 				n.c.expired++

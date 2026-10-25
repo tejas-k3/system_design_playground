@@ -321,6 +321,9 @@ func (s *Sim) Snapshot() Stats {
 		if sum.localHit > 0 {
 			ex["localHitRps"] = float64(sum.localHit) / span
 		}
+		if n.fillBytes > 0 {
+			ex["originMB"] = n.fillBytes / 1e6
+		}
 		if sum.evict > 0 {
 			ex["evictRps"] = float64(sum.evict) / span
 		}

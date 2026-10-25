@@ -51,6 +51,10 @@ func (s *Sim) configStore(n *node) {
 	if ttlMs > 0 {
 		ttlMs = math.Max(1, ttlMs-n.f("clockSkewMs")) // a clock ahead sees the stamped lifetime as shorter
 	}
+	pieces := s.rangePiecesOf(n)
+	if pieces > 0 { // the item limit counts whole objects: it allows that many pieces
+		capItems *= pieces
+	}
 	if mb := n.f("capacityMB"); mb > 0 {
 		// bodies are as large as the biggest response any client asks for (1 KB when none says)
 		kb := 1.0
@@ -58,6 +62,9 @@ func (s *Sim) configStore(n *node) {
 			if c.kind == KClient && c.f("respKB") > kb {
 				kb = c.f("respKB")
 			}
+		}
+		if pieces > 0 {
+			kb = n.f("rangeKB") // the unit is a piece
 		}
 		capItems = min(capItems, int(mb*1000/kb))
 	}

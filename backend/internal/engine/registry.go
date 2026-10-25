@@ -134,6 +134,8 @@ func init() {
 					opt("exponential", "Exponential + jitter"), opt("none", "Immediate")),
 				num("reqKB", "Request size", "Payload", 0, 0, 102400, 10, "KB", "How big each request is (what an upload sends). 0 = not modelled. A message queue refuses anything above its own size limit.").adv(),
 				num("respKB", "Response size", "Payload", 0, 0, 102400, 10, "KB", "How big each response is. 0 = not modelled. Recorded for the bandwidth model that builds on this.").adv(),
+				sel("sizeDist", "Size distribution", "Payload", "fixed", "Every request and response the size above (fixed), or sizes spread lognormally around that mean: most are smaller, a few are several times larger. The average load is the same, but the big ones queue behind each other, so the tail of the latency is worse. Needs a size above.", opt("fixed", "Fixed"), opt("lognormal", "Lognormal: a heavy tail")).adv(),
+				num("sizeSigma", "Size spread", "Payload", 0.5, 0.1, 2, 0.1, "", "How wide the lognormal spread is (the standard deviation of the logarithm of the size): 0.5 puts the biggest 1 in 100 at about 3 times the mean, 1 at about 10 times.").adv().showIf("sizeDist", "lognormal"),
 				num("retryBudgetPct", "Retry budget", "Patience & retries", 0, 0, 100, 5, "%", "Retries may add at most this share to the number of first attempts (over the last ten seconds). Past it, a failure is simply reported instead of retried, so a struggling system is not buried under its own retries. 0 = no limit.").adv(),
 				num("identities", "Distinct users", "Identity", 0, 0, 1000000, 10, "", "How many different accounts the requests come from (0 = not modelled). A rate limiter set to limit per user counts each account separately.").adv(),
 				num("tenants", "Tenants", "Identity", 0, 0, 50, 1, "", "Group the accounts into this many tenants (customers of a shared service), in blocks: the first tenant has the lowest-numbered accounts, which with account skew are the busiest. A rate limiter set to limit per tenant then gives each tenant its own allowance. 0 = not modelled.").adv(),
@@ -275,6 +277,7 @@ func init() {
 			Params: []ParamSpec{
 				num("capacityItems", "Capacity", "Memory", 2000, 0, 100000, 100, "items", "How many items fit."),
 				num("capacityMB", "Capacity in bytes", "Memory", 0, 0, 1000000, 10, "MB", "Memory for cached bodies. Items are as large as the users' response size, so big objects fit fewer; the smaller of this and the item count applies. 0 = only count items.").adv(),
+				num("rangeKB", "Range size", "Memory", 0, 0, 102400, 10, "KB", "Cache big objects in pieces of this size, each kept or evicted on its own. A request needs all the pieces of its object; only the missing ones go to the origin (and with sharing of concurrent misses, once each). 0 = whole objects. Needs the users' response size; an object no bigger than one piece is not cut up.").adv(),
 				sel("eviction", "Eviction", "Memory", "lru", "Which item to drop when full.",
 					opt("lru", "LRU: least recently used"), opt("lfu", "LFU: least frequently used"), opt("fifo", "FIFO: oldest inserted"), opt("random", "Random")),
 				sel("writePolicy", "On writes", "Freshness", "none", "What happens to cached copies when data is written.",
@@ -293,7 +296,7 @@ func init() {
 			// range queries by time with downsampling for time-series. The engine has no join or range-query concept yet.
 			Kind: KDatabase, Name: "Database", Description: "The primary data store. Handles reads and writes.",
 			Lesson: "Connections and query time cap throughput long before disks do.",
-			Accent: "#e8590c", Width: 160, Height: 72, CanConnect: []string{KCoordinator},
+			Accent: "#e8590c", Width: 160, Height: 72, CanConnect: []string{KCoordinator, KObjectStore},
 			Params: []ParamSpec{
 				num("connections", "Concurrent queries", "Capacity", 16, 1, 256, 1, "", "Queries it can work on at once."),
 				num("readMs", "Read time", "Speed", 10, 1, 500, 1, "ms", "Time for one read."),
@@ -435,6 +438,7 @@ func init() {
 			Params: []ParamSpec{
 				num("capacityItems", "Capacity", "Memory", 5000, 0, 200000, 100, "items", "How many items it can hold."),
 				num("capacityMB", "Capacity in bytes", "Memory", 0, 0, 1000000, 10, "MB", "Disk or memory for cached bodies. Items are as large as the users' response size, so big objects fit fewer; the smaller of this and the item count applies. 0 = only count items.").adv(),
+				num("rangeKB", "Range size", "Memory", 0, 0, 102400, 10, "KB", "Cache big objects in pieces of this size, each kept or evicted on its own. A request needs all the pieces of its object; only the missing ones go to the origin (and with sharing of concurrent misses, once each). 0 = whole objects. Needs the users' response size; an object no bigger than one piece is not cut up.").adv(),
 				num("ttlSec", "Time to live", "Freshness", 60, 0, 3600, 1, "s", "Entries expire after this long."),
 				clockSkew(),
 				ttlJitter(),
@@ -499,6 +503,8 @@ func init() {
 				num("firstByteMs", "Time to first byte", "Speed", 30, 1, 2000, 5, "ms", "How long before an upload starts being accepted."),
 				num("throughputMBps", "Throughput per upload", "Speed", 50, 1, 2000, 5, "MB/s", "How fast one upload's body is written once it has started."),
 				num("maxConcurrent", "Uploads at once", "Capacity", 1000, 1, 100000, 10, "", "Uploads it handles at the same time; beyond it, new ones are refused.").adv(),
+				num("multipartKB", "Multipart chunk", "Speed", 0, 0, 102400, 100, "KB", "Upload big bodies in parts of this size, several at a time: the store's part of an upload takes the time to first byte plus the number of rounds (parts divided by uploads in parallel, rounded up) times one part's transfer time. The link in front of the store still carries every byte, so it stays the floor. 0 = one upload; a body no bigger than a part is not split.").adv(),
+				num("multipartParallel", "Parts in parallel", "Speed", 4, 1, 64, 1, "", "How many parts of one upload are in flight at once.").adv(),
 				num("egressPerGB", "Download price", "Cost", 0.09, 0, 1, 0.01, "$/GB", "What each GB served to users costs. Charged from the rate seen so far, so it appears in the hourly cost once downloads run.").adv(),
 				num("requestPer1k", "Request price", "Cost", 0.0004, 0, 0.1, 0.0001, "$/1k", "Price per 1,000 requests, uploads and downloads alike.").adv(),
 				num("dataGB", "Data stored", "Cost", 0, 0, 10000000, 100, "GB", "How much is kept in the store; charged per GB per month.").adv(),
@@ -640,6 +646,11 @@ func init() {
 		if specs[i].Kind != KClient {
 			specs[i].Params = append(specs[i].Params, sel("zone", "Availability zone", "Placement", "az-a", "Where it runs. A call between two zones pays a hop each way, and a zone outage takes down everything placed in it.",
 				opt("az-a", "Zone A"), opt("az-b", "Zone B"), opt("az-c", "Zone C")).adv())
+		}
+	}
+	for i := range specs { // every component except the users has a network card
+		if specs[i].Kind != KClient {
+			specs[i].Params = append(specs[i].Params, num("nicMbps", "Network card", "Capacity", 0, 0, 100000, 100, "Mbit/s", "How fast this machine can send, shared by everything that leaves it (its requests to other components and its answers to callers): bytes queue behind bytes on one transmitter, so a card smaller than the traffic caps throughput at card speed / message size, whatever the links beyond it can carry. 0 = unlimited. Needs the users' request or response sizes.").adv())
 		}
 	}
 	specByKind = map[string]*NodeSpec{}
