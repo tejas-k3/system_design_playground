@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchQuestions, fetchScenarios } from '../api/client'
+import { fetchQuestions } from '../api/client'
 import type { QuestionSummary, ScenarioSummary } from '../api/types'
 import { LEVEL_TAG, orderByLevel } from '../model/level'
 import { MODE_FILTERS, modeOfQuestion, modeOfScenario, showsMode, type ModeFilter } from '../model/questions'
@@ -9,6 +9,7 @@ import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
 import { LevelSwitch } from './LevelSwitch'
 import { Stars } from './Stars'
+import { useScenarioList } from './useScenarioList'
 import { useEscapeKey } from './useEscapeKey'
 
 export function ScenarioPicker() {
@@ -18,13 +19,11 @@ export function ScenarioPicker() {
   const level = useStore((s) => s.level)
   const active = useStore((s) => s.scenario?.def.id)
   const exit = useStore((s) => s.exitScenario)
-  const [list, setList] = useState<ScenarioSummary[] | null>(null)
+  const { list, fromCache, pending, error: err } = useScenarioList(open)
   const [questions, setQuestions] = useState<QuestionSummary[]>([])
-  const [err, setErr] = useState('')
   const [filter, setFilter] = useState<ModeFilter>('all')
   useEffect(() => {
     if (!open) return
-    fetchScenarios().then(setList).catch((e: Error) => setErr(e.message))
     fetchQuestions().then(setQuestions).catch(() => setQuestions([]))
   }, [open])
   useEscapeKey(open, () => setUi({ picker: false }))
@@ -65,7 +64,8 @@ export function ScenarioPicker() {
         <div className="seg" role="group" aria-label="Kind of exercise">
           {MODE_FILTERS.map((f) => <button key={f.id} aria-pressed={filter === f.id} className={filter === f.id ? 'on' : ''} onClick={() => setFilter(f.id)}>{f.label}</button>)}
         </div>
-        {err && <p className="bad">{err}</p>}
+        {fromCache && !pending && <p className="muted small" role="status">Showing the last known list. Challenges still open through the server.</p>}
+        {err && !list && <p className="bad">{err}</p>}
         {!list && !err && <p className="muted">Loading…</p>}
         {shelf(ordered.first, 'a')}
         {hasOther && <h3 className="level-divider" role="separator" aria-label="Other levels">Other levels</h3>}

@@ -30,6 +30,7 @@ export interface ScenarioState {
   result: Score | null
   predictions: Record<string, PredictionAnswer> // answered prediction questions, with what the server said
   solved: boolean
+  dailySeed?: number // set only when the run was started from the daily card: the seed derived from the date
   compare: { mine: Diagram; reference: Diagram } | null // your design next to the reference, once you ask or reveal it
 }
 export interface Toast {
@@ -45,6 +46,7 @@ function emptyRun() {
 }
 
 const HISTORY = 100
+const DEFAULT_SEED = 42 // the seed of every run except one started from the daily card
 
 export interface State {
   reg: Reg | null
@@ -141,7 +143,8 @@ export interface State {
   setConnection(c: Connection): void
   toast(text: string, kind?: Toast['kind'], ms?: number): void
   dismissToast(id: number): void
-  openScenario(def: Scenario): void
+  /** Open a challenge. `dailySeed` is given only when it was started from the daily card; otherwise the default seed is used. */
+  openScenario(def: Scenario, opts?: { dailySeed?: number }): void
   exitScenario(): void
   recordPrediction(p: Prediction, answer: PredictionAnswer): void
   addHint(text: string): void
@@ -198,7 +201,7 @@ export const useStore = create<State>()((set, get) => {
     progress: {},
     records: {},
     level: readLevel(),
-    sim: { status: 'stopped', speed: 1, seed: 42 },
+    sim: { status: 'stopped', speed: 1, seed: DEFAULT_SEED },
     stats: emptyStats(),
     nodeSeries: null,
     traces: null,
@@ -483,7 +486,7 @@ export const useStore = create<State>()((set, get) => {
     },
     dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
-    openScenario: (def) => {
+    openScenario: (def, opts) => {
       const s = get()
       set({
         sandbox: s.scenario ? s.sandbox : s.diagram,
@@ -493,8 +496,8 @@ export const useStore = create<State>()((set, get) => {
         selection: [],
         stats: emptyStats(),
         traces: null,
-        scenario: { def, hintLevel: 0, hints: [], debrief: null, deeper: null, answer: null, result: null, predictions: {}, solved: false, compare: null },
-        sim: { ...s.sim, status: 'stopped', speed: def.speed || 1 },
+        scenario: { def, hintLevel: 0, hints: [], debrief: null, deeper: null, answer: null, result: null, predictions: {}, solved: false, compare: null, ...(opts?.dailySeed !== undefined ? { dailySeed: opts.dailySeed } : {}) },
+        sim: { ...s.sim, status: 'stopped', speed: def.speed || 1, seed: opts?.dailySeed ?? DEFAULT_SEED },
         ui: { ...s.ui, picker: false, welcome: false, result: false, library: !def.configOnly && !isNarrow() },
       })
     },
@@ -509,7 +512,7 @@ export const useStore = create<State>()((set, get) => {
         stats: emptyStats(),
         traces: null,
         scenario: null,
-        sim: { ...s.sim, status: 'stopped' },
+        sim: { ...s.sim, status: 'stopped', seed: DEFAULT_SEED },
         ui: { ...s.ui, welcome: !(s.sandbox?.nodes.length), result: false, library: !isNarrow() },
       })
     },

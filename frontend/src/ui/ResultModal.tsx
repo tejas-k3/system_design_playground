@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchScenarios } from '../api/client'
+import { fetchScenariosOrCached } from '../api/client'
 import type { ScenarioSummary } from '../api/types'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
@@ -17,7 +17,7 @@ export function ResultModal() {
   const setUi = useStore((s) => s.setUi)
   const [list, setList] = useState<ScenarioSummary[]>([])
   useEffect(() => {
-    if (open) fetchScenarios().then(setList).catch(() => undefined)
+    if (open) fetchScenariosOrCached().then((r) => setList(r.list)).catch(() => undefined)
   }, [open])
   useEffect(() => { // the debrief comes with a passing result, not with the challenge
     if (open && sc?.result?.pass && sc.debrief === null) void loadDebrief(sc.def.id)
@@ -36,6 +36,7 @@ export function ResultModal() {
         <p className="muted center small">
           {r.stars === 3 ? 'Fast and cheap: all three stars.' : r.stars === 2 ? 'Passing and affordable. A faster design earns the third star.' : r.stars === 1 ? 'Passing, but over the star budget. Cut cost to earn another star.' : 'Some goals failed. Read the table below, then adjust your design.'}
         </p>
+        {sc.dailySeed !== undefined && <p className="muted center small">Today's run: seed {sc.dailySeed}</p>}
         {r.stars < 3 && r.pass && <p className="muted center small">{starTargets(sc.def.goals)}</p>}
         <table className="checks">
           <tbody>

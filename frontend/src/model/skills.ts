@@ -1,5 +1,6 @@
 import type { ScenarioSummary } from '../api/types'
-import type { LearnerLevel } from './level'
+import type { Level } from '../api/types'
+import { LEVEL_TAG, type LearnerLevel } from './level'
 import { needsReview, type ChallengeRecord } from './record'
 
 /** The concepts the backend tags challenges with, in the order the skill map lists them, with their names. */
@@ -16,7 +17,28 @@ export const CONCEPT_LABELS: Record<string, string> = {
   autoscaling: 'Autoscaling',
 }
 
-const DIFFICULTY = ['Tutorial', 'Easy', 'Medium', 'Hard']
+export interface LevelRow {
+  level: Level
+  label: string // SDE1, SDE2, SDE3
+  total: number
+  solved: number
+  stars: number
+  maxStars: number
+  text: string // the same numbers in words, for the label next to the bar
+}
+
+/** Stars earned out of the stars available at each level. Challenges with no level are left out; a level with none shows 0 of 0. */
+export function levelSummary(list: ScenarioSummary[], progress: Record<string, number>): LevelRow[] {
+  return (['sde1', 'sde2', 'sde3'] as Level[]).map((level) => {
+    const items = list.filter((s) => s.level === level)
+    const stars = (s: ScenarioSummary) => Math.max(0, Math.min(3, Math.floor(progress[s.id] ?? 0)))
+    const solved = items.filter((s) => stars(s) > 0).length
+    const earned = items.reduce((n, s) => n + stars(s), 0)
+    return { level, label: LEVEL_TAG[level], total: items.length, solved, stars: earned, maxStars: items.length * 3, text: `${solved} of ${items.length} challenges solved · ${earned} of ${items.length * 3} stars` }
+  })
+}
+
+const DIFFICULTY =['Tutorial', 'Easy', 'Medium', 'Hard']
 
 export interface SkillRow {
   concept: string
