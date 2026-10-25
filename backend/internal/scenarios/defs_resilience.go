@@ -23,20 +23,20 @@ func registerResilienceAndCapstones() {
 	register(&Scenario{
 		ID: "reconnect-storm", Title: "The reconnect storm", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The server comes back in seconds, and the outage lasts minutes.",
-		Story:   "A chat server holds 1,500 live connections. It restarts for a few seconds, which is fine, but when it returns every client reconnects in the same instant. Setting up a connection costs real work, so the server cannot keep up, the clients give up and try again together, and it never catches its breath.",
+		Story:   "A chat server holds 1,500 live connections. It restarts for a few seconds, which is fine, but when it returns {{thundering-herd|every client reconnects in the same instant}}. Setting up a connection costs real work, so the server cannot keep up, the clients give up and try again together, and it never catches its breath.",
 		Diagram: reconnect(false), Solution: reconnect(true),
 		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app", AtSec: 15, DownSec: 3}},
 		Goals:       engine.Goals{MinSuccessRate: 0.95, MaxP95Ms: f(400), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.1), StarP95Ms: f(200)},
 		DurationSec: 60, WarmupSec: 10, Speed: 1,
 		Hints: [3]string{
 			"Watch the new-connections rate on the app server after the restart. How big is the spike, and how many connections can it set up per second?",
-			"16 threads at 30 ms a handshake is about 500 connections a second, and 1,500 clients arrive in one go. Those that time out try again at the same moment.",
+			"{{littles-law|16 threads at 30 ms a handshake is about 500 connections a second}}, and 1,500 clients arrive in one go. Those that time out try again at the same moment.",
 			"All the clients return at the same moment. What could each client do so that they do not, and where is that set?",
 		},
 		Answer: "The answer: spread the reconnects: give clients a random wait before they come back (the reconnect spread on the client). More servers would also work but cost more.",
 		Predictions: []Prediction{{ID: "p1", Question: "Spreading reconnects over 30 seconds will…", Options: []string{"Make the outage 30 seconds longer for everyone", "Turn one huge spike into a steady trickle", "Do nothing, as the same clients reconnect"}, Answer: 1,
 			Explain: "The same number of connections are set up, but the peak rate falls from the whole population at once to about fifty a second."}},
-		Debrief: "A restart is not the end of the incident: every client retrying in lockstep can keep the server down. Add random jitter (and backoff) to reconnects so the herd arrives as a stream.",
+		Debrief: "A restart is not the end of the incident: {{retry-storm|every client retrying in lockstep}} can keep the server down. Add random jitter (and backoff) to reconnects so the {{thundering-herd|herd}} arrives as a stream.",
 	})
 
 	// The bad deploy: version 2 is rolled out to half the fleet at once and it serves errors
@@ -76,7 +76,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: give the load balancer a canary share (advanced settings): a small percentage of requests goes to version 2 until you trust it.",
 		Predictions: []Prediction{{ID: "p1", Question: "With a 5% canary, roughly how many requests meet the bug?", Options: []string{"About half, as the canary is checked first", "About 5% of them, during the bad period", "Almost none, as a canary is always tested"}, Answer: 1,
 			Explain: "A canary sends the new version only its small share, so a broken release hurts only that share until it is rolled back."}},
-		Debrief: "Release safety is about blast radius. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
+		Debrief: "Release safety is about {{bulkhead|blast radius}}. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
 	})
 
 	// Zone outage: every component sits in the default zone, so one zone failing is a total outage
@@ -110,7 +110,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: set each component's availability zone (advanced settings): keep the balancer and the database out of zone A and spread the servers over different zones.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why does the design survive when the balancer is moved to another zone but the servers stay put?", Options: []string{"It does not: all three servers are still in the failed zone", "The balancer caches responses from the servers", "The database takes over when the zone fails"}, Answer: 0,
 			Explain: "A balancer in a healthy zone has nothing to send traffic to if every server it knows is in the failed zone. All the pieces a request needs must survive."}},
-		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
+		Debrief: "{{bulkhead|Failure domains}} are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
 	})
 
 	// Retry storm: a five-second slowdown that never ends, because the clients' retries keep the database saturated
@@ -128,7 +128,7 @@ func registerResilienceAndCapstones() {
 	register(&Scenario{
 		ID: "retry-storm", Title: "The retry storm", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "A five-second blip, and the site never recovers.",
-		Story:   "The database slows down for five seconds. Each client gives up after 400 ms and tries again, up to three more times, immediately. By the time the database is healthy again it is buried under the retries of requests that timed out, which time out in turn and are retried again. Fifty seconds later it is still down.",
+		Story:   "The database slows down for five seconds. Each client gives up after 400 ms and tries again, up to three more times, immediately. By the time the database is healthy again it is {{retry-storm|buried under the retries}} of requests that timed out, which time out in turn and are retried again. {{metastable-failure|Fifty seconds later it is still down}}.",
 		Diagram: retryStorm(false), Solution: retryStorm(true),
 		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 10, Factor: 3, DurationSec: 5}},
 		Goals:       engine.Goals{MinSuccessRate: 0.7, MaxP95Ms: f(400), MaxCostPerHour: f(2.7), StarCostPerHour: f(2.5), StarP95Ms: f(300)},
@@ -138,11 +138,11 @@ func registerResilienceAndCapstones() {
 			"Every timeout becomes up to three more requests, so the load is several times what the users really send. The database cannot ever catch up.",
 			"What limits the total extra load that retries can add, whatever the delays? Look at the users' retry settings.",
 		},
-		Answer: "The answer: limit the damage retries can do: give the users a retry budget (advanced settings), or reduce the retries. A retry budget keeps retrying cheap failures but stops a storm.",
+		Answer: "The answer: limit the damage retries can do: give the users a retry budget (advanced settings), or reduce the retries. A retry budget keeps retrying cheap failures but stops {{retry-storm|a storm}}.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why does adding exponential backoff to the retries not fix it here?", Options: []string{"It does: backoff always prevents retry storms", "The load stays several times the real traffic", "Backoff makes the database slower to answer"}, Answer: 1,
 			Explain: "Backoff spreads retries out but does not reduce how many there are. A cap on the total (a budget) is what keeps the extra load bounded."}},
-		Debrief: "Retries multiply load exactly when a dependency is weakest. Keep them bounded: a retry budget as a share of normal traffic, backoff with jitter, and a limit on attempts. Without that, a short blip turns into a long outage.",
-		Deeper:  "Retries multiply load exactly when the dependency is weakest, and the multiplication compounds across layers: if three layers each try an operation four times, one user action can become sixty-four calls at the bottom. The state is metastable, meaning the system stays broken after the original trigger is gone, as in this story where it is still down fifty seconds after a five-second slowdown. The remedies work together: a retry budget as a share of normal traffic, backoff with jitter so retries do not arrive in step, retries at one layer only, deadlines that travel with the request, and shedding load so the queue does not hold dead requests. The cost is that a budget gives up on some requests that would have succeeded. An interviewer will ask which layer should retry and why the operation must be idempotent.",
+		Debrief: "{{retry-storm|Retries multiply load exactly when a dependency is weakest}}. Keep them bounded: a retry budget as a share of normal traffic, backoff with jitter, and a limit on attempts. Without that, a short blip turns into a long outage.",
+		Deeper:  "{{retry-storm|Retries multiply load exactly when the dependency is weakest}}, and the multiplication compounds across layers: if three layers each try an operation four times, one user action can become sixty-four calls at the bottom. The state is {{metastable-failure|metastable}}, meaning the system stays broken after the original trigger is gone, as in this story where it is still down fifty seconds after a five-second slowdown. The remedies work together: a retry budget as a share of normal traffic, backoff with jitter so retries do not arrive in step, retries at one layer only, deadlines that travel with the request, and {{load-shedding|shedding load}} so the queue does not hold dead requests. The cost is that a budget gives up on some requests that would have succeeded. An interviewer will ask which layer should retry and why the operation must be {{idempotency|idempotent}}.",
 	})
 
 	// Bot flood: a scraper on three accounts, and a limiter that cannot tell it from a customer
@@ -163,7 +163,7 @@ func registerResilienceAndCapstones() {
 	register(&Scenario{
 		ID: "bot-flood", Title: "The bot flood", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A scraper is burying the database, and the limiter keeps turning customers away.",
-		Story:   "A scraper asks for item after item nobody has cached, at 600 requests a second from just three accounts, on top of 1,000 customers who send 100 a second between them. The database is saturated. Someone put a rate limiter in front of everything, but it counts all traffic together, so customers are rejected right along with the bot. Only the customers' experience counts here.",
+		Story:   "A scraper asks for item after item nobody has cached, at 600 requests a second from just three accounts, on top of 1,000 customers who send 100 a second between them. The database is saturated. Someone put {{load-shedding|a rate limiter}} in front of everything, but it counts all traffic together, so customers are rejected right along with the bot. Only the customers' experience counts here.",
 		Diagram: botFlood(false), Solution: botFlood(true),
 		Goals:       engine.Goals{MinCustomerSuccess: f(0.97), MaxCostPerHour: f(2.8), StarCostPerHour: f(2.6), StarP95Ms: f(300)},
 		DurationSec: 40, WarmupSec: 0, Speed: 1,
@@ -175,7 +175,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: make the limiter count per user (advanced settings) and set the allowance to what a customer plausibly needs, a few requests a second.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why does raising the shared limit not fix it?", Options: []string{"The customers become slower because limits add delay", "The bot's extra requests also get through to the database", "The bot just opens more accounts to get around it"}, Answer: 1,
 			Explain: "A shared limit that is high enough for the customers lets most of the bot through too. The two have to be told apart by who they are."}},
-		Debrief: "A global limit protects the system but not the people. Limit per identity so a heavy or abusive account runs out of allowance on its own, and size the per-user rate to legitimate use rather than to total capacity.",
+		Debrief: "{{load-shedding|A global limit}} protects the system but not the people. Limit per identity so a heavy or abusive account runs out of allowance on its own, and size the per-user rate to legitimate use rather than to total capacity.",
 	})
 
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
@@ -206,7 +206,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: add an Object Store and connect the app server to it. The app uploads the body there and queues only a pointer (the claim-check pattern).",
 		Predictions: []Prediction{{ID: "p1", Question: "A queue accepts messages up to 256 KB. Users upload 500 KB files. What is the standard fix?", Options: []string{"Raise the queue's size limit past 500 KB", "Retry the failed uploads in smaller pieces", "Store the file elsewhere and queue a pointer to it"}, Answer: 2,
 			Explain: "Queues and databases are built for small records. Large bodies go to an object store; what travels through the queue is a reference to it."}},
-		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes retries cheap, because a retry re-sends a pointer, not 500 KB.",
+		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes {{retry-storm|retries cheap}}, because a retry re-sends a pointer, not 500 KB.",
 	})
 
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: put a CDN between the users and the load balancer.",
 		Predictions: []Prediction{{ID: "p1", Question: "A CDN with a 60 second TTL serves a page that changes every few seconds. What is the catch?", Options: []string{"Users may see stale copies until the TTL expires", "The CDN cannot serve pages that change at all", "Every request still has to reach the origin"}, Answer: 0,
 			Explain: "Cached copies are served until they expire, so freshness is traded for speed unless writes invalidate them."}},
-		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is freshness, which is why caching suits content that changes slowly.",
+		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is {{ttl|freshness}}, which is why caching suits content that changes slowly.",
 	})
 
 	// 16 ─ Medium, config only ─────────────────────────────────────────────────────────
@@ -258,13 +258,13 @@ func registerResilienceAndCapstones() {
 		DurationSec: 50, WarmupSec: 6, Speed: 1,
 		Hints: [3]string{
 			"Round robin treats every server as equal. Is that still true?",
-			"The balancer can send new work to whichever server has the fewest requests in flight, or stop using a server that misbehaves.",
+			"The balancer can send new work to whichever server has {{littles-law|the fewest requests in flight}}, or stop using a server that misbehaves.",
 			"Which load balancer rule reacts to how many requests a server has in flight, and which setting takes a misbehaving server out of rotation?",
 		},
 		Answer: "The answer: switch the load balancer to least connections, or turn on outlier ejection.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why does a least-connections balancer help when one server is slow?", Options: []string{"A slow server accumulates open requests, so it is picked less", "It makes the slow server faster by easing its load", "It restarts the slow server automatically"}, Answer: 0,
 			Explain: "Requests pile up on the slow server, so its in-flight count is high and new requests go elsewhere."}},
-		Debrief: "Balancing is not about equal shares, it is about equal outcomes. Least connections adapts to slowness automatically; ejecting outliers goes further and rests a sick server entirely.",
+		Debrief: "Balancing is not about equal shares, it is about equal outcomes. Least connections adapts to slowness automatically; {{circuit-breaker|ejecting outliers}} goes further and rests a sick server entirely.",
 	})
 
 	// 17 ─ Hard ────────────────────────────────────────────────────────────────────────
@@ -288,20 +288,20 @@ func registerResilienceAndCapstones() {
 	register(&Scenario{
 		ID: "split-the-database", Title: "Split the database", Difficulty: "Hard",
 		Summary: "630 writes a second against a database that can commit about 400.",
-		Story:   "A busy write-heavy service has outgrown its single database. Buying a bigger one is not an option, so the data has to be spread over several databases.",
+		Story:   "A busy write-heavy service has outgrown its single database. Buying a bigger one is not an option, so the data has to be {{sharding|spread over several databases}}.",
 		Diagram: sharded(1), Solution: sharded(2),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(500), MaxCostPerHour: f(2.5)},
 		DurationSec: 45, WarmupSec: 6, Speed: 1,
 		Hints: [3]string{
 			"Count the writes per second and divide by what one database can commit.",
-			"Shard the data: a router sends each key to one of several databases.",
+			"{{sharding|Shard the data}}: a router sends each key to one of several databases.",
 			"What component picks a database from a key, and what must the servers be wired to instead of the database itself?",
 		},
-		Answer: "The answer: put a shard router between the servers and two databases, and connect each server to the router.",
+		Answer: "The answer: put a {{sharding|shard router}} between the servers and two databases, and connect each server to the router.",
 		Predictions: []Prediction{{ID: "p1", Question: "A shard router picks the database from the item's key. What goes wrong if a few keys are far hotter than the rest?", Options: []string{"One shard can get most of the traffic", "Nothing: sharding balances load perfectly", "Writes slow down because they become reads"}, Answer: 0,
 			Explain: "Hashing spreads keys, not requests. If a handful of keys dominate, whichever shard owns them becomes the bottleneck again."}},
-		Debrief: "Sharding multiplies write capacity by splitting the data, at the price of complexity: queries across shards get hard and skew can recreate the hotspot you were escaping.",
-		Deeper:  "Sharding multiplies write capacity by splitting the data, but you pay in operations: the shard key decides which queries stay on one shard and which fan out, cross-shard transactions and joins become difficult, and a key that is hot or a tenant that is large recreates the hot spot you were escaping. Hashing spreads keys evenly and loses range scans, ranges keep scans and make monotonic keys hot, and a consistent-hashing ring or fixed virtual shards makes adding capacity move only a fraction of the data. Resharding a live system needs copying, double writes and a cut-over, so choose more logical shards than machines at the start. An interviewer will ask why you did not first try read replicas, a bigger machine or a different data model, and how you generate unique ids across shards. The failure pattern is a shard key that looks even in testing and skews in production.",
+		Debrief: "{{sharding|Sharding}} multiplies write capacity by splitting the data, at the price of complexity: queries across shards get hard and skew can recreate the {{hot-key|hotspot}} you were escaping.",
+		Deeper:  "{{sharding|Sharding}} multiplies write capacity by splitting the data, but you pay in operations: the shard key decides which queries stay on one shard and which fan out, cross-shard transactions and joins become difficult, and {{hot-key|a key that is hot}} or a tenant that is large recreates the hot spot you were escaping. Hashing spreads keys evenly and loses range scans, ranges keep scans and make monotonic keys hot, and a {{consistent-hashing|consistent-hashing ring}} or fixed virtual shards makes adding capacity move only a fraction of the data. Resharding a live system needs copying, double writes and a cut-over, so choose more logical shards than machines at the start. An interviewer will ask why you did not first try read replicas, a bigger machine or a different data model, and how you generate unique ids across shards. The failure pattern is a shard key that looks even in testing and skews in production.",
 	})
 
 	// 18 ─ Hard capstone ───────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ func registerResilienceAndCapstones() {
 	register(&Scenario{
 		ID: "launch-day-capstone", Title: "Launch day", Difficulty: "Hard",
 		Summary: "A traffic ramp, a database slowdown and a crashed server, all in one afternoon.",
-		Story:   "Traffic climbs from 100 to 800 requests per second. Midway the database slows down for a while, and shortly after a server crashes. Clients retry, as clients do. Design a system that keeps most users happy through all of it.",
+		Story:   "Traffic climbs from 100 to 800 requests per second. Midway the database slows down for a while, and shortly after a server crashes. {{retry-storm|Clients retry}}, as clients do. Design a system that keeps most users happy through all of it.",
 		Diagram: capstone(false), Solution: capstone(true),
 		Traffic:     map[string][]engine.TrafficPoint{"users": {{0, 100}, {10, 100}, {40, 800}, {75, 800}, {85, 150}, {100, 150}}},
 		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 45, Factor: 4, DurationSec: 12}, {Type: "crash", NodeID: "random:appServer", AtSec: 60, DownSec: 15}},
@@ -329,13 +329,13 @@ func registerResilienceAndCapstones() {
 		DurationSec: 100, WarmupSec: 8, Speed: 2,
 		Hints: [3]string{
 			"Three things go wrong at different times: load, a slow dependency and a lost server. Which parts of your design handle each?",
-			"A cache takes load off the database, spare servers survive a crash, and timeouts with a short queue stop a slow dependency from tying up every thread.",
+			"A cache takes load off the database, spare servers survive a crash, and timeouts with a short queue stop a slow dependency from tying up {{thread-pool|every thread}}.",
 			"Tick off what the story demands: a cache for the reads, spare servers for a crash, and protection from a slow database. Which component or setting covers each?",
 		},
 		Answer: "The answer: a load balancer, five servers with call timeouts and a short newest-first queue, and a cache in front of the database.",
 		Predictions: []Prediction{{ID: "p1", Question: "The database becomes four times slower for twelve seconds. Which setting stops the slowdown from taking the whole system down?", Options: []string{"A call timeout on the app servers", "More threads on each app server", "Longer timeouts on the clients"}, Answer: 0,
 			Explain: "A timeout frees the thread instead of leaving it stuck behind the slow database, so servers keep answering what they can (from cache, for example)."}},
 		Debrief: "Real outages stack: capacity, a slow dependency and a failure arrive together. The designs that survive layer defences: caches to cut load, redundancy for failures, and timeouts and short queues so slowness cannot spread.",
-		Deeper:  "Each defence handles one failure and introduces a cost or a dependency: a cache cuts load but returns cold after a restart, spare servers cost money all day, timeouts convert a stall into errors that you must handle, and a short newest-first queue discards the oldest requests, which are the ones whose callers probably left, at the price of fairness. Client retries turn a brief slowdown into more load, so backoff matters as much as server settings. At larger scale you load test the combination and not each piece, since the interesting failures appear when capacity, a slow dependency and a crash arrive together. An interviewer will ask you to walk through the timeline of this outage and say what each layer does at each moment, and what you would alert on. The failure pattern is a cascade, where the first slow call holds threads, the retries add load, and the crash removes the headroom you were counting on.",
+		Deeper:  "Each defence handles one failure and introduces a cost or a dependency: a cache cuts load but returns cold after a restart, spare servers cost money all day, timeouts convert a stall into errors that you must handle, and a short newest-first queue discards the oldest requests, which are the ones whose callers probably left, at the price of fairness. {{retry-storm|Client retries turn a brief slowdown into more load}}, so backoff matters as much as server settings. At larger scale you load test the combination and not each piece, since the interesting failures appear when capacity, a slow dependency and a crash arrive together. An interviewer will ask you to walk through the timeline of this outage and say what each layer does at each moment, and what you would alert on. The failure pattern is a cascade, where the first slow call holds threads, the retries add load, and the crash removes the headroom you were counting on.",
 	})
 }
