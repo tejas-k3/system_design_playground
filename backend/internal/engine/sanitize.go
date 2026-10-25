@@ -3,6 +3,8 @@ package engine
 import (
 	"math"
 	"strconv"
+	"strings"
+	"unicode"
 )
 
 const (
@@ -100,6 +102,9 @@ func Sanitize(in Diagram) (Diagram, bool) {
 		return true
 	}
 	out := Diagram{Nodes: []Node{}, Edges: []Edge{}, Notes: []Note{}}
+	var nameAdj bool
+	out.Name, nameAdj = sanitizeName(in.Name)
+	adjusted = adjusted || nameAdj
 	kinds := map[string]string{}
 	for _, n := range in.Nodes {
 		spec := Spec(n.Kind)
@@ -220,6 +225,27 @@ func Sanitize(in Diagram) (Diagram, bool) {
 		out.Shapes = append(out.Shapes, Shape{ID: sh.ID, Kind: sh.Kind, Label: label, X: sh.X, Y: sh.Y, W: w, H: h})
 	}
 	return out, adjusted
+}
+
+// MaxDiagramName is the longest design title kept, in characters.
+const MaxDiagramName = 60
+
+// sanitizeName cleans a design title: control characters removed, cut to MaxDiagramName characters, trimmed.
+func sanitizeName(s string) (string, bool) {
+	if s == "" {
+		return "", false
+	}
+	clean := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+	if r := []rune(clean); len(r) > MaxDiagramName {
+		clean = string(r[:MaxDiagramName])
+	}
+	clean = strings.TrimSpace(clean)
+	return clean, clean != s
 }
 
 // Limits on the visual annotation shapes (ellipses and arrows).
