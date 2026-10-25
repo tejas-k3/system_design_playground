@@ -28,7 +28,7 @@ func registerLoadAndLiveData() {
 	register(&Scenario{
 		ID: "vendor-wait", Title: "Waiting on a vendor", Difficulty: "Hard",
 		Summary: "A slow third-party API holds every thread hostage.",
-		Story:   "Every write calls an email vendor that takes almost half a second. Threads pile up waiting, and even reads, which never touch the vendor, are starved.",
+		Story:   "Every write calls an email vendor that takes almost half a second. {{thread-pool|Threads}} pile up waiting, and even reads, which never touch the vendor, are starved.",
 		Diagram: vendor(false), Solution: vendor(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(400), MinJobsCompleted: f(0.99), MaxJobP95Ms: f(20000), MaxCostPerHour: f(1.4)},
 		DurationSec: 50, WarmupSec: 5, Speed: 1,
@@ -41,7 +41,7 @@ func registerLoadAndLiveData() {
 		Predictions: []Prediction{{ID: "p1", Question: "If the vendor's latency doubles, what happens to the user once the vendor call is behind a queue?", Options: []string{"User latency doubles, since the vendor is still called", "Users see no change; the backlog grows instead", "Requests fail, as the queue cannot hold them"}, Answer: 1,
 			Explain: "The queue absorbs the slowness. Users get a quick acknowledgement while workers fall behind."}},
 		Debrief: "Anything slow, unreliable or non-essential for the response belongs behind a queue. You trade immediacy for resilience and must watch the backlog.",
-		Deeper:  "A queue turns a latency problem into a backlog problem: users no longer wait for the vendor, but the age of the oldest message now tells you whether you are keeping up, so that is the number to alert on rather than the error rate. Workers need bounded concurrency, backoff and somewhere for hopeless jobs to go, otherwise a vendor outage grows the queue and the recovery arrives as a burst that knocks the vendor over again. Queues deliver at least once, so the vendor call must be idempotent or the user gets two emails. An interviewer will ask what the user is told while the email is late, and how you drain a backlog without flattening the vendor. The classic failure is the gap between committing the write and enqueueing the job, which silently drops the side effect; a transactional outbox closes it.",
+		Deeper:  "A queue turns a latency problem into a backlog problem: users no longer wait for the vendor, but the age of the oldest message now tells you whether you are keeping up, so that is the number to alert on rather than the error rate. Workers need bounded concurrency, backoff and {{dead-letter-queue|somewhere for hopeless jobs to go}}, otherwise a vendor outage grows the queue and the recovery arrives as a burst that knocks the vendor over again. Queues deliver at least once, so the vendor call must be {{idempotency|idempotent}} or the user gets two emails. An interviewer will ask what the user is told while the email is late, and how you drain a backlog without flattening the vendor. The classic failure is the gap between committing the write and enqueueing the job, which silently drops the side effect; a transactional outbox closes it.",
 	})
 
 	// 10 ─ Medium ─────────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ func registerLoadAndLiveData() {
 	register(&Scenario{
 		ID: "write-flood", Title: "Write flood", Difficulty: "Medium",
 		Summary: "A burst of writes outruns the database.",
-		Story:   "Writes arrive at 300 per second for a short burst, but the database can only commit about 250 per second.",
+		Story:   "Writes arrive at 300 per second for a short burst, but the database can only {{throughput|commit about 250 per second}}.",
 		Diagram: spike(false), Solution: spike(true),
 		Traffic:     map[string][]engine.TrafficPoint{"users": {{0, 100}, {10, 100}, {12, 300}, {32, 300}, {34, 100}, {50, 100}}},
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MinJobsCompleted: f(0.99), MaxJobP95Ms: f(40000), MaxCostPerHour: f(1.2)},
@@ -103,7 +103,7 @@ func registerLoadAndLiveData() {
 		Answer: "The answer: run enough servers that the survivors can carry 350 rps, for example four 8-thread servers.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why do a few requests still fail even in a well-sized system?", Options: []string{"The balancer takes a moment to notice the failure", "The database drops connections when a peer dies", "Clients keep the dead server's address cached"}, Answer: 0,
 			Explain: "Health checks run periodically, so for a couple of seconds the balancer still sends traffic to a dead server."}},
-		Debrief: "Redundancy only helps if the survivors have headroom. Shorter health-check intervals shrink the blip, at the price of more checking.",
+		Debrief: "Redundancy only helps if the survivors have {{utilisation|headroom}}. Shorter health-check intervals shrink the blip, at the price of more checking.",
 	})
 
 	// 12 ─ Hard ───────────────────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ func registerLoadAndLiveData() {
 	register(&Scenario{
 		ID: "live-scoreboard", Title: "Live scoreboard", Difficulty: "Hard",
 		Summary: "Ranking millions of scores with a SQL query is slow.",
-		Story:   "Every rank lookup sorts scores in the database and costs ten times a normal read. The database is the bottleneck.",
+		Story:   "Every rank lookup sorts scores in the database and costs ten times a normal read. The database is {{utilisation|the bottleneck}}.",
 		Diagram: board(false), Solution: board(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(200), MaxCostPerHour: f(1.2)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
@@ -139,7 +139,7 @@ func registerLoadAndLiveData() {
 		Predictions: []Prediction{{ID: "p1", Question: "Redis runs commands on one thread. Is that a problem at 300 requests per second?", Options: []string{"Yes: commands are queued one at a time", "No: each command takes only microseconds", "Only for writes, as reads run in parallel"}, Answer: 1,
 			Explain: "Cheap commands finish in about a tenth of a millisecond, so one thread handles thousands per second."}},
 		Debrief: "Use the data structure that matches the question. Sorted sets make 'who is in the top 10' cheap where a relational sort is not.",
-		Deeper:  "A sorted set answers rank and top-N in logarithmic time because the data is kept in the order the question asks for, which a relational sort recomputes on every read. The price is a second copy of the truth in memory, so you must decide which side wins after a partial failure and how Redis is rebuilt when it is lost. At larger scale one single-threaded instance becomes the ceiling, and you shard by board or season, or accept approximate ranks for very large boards. An interviewer will ask about ties, about friends-only boards that cannot use one global set, and about what happens to scores written while Redis was down. The common failure is drift: the database and the set disagree after a dropped write and nobody notices until a player complains.",
+		Deeper:  "A sorted set answers rank and top-N in logarithmic time because the data is kept in the order the question asks for, which a relational sort recomputes on every read. The price is a second copy of the truth in memory, so you must decide which side wins after a partial failure and how Redis is rebuilt when it is lost. At larger scale one single-threaded instance becomes the ceiling, and you {{sharding|shard}} by board or season, or accept approximate ranks for very large boards. An interviewer will ask about ties, about friends-only boards that cannot use one global set, and about what happens to scores written while Redis was down. The common failure is drift: the database and the set disagree after a dropped write and nobody notices until a player complains.",
 	})
 
 	// 13 ─ Hard, config only ──────────────────────────────────────────────────────────
@@ -167,8 +167,8 @@ func registerLoadAndLiveData() {
 		Answer: "The answer: turn on the spatial index in the database settings.",
 		Predictions: []Prediction{{ID: "p1", Question: "A spatial index mainly improves…", Options: []string{"Write throughput", "Proximity searches", "Network latency"}, Answer: 1,
 			Explain: "Spatial indexes organise points by location so a proximity query touches only nearby entries."}},
-		Debrief: "The cheapest scaling fix is often a better index. Measure first: the database was doing 25× the work for every search.",
-		Deeper:  "A spatial index (a grid, geohash prefixes, a quadtree or an R-tree) lets a proximity query visit only the cells around the rider instead of every row, which is why the work falls by an order of magnitude here. Moving drivers make the write side the real cost: every location update must maintain the index, so many systems keep live positions in memory grouped by cell and store history separately. A query near a cell edge has to look at the neighbouring cells too, and a dense cell such as a stadium exit becomes a hot spot that needs splitting. An interviewer will ask how fresh the results must be, how often drivers report, and how you shard by geography. The failure pattern is a skewed city centre: sharding by region balances the map but not the demand.",
+		Debrief: "The cheapest scaling fix is often a better index. Measure first: the database was {{utilisation|doing 25× the work}} for every search.",
+		Deeper:  "A spatial index (a grid, geohash prefixes, a quadtree or an R-tree) lets a proximity query visit only the cells around the rider instead of every row, which is why the work falls by an order of magnitude here. Moving drivers make the write side the real cost: every location update must maintain the index, so many systems keep live positions in memory grouped by cell and store history separately. A query near a cell edge has to look at the neighbouring cells too, and a dense cell such as a stadium exit becomes a {{hot-key|hot spot}} that needs splitting. An interviewer will ask how fresh the results must be, how often drivers report, and how you {{sharding|shard}} by geography. The failure pattern is a skewed city centre: sharding by region balances the map but not the demand.",
 	})
 
 	// 14 ─ Hard, config only ──────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ func registerLoadAndLiveData() {
 		Answer: "The answer: switch Redis persistence to the append-only file: a crash then loses at most the last second of writes.",
 		Predictions: []Prediction{{ID: "p1", Question: "With an append-only file, what is the most you can lose in a crash?", Options: []string{"Nothing at all, as every write is logged first", "About the last second of writes", "Everything since the last backup was taken"}, Answer: 1,
 			Explain: "The file is flushed about once a second, so writes acknowledged since the last flush can still be lost."}},
-		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose how many seconds of data you can afford to lose, then pick the setting that guarantees it.",
-		Deeper:  "Persistence is a choice of how much you are willing to lose: an append-only file flushed about once a second bounds the loss to roughly that window, flushing on every write shrinks it at a latency cost, and periodic snapshots lose everything since the last one. A replica adds availability, not durability, because asynchronous replication can lose the same last moments. The first question is whether Redis is the source of truth at all; if the scores can be rebuilt from the database, a restart that comes back empty plus a rebuild may be the cheaper answer. An interviewer will ask for your recovery point and recovery time and how you would test them. A real failure pattern is the empty restart: the cache returns cold, every request falls through to the database, and the recovery causes a second outage.",
+		Debrief: "Memory is fast and volatile. Persistence trades a little speed for a bounded loss window: choose {{slo|how many seconds of data you can afford to lose}}, then pick the setting that guarantees it.",
+		Deeper:  "Persistence is a choice of how much you are willing to lose: an append-only file flushed about once a second bounds the loss to roughly that window, flushing on every write shrinks it at a latency cost, and periodic snapshots lose everything since the last one. A replica adds availability, not durability, because asynchronous replication can lose the same last moments. The first question is whether Redis is the source of truth at all; if the scores can be rebuilt from the database, a restart that comes back empty plus a rebuild may be the cheaper answer. An interviewer will ask for your recovery point and recovery time and how you would test them. A real failure pattern is the empty restart: the cache returns cold, every request falls through to the database, and {{metastable-failure|the recovery causes a second outage}}.",
 	})
 }

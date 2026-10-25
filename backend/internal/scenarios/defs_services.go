@@ -25,7 +25,7 @@ func registerServicePatterns() {
 	register(&Scenario{
 		ID: "polite-crawler", Title: "The polite crawler", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The sites keep answering 429 to the crawler, and it is about to be blocked.",
-		Story:   "A crawler fetches pages from three sites. Its work arrives in rushes, so for a couple of seconds at a time it asks one site for 16 pages a second, while each site says it will serve a crawler at most 8 a second and answers 429 (too many requests) beyond that. Over a whole minute the crawler is nowhere near the limit, but the sites do not average: a crawler that keeps getting 429 gets blocked for good.",
+		Story:   "A crawler fetches pages from three sites. Its work arrives in rushes, so for a couple of seconds at a time it asks one site for 16 pages a second, while each site says it will serve a crawler at most 8 a second and answers {{load-shedding|429 (too many requests)}} beyond that. Over a whole minute the crawler is nowhere near the limit, but the sites do not average: a crawler that keeps getting 429 gets blocked for good.",
 		Diagram: politeCrawler(false), Solution: politeCrawler(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(7000), MaxCostPerHour: f(1.5), StarP95Ms: f(100)},
 		DurationSec: 120, WarmupSec: 10, Speed: 1,
@@ -37,7 +37,7 @@ func registerServicePatterns() {
 		Answer: "The answer: give the crawler server a limit on calls per second to any one site (its 'Calls per second to one service' setting, under Show advanced), equal to what the sites allow. The excess waits its turn instead of being refused.",
 		Predictions: []Prediction{{ID: "p1", Question: "Limiting the crawler to 8 calls a second per site (what the sites allow) will…", Options: []string{"Make it slower on average, since it cannot exceed 8", "Leave its speed unchanged, since the average is under 8", "Make each fetch faster, as sites then reply quicker"}, Answer: 0,
 			Explain: "A limit is a ceiling: a rush that used to be refused now queues. Nothing is lost, but pages wait their turn, and a limit below the average load would make the queue grow without end."}},
-		Debrief: "Politeness is a per-host rate limit on the crawler itself, usually with a queue per host so that waiting for one slow or strict site does not block the others. The average rate is what you plan capacity with, but the peak rate decides whether you get blocked.",
+		Debrief: "Politeness is a per-host rate limit on the crawler itself, usually with {{bulkhead|a queue per host}} so that waiting for one slow or strict site does not block the others. The average rate is what you plan capacity with, but the peak rate decides whether you get blocked.",
 	})
 
 	// Slow first token: a chat service on one GPU whose batch is far too small for the traffic
@@ -68,7 +68,7 @@ func registerServicePatterns() {
 		Answer: "The answer: raise the number of answers at once: 32 or 64 is enough. Every answer in progress holds its prompt and answer tokens in the KV cache (about 650 each), so the cache caps the batch at roughly 49 whatever you ask for; raising the cache lifts that cap. Buying a second GPU would work but breaks the budget.",
 		Predictions: []Prediction{{ID: "p1", Question: "Writing 64 answers at once instead of 4 makes each answer…", Options: []string{"Sixteen times slower, since the GPU is shared sixteen ways", "Somewhat slower, but many more answers per second", "Just as fast, as GPUs run batches in parallel for free"}, Answer: 1,
 			Explain: "Each decode step is a little longer with more answers sharing it, but a step produces a token for every answer in the batch. Batching trades a little speed per answer for a lot more answers per second."}},
-		Debrief: "A GPU's throughput comes from batching: decoding is limited by reading the model, which is shared by every answer in the batch. The limits are the KV cache (memory for every answer in progress) and the per-answer slowdown. Time to first token is mostly queueing, so fix the throughput, not the prompt reading.",
+		Debrief: "A GPU's {{throughput|throughput}} comes from batching: decoding is limited by reading the model, which is shared by every answer in the batch. The limits are the KV cache (memory for every answer in progress) and the per-answer slowdown. Time to first token is mostly queueing, so fix the throughput, not the prompt reading.",
 	})
 
 	// RAG under load: document search that finds everything but cannot keep up
@@ -86,13 +86,13 @@ func registerServicePatterns() {
 	register(&Scenario{
 		ID: "rag-under-load", Title: "Search under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The document search finds everything, and answers nobody in time.",
-		Story:   "An assistant looks up documents in a vector index before it answers: twenty million passages, searched approximately. Whoever set it up asked for the best recall they could get, so every search examines hundreds of candidates and finds nearly all the true neighbours. At 150 searches a second the four search cores cannot keep up, the queue grows and users time out. Retrieval should still find at least nine of every ten true neighbours.",
+		Story:   "An assistant looks up documents in a vector index before it answers: twenty million passages, searched approximately. Whoever set it up asked for the best recall they could get, so every search examines hundreds of candidates and finds nearly all the true neighbours. At 150 searches a second the four {{thread-pool|search cores}} cannot keep up, the queue grows and users time out. Retrieval should still find at least nine of every ten true neighbours.",
 		Diagram: ragSearch(false), Solution: ragSearch(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(250), MinRecall: f(0.9), MaxCostPerHour: f(2.0), StarP95Ms: f(100)},
 		DurationSec: 60, WarmupSec: 10, Speed: 1,
 		Hints: [3]string{
 			"Look at the search component: how long does one search take, and how many can it run at once?",
-			"Four searches at once, each taking about 30 ms, is about 135 a second: less than 150. A search takes a fixed time plus time for every candidate it examines.",
+			"{{littles-law|Four searches at once, each taking about 30 ms, is about 135 a second}}: less than 150. A search takes a fixed time plus time for every candidate it examines.",
 			"Search time has a fixed part and a part for each candidate examined. Which setting moves the second part, and how far can it go before recall drops under the line?",
 		},
 		Answer: "The answer: examine fewer candidates. Recall falls as you do (it is about 94% at 128 and 75% at 64), so stay above the 90% line. More search cores would also work, but they cost money and the budget is tight.",
@@ -126,11 +126,11 @@ func registerServicePatterns() {
 			"The limiter counts requests, and all requests look alike to it. The cost of a request to the GPU is its prompt: a limiter that counts tokens would charge a pasted document for what it takes.",
 			"What does a request cost the GPU, and what is the limiter counting instead? Which unit would match the cost?",
 		},
-		Answer: "The answer: switch the limiter's count to tokens and give it an allowance of about 56,000 tokens a minute: the short prompts fit easily, and the document-sized ones run the allowance dry and are turned away (roughly one request in ten is refused by design).",
+		Answer: "The answer: switch the limiter's count to tokens and give it an allowance of about 56,000 tokens a minute: the short prompts fit easily, and the document-sized ones run the allowance dry and are {{load-shedding|turned away}} (roughly one request in ten is refused by design).",
 		Predictions: []Prediction{{ID: "p1", Question: "A limiter that counts tokens instead of requests will mostly refuse…", Options: []string{"Everyone a little, to stay under the cap", "The few huge requests that use most of the tokens", "The newest users, who have no history yet"}, Answer: 1,
 			Explain: "A request is let through only if its whole weight fits in what is left. A small one almost always does; a huge one needs far more than the bucket usually holds, so the heavy few are refused and the many light ones carry on."}},
-		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. Limiting by tokens (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
-		Deeper:  "In an LLM service the cost of a request is its tokens, not its count: reading a long prompt keeps the GPU busy while it writes nothing for anyone, so one pasted document delays everyone's first word. A limiter that counts tokens charges the prompt up front, since the answer length is not yet known, and can settle the difference when the answer is finished; capping the prompt length and billing per token pushes the same pressure back onto users. In practice you also separate long prompts onto their own pool or priority, and split a long read into chunks so the decode work for other users is not blocked behind it. An interviewer will ask how to be fair per tenant rather than globally, and what the memory for the attention cache does to your batch size. The failure pattern is head-of-line blocking: a few expensive requests that look identical to cheap ones at the door.",
+		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. {{load-shedding|Limiting by tokens}} (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
+		Deeper:  "In an LLM service the cost of a request is its tokens, not its count: reading a long prompt keeps the GPU busy while it writes nothing for anyone, so one pasted document delays everyone's first word. A limiter that counts tokens charges the prompt up front, since the answer length is not yet known, and can settle the difference when the answer is finished; capping the prompt length and billing per token pushes the same pressure back onto users. In practice you also {{bulkhead|separate long prompts onto their own pool}} or priority, and split a long read into chunks so the decode work for other users is not blocked behind it. An interviewer will ask how to be fair per tenant rather than globally, and what the memory for the attention cache does to your batch size. The failure pattern is head-of-line blocking: a few expensive requests that look identical to cheap ones at the door.",
 	})
 
 	// Shed the cheap traffic: more arrives than the server can do, and a deep queue makes every request wait out its timeout
@@ -154,13 +154,13 @@ func registerServicePatterns() {
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
 			"Look at the queue and at how long a request waits in it. Is the server busy with requests whose users are still there?",
-			"Past 250 a second a longer queue only makes every request older. Turning some requests away early keeps the queue short, so the ones that are admitted are answered in time.",
+			"Past 250 a second a longer queue only makes every request older. {{load-shedding|Turning some requests away early}} keeps the queue short, so the ones that are admitted are answered in time.",
 			"What could the server look at, such as how long the oldest request has waited, to decide to turn work away before it joins a queue that is already too slow?",
 		},
-		Answer: "The answer: set 'Shed above' on the app server to a few hundred milliseconds: when the oldest waiting request is older than that, ordinary requests are turned away at the door and the urgent ones are still admitted.",
+		Answer: "The answer: set 'Shed above' on the app server to a few hundred milliseconds: when the oldest waiting request is older than that, ordinary requests are {{load-shedding|turned away at the door}} and the urgent ones are still admitted.",
 		Predictions: []Prediction{{ID: "p1", Question: "Turning away some requests at the door will make the share of requests answered…", Options: []string{"Lower, as every request turned away at the door is a failure by itself", "Higher, as work is no longer wasted on requests users abandoned", "Unchanged, since the server still does the same total work"}, Answer: 1,
 			Explain: "An overloaded server with a deep queue serves requests so late that their users have left: very little of its work counts. Shedding spends the same capacity on requests that are still wanted."}},
-		Debrief: "Overload is not fixed by queueing more. Bound the wait, shed the requests that can be retried, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
+		Debrief: "Overload is not fixed by queueing more. Bound the wait, {{load-shedding|shed the requests that can be retried}}, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
 	})
 
 	// URL shortener: millions of reads of short links, and every new link takes its number from one counter row
@@ -186,7 +186,7 @@ func registerServicePatterns() {
 	register(&Scenario{
 		ID: "url-shortener", Title: "The URL shortener", Difficulty: "Medium",
 		Summary: "Short links are read hundreds of times for every one created, and every new link takes its number from one counter row.",
-		Story:   "Visitors follow short links at 1,200 a second, a few viral ones far more than the rest, and new links are created at 70 a second. Every read goes to the database, which can answer about 600 a second at best. Each new link also takes the next number from a single counter row, and the row lock lets one such write through every 20 ms: 50 a second, while 70 are asked for. The waiting writes hold database connections that the readers need.",
+		Story:   "Visitors follow short links at 1,200 a second, {{hot-key|a few viral ones far more than the rest}}, and new links are created at 70 a second. Every read goes to the database, which can answer about 600 a second at best. Each new link also takes the next number from a single counter row, and the row lock lets one such write through every 20 ms: 50 a second, while 70 are asked for. The waiting writes hold {{connection-pool|database connections}} that the readers need.",
 		Diagram: urlShortener(false), Solution: urlShortener(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(250), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.7), StarP95Ms: f(100)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
@@ -198,7 +198,7 @@ func registerServicePatterns() {
 		Answer: "The answer: add a cache between the app server and the database, and in the app server's hot-key setting split the counter over several rows (or hand each server its own range of numbers).",
 		Predictions: []Prediction{{ID: "p1", Question: "A cache in front of the database would fix…", Options: []string{"The slow reads, but not the counter", "Both the reads and the counter", "Only the counter, which is hit most"}, Answer: 0,
 			Explain: "A cache absorbs repeated reads. Creating a link is a write, and every write to the counter row still has to take its turn at the database."}},
-		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and the database is left with the misses. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
+		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and {{cache-hit-rate|the database is left with the misses}}. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
 	})
 
 	// Rate limiter showdown: a partner's job fires a burst on the second, across the edge of the limiter's window
@@ -219,7 +219,7 @@ func registerServicePatterns() {
 	register(&Scenario{
 		ID: "rate-limiter-showdown", Title: "Rate limiter showdown", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The limiter promises 300 requests a second, and the database sees twice that for a moment.",
-		Story:   "A partner's batch job fires a burst of requests every other second, centred on the instant the clock ticks over, on top of a steady trickle of other users. The rate limiter promises no more than 300 requests a second to a database that does about 350, yet the database is drowning for a second after every burst. The limiter counts requests in fixed one-second windows that reset on the clock: half of each burst lands at the end of one window and half at the start of the next, and each half is given a full allowance. Most of the burst has to be turned away either way.",
+		Story:   "A partner's batch job fires a burst of requests every other second, centred on the instant the clock ticks over, on top of a steady trickle of other users. The rate limiter promises no more than 300 requests a second to a database that does about 350, yet the database is drowning for a second after every burst. The limiter counts requests in fixed one-second windows that reset on the clock: half of each burst lands at the end of one window and half at the start of the next, and each half is given a full allowance. Most of the burst has to be {{load-shedding|turned away}} either way.",
 		Diagram: limiterShowdown("fixedWindow"), Solution: limiterShowdown("slidingWindowLog"),
 		Traffic:     map[string][]engine.TrafficPoint{"users": edgeSpikes},
 		Goals:       engine.Goals{MinSuccessRate: 0.2, MaxP95Ms: f(800), MaxCostPerHour: f(1.1), StarCostPerHour: f(1.0)},
