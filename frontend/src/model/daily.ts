@@ -96,6 +96,17 @@ export function saveStreak(s: Streak): void {
   }
 }
 
+/** The challenges are verified to give the same stars on these seeds (see scenarios_test.go), so a daily run stays fair. */
+export const DAILY_SEEDS = 8
+
+/** The simulator seed for a daily run on `date`: 1..8, the same all day, and never the same two days running. */
+export function dailySeed(date: string): number {
+  const day = dayNumber(date)
+  if (Number.isNaN(day)) return 1
+  // a step of 3 visits all eight seeds before repeating; the extra week term shifts the pattern each round
+  return 1 + ((((day * 3 + Math.floor(day / DAILY_SEEDS)) % DAILY_SEEDS) + DAILY_SEEDS) % DAILY_SEEDS)
+}
+
 /** Today's date in the player's own time zone, as YYYY-MM-DD. */
 export function localDate(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0')
