@@ -230,7 +230,7 @@ func Sanitize(in Diagram) (Diagram, bool) {
 // MaxDiagramName is the longest design title kept, in characters.
 const MaxDiagramName = 60
 
-// sanitizeName cleans a design title: control characters removed, cut to MaxDiagramName characters, trimmed.
+// sanitizeName cleans a design title: control characters removed, trimmed, cut to MaxDiagramName characters, trimmed again.
 func sanitizeName(s string) (string, bool) {
 	if s == "" {
 		return "", false
@@ -241,6 +241,7 @@ func sanitizeName(s string) (string, bool) {
 		}
 		return r
 	}, s)
+	clean = strings.TrimSpace(clean) // leading blanks must not eat into the length limit
 	if r := []rune(clean); len(r) > MaxDiagramName {
 		clean = string(r[:MaxDiagramName])
 	}
