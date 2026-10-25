@@ -93,7 +93,7 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 	}
 	oneWay += regionMs(e.from.region, e.to.region) // and the distance between regions
 	req, resp := s.sizes(c)
-	fwd := oneWay + s.transmit(e, 0, req)
+	fwd := oneWay + s.transmit(e, 0, req) + s.nic(e.from, req)
 	if via != nil {
 		fwd += s.transmit(via, 0, req)
 	}
@@ -118,7 +118,7 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 func (s *Sim) hopArrive(e, via *edge, target *node, oneWay float64, resp float64, c *call, cb func(Result)) {
 	{
 		s.arrive(target, c, func(res Result) {
-			back := oneWay + s.transmit(e, 1, resp)
+			back := oneWay + s.transmit(e, 1, resp) + s.nic(e.to, resp)
 			if via != nil {
 				back += s.transmit(via, 1, resp)
 			}
@@ -203,6 +203,23 @@ func (s *Sim) sizes(c *call) (req, resp float64) {
 		resp = float64(c.bodyB)
 	}
 	return req, resp
+}
+
+// nic puts bytes on the network card of the node they leave, one first-in-first-out transmitter for everything that
+// node sends (requests and answers alike), and returns the wait plus the transmission time. No card limit (the
+// default) or no bytes costs nothing.
+func (s *Sim) nic(n *node, bytes float64) float64 {
+	if bytes <= 0 {
+		return 0
+	}
+	mbps := n.f("nicMbps")
+	if mbps <= 0 {
+		return 0
+	}
+	dur := bytes * 8 / (mbps * 1000)
+	start := math.Max(s.now, n.nicFree)
+	n.nicFree = start + dur
+	return start + dur - s.now
 }
 
 // transmit puts bytes on a link in one direction and returns how long until they have all arrived: the wait for

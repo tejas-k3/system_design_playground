@@ -648,6 +648,11 @@ func init() {
 				opt("az-a", "Zone A"), opt("az-b", "Zone B"), opt("az-c", "Zone C")).adv())
 		}
 	}
+	for i := range specs { // every component except the users has a network card
+		if specs[i].Kind != KClient {
+			specs[i].Params = append(specs[i].Params, num("nicMbps", "Network card", "Capacity", 0, 0, 100000, 100, "Mbit/s", "How fast this machine can send, shared by everything that leaves it (its requests to other components and its answers to callers): bytes queue behind bytes on one transmitter, so a card smaller than the traffic caps throughput at card speed / message size, whatever the links beyond it can carry. 0 = unlimited. Needs the users' request or response sizes.").adv())
+		}
+	}
 	specByKind = map[string]*NodeSpec{}
 	for i := range specs {
 		specByKind[specs[i].Kind] = &specs[i]
