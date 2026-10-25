@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Diagram } from '../api/types'
 import type { Reg } from '../model/diagram'
-import { CHIP_H, collapseView } from '../model/collapse'
+import { CHIP_H, CHIP_W, collapseView } from '../model/collapse'
 import { boundsOf, edgeGeom, hitTest, nodeRect } from './geometry'
 
 const viewOf = (dg: Diagram) => collapseView(dg, (n) => nodeRect(n, reg))
@@ -56,8 +56,8 @@ describe('edge geometry with a collapsed box', () => {
     const dg = d(true)
     const nodes = new Map(dg.nodes.map((n) => [n.id, n]))
     const e = edgeGeom(dg.edges[0], nodes, reg, viewOf(dg))!
-    expect(e.b.x).toBeGreaterThanOrEqual(260 - 1) // on the right edge of the 260 wide chip
-    expect(e.b.x).toBeLessThanOrEqual(260 + 8)
+    expect(e.b.x).toBeGreaterThanOrEqual(CHIP_W - 1) // on the right edge of the CHIP_W wide chip
+    expect(e.b.x).toBeLessThanOrEqual(CHIP_W + 8)
     expect(edgeGeom(dg.edges[2], nodes, reg, viewOf(dg))).toBeNull()
     const open = edgeGeom(d(false).edges[0], nodes, reg, viewOf(d(false)))!
     expect(open.b.x).toBeCloseTo(200 + 6, -1)

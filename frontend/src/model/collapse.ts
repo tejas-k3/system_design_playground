@@ -8,7 +8,7 @@ import { shapeRect, shapesOf } from './shapes'
  * box's `collapsed` flag. This module derives, from the diagram alone, what the canvas should show: which items are
  * hidden, where the compact "chip" of each collapsed box sits, and where connections to hidden members are drawn.
  */
-export const CHIP_W = 260
+export const CHIP_W = 300
 export const CHIP_H = 64
 /** The narrowest a chip is drawn, even for a small box. */
 const CHIP_MIN_W = 180
@@ -160,9 +160,9 @@ export function chipSummary(v: CollapseView, d: Diagram, boxId: string, stats: R
   return { count, busiest, down, failing }
 }
 
-/** The text a chip shows under the name: "3 components · busiest 87% · 1 down". */
-export function chipText(s: ChipSummary): string {
-  const parts = [`${s.count} component${s.count === 1 ? '' : 's'}`]
+/** The text a chip shows under the name: "3 components · busiest 87% · 1 down" (compact: "3 · busiest 87% · 1 down", for a narrow chip). */
+export function chipText(s: ChipSummary, compact = false): string {
+  const parts = [compact ? `${s.count}` : `${s.count} component${s.count === 1 ? '' : 's'}`]
   if (s.busiest !== null) parts.push(`busiest ${s.busiest}%`)
   if (s.down > 0) parts.push(`${s.down} down`)
   if (s.failing > 0) parts.push(`${s.failing} failing`)

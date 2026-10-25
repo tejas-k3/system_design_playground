@@ -52,8 +52,7 @@ export function SearchDialog() {
         <ul id="search-results" role="listbox" aria-label="Matching components">
           {found.map((n, i) => (
             <li key={n.id} id={`search-${n.id}`} role="option" aria-selected={i === at} className={i === at ? 'on' : ''} onMouseEnter={() => setAt(i)} onClick={() => pick(i)}>
-              <span>{n.label}</span> <span className="muted small">{reg?.spec(n.kind)?.name ?? n.kind}</span>
-              {boxOf(n.id) && <span className="muted small"> · inside collapsed {groupTitle(boxOf(n.id)!)} (opens it)</span>}
+              <span>{n.label}</span> <span className="muted small">{reg?.spec(n.kind)?.name ?? n.kind}{boxOf(n.id) ? ` · inside collapsed ${groupTitle(boxOf(n.id)!)}, opens it` : ''}</span>
             </li>
           ))}
         </ul>

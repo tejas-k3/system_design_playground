@@ -558,8 +558,9 @@ function drawGroups(ctx: CanvasRenderingContext2D, sc: Scene, view: CollapseView
       const small = legibleSize(13, zoom, 10)
       ctx.font = `${bad ? 'bold ' : ''}${small}px ${FONT}`
       ctx.fillStyle = bad ? p.bad : p.muted
-      let text = chipText(summary)
       const room = r.w - 20
+      let text = chipText(summary)
+      if (ctx.measureText(text).width > room) text = chipText(summary, true)
       while (text.length > 4 && ctx.measureText(text).width > room) text = text.slice(0, -2) + '…'
       ctx.fillText(text, r.x + 12, r.y + r.h - 20)
       if (summary.busiest !== null) {

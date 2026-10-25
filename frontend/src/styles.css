@@ -39,7 +39,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
 
 .app { height: 100%; display: flex; flex-direction: column; }
 .toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 52px; }
-.design-name { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); border: 1px solid transparent; border-bottom-color: var(--line); border-radius: 8px; padding: 2px 8px; max-width: 260px; min-width: 120px; flex: 0 1 220px; }
+.design-name { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); border: 1px solid transparent; border-bottom-color: var(--line); border-radius: 8px; padding: 2px 8px; max-width: 220px; min-width: 90px; flex: 0 1 150px; }
 .design-name:hover, .design-name:focus-within { border-color: var(--line); background: var(--panel2); color: var(--ink); }
 .design-name input { background: none; border: 0; padding: 2px 0; min-width: 0; width: 100%; font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--ink); text-overflow: ellipsis; }
 .brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; } .brand-name { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; }
@@ -138,6 +138,7 @@ button.x { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px; b
   .inspector { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
   .inspector-tab { top: 8px; }
 }
+@media (max-width: 1400px) { .brand-name { display: none; } } /* the design's name takes its place in the toolbar */
 @media (max-width: 1100px) { .brand-name { display: none; } } /* keep the toolbar on one row at tablet widths */
 @media (max-width: 980px) { /* keep in step with NARROW_PX in model/responsive.ts */
   .toolbar { gap: 6px; padding: 6px 8px; } .brand-name, .clock { display: none; } .spacer { display: none; }

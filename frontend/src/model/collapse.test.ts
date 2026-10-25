@@ -61,7 +61,7 @@ describe('collapseView', () => {
     const g = d.groups!.find((x) => x.id === 'za')!
     const chip = groupDisplayRect(collapseView(d, rect), g)
     expect(chip).toMatchObject({ x: 20, y: 20, h: CHIP_H })
-    expect(chip.w).toBeLessThan(g.w + 1)
+    expect(chip.w).toBeLessThanOrEqual(g.w)
     expect(groupDisplayRect(collapseView(base(), rect), g)).toEqual({ x: 20, y: 20, w: 360, h: 360 })
   })
 })
