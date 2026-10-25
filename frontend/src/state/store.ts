@@ -4,6 +4,7 @@ import type { StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, Shape, ShapeKind, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
 import { alignNodes, distributeNodes, type AlignMode } from '../model/arrange'
+import { normalizeDesignName } from '../model/designName'
 import { tidyDiagram } from '../model/tidy'
 import { collapseView, expandFor, isHidden, setCollapsed, visibleIds } from '../model/collapse'
 import { MAX_SHAPES, MAX_SHAPE_LABEL, clampShape, newShape, shapesOf } from '../model/shapes'
@@ -97,6 +98,8 @@ export interface State {
   updateGroup(id: string, patch: Partial<Pick<Group, 'label' | 'kind' | 'w' | 'h'>>): void
   /** Collapse a box to its header chip or expand it (no argument: flip it). Purely visual; one undo step. */
   toggleCollapsed(id: string, collapsed?: boolean): void
+  /** Name the whole design (normalised; empty means the default name); one undo step. */
+  setDiagramName(name: string): void
   addShape(kind: ShapeKind, x: number, y: number): string | null
   updateShape(id: string, patch: Partial<Pick<Shape, 'label' | 'w' | 'h'>>): void
   /** Drag one end of an arrow by (dx, dy); the other end stays put. */
@@ -331,6 +334,16 @@ export const useStore = create<State>()((set, get) => {
       return id
     },
 
+    setDiagramName: (raw) => {
+      const name = normalizeDesignName(raw)
+      mutate((d) => {
+        if ((d.name ?? '') === name) return d
+        const { name: _old, ...rest } = d
+        void _old
+        return name ? { name, ...rest } : rest
+      })
+    },
+
     toggleCollapsed: (id, collapsed) => {
       const g = groupsOf(get().diagram).find((x) => x.id === id)
       if (!g) return
@@ -553,7 +566,8 @@ export const useStore = create<State>()((set, get) => {
     },
     applyTemplate: (d) => {
       if (guardTopology()) return
-      mutate(() => d)
+      const keep = get().diagram.name
+      mutate(() => (keep ? { ...d, name: keep } : d)) // a template fills the canvas; the design keeps its name
       set({ selection: [], ui: { ...get().ui, welcome: false, templates: false } })
       get().requestFit()
     },
