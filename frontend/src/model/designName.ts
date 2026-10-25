@@ -16,7 +16,7 @@ export function normalizeDesignName(raw: string): string {
 }
 
 /** The name to show for a design: its own, or "Untitled design". */
-export const designName = (d: Pick<Diagram, 'name'>): string => d.name || DEFAULT_DESIGN_NAME
+export const designName = (d: Partial<Diagram>): string => d.name || DEFAULT_DESIGN_NAME
 
 /** The browser tab title. */
 export const pageTitle = (name: string): string => `${name} · ${APP_TITLE}`

@@ -1,7 +1,8 @@
 import type { Diagram } from '../../api/types'
 import { palettes } from '../../draw/theme'
-import { createRough, render } from '../../draw/renderer'
-import { nodeRect } from '../../draw/geometry'
+import { createRough, measureText, render } from '../../draw/renderer'
+import { boundsOf } from '../../draw/geometry'
+import { FONT } from '../../draw/theme'
 import type { Reg } from '../../model/diagram'
 import { emptyStats } from '../../state/store'
 
@@ -9,14 +10,15 @@ import { emptyStats } from '../../state/store'
 export async function diagramPng(diagram: Diagram, reg: Reg, theme: 'light' | 'dark'): Promise<Blob | null> {
   if (diagram.nodes.length === 0) return null
   await document.fonts?.ready
-  const rects = diagram.nodes.map((n) => nodeRect(n, reg))
-  const x0 = Math.min(...rects.map((r) => r.x))
-  const y0 = Math.min(...rects.map((r) => r.y))
-  const x1 = Math.max(...rects.map((r) => r.x + r.w))
-  const y1 = Math.max(...rects.map((r) => r.y + r.h))
+  // the picture covers everything that is drawn (boxes and notes too), as the canvas shows it, so a collapsed box is its chip
+  const b = boundsOf(diagram, reg, measureText)
+  if (!b) return null
+  const x0 = b.x
+  const y0 = b.y
   const pad = 40
-  const w = Math.ceil(x1 - x0 + 2 * pad)
-  const h = Math.ceil(y1 - y0 + 2 * pad)
+  const head = diagram.name ? 34 : 0 // room for the design's name above the picture
+  const w = Math.ceil(b.w + 2 * pad)
+  const h = Math.ceil(b.h + 2 * pad + head)
   const dpr = 2
   const canvas = document.createElement('canvas')
   canvas.width = w * dpr
@@ -25,10 +27,17 @@ export async function diagramPng(diagram: Diagram, reg: Reg, theme: 'light' | 'd
   if (!ctx) return null
   render(ctx, createRough(canvas), w, h, dpr, {
     diagram, reg, stats: emptyStats(), running: false,
-    viewport: { scrollX: pad - x0, scrollY: pad - y0, zoom: 1 },
+    viewport: { scrollX: pad - x0, scrollY: pad + head - y0, zoom: 1 },
     palette: palettes[theme], selection: new Set(), hover: null, handles: new Set(), connect: null, validTargets: new Set(), marquee: null,
     particles: [], now: 0, editingNote: null, showParticles: false,
   })
+  if (diagram.name) {
+    ctx.fillStyle = palettes[theme].ink
+    ctx.font = `bold 20px ${FONT}`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(diagram.name, pad, 34)
+  }
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'))
 }
 

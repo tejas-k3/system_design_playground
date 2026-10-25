@@ -16,6 +16,7 @@ export interface ExportOptions {
 /** The design write-up as Markdown: requirements, estimates, API, data model, design, self-assessment, notes. */
 export function buildMarkdown(d: InterviewData, diagram: Diagram, reg: Reg, o: ExportOptions): string {
   const out: string[] = [`# ${o.title}`, '', `_System design practice, ${o.date}_`, '']
+  if (diagram.name) out.push(`Design: **${cell(diagram.name)}**`, '')
 
   out.push('## Requirements', '')
   out.push('**Functional**', '')
