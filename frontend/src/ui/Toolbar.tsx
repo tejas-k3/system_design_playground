@@ -31,12 +31,16 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="brand" title="System Design Playground">
-        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden>
-          <rect x="3" y="3" width="26" height="26" rx="6" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="10" cy="11" r="3" fill="#1971c2" />
-          <circle cx="22" cy="11" r="3" fill="#e8590c" />
-          <circle cx="16" cy="22" r="3" fill="#2f9e44" />
-          <path d="M12 12.5 15 19M20 12.5 17 19M13 11h6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+        <svg width="26" height="26" viewBox="0 0 100 100" aria-hidden>
+          <rect x="5" y="31" width="30" height="38" rx="7" fill="var(--panel)" stroke="currentColor" strokeWidth="5" />
+          <path d="M5 43h30" stroke="currentColor" strokeWidth="4" />
+          <circle cx="12" cy="37" r="2.5" fill="var(--ok)" />
+          <circle cx="19" cy="37" r="2.5" fill="var(--accent)" />
+          <path d="M42 50h17m-7-8 8 8-8 8" fill="none" stroke="var(--accent)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="49" cy="50" r="3" fill="var(--ok)" />
+          <path d="M68 36c0-5 25-5 25 0v28c0 7-25 7-25 0z" fill="var(--panel2)" stroke="currentColor" strokeWidth="5" />
+          <ellipse cx="80.5" cy="36" rx="12.5" ry="5" fill="var(--panel)" stroke="currentColor" strokeWidth="5" />
+          <path d="M68 50c0 7 25 7 25 0" fill="none" stroke="currentColor" strokeWidth="4" />
         </svg>
         <span className="brand-name">System Design Playground</span>
       </div>

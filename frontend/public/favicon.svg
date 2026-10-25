@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .bg{fill:#f6f1e7}.ink{color:#1d2433}.panel{fill:#fffdf8}.soft{fill:#f2ebdb}.hot{fill:#b43a0a}.cool{fill:#286b69}.arrow{fill:none;stroke:#b43a0a}
+    @media(prefers-color-scheme:dark){.bg{fill:#132238}.ink{color:#e8eefc}.panel{fill:#132238}.soft{fill:#1a2f4b}.hot{fill:#ffa94d}.cool{fill:#70d6c6}.arrow{stroke:#ffa94d}}
+  </style>
+  <rect class="bg" x="1" y="1" width="30" height="30" rx="8"/>
+  <g class="ink" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <rect class="panel" x="3.5" y="10" width="9.5" height="12" rx="2.2" stroke-width="1.6"/>
+    <path d="M3.5 14h9.5" fill="none" stroke-width="1.2"/>
+    <circle class="cool" cx="5.8" cy="12" r=".7" stroke="none"/><circle class="hot" cx="8" cy="12" r=".7" stroke="none"/>
+    <path class="arrow" d="M14.5 16h4.3m-1.7-1.8 1.9 1.8-1.9 1.8" stroke-width="1.8"/>
+    <path class="soft" d="M21 11.5c0-1.5 7.5-1.5 7.5 0v8.3c0 2.1-7.5 2.1-7.5 0z" stroke-width="1.5"/>
+    <ellipse class="panel" cx="24.75" cy="11.5" rx="3.75" ry="1.5" stroke-width="1.5"/>
+    <path d="M21 15.7c0 2.1 7.5 2.1 7.5 0" fill="none" stroke-width="1.2"/>
+  </g>
+</svg>
