@@ -50,6 +50,7 @@ zone-outage 0c362f2a6cd10a39784343fecb4561f2a7a0e68f36b4ccd79f32a7b98a392dd4 sta
 bot-flood 01c7711d8684a6ce8c160683602d8deee72fff15c140002ee7b21ba350f263cc start=false/0/0.2179/177.4 solution=true/3/0.1625/157.5
 upload-500kb c40978988d569dcde2a8e86f18886df4436eeeb42c7d9437b54667612bee5af0 start=false/0/0.0000/0.0 solution=true/3/1.0000/234.1
 one-slow-server ceed12fb13d2405d2172698edb07489175e54035a64094ed0a40ea279c0d8a89 start=false/0/0.8957/1447.3 solution=true/2/1.0000/243.5
+restore-window 0ca9207c98176f927cf47d3a8b2afe5ac188f59be06f58eb07578c17da8410b9 start=false/0/0.1796/167.2 solution=true/3/0.5894/167.2
 vendor-wait cddad74793fd8396d7bcd92473cc067efad5c86956a460d5425ae933395ef118 start=false/0/0.0078/1986.9 solution=true/3/1.0000/145.5
 live-scoreboard 662efae8aece573519aaeb31cfecdf0a99595f3287f1ad4327d3b7b679f65ed6 start=false/0/0.6162/1164.0 solution=true/2/1.0000/139.9
 nearby-drivers 10c41ba723ac6413a782aba505ab81729f4d9c21cdb58b0881eb854d3fb502e6 start=false/0/0.4068/1986.9 solution=true/2/1.0000/160.7

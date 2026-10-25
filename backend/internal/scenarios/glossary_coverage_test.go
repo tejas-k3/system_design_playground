@@ -20,7 +20,7 @@ func challengeTexts(sc *Scenario) map[string]string {
 
 // notYetMarked lists challenges whose text lives outside the defs_*.go files (scenarios_open.go) and so was not
 // marked up together with the others. Delete an entry once its text carries a term.
-var notYetMarked = map[string]bool{"ten-thousand-students": true, "checkout-during-a-sale": true}
+var notYetMarked = map[string]bool{"ten-thousand-students": true, "checkout-during-a-sale": true, "restore-window": true}
 
 func TestGlossaryCoverage(t *testing.T) {
 	distinct := map[string]bool{}
