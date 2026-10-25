@@ -350,7 +350,7 @@ func registerResourceLimits() {
 		DurationSec: 40, WarmupSec: 0, Speed: 1,
 		Hints: [3]string{
 			"Open the job counters: how many retries are there, and how long do healthy jobs wait?",
-			"Retrying something that can never succeed only burns worker time. How many attempts does a job deserve, and {{dead-letter-queue|where should the failures go instead of vanishing}}?",
+			"Retrying something that can never succeed only burns worker time. How many attempts does a job deserve, and where should the failures go instead of vanishing?",
 			"Two settings on the queue: how many attempts a job deserves, and where a job goes once it has used them up.",
 		},
 		Answer: "The answer: on the queue (advanced settings): lower the attempts per job and turn on the {{dead-letter-queue|dead-letter queue}} so the failed jobs are kept for inspection.",

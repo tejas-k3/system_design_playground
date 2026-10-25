@@ -56,7 +56,7 @@ func registerFailureAndElasticity() {
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(600), MaxCostPerHour: f(0.85)},
 		DurationSec: 150, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
-			"One server has {{thread-pool|a fixed number of threads}}. What if {{autoscaling|the number of servers could follow the traffic}}?",
+			"One server has {{thread-pool|a fixed number of threads}}. What if the number of servers could follow the traffic?",
 			"Open the App Server's settings, choose 'Show advanced' and look at the Scaling group.",
 			"A new server needs time to boot. Which setting makes the scaler order servers while the existing ones still have room?",
 		},
