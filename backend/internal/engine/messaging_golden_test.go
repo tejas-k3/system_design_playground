@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -59,7 +61,7 @@ func TestMessagingGolden(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			h := func(b []byte) string { x := sha256.Sum256(b); return hex.EncodeToString(x[:]) }
+			h := func(b []byte) string { x := sha256.Sum256(canonicalJSON(t, b)); return hex.EncodeToString(x[:]) }
 			lines = append(lines, fmt.Sprintf("%s seed=%d snapshot=%s events=%s run=%s", c.name, seed, h(sb), h(eb), h(rb)))
 		}
 	}
@@ -86,4 +88,45 @@ func TestMessagingGolden(t *testing.T) {
 			}
 		}
 	}
+}
+
+// canonicalJSON rounds every fractional number to six significant digits before it is hashed. The simulation is
+// deterministic on one machine, but arm64 fuses multiply-add and amd64 does not, so the last bits of a float differ
+// between a laptop and the CI runner; whole numbers (counters, event times in ms) are kept exactly.
+func canonicalJSON(t *testing.T, b []byte) []byte {
+	t.Helper()
+	var v any
+	if err := json.Unmarshal(b, &v); err != nil {
+		t.Fatal(err)
+	}
+	var round func(any) any
+	round = func(x any) any {
+		switch y := x.(type) {
+		case float64:
+			if y == math.Trunc(y) {
+				return y
+			}
+			r, err := strconv.ParseFloat(strconv.FormatFloat(y, 'g', 6, 64), 64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return r
+		case []any:
+			for i := range y {
+				y[i] = round(y[i])
+			}
+			return y
+		case map[string]any:
+			for k := range y {
+				y[k] = round(y[k])
+			}
+			return y
+		}
+		return x
+	}
+	out, err := json.Marshal(round(v))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
