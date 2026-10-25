@@ -14,7 +14,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # 2. build a static Go binary
-FROM golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f AS api
+FROM golang:1.27-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS api
 WORKDIR /src/backend
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
