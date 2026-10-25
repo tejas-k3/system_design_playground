@@ -61,7 +61,7 @@ func registerFundamentals() {
 		Answer: "The answer: four 8-thread servers behind one load balancer will carry 600 rps within the cost cap.",
 		Predictions: []Prediction{{ID: "p1", Question: "A 4-thread server spends ~40 ms per request. Roughly what is its limit?", Options: []string{"~100 rps", "~400 rps", "~1000 rps"}, Answer: 0,
 			Explain: "4 threads ÷ 0.04 s ≈ 100 requests per second. Beyond that the queue fills and requests are rejected."}},
-		Debrief: "Horizontal scaling is a load balancer plus enough identical servers. Notice the cost: {{thread-pool|threads}} are not free, so you want just enough headroom, not ten times too much.",
+		Debrief: "Horizontal scaling is a load balancer plus enough identical servers. Notice the cost: {{thread-pool|threads}} are not free, so you want just enough {{queueing-knee|headroom}}, not ten times too much.",
 	})
 
 	// 3 ─ Easy ────────────────────────────────────────────────────────────────────────
