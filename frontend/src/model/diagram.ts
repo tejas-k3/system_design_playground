@@ -1,4 +1,5 @@
 import type { Diagram, Edge, Group, GroupKind, Node, Shape, ShapeKind, NodeSpec, Params, ParamSpec, ParamValue, Registry } from '../api/types'
+import { normalizeDesignName } from './designName'
 import { GROUP_KIND_IDS, MAX_GROUPS, MAX_GROUP_LABEL, clampGroupSize } from './groups'
 import { MAX_SHAPES, MAX_SHAPE_LABEL, SHAPE_KIND_IDS, clampShape } from './shapes'
 
@@ -197,7 +198,12 @@ export function sanitizeDiagram(reg: Reg, raw: unknown): { diagram: Diagram; adj
     label = [...label].slice(0, MAX_SHAPE_LABEL).join('')
     shapes.push({ id: s.id, kind: s.kind as ShapeKind, label, x: s.x, y: s.y, w, h })
   }
-  return { diagram: { nodes, edges, notes, ...(groups.length ? { groups } : {}), ...(shapes.length ? { shapes } : {}) }, adjusted }
+  let name = ''
+  if (raw.name !== undefined) {
+    name = typeof raw.name === 'string' ? normalizeDesignName(raw.name) : ''
+    if (name !== raw.name) adjusted = true
+  }
+  return { diagram: { ...(name ? { name } : {}), nodes, edges, notes, ...(groups.length ? { groups } : {}), ...(shapes.length ? { shapes } : {}) }, adjusted }
 }
 
 /** Next free label: "Cache", "Cache 2", ... */

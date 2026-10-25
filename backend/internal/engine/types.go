@@ -92,6 +92,7 @@ type Shape struct {
 }
 
 type Diagram struct {
+	Name   string  `json:"name,omitempty"` // the design's title; absent in older designs
 	Nodes  []Node  `json:"nodes"`
 	Edges  []Edge  `json:"edges"`
 	Notes  []Note  `json:"notes"`

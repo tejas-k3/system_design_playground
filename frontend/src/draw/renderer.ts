@@ -6,7 +6,8 @@ import type { Reg } from '../model/diagram'
 import { phaseChip } from '../model/phase'
 import { placementTag } from '../model/placement'
 import { clientRateLabel, edgeLabel, serverSubtitle, smoothRate, utilBarWidth } from '../model/rates'
-import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, HANDLE_R } from './geometry'
+import { type Rect, type Pt, NOTE_FONT, boundaryPoint, center, edgeGeom, edgeShown, fitFontSize, handlePos, handleRadius, legibleSize, particleShape, noteRect, nodeRect, toggleRect, viewOf, HANDLE_R } from './geometry'
+import { type CollapseView, chipSummary, chipText, groupDisplayRect, hasUtilBar } from '../model/collapse'
 import { GROUP_HEADER, groupInfo, groupsOf } from '../model/groups'
 import { arrowEnds, shapesOf } from '../model/shapes'
 import type { Guide } from '../model/snap'
@@ -91,10 +92,11 @@ function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, sc: Scene
   for (let x = ox; x < w; x += step) for (let y = oy; y < h; y += step) ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5)
 }
 
-function drawEdge(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, nodes: Map<string, Node>) {
+function drawEdge(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, nodes: Map<string, Node>, view: CollapseView) {
   const { palette: p, stats } = sc
   for (const e of sc.diagram.edges) {
-    const g = edgeGeom(e, nodes, sc.reg)
+    if (!edgeShown(e, view)) continue
+    const g = edgeGeom(e, nodes, sc.reg, view)
     if (!g) continue
     const st = stats.edges[e.id]
     const selected = sc.selection.has(e.id)
@@ -138,12 +140,12 @@ function drawEdge(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, nod
   }
 }
 
-function drawParticles(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>) {
+function drawParticles(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>, view: CollapseView) {
   const edges = new Map(sc.diagram.edges.map((e) => [e.id, e]))
   for (const pt of sc.particles) {
     const e = edges.get(pt.edge)
     if (!e) continue
-    const g = edgeGeom(e, nodes, sc.reg)
+    const g = edgeGeom(e, nodes, sc.reg, view) // a request to a hidden member arrives at the box's chip
     if (!g) continue
     const t = (sc.now - pt.t0) / PARTICLE_MS
     if (t < 0 || t > 1) continue
@@ -177,15 +179,18 @@ function drawParticles(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<stri
 const shownRate = new Map<string, { v: number; at: number }>()
 
 /** Rate / latency labels, drawn after the particles so the moving dots never cover them, on an opaque pill. */
-function drawEdgeLabels(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>) {
+function drawEdgeLabels(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>, view: CollapseView) {
   const { palette: p, stats } = sc
   const size = legibleSize(13, sc.viewport.zoom, 11)
   for (const e of sc.diagram.edges) {
-    const g = edgeGeom(e, nodes, sc.reg)
+    if (!edgeShown(e, view)) continue
+    const g = edgeGeom(e, nodes, sc.reg, view)
     if (!g) continue
     const st = stats.edges[e.id]
     const prev = shownRate.get(e.id)
-    const rps = smoothRate(prev?.v, st?.rps ?? 0, prev ? Math.min(1000, sc.now - prev.at) : 0)
+    // a line standing for several connections to hidden members carries their total rate
+    const total = view.any ? (view.routes.get(e.id)?.members ?? [e.id]).reduce((t, id) => t + (stats.edges[id]?.rps ?? 0), 0) : (st?.rps ?? 0)
+    const rps = smoothRate(prev?.v, total, prev ? Math.min(1000, sc.now - prev.at) : 0)
     shownRate.set(e.id, { v: rps, at: sc.now })
     const label = edgeLabel(e.latencyMs, rps, sc.selection.has(e.id) || sc.hover === e.id, sc.running, { mbps: sc.stats.edges[e.id]?.mbps, util: sc.stats.edges[e.id]?.util, limit: e.bandwidthMbps, protocol: e.protocol, async: e.async })
     if (!label) continue
@@ -339,7 +344,7 @@ function drawNode(ctx: CanvasRenderingContext2D, rc: RoughCanvas, sc: Scene, n: 
   ctx.font = `${legibleSize(13, zoom, 10)}px ${FONT}`
   ctx.fillText(nodeSubtitle(n, sc), r.x + 52, r.y + 46)
   // utilization bar
-  if (ns && sc.running && n.kind !== 'client' && n.kind !== 'loadBalancer') {
+  if (ns && sc.running && hasUtilBar(n.kind)) {
     const bx = r.x + 12
     const by = r.y + r.h - 12
     const bw = r.w - 24
@@ -436,10 +441,10 @@ function drawHandle(ctx: CanvasRenderingContext2D, sc: Scene, n: Node) {
   ctx.stroke()
 }
 
-function drawNotes(ctx: CanvasRenderingContext2D, sc: Scene) {
+function drawNotes(ctx: CanvasRenderingContext2D, sc: Scene, view: CollapseView) {
   const p = sc.palette
   for (const n of sc.diagram.notes) {
-    if (n.id === sc.editingNote) continue
+    if (n.id === sc.editingNote || view.hiddenNotes.has(n.id)) continue
     const r = noteRect(n, measureText)
     ctx.save()
     ctx.fillStyle = p.noteBg
@@ -470,21 +475,54 @@ function drawNotes(ctx: CanvasRenderingContext2D, sc: Scene) {
   }
 }
 
+/** The fold arrow in a box header: pointing down while the box is open, right while it is collapsed. */
+function drawChevron(ctx: CanvasRenderingContext2D, r: Rect, collapsed: boolean, color: string) {
+  const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 }
+  const k = Math.min(r.w, 18) * 0.28
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 2.2
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.setLineDash([])
+  ctx.beginPath()
+  if (collapsed) {
+    ctx.moveTo(c.x - k * 0.6, c.y - k)
+    ctx.lineTo(c.x + k * 0.6, c.y)
+    ctx.lineTo(c.x - k * 0.6, c.y + k)
+  } else {
+    ctx.moveTo(c.x - k, c.y - k * 0.6)
+    ctx.lineTo(c.x, c.y + k * 0.6)
+    ctx.lineTo(c.x + k, c.y - k * 0.6)
+  }
+  ctx.stroke()
+  ctx.restore()
+}
+
 /** Boxes behind everything: a tinted fill, a dashed outline whose pattern depends on the kind, and a header that says what it is in words. */
-function drawGroups(ctx: CanvasRenderingContext2D, sc: Scene) {
+function drawGroups(ctx: CanvasRenderingContext2D, sc: Scene, view: CollapseView) {
   const p = sc.palette
   const zoom = sc.viewport.zoom
   const tint: Record<string, string> = { region: p.muted, az: p.ok, vpc: p.accent, service: p.ink, note: p.muted }
-  const sorted = [...groupsOf(sc.diagram)].sort((a, b) => b.w * b.h - a.w * a.h) // big ones first so small ones sit on top
+  const sorted = [...groupsOf(sc.diagram)].filter((g) => !view.hiddenGroups.has(g.id)).sort((a, b) => b.w * b.h - a.w * a.h) // big ones first so small ones sit on top
   for (const g of sorted) {
     const info = groupInfo(g.kind)
     const color = tint[g.kind] ?? p.muted
     const selected = sc.selection.has(g.id)
+    const r = groupDisplayRect(view, g)
+    const collapsed = !!g.collapsed
+    const summary = collapsed ? chipSummary(view, sc.diagram, g.id, sc.running ? sc.stats.nodes : {}) : null
     ctx.save()
+    if (collapsed) {
+      ctx.fillStyle = p.card
+      ctx.beginPath()
+      ctx.roundRect(r.x, r.y, r.w, r.h, 12)
+      ctx.fill()
+    }
     ctx.globalAlpha = 0.09
     ctx.fillStyle = color
     ctx.beginPath()
-    ctx.roundRect(g.x, g.y, g.w, g.h, 12)
+    ctx.roundRect(r.x, r.y, r.w, r.h, 12)
     ctx.fill()
     ctx.globalAlpha = 1
     ctx.strokeStyle = selected ? p.accent : color
@@ -496,28 +534,66 @@ function drawGroups(ctx: CanvasRenderingContext2D, sc: Scene) {
     ctx.font = `${size}px ${FONT}`
     ctx.textBaseline = 'middle'
     ctx.textAlign = 'left'
+    const tog = toggleRect(g, view, zoom)
+    drawChevron(ctx, tog, collapsed, selected ? p.accent : p.ink)
+    const tx = tog.x + tog.w + 2
     const tagW = ctx.measureText(info.tag).width + 12
-    const cy = g.y + GROUP_HEADER / 2 + 2
+    const cy = r.y + GROUP_HEADER / 2 + 2
     ctx.fillStyle = selected ? p.accent : color
     ctx.beginPath()
-    ctx.roundRect(g.x + 10, cy - size * 0.7, tagW, size * 1.4, 5)
+    ctx.roundRect(tx, cy - size * 0.7, tagW, size * 1.4, 5)
     ctx.fill()
     ctx.fillStyle = p.bg
-    ctx.fillText(info.tag, g.x + 16, cy + 1)
+    ctx.fillText(info.tag, tx + 6, cy + 1)
     if (g.label) {
       ctx.fillStyle = p.ink
       let text = g.label
-      const room = g.w - tagW - 34
+      const room = r.w - (tx - r.x) - tagW - 24
       while (text.length > 1 && ctx.measureText(text).width > room) text = text.slice(0, -2) + '…'
-      if (room > 20) ctx.fillText(text, g.x + 10 + tagW + 8, cy + 1)
+      if (room > 20) ctx.fillText(text, tx + tagW + 8, cy + 1)
     }
-    if (selected) {
-      const r = 6 / Math.min(1, zoom)
+    if (summary) {
+      // the chip says what it hides in words, so a problem inside a collapsed box cannot go unseen
+      const bad = summary.down > 0 || summary.failing > 0 || (summary.busiest ?? 0) >= 85
+      const small = legibleSize(13, zoom, 10)
+      ctx.font = `${bad ? 'bold ' : ''}${small}px ${FONT}`
+      ctx.fillStyle = bad ? p.bad : p.muted
+      const room = r.w - 20
+      let text = chipText(summary)
+      if (ctx.measureText(text).width > room) text = chipText(summary, true)
+      while (text.length > 4 && ctx.measureText(text).width > room) text = text.slice(0, -2) + '…'
+      ctx.fillText(text, r.x + 12, r.y + r.h - 20)
+      if (summary.busiest !== null) {
+        const bx = r.x + 12
+        const by = r.y + r.h - 9
+        const bw = r.w - 24
+        ctx.fillStyle = p.grid
+        ctx.beginPath()
+        ctx.roundRect(bx, by, bw, 4, 2)
+        ctx.fill()
+        ctx.fillStyle = utilColor(summary.busiest / 100, p)
+        ctx.beginPath()
+        ctx.roundRect(bx, by, utilBarWidth(summary.busiest / 100, bw), 4, 2)
+        ctx.fill()
+      }
+      if (bad && sc.running) {
+        // dashed as well as red, like a failing component
+        ctx.setLineDash([7, 4])
+        ctx.strokeStyle = p.bad
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.roundRect(r.x - 3, r.y - 3, r.w + 6, r.h + 6, 14)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+    }
+    if (selected && !collapsed) {
+      const hr = 6 / Math.min(1, zoom)
       ctx.fillStyle = p.card
       ctx.strokeStyle = p.accent
       ctx.lineWidth = 2
       ctx.beginPath()
-      ctx.rect(g.x + g.w - r, g.y + g.h - r, r * 2, r * 2)
+      ctx.rect(r.x + r.w - hr, r.y + r.h - hr, hr * 2, hr * 2)
       ctx.fill()
       ctx.stroke()
     }
@@ -526,10 +602,11 @@ function drawGroups(ctx: CanvasRenderingContext2D, sc: Scene) {
 }
 
 /** Ellipses and arrows: outlines only, so what they point at stays visible. A caption, if any, is drawn as text on a plate. */
-function drawShapes(ctx: CanvasRenderingContext2D, sc: Scene) {
+function drawShapes(ctx: CanvasRenderingContext2D, sc: Scene, view: CollapseView) {
   const p = sc.palette
   const zoom = sc.viewport.zoom
   for (const s of shapesOf(sc.diagram)) {
+    if (view.hiddenShapes.has(s.id)) continue
     const selected = sc.selection.has(s.id)
     ctx.save()
     ctx.strokeStyle = selected ? p.accent : p.ink
@@ -611,12 +688,14 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
   ctx.translate(v.scrollX, v.scrollY)
   ctx.scale(v.zoom, v.zoom)
   const nodes = new Map(sc.diagram.nodes.map((n) => [n.id, n]))
-  drawGroups(ctx, sc)
-  drawEdge(ctx, rc, sc, nodes)
-  if (sc.showParticles) drawParticles(ctx, sc, nodes)
-  drawEdgeLabels(ctx, sc, nodes)
+  const view = viewOf(sc.diagram, sc.reg)
+  drawGroups(ctx, sc, view)
+  drawEdge(ctx, rc, sc, nodes, view)
+  if (sc.showParticles) drawParticles(ctx, sc, nodes, view)
+  drawEdgeLabels(ctx, sc, nodes, view)
   // dim nodes that cannot accept the connection being dragged
   for (const n of sc.diagram.nodes) {
+    if (view.hiddenNodes.has(n.id)) continue
     if (sc.connect && n.id !== sc.connect.from && !sc.validTargets.has(n.id)) ctx.globalAlpha = 0.35
     if (sc.rewire && !sc.rewire.valid.has(n.id)) {
       const re = sc.diagram.edges.find((x) => x.id === sc.rewire!.edge)
@@ -626,7 +705,7 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
     ctx.globalAlpha = 1
   }
   for (const n of sc.diagram.nodes) {
-    if (sc.handles.has(n.id)) drawHandle(ctx, sc, n)
+    if (sc.handles.has(n.id) && !view.hiddenNodes.has(n.id)) drawHandle(ctx, sc, n)
   }
   if (sc.connect) {
     const from = nodes.get(sc.connect.from)
@@ -646,10 +725,10 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
       ctx.restore()
     }
   }
-  drawEdgeEnds(ctx, sc, nodes)
+  drawEdgeEnds(ctx, sc, nodes, view)
   drawRewire(ctx, sc, nodes)
-  drawShapes(ctx, sc)
-  drawNotes(ctx, sc)
+  drawShapes(ctx, sc, view)
+  drawNotes(ctx, sc, view)
   if (sc.guides?.length) {
     ctx.save()
     ctx.strokeStyle = sc.palette.accent
@@ -682,10 +761,10 @@ export function render(ctx: CanvasRenderingContext2D, rc: RoughCanvas, width: nu
 }
 
 /** A selected connection shows a round grip at each end: drag one onto another component to move that end. */
-function drawEdgeEnds(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>) {
+function drawEdgeEnds(ctx: CanvasRenderingContext2D, sc: Scene, nodes: Map<string, Node>, view: CollapseView) {
   for (const e of sc.diagram.edges) {
-    if (!sc.selection.has(e.id) || sc.rewire?.edge === e.id) continue
-    const g = edgeGeom(e, nodes, sc.reg)
+    if (!sc.selection.has(e.id) || sc.rewire?.edge === e.id || !edgeShown(e, view)) continue
+    const g = edgeGeom(e, nodes, sc.reg, view)
     if (!g) continue
     for (const pt of [g.a, g.b]) {
       ctx.save()

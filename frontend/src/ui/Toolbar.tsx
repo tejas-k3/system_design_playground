@@ -1,4 +1,7 @@
+import { useEffect } from 'react'
 import { fmtCost } from '../model/goals'
+import { APP_TITLE, designName, pageTitle } from '../model/designName'
+import { DesignName } from './DesignName'
 import { scrubTarget } from '../model/scrub'
 import { reset, seek, step, togglePlay } from '../sim/bridge'
 import { shareCurrentDesign } from '../sim/designs'
@@ -25,6 +28,15 @@ export function Toolbar() {
   const connection = useStore((s) => s.connection)
   const requestFit = useStore((s) => s.requestFit)
   const running = status === 'running'
+  const name = useStore((s) => designName({ name: s.diagram.name }))
+  const scenarioTitle = useStore((s) => s.scenario?.def.title)
+  // the tab says which design this is: its name, or the challenge's title while one is open
+  useEffect(() => {
+    document.title = scenarioTitle ? pageTitle(scenarioTitle) : pageTitle(name)
+    return () => {
+      document.title = APP_TITLE
+    }
+  }, [name, scenarioTitle])
   const ended = useStore((s) => !!s.scenario?.result) // a challenge run that has finished: Play starts a new run, it does not carry on
   const playLabel = running ? 'Pause' : ended ? 'Run again' : status === 'paused' ? 'Resume' : 'Play'
 
@@ -44,6 +56,8 @@ export function Toolbar() {
         </svg>
         <span className="brand-name">System Design Playground</span>
       </div>
+
+      {!scenarioTitle && <DesignName />}
 
       <div className="group" role="group" aria-label="Tools">
         <button className={tool === 'select' ? 'on' : ''} onClick={() => setTool('select')} title="Select / move (V)" aria-pressed={tool === 'select'}>

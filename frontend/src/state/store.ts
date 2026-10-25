@@ -4,7 +4,9 @@ import type { StageId } from '../model/timer'
 import type { Diagram, Edge, Finding, Group, GroupKind, Node, Note, Shape, ShapeKind, NodePoint, Prediction, PredictionAnswer, Scenario, Score, SimStatus, Stats, TraceSet } from '../api/types'
 import { MAX_ZOOM, MIN_ZOOM, Reg, emptyDiagram, newId, uniqueLabel, uniqueLabels } from '../model/diagram'
 import { alignNodes, distributeNodes, type AlignMode } from '../model/arrange'
+import { normalizeDesignName } from '../model/designName'
 import { tidyDiagram } from '../model/tidy'
+import { collapseView, expandFor, isHidden, setCollapsed, visibleIds } from '../model/collapse'
 import { MAX_SHAPES, MAX_SHAPE_LABEL, clampShape, newShape, shapesOf } from '../model/shapes'
 import { nodeRect } from '../draw/geometry'
 import { clipIsEmpty, copySelection, pasteClip, type Clip } from '../model/clipboard'
@@ -96,6 +98,10 @@ export interface State {
   updateNote(id: string, patch: Partial<Note>): void
   addGroup(kind: GroupKind, x: number, y: number): string | null
   updateGroup(id: string, patch: Partial<Pick<Group, 'label' | 'kind' | 'w' | 'h'>>): void
+  /** Collapse a box to its header chip or expand it (no argument: flip it). Purely visual; one undo step. */
+  toggleCollapsed(id: string, collapsed?: boolean): void
+  /** Name the whole design (normalised; empty means the default name); one undo step. */
+  setDiagramName(name: string): void
   addShape(kind: ShapeKind, x: number, y: number): string | null
   updateShape(id: string, patch: Partial<Pick<Shape, 'label' | 'w' | 'h'>>): void
   /** Drag one end of an arrow by (dx, dy); the other end stays put. */
@@ -219,7 +225,12 @@ export const useStore = create<State>()((set, get) => {
 
     setReg: (reg) => set({ reg }),
     requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
-    focusNode: (id) => set((s) => ({ selection: [id], centerRequest: { id, n: (s.centerRequest?.n ?? 0) + 1 } })),
+    focusNode: (id) => {
+      const reg = get().reg
+      // a component hidden inside a collapsed box: open the box first (one undo step)
+      if (reg) mutate((d) => expandFor(d, [id], (n) => nodeRect(n, reg)))
+      set((s) => ({ selection: [id], centerRequest: { id, n: (s.centerRequest?.n ?? 0) + 1 } }))
+    },
     clearRun: () =>
       set((s) => ({
         stats: emptyStats(),
@@ -233,10 +244,11 @@ export const useStore = create<State>()((set, get) => {
       const spec = reg?.spec(kind)
       if (!spec || guardTopology()) return null
       const id = newId('n')
-      mutate((d) => ({
-        ...d,
-        nodes: [...d.nodes, { id, kind, x, y, label: uniqueLabel(d, spec.name), params: {} }],
-      }))
+      mutate((d) => {
+        const added = { ...d, nodes: [...d.nodes, { id, kind, x, y, label: uniqueLabel(d, spec.name), params: {} }] }
+        // a component dropped inside a collapsed box would vanish: open the box instead
+        return expandFor(added, [id], (n) => nodeRect(n, reg!))
+      })
       set({ selection: [id], ui: { ...get().ui, welcome: false } })
       return id
     },
@@ -323,6 +335,23 @@ export const useStore = create<State>()((set, get) => {
       mutate((d) => ({ ...d, groups: [...groupsOf(d), { id, kind, label: groupLabel(d, kind), x, y, ...GROUP_DEFAULT }] }))
       set({ selection: [id], ui: { ...get().ui, welcome: false } })
       return id
+    },
+
+    setDiagramName: (raw) => {
+      const name = normalizeDesignName(raw)
+      mutate((d) => {
+        if ((d.name ?? '') === name) return d
+        const { name: _old, ...rest } = d
+        void _old
+        return name ? { name, ...rest } : rest
+      })
+    },
+
+    toggleCollapsed: (id, collapsed) => {
+      const g = groupsOf(get().diagram).find((x) => x.id === id)
+      if (!g) return
+      mutate((d) => setCollapsed(d, id, collapsed ?? !g.collapsed))
+      set({ selection: [id] })
     },
 
     updateGroup: (id, patch) =>
@@ -414,6 +443,12 @@ export const useStore = create<State>()((set, get) => {
         ids = out.ids
         return out.diagram
       })
+      // only what can be seen is selected: a pasted collapsed box hides its members
+      const reg = get().reg
+      if (reg) {
+        const d = get().diagram
+        ids = visibleIds(d, collapseView(d, (n) => nodeRect(n, reg)), ids)
+      }
       // paste again and the next copy lands a step further along
       clipboard = { ...clipboard, nodes: clipboard.nodes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), notes: clipboard.notes.map((n) => ({ ...n, x: n.x + 24, y: n.y + 24 })), groups: (clipboard.groups ?? []).map((g) => ({ ...g, x: g.x + 24, y: g.y + 24 })), shapes: (clipboard.shapes ?? []).map((s) => ({ ...s, x: s.x + 24, y: s.y + 24 })) }
       set({ selection: ids, ui: { ...get().ui, welcome: false } })
@@ -455,7 +490,16 @@ export const useStore = create<State>()((set, get) => {
       set({ selection: [], ui: { ...get().ui, welcome: false } })
     },
 
-    setSelection: (ids) => set({ selection: ids }),
+    setSelection: (ids) => {
+      // selecting something that sits hidden in a collapsed box (a lint finding, the outline, a search) opens that box
+      const { reg, diagram } = get()
+      if (reg && diagram.groups?.some((g) => g.collapsed)) {
+        const rect = (n: Node) => nodeRect(n, reg)
+        const v = collapseView(diagram, rect)
+        if (ids.some((id) => isHidden(v, id))) mutate((d) => expandFor(d, ids, rect))
+      }
+      set({ selection: ids })
+    },
     setTool: (tool) => set({ tool }),
     setViewport: (v) => set((s) => ({ viewport: { ...s.viewport, ...v } })),
     zoomAt: (factor, cx, cy) =>
@@ -525,7 +569,8 @@ export const useStore = create<State>()((set, get) => {
     },
     applyTemplate: (d) => {
       if (guardTopology()) return
-      mutate(() => d)
+      const keep = get().diagram.name
+      mutate(() => (keep ? { ...d, name: keep } : d)) // a template fills the canvas; the design keeps its name
       set({ selection: [], ui: { ...get().ui, welcome: false, templates: false } })
       get().requestFit()
     },

@@ -40,7 +40,7 @@ export interface Group {
   y: number
   w: number
   h: number
-  collapsed?: boolean // reserved; the editor does not collapse yet
+  collapsed?: boolean // shown as a header chip only; visual, the simulation still runs what is inside
 }
 export type ShapeKind = 'ellipse' | 'arrow'
 /** A purely visual annotation: an ellipse (x, y, w, h is its bounding box) or an arrow (from x, y to x+w, y+h; w and h are signed). */
@@ -77,6 +77,7 @@ export interface Finding {
 }
 
 export interface Diagram {
+  name?: string // the design's title (at most 60 characters); absent in older designs
   nodes: Node[]
   edges: Edge[]
   notes: Note[]

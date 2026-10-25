@@ -112,6 +112,15 @@ Second line.
   })
 })
 
+describe('buildMarkdown with a design name', () => {
+  it('names the design under the title, and says nothing for an unnamed one', () => {
+    const named = buildMarkdown(emptyInterview(), { name: 'Checkout | v2', nodes: [], edges: [], notes: [] }, reg, { title: 'T', date: 'D' })
+    expect(named).toContain('\nDesign: **Checkout \\| v2**\n')
+    const plain = buildMarkdown(emptyInterview(), { nodes: [], edges: [], notes: [] }, reg, { title: 'T', date: 'D' })
+    expect(plain).not.toContain('Design: **')
+  })
+})
+
 describe('fileStamp', () => {
   it('is year-month-day with leading zeros', () => {
     expect(fileStamp(new Date(2026, 0, 5))).toBe('2026-01-05')

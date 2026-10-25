@@ -1,6 +1,7 @@
 import { type RefObject, useRef } from 'react'
-import { nodeRect } from '../../draw/geometry'
-import { groupInfo, groupRect, groupsOf } from '../../model/groups'
+import { nodeRect, viewOf } from '../../draw/geometry'
+import { groupDisplayRect } from '../../model/collapse'
+import { groupInfo, groupsOf } from '../../model/groups'
 import { arrowEnds, shapeRect, shapesOf } from '../../model/shapes'
 import { miniLayout, miniTag, miniToViewport } from '../../model/minimap'
 import { useStore } from '../../state/store'
@@ -20,15 +21,18 @@ export function Minimap({ wrap }: { wrap: RefObject<HTMLElement | null> }) {
   const setViewport = useStore((s) => s.setViewport)
   const drag = useRef(false)
   const el = wrap.current
-  const boxes = groupsOf(diagram)
-  const shapes = shapesOf(diagram)
-  if (!reg || (diagram.nodes.length < 4 && boxes.length === 0 && shapes.length === 0) || !el) return null // a handful of components fits on screen without a map
+  const view = reg ? viewOf(diagram, reg) : null
+  // a collapsed box is drawn as its chip and what it hides is left out
+  const boxes = groupsOf(diagram).filter((g) => !view?.hiddenGroups.has(g.id))
+  const shapes = shapesOf(diagram).filter((s) => !view?.hiddenShapes.has(s.id))
+  const nodes = diagram.nodes.filter((n) => !view?.hiddenNodes.has(n.id))
+  if (!reg || !view || (nodes.length < 4 && boxes.length === 0 && shapes.length === 0) || !el) return null // a handful of components fits on screen without a map
   const { width, height } = el.getBoundingClientRect()
   const canvas = { w: width, h: height }
-  const l = miniLayout([...diagram.nodes.map((n) => nodeRect(n, reg)), ...boxes.map(groupRect), ...shapes.map(shapeRect)], vp, canvas, MAP)
-  const nodeMaps = l.nodes.slice(0, diagram.nodes.length)
-  const boxMaps = l.nodes.slice(diagram.nodes.length, diagram.nodes.length + boxes.length)
-  const shapeMaps = l.nodes.slice(diagram.nodes.length + boxes.length)
+  const l = miniLayout([...nodes.map((n) => nodeRect(n, reg)), ...boxes.map((g) => groupDisplayRect(view, g)), ...shapes.map(shapeRect)], vp, canvas, MAP)
+  const nodeMaps = l.nodes.slice(0, nodes.length)
+  const boxMaps = l.nodes.slice(nodes.length, nodes.length + boxes.length)
+  const shapeMaps = l.nodes.slice(nodes.length + boxes.length)
   const move = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
     setViewport(miniToViewport({ x: e.clientX - r.left, y: e.clientY - r.top }, l, canvas, vp.zoom))
@@ -39,7 +43,7 @@ export function Minimap({ wrap }: { wrap: RefObject<HTMLElement | null> }) {
       width={MAP.w}
       height={MAP.h}
       role="img"
-      aria-label={`Overview map of the design${boxes.length ? ` with ${boxes.length} ${boxes.length === 1 ? 'box' : 'boxes'}` : ''}; click or drag to move the view`}
+      aria-label={`Overview map of the design${boxes.length ? ` with ${boxes.length} ${boxes.length === 1 ? 'box' : 'boxes'}` : ''}${view.any ? ', some collapsed' : ''}; click or drag to move the view`}
       onPointerDown={(e) => { drag.current = true; e.currentTarget.setPointerCapture(e.pointerId); move(e) }}
       onPointerMove={(e) => { if (drag.current) move(e) }}
       onPointerUp={() => { drag.current = false }}
@@ -56,7 +60,7 @@ export function Minimap({ wrap }: { wrap: RefObject<HTMLElement | null> }) {
           </g>
         )
       })}
-      {nodeMaps.map((r, i) => <rect key={diagram.nodes[i].id} x={r.x} y={r.y} width={Math.max(2, r.w)} height={Math.max(2, r.h)} rx={1.5} className="mm-node" />)}
+      {nodeMaps.map((r, i) => <rect key={nodes[i].id} x={r.x} y={r.y} width={Math.max(2, r.w)} height={Math.max(2, r.h)} rx={1.5} className="mm-node" />)}
       {shapes.map((s, i) => {
         const r = shapeMaps[i]
         if (s.kind === 'ellipse') return <ellipse key={s.id} cx={r.x + r.w / 2} cy={r.y + r.h / 2} rx={Math.max(1, r.w / 2)} ry={Math.max(1, r.h / 2)} className="mm-shape" />

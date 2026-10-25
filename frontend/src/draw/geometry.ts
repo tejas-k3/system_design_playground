@@ -1,5 +1,6 @@
-import type { Diagram, Edge, Node, Note } from '../api/types'
+import type { Diagram, Edge, Group, Node, Note } from '../api/types'
 import type { Reg } from '../model/diagram'
+import { type CollapseView, collapseView, groupDisplayRect } from '../model/collapse'
 import { GROUP_HEADER } from '../model/groups'
 import { SHAPE_GRIP, arrowEnds, onShape, shapeRect } from '../model/shapes'
 
@@ -64,7 +65,18 @@ export interface EdgeGeom {
   b: Pt
 }
 
-export function edgeGeom(e: Edge, nodes: Map<string, Node>, reg: Reg): EdgeGeom | null {
+/** What the canvas shows given the collapsed boxes (nothing hidden when none is collapsed). */
+export const viewOf = (d: Diagram, reg: Reg): CollapseView => collapseView(d, (n) => nodeRect(n, reg))
+
+/** Is this connection drawn as its own line? False for one inside a collapsed box, and for one folded into another to the same neighbour. */
+export const edgeShown = (e: Edge, view?: CollapseView): boolean => !view?.any || view.routes.get(e.id)?.draw === true
+
+/** Where a connection is drawn. With a collapsed box in `view`, an end on a hidden member lands on the box's chip. */
+export function edgeGeom(e: Edge, nodes: Map<string, Node>, reg: Reg, view?: CollapseView): EdgeGeom | null {
+  if (view?.any) {
+    const r = view.routes.get(e.id)
+    return r ? { a: boundaryPoint(r.a, center(r.b), 4), b: boundaryPoint(r.b, center(r.a), 6) } : null
+  }
   const f = nodes.get(e.from)
   const t = nodes.get(e.to)
   if (!f || !t) return null
@@ -86,6 +98,12 @@ export function noteRect(n: Note, measure: (text: string, size: number) => { w: 
   const size = n.fontSize ?? NOTE_FONT
   const m = measure(n.text || 'Note', size)
   return { x: n.x, y: n.y, w: m.w + 16, h: m.h + 12 }
+}
+
+/** The fold arrow's place in a box header (world units): the button a pointer or keyboard uses to collapse or expand the box. */
+export function toggleRect(g: Group, view: CollapseView, zoom: number): Rect {
+  const r = groupDisplayRect(view, g)
+  return { x: r.x + 6, y: r.y + 2, w: legibleSize(15, zoom, 11) * 1.6, h: GROUP_HEADER }
 }
 
 /** Screen-pixel radius of a selected box's resize grip. */
@@ -119,9 +137,10 @@ export function hitTest(
   selectedShapes: Set<string> = new Set(),
 ): Hit {
   const byId = new Map(d.nodes.map((n) => [n.id, n]))
+  const view = viewOf(d, reg)
   for (const e of d.edges) {
     if (!selectedEdges.has(e.id)) continue
-    const g = edgeGeom(e, byId, reg)
+    const g = edgeGeom(e, byId, reg, view)
     if (!g) continue
     const r = EDGE_END_RADIUS / zoom
     if (Math.hypot(p.x - g.b.x, p.y - g.b.y) <= r) return { type: 'edgeEnd', id: e.id, end: 'to' }
@@ -129,13 +148,13 @@ export function hitTest(
   }
   for (const id of handleFor) {
     const n = byId.get(id)
-    if (n) {
+    if (n && !view.hiddenNodes.has(id)) {
       const h = handlePos(nodeRect(n, reg), zoom)
       if (Math.hypot(p.x - h.x, p.y - h.y) <= handleRadius(zoom) + 4 / zoom) return { type: 'handle', id }
     }
   }
   for (const s of d.shapes ?? []) {
-    if (!selectedShapes.has(s.id)) continue
+    if (!selectedShapes.has(s.id) || view.hiddenShapes.has(s.id)) continue
     const r = SHAPE_GRIP / zoom
     if (s.kind === 'arrow') {
       const { a, b } = arrowEnds(s)
@@ -145,30 +164,33 @@ export function hitTest(
   }
   const groups = d.groups ?? []
   for (const g of groups) {
-    if (selectedGroups.has(g.id) && Math.hypot(p.x - (g.x + g.w), p.y - (g.y + g.h)) <= GROUP_GRIP / zoom) return { type: 'groupResize', id: g.id }
+    if (selectedGroups.has(g.id) && !g.collapsed && !view.hiddenGroups.has(g.id) && Math.hypot(p.x - (g.x + g.w), p.y - (g.y + g.h)) <= GROUP_GRIP / zoom) return { type: 'groupResize', id: g.id }
   }
-  for (let i = d.notes.length - 1; i >= 0; i--) if (inRect(p, noteRect(d.notes[i], measure))) return { type: 'note', id: d.notes[i].id }
-  for (let i = d.nodes.length - 1; i >= 0; i--) if (inRect(p, nodeRect(d.nodes[i], reg))) return { type: 'node', id: d.nodes[i].id }
+  for (let i = d.notes.length - 1; i >= 0; i--) if (!view.hiddenNotes.has(d.notes[i].id) && inRect(p, noteRect(d.notes[i], measure))) return { type: 'note', id: d.notes[i].id }
+  for (let i = d.nodes.length - 1; i >= 0; i--) if (!view.hiddenNodes.has(d.nodes[i].id) && inRect(p, nodeRect(d.nodes[i], reg))) return { type: 'node', id: d.nodes[i].id }
   let best: { id: string; dist: number } | null = null
   const tol = 8 / zoom
   for (const e of d.edges) {
-    const g = edgeGeom(e, byId, reg)
+    if (!edgeShown(e, view)) continue
+    const g = edgeGeom(e, byId, reg, view)
     if (!g) continue
     const dist = distToSegment(p, g.a, g.b)
     if (dist <= tol && (!best || dist < best.dist)) best = { id: e.id, dist }
   }
   if (best) return { type: 'edge', id: best.id }
   const shapes = d.shapes ?? []
-  for (let i = shapes.length - 1; i >= 0; i--) if (onShape(p, shapes[i], 6 / zoom)) return { type: 'shape', id: shapes[i].id }
+  for (let i = shapes.length - 1; i >= 0; i--) if (!view.hiddenShapes.has(shapes[i].id) && onShape(p, shapes[i], 6 / zoom)) return { type: 'shape', id: shapes[i].id }
   // boxes are behind everything: only their header and border can be grabbed, and the smallest one under the pointer wins
   let box: { id: string; area: number } | null = null
   const bt = 6 / zoom
   for (const g of groups) {
-    const r = { x: g.x, y: g.y, w: g.w, h: g.h }
+    if (view.hiddenGroups.has(g.id)) continue
+    const r = groupDisplayRect(view, g)
     if (!inRect(p, r, bt)) continue
-    const inHeader = inRect(p, { x: g.x, y: g.y, w: g.w, h: GROUP_HEADER })
-    const onBorder = !inRect(p, { x: g.x + bt, y: g.y + bt, w: g.w - 2 * bt, h: g.h - 2 * bt })
-    if ((inHeader || onBorder) && (!box || g.w * g.h < box.area)) box = { id: g.id, area: g.w * g.h }
+    // a collapsed box is a small chip: all of it grabs the box
+    const inHeader = g.collapsed || inRect(p, { x: r.x, y: r.y, w: r.w, h: GROUP_HEADER })
+    const onBorder = !inRect(p, { x: r.x + bt, y: r.y + bt, w: r.w - 2 * bt, h: r.h - 2 * bt })
+    if ((inHeader || onBorder) && (!box || r.w * r.h < box.area)) box = { id: g.id, area: r.w * r.h }
   }
   return box ? { type: 'group', id: box.id } : null
 }
@@ -181,7 +203,13 @@ export function screenToWorld(p: Pt, v: { scrollX: number; scrollY: number; zoom
 }
 
 export function boundsOf(d: Diagram, reg: Reg, measure: (t: string, s: number) => { w: number; h: number }): Rect | null {
-  const rs: Rect[] = [...d.nodes.map((n) => nodeRect(n, reg)), ...d.notes.map((n) => noteRect(n, measure)), ...(d.groups ?? []).map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h })), ...(d.shapes ?? []).map(shapeRect)]
+  const view = viewOf(d, reg)
+  const rs: Rect[] = [
+    ...d.nodes.filter((n) => !view.hiddenNodes.has(n.id)).map((n) => nodeRect(n, reg)),
+    ...d.notes.filter((n) => !view.hiddenNotes.has(n.id)).map((n) => noteRect(n, measure)),
+    ...(d.groups ?? []).filter((g) => !view.hiddenGroups.has(g.id)).map((g) => groupDisplayRect(view, g)),
+    ...(d.shapes ?? []).filter((s) => !view.hiddenShapes.has(s.id)).map(shapeRect),
+  ]
   if (!rs.length) return null
   const x1 = Math.min(...rs.map((r) => r.x))
   const y1 = Math.min(...rs.map((r) => r.y))

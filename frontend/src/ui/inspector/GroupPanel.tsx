@@ -1,5 +1,6 @@
 import type { GroupKind } from '../../api/types'
 import { nodeRect } from '../../draw/geometry'
+import { chipSummary, chipText, collapseView } from '../../model/collapse'
 import { GROUP_KINDS, MAX_GROUP, MAX_GROUP_LABEL, MIN_GROUP, groupInfo, groupMembers } from '../../model/groups'
 import { useStore } from '../../state/store'
 
@@ -8,11 +9,16 @@ export function GroupPanel({ id }: { id: string }) {
   const diagram = useStore((s) => s.diagram)
   const reg = useStore((s) => s.reg)
   const updateGroup = useStore((s) => s.updateGroup)
+  const toggle = useStore((s) => s.toggleCollapsed)
+  const running = useStore((s) => s.sim.status !== 'stopped')
+  const stats = useStore((s) => s.stats.nodes)
   const del = useStore((s) => s.deleteIds)
   if (!group || !reg) return null
   const inside = groupMembers(diagram, id, (n) => nodeRect(n, reg))
   const comps = inside.filter((i) => diagram.nodes.some((n) => n.id === i)).length
   const other = inside.length - comps
+  const view = collapseView(diagram, (n) => nodeRect(n, reg))
+  const hiding = group.collapsed && view.chips.has(id) // false when an outer collapsed box already hides this one
   return (
     <div className="panel">
       <h2>{groupInfo(group.kind).name} box</h2>
@@ -34,6 +40,12 @@ export function GroupPanel({ id }: { id: string }) {
         <label htmlFor="gh">Height</label>
         <input id="gh" type="number" min={MIN_GROUP} max={MAX_GROUP} step={20} value={Math.round(group.h)} onChange={(e) => Number.isFinite(e.target.valueAsNumber) && updateGroup(id, { h: e.target.valueAsNumber })} />
       </div>
+      <label className="check"><input type="checkbox" checked={!!group.collapsed} onChange={(e) => toggle(id, e.target.checked)} /> Collapse to its header</label>
+      <p className="muted small" role="status">
+        {group.collapsed
+          ? `Collapsed: only the header shows${hiding ? ` (${chipText(chipSummary(view, diagram, id, running ? stats : {}))})` : ''}. The components inside still run in the simulation.`
+          : 'Collapsing hides what is inside on the canvas only; the simulation is not affected.'}
+      </p>
       <p className="muted small">Holds {comps} component{comps === 1 ? '' : 's'}{other > 0 ? ` and ${other} other item${other === 1 ? '' : 's'}` : ''}. Moving the box moves them. The simulation ignores boxes.</p>
       <button className="danger-outline" onClick={() => del([id])}>Delete box (keeps what is inside)</button>
     </div>
