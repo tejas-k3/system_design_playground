@@ -41,6 +41,7 @@ type call struct {
 	lg       *logical
 	at       *attempt
 	write    bool
+	bodyB    int32 // bytes of the response this call carries when it is only the missing pieces of a ranged object (0 = the whole response); fills padding
 	key      int
 	wl       int
 	hash     uint32
@@ -197,7 +198,11 @@ func (s *Sim) sizes(c *call) (req, resp float64) {
 	if c.lg == nil {
 		return 0, 0
 	}
-	return c.lg.client.f("reqKB") * 1000, c.lg.client.f("respKB") * 1000
+	req, resp = c.lg.client.f("reqKB")*1000, c.lg.client.f("respKB")*1000
+	if c.bodyB > 0 {
+		resp = float64(c.bodyB)
+	}
+	return req, resp
 }
 
 // transmit puts bytes on a link in one direction and returns how long until they have all arrived: the wait for
@@ -1235,6 +1240,26 @@ func (s *Sim) procCDN(n *node, c *call, cb func(Result), release func()) {
 	}
 	s.hold(n, ms*n.slow, release, cb, func() {
 		release()
+		pieces, size, piece := s.rangeOf(n, c)
+		if !c.write && pieces > 0 {
+			missing, ver, expired := s.rangeLookup(n, c, pieces)
+			if expired {
+				n.c.expired++
+			}
+			if len(missing) == 0 {
+				n.c.hit++
+				s.okAt(n, Result{Ver: ver, Hit: true, Done: true, Src: n}, cb)
+				return
+			}
+			n.c.miss++
+			e := s.pickBackend(n)
+			if e == nil {
+				s.failAt(n, RNoBackend, cb)
+				return
+			}
+			s.rangeMiss(n, c, missing, pieces, size, piece, func(cc *call, done func(Result)) { s.hop(n, e, cc, done) }, cb)
+			return
+		}
 		if !c.write {
 			ver, hit, expired := n.store.Get(s.now, c.key)
 			if expired {
@@ -1247,6 +1272,9 @@ func (s *Sim) procCDN(n *node, c *call, cb func(Result), release func()) {
 			}
 			n.c.miss++
 		} else {
+			if pieces > 0 {
+				s.rangeDeleteAll(n, c, pieces)
+			}
 			n.store.Delete(c.key)
 		}
 		e := s.pickBackend(n)
