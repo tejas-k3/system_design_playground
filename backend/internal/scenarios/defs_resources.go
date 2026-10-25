@@ -25,20 +25,20 @@ func registerResourceLimits() {
 	register(&Scenario{
 		ID: "search-tail", Title: "Search at 16 shards", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Every search waits for the slowest of 16 shards.",
-		Story:   "Search is split over 16 shards and the app server asks all of them and waits for every answer. Each shard answers in about 30 ms, but some answers take far longer, and with 16 shards nearly every search meets one of them. The architecture is fixed; tune the fan-out.",
+		Story:   "Search is {{sharding|split over 16 shards}} and the app server asks all of them and waits for every answer. Each shard answers in about 30 ms, but some answers take far longer, and {{tail-latency-amplification|with 16 shards nearly every search meets one of them}}. The architecture is fixed; tune the fan-out.",
 		Diagram: searchTail(false), Solution: searchTail(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.7), StarCostPerHour: f(1.65), StarP95Ms: f(200)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
-			"Look at the latency distribution: the median is fine for one shard, so why is the p95 so far from it?",
+			"Look at the latency distribution: the {{p50|median}} is fine for one shard, so why is the {{p95}} so far from it?",
 			"A request that waits for all 16 answers is as slow as the slowest of 16. Do you really need all of them?",
 			"Does a request really need every shard to answer? What are the two ways to stop waiting for the slowest one?",
 		},
 		Answer: "The answer: set the app server's fan-out to answer on the first K shards (try 12 of 16), or hedge: ask a slow shard again. More threads will not help.",
 		Predictions: []Prediction{{ID: "p1", Question: "Adding more app-server threads will…", Options: []string{"Cut the p95 a lot, as requests get served sooner", "Barely change it: the wait is on the shards", "Make each shard answer faster than before"}, Answer: 1,
 			Explain: "The threads are not the bottleneck: each request is waiting for the slowest of 16 shards. Fewer required answers or a second try attacks that wait."}},
-		Debrief: "Waiting for all N answers makes latency the maximum of N draws, so tail latency grows with fan-out. Answering on the first K, hedging slow calls, or allowing partial results trade completeness or extra load for a much shorter tail.",
-		Deeper:  "When a request waits for all N shards its latency is the maximum of N draws, and the chance that at least one shard is slow grows quickly with N, so the tail gets worse as you add shards even if every shard is healthy. Answering on the first K trades completeness for latency, so the response must say it is partial and you must know how much relevance you give up; hedging a slow shard to a replica trades extra load for a shorter tail but only works when the slowness is independent between copies. At larger scale you limit fan-out with routing or tiered indexes and keep replicas per shard so a hedge has somewhere to go. An interviewer will ask how you choose K and how you spot a shard that is slow every time, which calls for ejecting it rather than hedging around it. The failure pattern is hedging during overload: the extra requests make every shard slower and the tail gets worse.",
+		Debrief: "{{tail-latency-amplification|Waiting for all N answers makes latency the maximum of N draws}}, so tail latency grows with fan-out. Answering on the first K, hedging slow calls, or allowing partial results trade completeness or extra load for a much shorter tail.",
+		Deeper:  "{{tail-latency-amplification|When a request waits for all N shards its latency is the maximum of N draws}}, and the chance that at least one shard is slow grows quickly with N, so the tail gets worse as you add shards even if every shard is healthy. Answering on the first K trades completeness for latency, so the response must say it is partial and you must know how much relevance you give up; hedging a slow shard to a replica trades extra load for a shorter tail but only works when the slowness is independent between copies. At larger scale you limit fan-out with routing or tiered indexes and keep replicas per shard so a hedge has somewhere to go. An interviewer will ask how you choose K and how you spot a shard that is slow every time, which calls for ejecting it rather than hedging around it. The failure pattern is hedging during overload: the extra requests make every shard slower and the tail gets worse.",
 	})
 
 	// A celebrity's post is pushed into millions of timelines. Config only: stop pushing for the few huge accounts.
@@ -57,19 +57,19 @@ func registerResourceLimits() {
 	register(&Scenario{
 		ID: "celebrity-post", Title: "The celebrity post", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Most posts are fine, but a few accounts make the whole feed stall.",
-		Story:   "Every post is copied into each follower's timeline when it is written, so reads are fast. Most accounts have a few dozen followers, but a handful have tens of thousands, and every time one of them posts the database is buried under timeline inserts. The architecture is fixed; change how the feed is built.",
+		Story:   "Every post is copied into each follower's timeline when it is written, so reads are fast. Most accounts have a few dozen followers, but {{hot-key|a handful have tens of thousands}}, and every time one of them posts the database is buried under timeline inserts. The architecture is fixed; change how the feed is built.",
 		Diagram: celebrity(false), Solution: celebrity(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.05), StarP95Ms: f(250)},
 		DurationSec: 40, WarmupSec: 0, Speed: 1,
 		Hints: [3]string{
-			"Look at the failures and the p95: they come in bursts. Who is posting when it happens?",
+			"Look at the failures and the {{p95}}: they come in bursts. Who is posting when it happens?",
 			"Pushing a post costs one insert per follower. For an account with 30,000 followers that is 30,000 inserts for a single post.",
 			"Could ordinary accounts and celebrities be handled differently? Which side of the work should each kind pay for?",
 		},
 		Answer: "The answer: set the app server's feed strategy to hybrid: push for ordinary accounts, pull celebrities when a timeline is read. More connections or threads only cost money.",
 		Predictions: []Prediction{{ID: "p1", Question: "Where does the work go if celebrities are pulled instead of pushed?", Options: []string{"Nowhere: the posts are simply never delivered to anyone", "To readers: each timeline read fetches a few celebrity posts", "To the author, who waits much longer for the post to publish"}, Answer: 1,
 			Explain: "Fan-out on write spends effort once per follower; fan-out on read spends it once per reader. A hybrid pays the cheap side for each kind of account."}},
-		Debrief: "Push makes reads cheap and writes proportional to the audience; pull makes writes cheap and reads proportional to who you follow. With heavy skew a hybrid wins: push for the many small accounts and pull the few giants.",
+		Debrief: "Push makes reads cheap and writes proportional to the audience; pull makes writes cheap and reads proportional to who you follow. With heavy skew a hybrid wins: push for the many small accounts and pull {{hot-key|the few giants}}.",
 	})
 
 	// Image downloads billed per GB: every view pays egress unless a CDN answers it
@@ -102,7 +102,7 @@ func registerResourceLimits() {
 		Answer: "The answer: put a CDN in front of the app server and give it room for the popular pictures (there are about 2,000 distinct ones).",
 		Predictions: []Prediction{{ID: "p1", Question: "A CDN that can only hold a quarter of the pictures will…", Options: []string{"Cut the bill to almost nothing, as the CDN is free", "Cut it somewhat: popular pictures hit, the rest still pay", "Make no difference, since a quarter is too few"}, Answer: 1,
 			Explain: "Views are skewed, so a small cache catches the popular ones, but every miss still downloads from the store and pays for it."}},
-		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN sized to the popular set turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest.",
+		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN {{cache-hit-rate|sized to the popular set}} turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest.",
 	})
 
 	// Video uploads of 10 MB at 6 a second need 480 Mbit/s on every hop: the link to the store is sized for far less
@@ -138,7 +138,7 @@ func registerResourceLimits() {
 		Answer: "The answer: select the connection from the app server to the video store and raise its bandwidth above what the peak needs (1,000 Mbit/s leaves room).",
 		Predictions: []Prediction{{ID: "p1", Question: "More app-server threads will…", Options: []string{"Fix it, since more uploads then run in parallel", "Not help: they all share the same saturated link", "Lower the bandwidth each upload needs, as work is shared"}, Answer: 1,
 			Explain: "Parallel uploads still squeeze through one link. When a link is the limit, adding workers only adds more bytes waiting for it."}},
-		Debrief: "Bandwidth is a capacity like any other: bytes per second in must be less than the link can carry. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones.",
+		Debrief: "Bandwidth is a capacity like any other: {{throughput|bytes per second in must be less than the link can carry}}. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones.",
 	})
 
 	// GC storm: long stop-the-world pauses on every app server. Config only: tune the pauses, do not paper over them.
@@ -203,7 +203,7 @@ func registerResourceLimits() {
 		Answer: "The answer: nobody queries by those fields (the lookups share is zero), so drop the indexes. A faster disk would also work, but removing the waste is cheaper.",
 		Predictions: []Prediction{{ID: "p1", Question: "Removing the three unused indexes will…", Options: []string{"Slow reads down a lot, since lookups lose their index", "Cut the disk operations per write from four to one", "Free memory, but leave the disk work as it was"}, Answer: 1,
 			Explain: "Each write must update every index as well as the table. With no reads using them, they only cost disk writes."}},
-		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
+		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with {{utilisation|the disk's budget}}.",
 	})
 
 	// A few expensive requests hold every thread: head-of-line blocking. Config only: give the server more threads.
@@ -221,19 +221,19 @@ func registerResourceLimits() {
 	register(&Scenario{
 		ID: "one-heavy-query", Title: "One heavy query", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One request in twenty is expensive, and everyone suffers.",
-		Story:   "A search page answers in 20 ms, except that one request in twenty runs a report that takes 800 ms of server time. The server has 16 threads. Most requests are light, yet the whole site goes slow in waves and some time out.",
+		Story:   "A search page answers in 20 ms, except that one request in twenty runs a report that takes 800 ms of server time. The server has {{thread-pool|16 threads}}. Most requests are light, yet the whole site goes slow in waves and some time out.",
 		Diagram: oneHeavy(false), Solution: oneHeavy(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(4), StarCostPerHour: f(3.5), StarP95Ms: f(200)},
 		DurationSec: 40, WarmupSec: 0, Speed: 1,
 		Hints: [3]string{
-			"Work out the threads' budget: the heavy requests are 5% of 250 a second, each holding a thread for 800 ms. How many threads is that on average?",
-			"12 requests a second x 0.8 s is about 10 threads busy with heavy work alone, out of 16, so the 238 light requests a second have almost nothing left and queue behind them.",
+			"Work out the {{thread-pool|threads}}' budget: the heavy requests are 5% of 250 a second, each holding a thread for 800 ms. How many threads is that on average?",
+			"{{littles-law|12 requests a second x 0.8 s is about 10 threads busy}} with heavy work alone, out of 16, so the 238 light requests a second have almost nothing left and queue behind them.",
 			"How many threads do the heavy requests tie up at once, and how many must stay free for the light ones?",
 		},
-		Answer: "The answer: give the server enough threads that the heavy requests cannot take them all. The inspector shows p95 for light and heavy requests separately.",
+		Answer: "The answer: give the server enough threads that the heavy requests cannot take them all. The inspector shows {{p95}} for light and heavy requests separately.",
 		Predictions: []Prediction{{ID: "p1", Question: "The heavy requests are 5% of traffic. Their effect on the light ones is…", Options: []string{"About 5% slower, in line with their share of traffic", "Far worse: they hold threads the light ones need", "None at all, since they are separate requests"}, Answer: 1,
 			Explain: "Every request shares the same threads. A few long requests occupy a large share of thread-time, so the quick ones wait behind them."}},
-		Debrief: "Throughput is not the only budget: a small share of expensive requests can take most of the worker time and make the cheap majority slow. Look at latency by request type, and keep heavy work from sharing the pool the light work needs.",
+		Debrief: "{{throughput|Throughput}} is not the only budget: a small share of expensive requests can take most of the worker time and make the cheap majority slow. Look at latency by request type, and {{bulkhead|keep heavy work from sharing the pool the light work needs}}.",
 	})
 
 	// Write skew: each doctor leaves after checking the other is still on call. Config only: raise the isolation level.
@@ -263,8 +263,8 @@ func registerResourceLimits() {
 		Answer: "The answer: only serializable makes the two requests take turns on the pair. Set the database's isolation level to serializable and check the aborts it brings.",
 		Predictions: []Prediction{{ID: "p1", Question: "Will repeatable read (snapshot isolation) stop both doctors leaving?", Options: []string{"Yes: snapshot isolation aborts anything that conflicts", "No: they write different rows, so nothing clashes", "Only when load is low and few requests overlap"}, Answer: 1,
 			Explain: "Snapshot isolation only detects two writes to the same row. Write skew is two writes to different rows justified by the same stale read, which only serializable execution rules out."}},
-		Debrief: "Write skew is the anomaly snapshot isolation misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
-		Deeper:  "Write skew happens when two transactions read an overlapping set of rows, each decides it is safe, and each writes a different row, so snapshot isolation sees no conflict even though the rule across the rows is broken. You have three fixes: run the transactions serializably and accept aborts that the client must retry, lock the rows the rule reads, or turn the rule into something the database enforces, for example by making both writers touch one row that represents the pair. At larger scale the rule gets harder when the rows live on different shards, which is a reason to keep an invariant inside one partition. An interviewer will ask for other examples such as booking the same room or spending from two accounts, and what your database really means by repeatable read, because the name does not guarantee the same behaviour everywhere. The failure is silent: nothing errors and the broken invariant is noticed by a person, as in this story.",
+		Debrief: "Write skew is the anomaly {{consistency-levels|snapshot isolation}} misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
+		Deeper:  "Write skew happens when two transactions read an overlapping set of rows, each decides it is safe, and each writes a different row, so snapshot isolation sees no conflict even though the rule across the rows is broken. You have three fixes: run the transactions serializably and accept aborts that the client must retry, lock the rows the rule reads, or turn the rule into something the database enforces, for example by making both writers touch one row that represents the pair. At larger scale the rule gets harder when the rows live on {{sharding|different shards}}, which is a reason to keep an invariant inside one partition. An interviewer will ask for other examples such as booking the same room or spending from two accounts, and what your database really means by repeatable read, because the name does not guarantee the same behaviour everywhere. The failure is silent: nothing errors and the broken invariant is noticed by a person, as in this story.",
 	})
 
 	// The slow query: most reads look an item up by a field other than its key, and there is no index for it
@@ -282,12 +282,12 @@ func registerResourceLimits() {
 	register(&Scenario{
 		ID: "slow-query", Title: "The slow query", Difficulty: "Easy", ConfigOnly: true,
 		Summary: "Most reads search by email, and the database reads every row to find it.",
-		Story:   "Sixty percent of reads look an account up by its email address, not its id. The table has no index on email, so each of those reads scans the table and takes twenty times as long as a lookup by id. At the lunchtime peak the database queue fills and requests are refused.",
+		Story:   "Sixty percent of reads look an account up by its email address, not its id. The table has no index on email, so each of those reads scans the table and takes twenty times as long as a lookup by id. At the lunchtime peak {{backpressure|the database queue fills and requests are refused}}.",
 		Diagram: slowQuery(false), Solution: slowQuery(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.05), StarP95Ms: f(200)},
 		DurationSec: 30, WarmupSec: 0, Speed: 1,
 		Hints: [3]string{
-			"The database is busy but not because of how many requests there are: what is each lookup by email doing?",
+			"{{utilisation|The database is busy}} but not because of how many requests there are: what is each lookup by email doing?",
 			"Without an index on the field being searched, the database reads the whole table (see 'lookups by another field' on the users).",
 			"The database can keep one extra structure that costs a little on every write. Is that price worth paying for this mix of reads and writes?",
 		},
@@ -312,13 +312,13 @@ func registerResourceLimits() {
 	register(&Scenario{
 		ID: "pick-the-store", Title: "Pick the store", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Seven hundred sensor readings a second overwhelm a general-purpose database.",
-		Story:   "Sensors send 700 readings a second and nothing ever reads them back in real time. The readings go into a relational database that spends the same effort on each insert as on an order, and a quarter of them are refused when its queue fills.",
+		Story:   "Sensors send 700 readings a second and nothing ever reads them back in real time. The readings go into a relational database that spends the same effort on each insert as on an order, and {{backpressure|a quarter of them are refused when its queue fills}}.",
 		Diagram: pickStore(false), Solution: pickStore(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.6), StarP95Ms: f(200)},
 		DurationSec: 30, WarmupSec: 0, Speed: 1,
 		Hints: [3]string{
 			"The workload is almost all appends and almost no reads. Is a general-purpose relational layout the right shape for it?",
-			"More database connections do not help here: the pool each app server may open to the database is the limit.",
+			"More database connections do not help here: {{connection-pool|the pool each app server may open to the database}} is the limit.",
 			"What is it about the data (what is written, and how it is read) that points to a different kind of storage engine, and where is the data model chosen?",
 		},
 		Answer: "The answer: change the database's data model (advanced settings) to one built for append-heavy writes: time-series, or wide-column.",
@@ -353,10 +353,10 @@ func registerResourceLimits() {
 			"Retrying something that can never succeed only burns worker time. How many attempts does a job deserve, and where should the failures go instead of vanishing?",
 			"Two settings on the queue: how many attempts a job deserves, and where a job goes once it has used them up.",
 		},
-		Answer: "The answer: on the queue (advanced settings): lower the attempts per job and turn on the dead-letter queue so the failed jobs are kept for inspection.",
+		Answer: "The answer: on the queue (advanced settings): lower the attempts per job and turn on the {{dead-letter-queue|dead-letter queue}} so the failed jobs are kept for inspection.",
 		Predictions: []Prediction{{ID: "p1", Question: "Lowering the attempts alone (no dead-letter queue) will…", Options: []string{"Fix everything, since the bad jobs are then gone", "Free the workers but lose the bad messages silently", "Keep the bad messages, just with fewer attempts each"}, Answer: 1,
 			Explain: "Fewer retries stop the waste, but a job that used up its attempts is gone. A dead-letter queue keeps it where someone can look at it."}},
-		Debrief: "Retries help against transient failures and hurt against permanent ones. Bound the attempts, back off, and route what still fails to a dead-letter queue so it is visible and recoverable instead of lost.",
+		Debrief: "Retries help against transient failures and hurt against permanent ones. Bound the attempts, back off, and route what still fails to a {{dead-letter-queue|dead-letter queue}} so it is visible and recoverable instead of lost.",
 	})
 
 	// Consumer lag: eight consumers, four partitions
@@ -380,7 +380,7 @@ func registerResourceLimits() {
 	register(&Scenario{
 		ID: "consumer-lag", Title: "Consumer lag", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Eight consumers, and the backlog still grows.",
-		Story:   "Events stream into a partitioned log read by eight consumers, each able to handle several messages at once. Yet the backlog grows all day and processing falls further and further behind. Adding yet more consumers was already tried.",
+		Story:   "Events stream into a {{sharding|partitioned}} log read by eight consumers, each able to handle several messages at once. Yet the backlog grows all day and processing falls further and further behind. Adding yet more consumers was already tried.",
 		Diagram: consumerLag(false), Solution: consumerLag(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MinJobsCompleted: f(0.97), MaxJobP95Ms: f(2000), MaxCostPerHour: f(1.5), StarCostPerHour: f(1.4), StarP95Ms: f(800)},
 		DurationSec: 40, WarmupSec: 0, Speed: 1,
@@ -392,7 +392,7 @@ func registerResourceLimits() {
 		Answer: "The answer: raise the number of partitions on the log (16 gives every consumer two). More consumers would not help: they would sit idle.",
 		Predictions: []Prediction{{ID: "p1", Question: "With 4 partitions, what do consumers 5 to 8 do?", Options: []string{"Share the load equally with consumers 1 to 4", "Nothing: a partition has one reader per group", "Take over the slowest partitions from the others"}, Answer: 1,
 			Explain: "Within a consumer group each partition is assigned to exactly one member, so parallelism is capped by the partition count."}},
-		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the throughput you will need, since changing it later also changes how keys map to partitions.",
+		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the {{throughput|throughput}} you will need, since changing it later also changes how keys map to partitions.",
 	})
 
 	// Hot cell: location pings from one busy city all land on the shard that owns that map cell
@@ -415,7 +415,7 @@ func registerResourceLimits() {
 	register(&Scenario{
 		ID: "hot-cell", Title: "The hot cell", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Four shards, and one of them is on fire.",
-		Story:   "A ride-sharing app stores driver locations in four shards, split by map cell. Most pings come from the one busy city centre, so the shard that owns that cell takes most of the load while the other three idle. Adding shards was already tried: the hot cell stays on a single one.",
+		Story:   "A ride-sharing app stores driver locations in {{sharding|four shards}}, split by map cell. Most pings come from the one busy city centre, so the shard that owns that cell takes most of the load while the other three idle. Adding shards was already tried: the {{hot-key|hot cell}} stays on a single one.",
 		Diagram: hotCell(false), Solution: hotCell(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(1.5), StarCostPerHour: f(1.3), StarP95Ms: f(200)},
 		DurationSec: 30, WarmupSec: 5, Speed: 1,
@@ -427,6 +427,6 @@ func registerResourceLimits() {
 		Answer: "The answer: change how the shard router chooses a shard: by the request itself rather than the cell, so the busy cell is spread over all four. (A real system pays for that on reads, which then have to ask every shard.)",
 		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth and sixth shard, still split by cell, will…", Options: []string{"Fix the hot shard, as the cell spreads out", "Leave the hot cell on one shard, so nothing improves", "Make it worse, since the data must move first"}, Answer: 1,
 			Explain: "One cell maps to one shard however many shards there are. A hot key cannot be spread by adding more partitions of the same key."}},
-		Debrief: "Partitioning by a key that is itself skewed concentrates the skew. Spread hot keys (by sender, by a suffix, or by splitting the cell), and remember the price: reads of one key must then query every shard.",
+		Debrief: "{{sharding|Partitioning}} by a key that is itself skewed concentrates the skew. Spread {{hot-key|hot keys}} (by sender, by a suffix, or by splitting the cell), and remember the price: reads of one key must then query every shard.",
 	})
 }

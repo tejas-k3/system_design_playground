@@ -31,7 +31,7 @@ func registerFundamentals() {
 		Answer: "The answer: use the connect tool, click the app server, then click the database.",
 		Predictions: []Prediction{{ID: "p1", Question: "With one app server and one database, what limits throughput first?", Options: []string{"The app server's threads", "The database's disk speed", "Bandwidth between the two boxes"}, Answer: 0,
 			Explain: "Each request holds a thread for CPU plus the database wait; 8 threads at ~40 ms each serve about 200 requests per second."}},
-		Debrief: "Every request travels users → app → database and back. Latency is the sum of the hops plus the time spent waiting for a free thread. Keep that picture in mind: every later challenge is about where the waiting happens.",
+		Debrief: "Every request travels users → app → database and back. Latency is the sum of the hops plus the time spent waiting for a free {{thread-pool|thread}}. Keep that picture in mind: every later challenge is about where the waiting happens.",
 	})
 
 	// 2 ─ Easy ────────────────────────────────────────────────────────────────────────
@@ -54,14 +54,14 @@ func registerFundamentals() {
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(500), MaxCostPerHour: f(0.9)},
 		DurationSec: 70, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
-			"Add up how many requests per second one server can handle: threads ÷ time each request holds a thread.",
+			"Add up how many requests per second one server can handle: {{thread-pool|threads}} ÷ time each request holds a thread.",
 			"You need a load balancer in front of several app servers.",
 			"Divide the peak load by what one server can take and round up, then check the total against the cost cap. Is there room for a spare?",
 		},
 		Answer: "The answer: four 8-thread servers behind one load balancer will carry 600 rps within the cost cap.",
 		Predictions: []Prediction{{ID: "p1", Question: "A 4-thread server spends ~40 ms per request. Roughly what is its limit?", Options: []string{"~100 rps", "~400 rps", "~1000 rps"}, Answer: 0,
 			Explain: "4 threads ÷ 0.04 s ≈ 100 requests per second. Beyond that the queue fills and requests are rejected."}},
-		Debrief: "Horizontal scaling is a load balancer plus enough identical servers. Notice the cost: threads are not free, so you want just enough headroom, not ten times too much.",
+		Debrief: "Horizontal scaling is a load balancer plus enough identical servers. Notice the cost: {{thread-pool|threads}} are not free, so you want just enough {{queueing-knee|headroom}}, not ten times too much.",
 	})
 
 	// 3 ─ Easy ────────────────────────────────────────────────────────────────────────
@@ -112,19 +112,19 @@ func registerFundamentals() {
 	register(&Scenario{
 		ID: "connection-crunch", Title: "Connection crunch", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Every server may open 100 connections. The database allows 64 in total.",
-		Story:   "Six app servers each keep a pool of up to 100 database connections, but the database only accepts 64 at once. Under load, new connections are refused. The architecture is fixed: fix it with configuration.",
+		Story:   "Six app servers each keep a {{connection-pool|pool}} of up to 100 database connections, but the database only accepts 64 at once. Under load, new connections are refused. The architecture is fixed: fix it with configuration.",
 		Diagram: crunch(100), Solution: crunch(10),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(600)},
 		DurationSec: 40, WarmupSec: 6, Speed: 1,
 		Hints: [3]string{
 			"Open the database and compare its maximum connections with servers × pool size.",
-			"Pools should add up to less than the database limit, leaving headroom.",
+			"{{connection-pool|Pools}} should add up to less than the database limit, leaving headroom.",
 			"Multiply the servers by the pool each may open. How does that compare with what the database accepts, and how much room do you want to leave?",
 		},
-		Answer: "The answer: six servers × a pool of 10 is 60 connections, under the limit of 64.",
+		Answer: "The answer: six servers × a {{connection-pool|pool}} of 10 is 60 connections, under the limit of 64.",
 		Predictions: []Prediction{{ID: "p1", Question: "If you shrink the pool, what happens to requests that cannot get a connection?", Options: []string{"They are refused with an error at once", "They wait for a free connection", "They open a temporary extra connection"}, Answer: 1,
 			Explain: "A pool makes callers wait for a free connection instead of opening a new one, which keeps the database healthy."}},
-		Debrief: "Connection pools protect the database from the fleet in front of it. Pool size is a budget shared by every server: per-server pool × number of servers must stay under the database's limit.",
+		Debrief: "{{connection-pool|Connection pools}} protect the database from the fleet in front of it. Pool size is a budget shared by every server: per-server pool × number of servers must stay under the database's limit.",
 	})
 
 	// 5 ─ Medium, config only ─────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ func registerFundamentals() {
 	register(&Scenario{
 		ID: "retry-pileup", Title: "Retry pile-up", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A short database slowdown turns into a long outage because everyone retries at once.",
-		Story:   "The database gets 10× slower for ten seconds. When it recovers, the system does not: clients retry instantly and servers keep working on requests whose users already left. The architecture is fixed.",
+		Story:   "The database gets 10× slower for ten seconds. When it recovers, the system does not: clients {{retry-storm|retry instantly}} and servers keep working on requests whose users already left. The architecture is fixed.",
 		Diagram: storm(false), Solution: storm(true),
 		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 15, Factor: 12, DurationSec: 10}},
 		Goals:       engine.Goals{MinSuccessRate: 0.85, MaxP95Ms: f(1500), MaxCostPerHour: f(1.2)},
@@ -154,10 +154,10 @@ func registerFundamentals() {
 			"Back off exponentially, retry less, and make servers drop work nobody is waiting for.",
 			"Four things pile work onto a struggling system: how retries are timed and counted, the order of the queue, how long work may wait, and calls that wait forever. Which have you not changed yet?",
 		},
-		Answer: "The answer: exponential backoff, 2 retries, newest-first queue, a short max queue wait, and a call timeout with a circuit breaker.",
+		Answer: "The answer: exponential backoff, 2 retries, newest-first queue, a short max queue wait, and a call timeout with a {{circuit-breaker|circuit breaker}}.",
 		Predictions: []Prediction{{ID: "p1", Question: "With oldest-first queues under overload, who gets served?", Options: []string{"Users who are still waiting for an answer", "Users who have already given up", "Whoever sent the cheapest request"}, Answer: 1,
 			Explain: "The oldest requests are the ones whose callers have likely timed out. Serving them wastes capacity; newest-first or a queue timeout avoids it."}},
-		Debrief: "A {{retry-storm|retry storm}} is a feedback loop: slowness causes timeouts, timeouts cause retries, retries cause slowness. Break it with backoff and jitter, bounded retries, {{load-shedding|load shedding}} and {{circuit-breaker|circuit breakers}}.",
+		Debrief: "A {{retry-storm|retry storm}} is a {{metastable-failure|feedback loop}}: slowness causes timeouts, timeouts cause retries, retries cause slowness. Break it with backoff and jitter, bounded retries, {{load-shedding|load shedding}} and {{circuit-breaker|circuit breakers}}.",
 	})
 
 	// 6 ─ Medium ──────────────────────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ func registerFundamentals() {
 		Answer: "The answer: set the app server's read routing to 'By freshness' and the cache to invalidate on writes.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why does a 2 second replication lag matter even though the replica is 'a copy'?", Options: []string{"Reads may return versions older than a recent write", "Writes take longer because they wait for the replica", "The replica refuses reads until it catches up"}, Answer: 0,
 			Explain: "A replica applies writes after a delay, so a read right after a write can miss it."}},
-		Debrief: "Caches and replicas trade freshness for speed. Decide per read how stale is acceptable, route accordingly, and invalidate on writes so the cache does not outlive the truth.",
+		Debrief: "Caches and replicas trade freshness for speed. Decide per read {{consistency-levels|how stale is acceptable}}, route accordingly, and invalidate on writes so the cache does not outlive the truth.",
 	})
 
 	// 7 ─ Medium ──────────────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ func registerFundamentals() {
 		Answer: "The answer: turn on row locks in the database, or add Redis and give the app server a lock wait.",
 		Predictions: []Prediction{{ID: "p1", Question: "A fail-fast Redis lock (no wait) will…", Options: []string{"Reject some honest bookings that collide", "Allow a few double bookings under load", "Queue colliding bookings until the lock frees"}, Answer: 0,
 			Explain: "Failing fast avoids double bookings but turns every collision into an error unless you wait a little for the lock."}},
-		Debrief: "Correctness under concurrency needs an explicit mechanism: row locks, optimistic version checks, or a distributed lock with a lease. Locks have costs: contention, waiting, and expiry races.",
+		Debrief: "Correctness under concurrency needs an explicit mechanism: row locks, optimistic version checks, or a distributed lock with a lease. Locks have costs: contention, waiting, and {{fencing|expiry races}}.",
 	})
 
 	// 8 ─ Medium ──────────────────────────────────────────────────────────────────────
@@ -246,10 +246,10 @@ func registerFundamentals() {
 			"The server needs a way to recognise a retry of the same request.",
 			"The retry looks identical to the first request. What would the server need to remember about a request to notice it has seen it before?",
 		},
-		Answer: "The answer: enable idempotency keys on the app server.",
+		Answer: "The answer: enable {{idempotency|idempotency}} keys on the app server.",
 		Predictions: []Prediction{{ID: "p1", Question: "What does an idempotency key guarantee?", Options: []string{"The write is applied at most once per key", "The request is sent to the server only once", "The request can never be lost on the way"}, Answer: 0,
 			Explain: "The server remembers the key and returns the earlier outcome instead of applying the write again."}},
-		Debrief: "Retries are only safe for idempotent operations. Make writes idempotent with a client-supplied key, then retry freely.",
+		Debrief: "Retries are only safe for {{idempotency|idempotent}} operations. Make writes idempotent with a client-supplied key, then retry freely.",
 	})
 
 	// 8b ─ Medium, config only: concurrent transfers silently overwrite each other ───────
@@ -279,6 +279,6 @@ func registerFundamentals() {
 		Answer: "The answer: raise the isolation level on the database to serializable and watch what it costs under contention.",
 		Predictions: []Prediction{{ID: "p1", Question: "Moving to a stronger isolation level will…", Options: []string{"Make every transfer slower, overlapping or not", "Make overlapping transfers wait or abort", "Stop transfers from ever being aborted"}, Answer: 1,
 			Explain: "Stronger isolation turns silent overwrites into waiting (locks) or errors (aborts and deadlocks): correctness is paid for with latency under contention."}},
-		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how hot the shared rows are.",
+		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how {{hot-key|hot}} the shared rows are.",
 	})
 }

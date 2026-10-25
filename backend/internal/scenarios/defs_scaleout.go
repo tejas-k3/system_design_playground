@@ -31,7 +31,7 @@ func registerScaleOut() {
 	register(&Scenario{
 		ID: "multi-region-reads", Title: "Multi-region reads", Difficulty: "Medium",
 		Summary: "App servers are in three regions, yet reads in Europe and Asia are still slow.",
-		Story:   "Last quarter the app servers moved close to the users, and every user is sent to the nearest one. The database is still a single primary in the US, so a read from Europe or Asia crosses an ocean twice to be answered, and the app server spends most of its time waiting for the answer. Reads are 98% of the traffic, and a read may be at most a second out of date.",
+		Story:   "Last quarter the app servers moved close to the users, and every user is sent to the nearest one. The database is still a single primary in the US, so a read from Europe or Asia crosses an ocean twice to be answered, and the app server spends most of its time waiting for the answer. Reads are 98% of the traffic, and {{consistency-levels|a read may be at most a second out of date}}.",
 		Diagram: multiRegion(false), Solution: multiRegion(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(200), MaxStaleReadPct: f(0.02), MaxCostPerHour: f(2.6), StarCostPerHour: f(2.4)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
@@ -40,10 +40,10 @@ func registerScaleOut() {
 			"Every read from Europe crosses to the US and back, about 90 ms of distance before the database does anything; Asia pays 150 ms. The app servers are already close, so the data has to come closer too.",
 			"Where must the data live so that a read from Europe or Asia does not cross the ocean, and what must each regional server be wired to?",
 		},
-		Answer: "The answer: put a read replica in Europe and one in Asia, in their regions, and wire each region's app server to its replica. Reads are answered locally, writes still go to the US primary, and a replica runs a little behind, which a read that may be a second old can live with.",
+		Answer: "The answer: put a read replica in Europe and one in Asia, in their regions, and wire each region's app server to its replica. Reads are answered locally, writes still go to the US primary, and {{replication-lag|a replica runs a little behind}}, which a read that may be a second old can live with.",
 		Predictions: []Prediction{{ID: "p1", Question: "A read replica in Asia will make reads there faster, and writes from Asia…", Options: []string{"Faster as well, since the replica is closer", "No faster: they still go to the primary", "Slower, as the replica must also copy them"}, Answer: 1,
 			Explain: "A replica serves reads only. Every write still has to reach the one primary, so a write from Asia keeps paying the distance."}},
-		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add replication lag that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or sharding users by home region.",
+		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add {{replication-lag|replication lag}} that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or {{sharding|sharding}} users by home region.",
 	})
 
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
@@ -66,7 +66,7 @@ func registerScaleOut() {
 	register(&Scenario{
 		ID: "add-a-shard", Title: "Adding a shard under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "More capacity, and for ten seconds everything gets slower.",
-		Story:   "The four-shard database is getting full, so a fifth shard is added at 20 seconds while traffic keeps flowing. The router places each key on a shard by hashing it and taking the remainder after dividing by the number of shards, so adding one changes where almost every key lives. For ten seconds the data of every moved key is still travelling, and each request for one of them takes 400 ms longer.",
+		Story:   "The {{sharding|four-shard}} database is getting full, so a fifth shard is added at 20 seconds while traffic keeps flowing. The router places each key on a shard by hashing it and taking the remainder after dividing by the number of shards, so adding one changes where almost every key lives. For ten seconds the data of every moved key is still travelling, and each request for one of them takes 400 ms longer.",
 		Diagram: addShard(false), Solution: addShard(true),
 		Chaos:       []engine.ChaosEvent{{Type: "addNode", NodeID: "shards", AtSec: 20}},
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(300), MaxCostPerHour: f(4.2), StarCostPerHour: f(4.0), StarP95Ms: f(200)},
@@ -76,10 +76,10 @@ func registerScaleOut() {
 			"Placing a key by hash mod n changes the home of about four keys in five when n goes from 4 to 5. About 80% of requests wait for data that is still moving.",
 			"Which key placement scheme moves only the keys that belong to the new shard, instead of nearly all of them?",
 		},
-		Answer: "The answer: place keys on a consistent-hashing ring instead (key placement on the shard router): a new shard takes over only about a fifth of the keys, so only about a fifth of the requests are slowed, and for a shorter time than the p95 notices.",
+		Answer: "The answer: place keys on a {{consistent-hashing|consistent-hashing ring}} instead (key placement on the shard router): a new shard takes over only about a fifth of the keys, so only about a fifth of the requests are slowed, and for a shorter time than the {{p95}} notices.",
 		Predictions: []Prediction{{ID: "p1", Question: "Adding a fifth shard to a router that places keys by hash mod 4 moves about…", Options: []string{"About a fifth of the keys", "About four fifths of the keys", "None: the new shard starts empty"}, Answer: 1,
 			Explain: "Changing the divisor changes the remainder for almost every key. A ring only reassigns the arc the new shard takes over, about one key in five."}},
-		Debrief: "Hash mod n makes resizing a cluster as expensive as rebuilding it. Consistent hashing moves only about 1/n of the keys when a node joins or leaves, which is why caches and key-value stores use it.",
+		Debrief: "Hash mod n makes resizing a cluster as expensive as rebuilding it. {{consistent-hashing|Consistent hashing}} moves only about 1/n of the keys when a node joins or leaves, which is why caches and key-value stores use it.",
 	})
 
 	// Heavy tail: identical replicas whose service times have a long tail; capacity cannot shorten it, a second ask can
@@ -102,7 +102,7 @@ func registerScaleOut() {
 	register(&Scenario{
 		ID: "heavy-tail", Title: "The slow one in a hundred", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Three healthy read replicas, and one read in twenty is far slower than the rest.",
-		Story:   "A product page reads from three identical read replicas, taking turns. Most reads take a few milliseconds, but the replicas have a long tail: now and then one read takes ten times as long, whichever replica serves it. The median is great. The slowest one in twenty is what customers feel, and adding threads or servers has not moved it.",
+		Story:   "A product page reads from three identical read replicas, taking turns. Most reads take a few milliseconds, but the replicas have a long tail: now and then one read takes ten times as long, whichever replica serves it. The {{p50|median}} is great. {{p95|The slowest one in twenty}} is what customers feel, and adding threads or servers has not moved it.",
 		Diagram: heavyTail(false), Solution: heavyTail(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(230), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.8), StarP95Ms: f(190)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
@@ -114,8 +114,8 @@ func registerScaleOut() {
 		Answer: "The answer: hedge the reads (advanced setting on the app server): if a read has not been answered after a short wait, ask another replica too and take the first answer. Wait about the time a normal read takes; hedging too early doubles the load for nothing.",
 		Predictions: []Prediction{{ID: "p1", Question: "Hedging reads after 80 ms sends a second request for…", Options: []string{"Every read, so the load roughly doubles", "Only the slow ones, a small share of reads", "None, as it only works when a replica is down"}, Answer: 1,
 			Explain: "Most reads finish before the wait is over, so only the few that are still waiting get a second request, a modest increase in load for a large cut in the tail."}},
-		Debrief: "Hedged requests trade a little extra load for a much shorter tail: the chance that two independent replicas are both slow is the square of the chance that one is. Wait about the p95 of a normal request before hedging, or you simply double your traffic.",
-		Deeper:  "A hedged request sends a second copy to another replica after a short wait and takes whichever answers first; if slowness is independent between replicas, the chance both are slow is the square of the chance one is. Waiting about the p95 of a normal read means only the slowest few percent of reads are duplicated, so the extra load is small, while hedging immediately simply doubles your traffic. It is only safe for requests that can run twice, so reads and idempotent calls, and you cancel the loser when you can. The assumption breaks when slowness is shared, for example a failing network path or a server that is overloaded, and then hedging adds load to a system that is already struggling. An interviewer will ask why not retry after a timeout, how to pick the delay adaptively, and how hedging combines with ejecting a consistently slow replica.",
+		Debrief: "Hedged requests trade a little extra load for a much shorter tail: the chance that two independent replicas are both slow is the square of the chance that one is. Wait about the {{p95}} of a normal request before hedging, or you simply double your traffic.",
+		Deeper:  "A hedged request sends a second copy to another replica after a short wait and takes whichever answers first; if slowness is independent between replicas, the chance both are slow is the square of the chance one is. Waiting about the {{p95}} of a normal read means only the slowest few percent of reads are duplicated, so the extra load is small, while hedging immediately simply doubles your traffic. It is only safe for requests that can run twice, so reads and {{idempotency|idempotent}} calls, and you cancel the loser when you can. The assumption breaks when slowness is shared, for example a failing network path or a server that is overloaded, and then {{retry-storm|hedging adds load to a system that is already struggling}}. An interviewer will ask why not retry after a timeout, how to pick the delay adaptively, and how hedging combines with ejecting a consistently slow replica.",
 	})
 
 	// Noisy tenant: one customer of a shared service sends most of the traffic; a single shared limit punishes everyone
@@ -146,7 +146,7 @@ func registerScaleOut() {
 		Answer: "The answer: make the rate limiter count per tenant (Limit per: each tenant): every tenant gets its own allowance, so the noisy one runs out without turning anyone else away.",
 		Predictions: []Prediction{{ID: "p1", Question: "Doubling the shared limit to 200 requests a second would…", Options: []string{"Fix it for the quiet tenants, who get twice the room", "Help a little, but the noisy tenant still takes more", "Make no difference, since the noisy tenant is capped"}, Answer: 1,
 			Explain: "A shared limit divides capacity in proportion to demand, so the loudest tenant keeps getting the most. A limit per tenant divides it fairly."}},
-		Debrief: "A global rate limit protects the servers but not the tenants from each other. Limit per customer so one customer's burst runs into its own allowance, and add a shared limit on top if the total must be bounded too.",
+		Debrief: "A global rate limit protects the servers but not the tenants from each other. {{bulkhead|Limit per customer so one customer's burst runs into its own allowance}}, and add a shared limit on top if the total must be bounded too.",
 	})
 
 	// Notification fan-out: one event must reach email, push and SMS. A queue gives each message to one worker only
@@ -182,7 +182,7 @@ func registerScaleOut() {
 		Answer: "The answer: replace the queue with a topic (publish/subscribe): every worker connected to it is a subscriber and gets its own copy of every message.",
 		Predictions: []Prediction{{ID: "p1", Question: "If email, push and SMS are three workers on one queue, an order produces…", Options: []string{"Three notifications, one from each worker", "One notification, from whichever worker took it", "None until all three workers have finished"}, Answer: 1,
 			Explain: "Workers on a queue compete for messages: each message is processed once. To give every consumer its own copy you need publish/subscribe."}},
-		Debrief: "A queue is for sharing work among identical workers; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
+		Debrief: "A queue is for {{thread-pool|sharing work among identical workers}}; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
 	})
 
 	// Go global: users on three continents, one stack in one region
@@ -224,7 +224,7 @@ func registerScaleOut() {
 		Answer: "The answer: run a stack (balancer, app, database) in each region, connect every user group to all of them, and turn on 'Send users to the nearest region' for the users. Remember the stacks cost money too.",
 		Predictions: []Prediction{{ID: "p1", Question: "Adding more servers in the US would make users in Asia…", Options: []string{"Much faster, as the queues in the US shrink", "No faster: the delay is the distance, not the load", "Slower, since the US servers then take more of the traffic"}, Answer: 1,
 			Explain: "Latency to a far region is dominated by the distance each way. Capacity helps when servers are busy, not when the wait is the speed of light."}},
-		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to keeping their data consistent (which the multi-region database challenges are about).",
+		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to {{consistency-levels|keeping their data consistent}} (which the multi-region database challenges are about).",
 	})
 
 	// Payment saga: checkout spans stock, card and shipping; a failed step must not leave a half-done order
@@ -256,8 +256,8 @@ func registerScaleOut() {
 		Answer: "The answer: run the checkout as a saga (the app server's setting for writes that span services): when a later step fails, compensating calls undo the earlier steps, newest first. A few percent of orders still fail (declines are real), but none are left half done.",
 		Predictions: []Prediction{{ID: "p1", Question: "With a saga, will fewer orders fail?", Options: []string{"Yes: the failed steps are retried until they pass", "No: the same orders fail, but each is cleanly rolled back", "Yes: the card processor declines fewer orders"}, Answer: 1,
 			Explain: "A saga does not make steps succeed. It makes a failure safe by running the opposite of every earlier step, so the system ends up consistent."}},
-		Debrief: "Without a distributed transaction, consistency across services comes from compensation: every step has an undo, and a failure runs the undos backwards. Compensations must be possible, repeatable (idempotent), and watched: one that fails leaves a stuck order for a person.",
-		Deeper:  "A saga replaces one distributed transaction with a chain of local ones, each with a compensating action, and it is eventually consistent: other users can see the item reserved before the order completes, so you model a pending state and do not pretend there is isolation. Order the steps so the hardest to undo comes late, because a refund may itself fail or take time, and make every compensation idempotent so that retrying it is safe. The saga's own progress has to be stored somewhere durable, otherwise a crash between charging and recording leaves exactly the half-done order you were avoiding; with an idempotency key the retry cannot charge twice. An interviewer will ask what happens when a compensation keeps failing, and the honest answer is an alert and a person, as the debrief says. The failure pattern is the orchestrator that dies mid-saga with no record of how far it got.",
+		Debrief: "Without a distributed transaction, consistency across services comes from compensation: every step has an undo, and a failure runs the undos backwards. Compensations must be possible, repeatable ({{idempotency|idempotent}}), and watched: one that fails leaves a stuck order for a person.",
+		Deeper:  "A saga replaces one distributed transaction with a chain of local ones, each with a compensating action, and it is {{consistency-levels|eventually consistent}}: other users can see the item reserved before the order completes, so you model a pending state and do not pretend there is isolation. Order the steps so the hardest to undo comes late, because a refund may itself fail or take time, and make every compensation {{idempotency|idempotent}} so that retrying it is safe. The saga's own progress has to be stored somewhere durable, otherwise a crash between charging and recording leaves exactly the half-done order you were avoiding; with an idempotency key the retry cannot charge twice. An interviewer will ask what happens when a compensation keeps failing, and the honest answer is an alert and a person, as the debrief says. The failure pattern is the orchestrator that dies mid-saga with no record of how far it got.",
 	})
 
 	// Frozen checkout: two-phase commit across stock, card and shipping, and the server dies between the votes and the decision
@@ -290,7 +290,7 @@ func registerScaleOut() {
 		Answer: "The answer: run the checkout as a saga instead (the app server's setting for writes that span services): no service holds anything across steps, and a failure is undone by compensating calls.",
 		Predictions: []Prediction{{ID: "p1", Question: "Two-phase commit guarantees nothing is ever half done. What does it cost?", Options: []string{"Nothing: it is strictly better than a saga", "A second round of calls, and a stall if the coordinator dies", "Lost data, since a crash discards the votes"}, Answer: 1,
 			Explain: "It buys atomicity with latency and blocking: every service holds its part until the decision arrives, and a coordinator that dies between the votes and the decision leaves them all stuck."}},
-		Debrief: "Two-phase commit is atomic but blocking: its weak point is the coordinator. Production systems replicate the coordinator, or avoid distributed transactions and accept eventual consistency with sagas, where each step is a small local transaction and failures are compensated.",
-		Deeper:  "Two-phase commit is atomic but blocking: after a participant votes yes it must hold its locks until the coordinator's decision arrives, and a coordinator that dies in that gap leaves them in doubt and everything touching those rows waits. The fixes are to replicate the coordinator with a consensus protocol, as some distributed databases do, or to avoid the distributed transaction and use a saga with its own trade-offs. Two-phase commit also assumes every participant supports prepare, which a card processor or shipping service almost never does, so across services you do not control it is often not an option at all. An interviewer will ask when you would still choose it, and the answer is inside one system where the coordinator is replicated and the locks are short. The failure pattern is in-doubt transactions holding locks that block unrelated traffic until someone resolves them by hand.",
+		Debrief: "Two-phase commit is atomic but blocking: its weak point is the coordinator. Production systems replicate the coordinator, or avoid distributed transactions and accept {{consistency-levels|eventual consistency}} with sagas, where each step is a small local transaction and failures are compensated.",
+		Deeper:  "Two-phase commit is atomic but blocking: after a participant votes yes it must hold its locks until the coordinator's decision arrives, and a coordinator that dies in that gap leaves them in doubt and everything touching those rows waits. The fixes are to replicate the coordinator with a {{quorum|consensus protocol}}, as some distributed databases do, or to avoid the distributed transaction and use a saga with its own trade-offs. Two-phase commit also assumes every participant supports prepare, which a card processor or shipping service almost never does, so across services you do not control it is often not an option at all. An interviewer will ask when you would still choose it, and the answer is inside one system where the coordinator is replicated and the locks are short. The failure pattern is in-doubt transactions holding locks that block unrelated traffic until someone resolves them by hand.",
 	})
 }
