@@ -83,6 +83,7 @@ var conceptTags = map[string][]string{
 	"checkout-during-a-sale": {"consistency", "overload-control"},
 	"shed-the-cheap-traffic": {"overload-control", "capacity"},
 	"url-shortener":          {"caching", "sharding"},
+	"first-design-links":     {"capacity", "failure-handling"},
 	"rate-limiter-showdown":  {"overload-control"},
 	"multi-region-reads":     {"replication", "consistency"},
 }
