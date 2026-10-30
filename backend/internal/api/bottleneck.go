@@ -186,6 +186,10 @@ func (s *Server) bottleneck(w http.ResponseWriter, r *http.Request) {
 		// read how busy everything is while traffic is still flowing, not after it has stopped
 		for sim.Now() < 0.8*opts.StopTrafficAtMs && !sim.Finished() {
 			sim.Advance(100)
+			if time.Now().After(deadline) {
+				writeErr(w, http.StatusServiceUnavailable, "the check took too long; try a smaller design")
+				return
+			}
 		}
 		util := map[string]float64{}
 		pt := bottleneckPoint{Load: m, Rps: offered(pd)}

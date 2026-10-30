@@ -193,3 +193,12 @@ func TestGradingRefusesAMalformedSelection(t *testing.T) {
 		t.Error("only a requirements prompt can be graded this way")
 	}
 }
+
+// A decisive question without a flip is a mistake in the data; grading must not crash the server over it.
+func TestGradingSurvivesADecisiveQuestionWithoutAFlip(t *testing.T) {
+	q := &Question{ID: "t", Mode: ModeAsk, Picks: 2, Asks: []AskOption{{Text: "a", decisive: true, why: "x"}, {Text: "b", why: "y"}}}
+	r, err := q.GradeAsk([]int{0})
+	if err != nil || r.Found != 1 || r.Items[0].Flip != "" {
+		t.Errorf("%+v %v", r, err)
+	}
+}

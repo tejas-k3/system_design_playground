@@ -66,7 +66,9 @@ func (q *Question) GradeAsk(chosen []int) (AskResult, error) {
 		it := AskItemResult{Chosen: picked[i], Decisive: a.decisive, Explain: a.why}
 		if a.decisive {
 			decisive++
-			it.Flip = a.flip.says
+			if a.flip != nil {
+				it.Flip = a.flip.says
+			}
 			if picked[i] {
 				out.Found++
 			} else {
