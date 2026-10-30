@@ -66,7 +66,7 @@ The defaults (8 threads, 16 database slots, a 50-request queue, and so on) are r
 
 - Omission, wrong-answer and Byzantine faults are not simulated; tolerating k Byzantine faults requires at least 3k+1 members.
 - Clock skew and drift are not simulated; Lamport and vector clocks appear only in challenge text.
-- Stateful servers, per-client sessions and sticky routing are not simulated.
+- Stateful servers, server-side sessions and sticky routing are not simulated (per-client consistency guarantees, such as read-your-writes, are).
 - DNS and service discovery, peer-to-peer systems and blockchains are not simulated.
 - Authentication, authorisation and encryption are not simulated.
 - Container and virtual-machine behaviour is not simulated.
