@@ -5,6 +5,7 @@ import { paramVisible } from '../model/diagram'
 import { describeCurve, findKnee } from '../model/sweep'
 import { parseValues, suggestValues } from '../model/whatif'
 import { useStore } from '../state/store'
+import { BottleneckQuiz } from './BottleneckQuiz'
 import { useEscapeKey } from './useEscapeKey'
 
 const LOADS = [0.25, 0.5, 1, 1.5, 2, 3, 4]
@@ -62,6 +63,7 @@ export function CapacityDialog() {
             </table>
           </>
         )}
+        <BottleneckQuiz />
         <WhatIf />
       </div>
     </div>

@@ -63,6 +63,21 @@ export interface SweepPoint {
   costPerHour: number
   truncated?: boolean
 }
+export interface BottleneckPoint {
+  load: number
+  rps: number
+  successRate: number
+  p95: number
+  hottest: string // the busiest component at this load
+  hottestUtil: number
+}
+export interface BottleneckResult {
+  correct: boolean
+  culprits: string[]
+  at: number // index of the first load where something runs out, -1 for none
+  points: BottleneckPoint[]
+  explain: string
+}
 export interface SweepResponse {
   points: SweepPoint[]
   truncated?: boolean
