@@ -125,6 +125,11 @@ func (s *Sim) countSession(lg *logical, res Result) {
 	}
 }
 
+// countMonotonicWrite counts a client's write that commits after a later one to the same key. It compares the order
+// writes were issued (the logical request ids) with the order they commit, which timing alone can swap when
+// several of a client's writes are in flight, so quorum settings do not remove it. A logical write is counted once:
+// a negative sawWrite marks it, since that field is otherwise unused for this model and a new field on every
+// request would cost memory on the default path.
 func (s *Sim) countMonotonicWrite(c *call) {
 	lg := c.lg
 	if lg == nil || lg.client.s("consistency") != "monotonicWrites" {
@@ -144,6 +149,8 @@ func (s *Sim) countMonotonicWrite(c *call) {
 	cl.sessWrite[c.key] = lg.id
 }
 
+// countWritesFollowReads counts a write that reaches a key-value copy older than a value its client has already read.
+// Only the key-value store keeps a version for each copy, so no other store reports it. Counted once, like the above.
 func (s *Sim) countWritesFollowReads(lg *logical, version int) {
 	if lg == nil || lg.client.s("consistency") != "writesFollowReads" || lg.sawRead <= version || lg.sawWrite < 0 {
 		return
