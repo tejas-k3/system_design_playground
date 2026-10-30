@@ -217,6 +217,21 @@ export interface Alternative {
   why: string
 }
 
+export interface DefendScore {
+  pass: boolean
+  successPct: number
+  p95Ms: number
+  costPerHour: number
+}
+
+export interface DefendResponse {
+  applicable: boolean
+  reason?: string
+  alternative?: { label: string; why: string }
+  yours?: DefendScore
+  withChange?: DefendScore
+}
+
 export interface ScenarioSummary {
   id: string
   title: string

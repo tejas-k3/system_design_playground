@@ -324,6 +324,10 @@ ul.templates button { display: grid; gap: 6px; text-align: left; width: 100%; pa
 .term-tip.open { visibility: visible; }
 .term-try { display: block; margin-top: 6px; }
 .alts th { text-align: left; font-weight: 600; padding: 4px 6px; } .alts td { vertical-align: top; }
+.defend { margin: 12px 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.defend h3 { margin: 0 0 6px; }
+.defend-results > div { padding: 8px; background: var(--panel); border-radius: 6px; }
+.defend-metrics { margin: 6px 0 0; padding-left: 18px; }
 .level-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; } .welcome .level-switch { justify-content: center; }
 .card em.lvl { font-weight: 600; letter-spacing: .02em; color: var(--text, inherit); border: 1px solid var(--border, #888); border-radius: 4px; padding: 0 5px; align-self: flex-start; }
 .level-divider { margin-top: 18px; padding-top: 8px; border-top: 2px dashed var(--border, #888); color: var(--muted); }
