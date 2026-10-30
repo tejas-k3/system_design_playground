@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -90,8 +91,11 @@ func TestLintFlagsWriteQuorumsThatCanConflict(t *testing.T) {
 		want bool
 	}{
 		{"overlapping reads but disjoint writes", kvLintDiagram(3, 3, 1), true},
+		{"every copy written", kvLintDiagram(3, 1, 3), false},
 		{"majority writes overlap", kvLintDiagram(3, 2, 2), false},
-		{"read quorum does not overlap writes", kvLintDiagram(3, 2, 1), false},
+		{"a single write copy and a read quorum of two", kvLintDiagram(3, 2, 1), true},
+		{"a single write copy and a single read copy", kvLintDiagram(3, 1, 1), true},
+		{"write quorum exactly half is still not a majority", kvLintDiagram(4, 3, 2), true},
 		{"no key-value store", Diagram{Nodes: []Node{{ID: "db", Kind: KDatabase}}}, false},
 	}
 	for _, c := range cases {
@@ -99,7 +103,12 @@ func TestLintFlagsWriteQuorumsThatCanConflict(t *testing.T) {
 		if ok != c.want {
 			t.Errorf("%s: rule fired=%v, want %v", c.name, ok, c.want)
 		}
-		if ok && (f.Severity != "warn" || !strings.Contains(f.Message, "N=3") || !strings.Contains(f.Message, "W=1") || !strings.Contains(f.Message, "two writes can succeed without meeting") || !strings.Contains(f.Message, "conflict")) {
+		counts := ""
+		if len(c.d.Nodes) > 0 {
+			p := c.d.Nodes[0].Params
+			counts = fmt.Sprintf("N=%.0f and W=%.0f", p["replicas"], p["writeQuorum"])
+		}
+		if ok && (f.Severity != "warn" || !strings.Contains(f.Message, counts) || !strings.Contains(f.Message, "two writes can succeed without meeting") || !strings.Contains(f.Message, "conflict")) {
 			t.Errorf("%s: finding must name the counts and explain the conflict: %+v", c.name, f)
 		}
 	}

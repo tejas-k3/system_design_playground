@@ -183,8 +183,8 @@ func Lint(d Diagram) []Finding {
 			continue
 		}
 		p := res[n.ID]
-		copies, readQuorum, writeQuorum := pf(p, "replicas", 3), pf(p, "readQuorum", 2), pf(p, "writeQuorum", 2)
-		if readQuorum+writeQuorum <= copies || writeQuorum > copies/2 {
+		copies, writeQuorum := pf(p, "replicas", 3), pf(p, "writeQuorum", 2)
+		if writeQuorum > copies/2 { // two writes that miss each other can conflict whatever the read quorum is
 			continue
 		}
 		msg := fmt.Sprintf("With N=%.0f and W=%.0f, two writes can succeed without meeting, so they can conflict.", copies, writeQuorum)
