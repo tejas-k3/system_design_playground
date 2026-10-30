@@ -16,3 +16,10 @@ export function componentOptions(d: Diagram): ComponentOption[] {
 export function rowsWithFirst(points: BottleneckPoint[], at: number): (BottleneckPoint & { first: boolean })[] {
   return points.map((p, i) => ({ ...p, first: i === at }))
 }
+
+export const NONE = '__none__'
+
+/** The guess if it still names a part of the design (or "none"); an empty string once that part has been removed. */
+export function usableGuess(d: Diagram, guess: string): string {
+  return guess === NONE || componentOptions(d).some((o) => o.id === guess) ? guess : ''
+}

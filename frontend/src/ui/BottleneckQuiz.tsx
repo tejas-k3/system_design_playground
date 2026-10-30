@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { checkBottleneck } from '../api/client'
 import type { BottleneckResult } from '../api/types'
-import { componentOptions, rowsWithFirst } from '../model/bottleneck'
+import { componentOptions, NONE, rowsWithFirst, usableGuess } from '../model/bottleneck'
 import { useStore } from '../state/store'
-
-const NONE = '__none__'
 
 /** Predict which part of the design runs out first at twice today's traffic, then see it run at five loads. */
 export function BottleneckQuiz() {
   const diagram = useStore((s) => s.diagram)
   const options = componentOptions(diagram)
-  const [guess, setGuess] = useState('')
+  const [asked, setGuess] = useState('')
+  const guess = usableGuess(diagram, asked) // a part deleted since it was chosen is no longer an answer
+  const current = useRef(diagram)
+  current.current = diagram
   const [result, setResult] = useState<BottleneckResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -24,7 +25,8 @@ export function BottleneckQuiz() {
     setBusy(true)
     setError('')
     try {
-      setResult(await checkBottleneck(diagram, guess === NONE ? '' : guess))
+      const r = await checkBottleneck(diagram, guess === NONE ? '' : guess)
+      if (current.current === diagram) setResult(r) // the design may have changed while it ran
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The check failed.')
     } finally {

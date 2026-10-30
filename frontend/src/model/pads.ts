@@ -9,6 +9,7 @@ export const blankTable = (): Table => ({ name: '', fields: '', key: '', indexes
 
 const words = (text: string): Set<string> => new Set(text.toLowerCase().split(/\W+/).filter(Boolean))
 const mentions = (e: Endpoint) => `${e.path} ${e.request} ${e.response} ${e.notes}`
+const describes = (e: Endpoint) => `${e.request} ${e.response} ${e.notes}` // what the learner wrote about it, without the path
 
 const PAGING = /\b(page|pages|paged|paging|pagination|limit|cursor|offset|per_page)\b|next_?(cursor|page|token)/i
 const FAILURE = /\b[45]\d\d\b|\b[45]xx\b|\berror|\bstatus\b/i
@@ -37,7 +38,7 @@ export function apiHints(rows: Endpoint[]): string[] {
     }
   }
   const sketched = rows.filter((e) => e.path.trim())
-  if (sketched.length > 0 && !sketched.some((e) => FAILURE.test(mentions(e)))) {
+  if (sketched.length > 0 && !sketched.some((e) => FAILURE.test(describes(e)))) {
     out.push('No endpoint says what it returns when it fails: which status codes (400, 404, 409, 429) and error body?')
   }
   return out

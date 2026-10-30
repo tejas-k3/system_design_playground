@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BottleneckPoint, Diagram } from '../api/types'
-import { componentOptions, rowsWithFirst } from './bottleneck'
+import { componentOptions, rowsWithFirst, usableGuess } from './bottleneck'
 
 const node = (id: string, kind: string, label: string) => ({ id, kind, x: 0, y: 0, label, params: {} })
 const diagram = (nodes: ReturnType<typeof node>[]): Diagram => ({ nodes, edges: [], notes: [] })
@@ -26,5 +26,18 @@ describe('rowsWithFirst', () => {
   })
   it('marks nothing when nothing runs out', () => {
     expect(rowsWithFirst(pts, -1).every((r) => !r.first)).toBe(true)
+  })
+})
+
+describe('usableGuess', () => {
+  const d = diagram([node('users', 'client', 'Users'), node('app', 'appServer', 'App Server')])
+  it('keeps a guess that is still a part of the design, or the answer none', () => {
+    expect(usableGuess(d, 'app')).toBe('app')
+    expect(usableGuess(d, '__none__')).toBe('__none__')
+  })
+  it('drops a guess whose part was deleted or renamed away, and never allows the users', () => {
+    expect(usableGuess(d, 'db')).toBe('')
+    expect(usableGuess(d, 'users')).toBe('')
+    expect(usableGuess(d, '')).toBe('')
   })
 })

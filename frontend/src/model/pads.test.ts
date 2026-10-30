@@ -51,6 +51,10 @@ describe('api hints', () => {
     expect(apiHints([ep('GET', '/posts/{id}'), ep('PUT', '/posts/{id}', { response: '200, or 409 on a clash' })])).toEqual([])
     expect(apiHints([ep('GET', '/posts/{id}', { response: '{error: string}' })])).toEqual([])
   })
+  it('does not take a path such as /status for a description of failures', () => {
+    expect(apiHints([ep('GET', '/status/{id}')])).toEqual([NO_ERRORS])
+    expect(apiHints([ep('GET', '/status/{id}', { notes: 'returns 404 for an unknown id' })])).toEqual([])
+  })
   it('asks for a path when a row has none, and leaves empty rows alone', () => {
     expect(apiHints([ep('GET', '')])).toEqual(['An endpoint has no path yet.'])
     expect(apiHints([])).toEqual([])
