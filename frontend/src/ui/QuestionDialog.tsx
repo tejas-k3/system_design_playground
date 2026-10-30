@@ -7,6 +7,8 @@ import { fmtMs } from '../model/trace'
 import { describeSeries } from '../model/symptoms'
 import { formatEstimate, parseNumber, verdictLabel } from '../model/questions'
 import { useStore } from '../state/store'
+import { AskQuestion } from './AskQuestion'
+import { MatchQuestion } from './MatchQuestion'
 import { Stars } from './Stars'
 import { useEscapeKey } from './useEscapeKey'
 
@@ -127,6 +129,8 @@ export function QuestionDialog() {
           <>
             <p>{q.prompt}</p>
             <dl className="kv">{q.facts?.map((f) => (<><dt key={f.label}>{f.label}</dt><dd key={f.value}>{f.value}</dd></>))}</dl>
+            {q.mode === 'ask' && q.asks && q.picks && <AskQuestion id={q.id} asks={q.asks} picks={q.picks} onDone={close} />}
+            {q.mode === 'match' && q.items && <MatchQuestion id={q.id} items={q.items} onDone={close} />}
             {q.mode === 'diagnose' && q.symptoms && q.options && (
               <>
                 <Dashboard symptoms={q.symptoms} />

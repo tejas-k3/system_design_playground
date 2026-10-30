@@ -237,8 +237,8 @@ func TestOpenChallengeHidesItsLoadAndHasNoSolutionToServe(t *testing.T) {
 			open++
 		}
 	}
-	if open != 2 {
-		t.Errorf("the list should flag the two open challenges, flagged %d", open)
+	if open != 3 {
+		t.Errorf("the list should flag the three open challenges, flagged %d", open)
 	}
 	// and it still runs with its hidden profile: a session scores it
 	var run runResp
@@ -285,4 +285,111 @@ func TestBuildRunsShareTheRunSlots(t *testing.T) {
 		t.Fatalf("status %d after the slot freed", c)
 	}
 	waitSlotsFree(t, srv, "the slot was not released after a build")
+}
+
+func TestAnsweringAMatchQuestionGradesEveryItemAndRevealsTheKeyOnlyAfterwards(t *testing.T) {
+	ts := newTestServer(t)
+	const path = "/api/questions/what-does-each-box-do"
+	var served struct {
+		Items []map[string]any `json:"items"`
+	}
+	if code := get(t, ts.URL+path, &served); code != 200 || len(served.Items) != 12 {
+		t.Fatalf("served: status %d, %d items", code, len(served.Items))
+	}
+	for _, it := range served.Items {
+		if _, leaks := it["answer"]; leaks {
+			t.Fatal("an item carries its answer before the learner has chosen")
+		}
+	}
+	zeros := make([]int, 12)
+	var res scenarios.MatchResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"choices": zeros}, &res); code != 200 || len(res.Items) != 12 || res.Items[0].Explain == "" {
+		t.Fatalf("graded: status %d %+v", code, res)
+	}
+	right := make([]int, 12)
+	for i, it := range res.Items {
+		right[i] = it.Answer
+	}
+	var full scenarios.MatchResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"choices": right}, &full); code != 200 || full.Correct != 12 || full.Stars != 3 {
+		t.Fatalf("all right: status %d %+v", code, full)
+	}
+	for name, body := range map[string]map[string]any{
+		"too few":           {"choices": []int{0, 1}},
+		"out of range":      {"choices": []int{0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0}},
+		"none given":        {},
+		"a single choice":   {"choice": 1},
+		"numbers to a menu": {"answers": map[string]float64{"a": 1}},
+	} {
+		if c := post(t, ts.URL+path+"/answer", body, nil); c != 400 {
+			t.Errorf("%s: status %d, want 400", name, c)
+		}
+	}
+	if c := post(t, ts.URL+"/api/questions/cut-off-threads/answer", map[string]any{"choices": zeros}, nil); c != 400 {
+		t.Errorf("a list of choices sent to a diagnosis: %d", c)
+	}
+}
+
+func TestGuidedBriefServesItsChecklistButNotTheHiddenLoadOrTheAnswer(t *testing.T) {
+	ts := newTestServer(t)
+	var sc map[string]any
+	if code := get(t, ts.URL+"/api/scenarios/first-design-links", &sc); code != 200 {
+		t.Fatalf("status %d", code)
+	}
+	steps, _ := sc["starter"].([]any)
+	if len(steps) != 3 {
+		t.Fatalf("served %d starter steps, want 3", len(steps))
+	}
+	for _, hidden := range []string{"traffic", "chaos", "answer", "solution"} {
+		if _, leaks := sc[hidden]; leaks {
+			t.Errorf("an open brief serves %q", hidden)
+		}
+	}
+	var list []map[string]any
+	get(t, ts.URL+"/api/scenarios", &list)
+	for _, s := range list {
+		if _, ok := s["starter"]; ok {
+			t.Error("the checklist belongs to the challenge view, not the first-load list")
+		}
+	}
+}
+
+func TestAnsweringARequirementsPromptGradesThePicksAndRevealsTheKeyAfterwards(t *testing.T) {
+	ts := newTestServer(t)
+	const path = "/api/questions/ask-photo-feed"
+	var served struct {
+		Asks  []map[string]any `json:"asks"`
+		Picks int              `json:"picks"`
+	}
+	if code := get(t, ts.URL+path, &served); code != 200 || len(served.Asks) != 8 || served.Picks != 3 {
+		t.Fatalf("served: status %d, %d asks, %d picks", code, len(served.Asks), served.Picks)
+	}
+	for _, a := range served.Asks {
+		if len(a) != 1 {
+			t.Fatalf("an ask is served with more than its text: %v", a)
+		}
+	}
+	var res scenarios.AskResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"picks": []int{0, 1}}, &res); code != 200 || res.Wasted != 2 || len(res.Items) != 8 || res.Stars != 0 {
+		t.Fatalf("graded: status %d %+v", code, res)
+	}
+	var best scenarios.AskResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"picks": []int{2, 5}}, &best); code != 200 || best.Found != 2 || best.Stars != 3 || best.Items[2].Flip == "" {
+		t.Fatalf("best picks: status %d %+v", code, best)
+	}
+	for name, body := range map[string]map[string]any{
+		"none":              {},
+		"too many":          {"picks": []int{0, 1, 2, 3}},
+		"a repeat":          {"picks": []int{2, 2}},
+		"out of range":      {"picks": []int{9}},
+		"a single choice":   {"choice": 1},
+		"numbers to a menu": {"answers": map[string]float64{"a": 1}},
+	} {
+		if c := post(t, ts.URL+path+"/answer", body, nil); c != 400 {
+			t.Errorf("%s: status %d, want 400", name, c)
+		}
+	}
+	if c := post(t, ts.URL+"/api/questions/cut-off-threads/answer", map[string]any{"picks": []int{0}}, nil); c != 400 {
+		t.Errorf("picks sent to a diagnosis: %d", c)
+	}
 }

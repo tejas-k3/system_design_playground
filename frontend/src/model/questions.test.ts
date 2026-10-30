@@ -38,7 +38,7 @@ describe('verdictLabel', () => {
   })
 })
 
-import { MODE_FILTERS, modeOfQuestion, modeOfScenario, showsMode } from './questions'
+import { MODE_FILTERS, modeOfQuestion, modeOfScenario, questionModeLabel, showsMode } from './questions'
 
 describe('mode filter', () => {
   it('knows the mode of a challenge and of a question', () => {
@@ -52,6 +52,16 @@ describe('mode filter', () => {
     expect(showsMode('review', 'fix')).toBe(false)
   })
   it('names every filter in words', () => {
-    expect(MODE_FILTERS.map((f) => f.label)).toEqual(['All', 'Fix a design', 'Build from scratch', 'Estimate', 'Diagnose', 'Trade-off', 'Review'])
+    expect(MODE_FILTERS.map((f) => f.label)).toEqual(['All', 'Fix a design', 'Build from scratch', 'Warm-up', 'Requirements', 'Estimate', 'Diagnose', 'Trade-off', 'Review'])
+  })
+  it('labels a question by its kind on the card', () => {
+    expect(questionModeLabel('match')).toBe('warm-up')
+    expect(questionModeLabel('ask')).toBe('requirements')
+    expect(questionModeLabel('tradeoff')).toBe('trade-off')
+    expect(questionModeLabel('estimate')).toBe('estimate')
+  })
+  it('files a matching question under the warm-up filter', () => {
+    expect(showsMode('match', modeOfQuestion({ mode: 'match' }))).toBe(true)
+    expect(showsMode('estimate', modeOfQuestion({ mode: 'match' }))).toBe(false)
   })
 })

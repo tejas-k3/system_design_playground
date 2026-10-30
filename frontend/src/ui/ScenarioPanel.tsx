@@ -8,6 +8,7 @@ import { loadAnswer } from '../state/learning'
 import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
 import { plain } from '../model/glossary'
+import { StarterChecklist } from './StarterChecklist'
 import { Rich } from './Term'
 
 export function ScenarioPanel() {
@@ -46,6 +47,7 @@ export function ScenarioPanel() {
       {open && (
         <div className="scenario-body">
           <p><Rich text={def.story} /></p>
+          {def.starter && <StarterChecklist steps={def.starter} />}
           <h3>Goals</h3>
           <ul className="goals">
             {rows.map((r) => (

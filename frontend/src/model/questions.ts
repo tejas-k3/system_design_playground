@@ -21,12 +21,14 @@ export function verdictLabel(v: 'good' | 'close' | 'off'): string {
   return v === 'good' ? 'Good: within 30%' : v === 'close' ? 'Close: within 2×' : 'Off by more than 2×'
 }
 
-export type ModeFilter = 'all' | 'fix' | 'open' | 'estimate' | 'diagnose' | 'tradeoff' | 'review'
+export type ModeFilter = 'all' | 'fix' | 'open' | 'match' | 'ask' | 'estimate' | 'diagnose' | 'tradeoff' | 'review'
 
 export const MODE_FILTERS: { id: ModeFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'fix', label: 'Fix a design' },
   { id: 'open', label: 'Build from scratch' },
+  { id: 'match', label: 'Warm-up' },
+  { id: 'ask', label: 'Requirements' },
   { id: 'estimate', label: 'Estimate' },
   { id: 'diagnose', label: 'Diagnose' },
   { id: 'tradeoff', label: 'Trade-off' },
@@ -36,3 +38,8 @@ export const MODE_FILTERS: { id: ModeFilter; label: string }[] = [
 export const modeOfScenario = (s: { open?: boolean }): ModeFilter => (s.open ? 'open' : 'fix')
 export const modeOfQuestion = (q: { mode: string }): ModeFilter => q.mode as ModeFilter
 export const showsMode = (filter: ModeFilter, mode: ModeFilter): boolean => filter === 'all' || filter === mode
+
+const MODE_WORDS: Record<string, string> = { tradeoff: 'trade-off', match: 'warm-up', ask: 'requirements' }
+
+/** How a question's kind reads on its card. */
+export const questionModeLabel = (mode: string): string => MODE_WORDS[mode] ?? mode

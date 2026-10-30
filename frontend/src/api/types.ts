@@ -63,6 +63,21 @@ export interface SweepPoint {
   costPerHour: number
   truncated?: boolean
 }
+export interface BottleneckPoint {
+  load: number
+  rps: number
+  successRate: number
+  p95: number
+  hottest: string // the busiest component at this load
+  hottestUtil: number
+}
+export interface BottleneckResult {
+  correct: boolean
+  culprits: string[]
+  at: number // index of the first load where something runs out, -1 for none
+  points: BottleneckPoint[]
+  explain: string
+}
 export interface SweepResponse {
   points: SweepPoint[]
   truncated?: boolean
@@ -215,6 +230,13 @@ export interface ScenarioSummary {
 
 export type Level = 'sde1' | 'sde2' | 'sde3'
 
+/** One line of a guided brief's checklist: a need in plain words, the kind of component that meets it, and a nudge shown on request. */
+export interface StarterStep {
+  need: string
+  kind: string
+  nudge: string
+}
+
 export interface Scenario extends ScenarioSummary {
   story: string
   diagram: Diagram
@@ -225,6 +247,7 @@ export interface Scenario extends ScenarioSummary {
   hintCount: number // the hints themselves are fetched one at a time, when asked for
   traffic?: Record<string, [number, number][]> // a client's rate over time, in seconds and rps, replacing its own setting
   predictions?: Prediction[]
+  starter?: StarterStep[] // a guided brief's checklist
 }
 
 /** Something that happened during the run, for markers on the charts (times in seconds, like the series). */
@@ -503,7 +526,27 @@ export interface BuildResult {
   rightSized: RunSummary
   verdict: 'under' | 'right' | 'over'
 }
+export interface MatchItem {
+  need: string
+  options: string[]
+}
+export interface MatchResult {
+  items: { correct: boolean; answer: number; explain: string }[]
+  correct: number
+  stars: number
+}
+export interface AskResult {
+  items: { chosen: boolean; decisive: boolean; explain: string; flip?: string }[]
+  found: number
+  wasted: number
+  missed: number
+  score: number
+  stars: number
+}
 export interface Question extends QuestionSummary {
+  items?: MatchItem[]
+  asks?: { text: string }[]
+  picks?: number
   buildHint?: string
   diagram?: Diagram
   candidates?: { label: string; detail: string }[]

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchQuestions } from '../api/client'
 import type { QuestionSummary, ScenarioSummary } from '../api/types'
 import { LEVEL_TAG, orderByLevel } from '../model/level'
-import { MODE_FILTERS, modeOfQuestion, modeOfScenario, showsMode, type ModeFilter } from '../model/questions'
+import { MODE_FILTERS, modeOfQuestion, modeOfScenario, questionModeLabel, showsMode, type ModeFilter } from '../model/questions'
 import { reset } from '../sim/bridge'
 import { loadScenario } from '../sim/loadScenario'
 import { useStore } from '../state/store'
@@ -79,7 +79,7 @@ export function ScenarioPicker() {
                 <button key={q.id} className="card" onClick={() => setUi({ picker: false, question: q.id })}>
                   <span className="card-top"><b>{q.title}</b><Stars n={progress[q.id] ?? 0} size={14} /></span>
                   <small>{q.summary}</small>
-                  <em>{q.mode === 'tradeoff' ? 'trade-off' : q.mode}</em>
+                  <em>{questionModeLabel(q.mode)}</em>
                 </button>
               ))}
             </div>

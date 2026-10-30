@@ -153,3 +153,32 @@ func symptomsDiffer(stored, fresh Symptoms) string {
 	}
 	return ""
 }
+
+// The explanations quote what the fixture shows. If the engine changes, these fail before a learner is told
+// something the dashboard no longer says.
+func TestWatchQuestionsQuoteWhatTheirFixturesShow(t *testing.T) {
+	down := Q("watch-server-down").Symptoms
+	if q, n := down.Errors["queueFull"], down.Errors["nodeDown"]; q < 5*n || n == 0 {
+		t.Errorf("server-down: %d 'Queue full' against %d 'Node down'; the explanation says almost all are queue full", q, n)
+	}
+	var okDuring, arrivals float64
+	for _, p := range down.Series {
+		if p.T > 24 && p.T < 44 {
+			okDuring = math.Max(okDuring, p.OkRps)
+		}
+		if p.T > 6 && p.T < 18 {
+			arrivals = math.Max(arrivals, p.OkRps)
+		}
+	}
+	if okDuring < 150 || okDuring > 230 || arrivals < 300 || arrivals > 400 {
+		t.Errorf("server-down: successes during the outage peak at %.0f (say about 190), normal load is %.0f (say about 350)", okDuring, arrivals)
+	}
+	slow := Q("watch-slow-query").Symptoms
+	first, last := slow.Series[0], slow.Series[len(slow.Series)/3]
+	if last.P50 < 3*first.P50 || last.InFly < 2*first.InFly {
+		t.Errorf("slow-query: p50 %.0f to %.0f ms, in flight %v to %v; the explanation says latency and requests in flight climb sharply", first.P50, last.P50, first.InFly, last.InFly)
+	}
+	if slow.Trace == nil || slow.Trace.Spans[0].Node != "app" || slow.Trace.Reason != "queueFull" {
+		t.Error("slow-query: the failed request should be refused at the app server, which is the point of the question")
+	}
+}

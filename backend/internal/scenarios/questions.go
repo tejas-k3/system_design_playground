@@ -18,6 +18,8 @@ const (
 	ModeDiagnose = "diagnose"
 	ModeTradeoff = "tradeoff"
 	ModeReview   = "review"
+	ModeMatch    = "match"
+	ModeAsk      = "ask"
 )
 
 // Verdicts for one estimated number.
@@ -42,6 +44,14 @@ type Fact struct {
 	Value string `json:"value"`
 }
 
+// MatchItem is one need and the components that might meet it. The right option and the reason stay on the server.
+type MatchItem struct {
+	Need    string   `json:"need"`
+	Options []string `json:"options"`
+	answer  int
+	why     string
+}
+
 type Question struct {
 	ID         string          `json:"id"`
 	Title      string          `json:"title"`
@@ -53,6 +63,9 @@ type Question struct {
 	Fields     []EstimateField `json:"fields,omitempty"`
 	BuildHint  string          `json:"buildHint,omitempty"`  // estimate: how the numbers become a design, if the question can be built and tested
 	Options    []string        `json:"options,omitempty"`    // diagnose: the candidate explanations
+	Items      []MatchItem     `json:"items,omitempty"`      // match: several needs, each with its own options
+	Asks       []AskOption     `json:"asks,omitempty"`       // ask: the clarifying questions on offer
+	Picks      int             `json:"picks,omitempty"`      // ask: how many of them may be asked
 	Symptoms   *Symptoms       `json:"symptoms,omitempty"`   // diagnose: what the learner gets to look at
 	Candidates []Candidate     `json:"candidates,omitempty"` // tradeoff: designs to run and compare
 	Diagram    *engine.Diagram `json:"diagram,omitempty"`    // review: the design to critique
@@ -148,6 +161,57 @@ func (q *Question) GradeChoice(choice int) (ChoiceResult, error) {
 		r.Stars = 3
 	}
 	return r, nil
+}
+
+type MatchItemResult struct {
+	Correct bool   `json:"correct"`
+	Answer  int    `json:"answer"`
+	Explain string `json:"explain"`
+}
+
+type MatchResult struct {
+	Items   []MatchItemResult `json:"items"`
+	Correct int               `json:"correct"`
+	Stars   int               `json:"stars"`
+}
+
+// GradeMatch grades one choice per item. Every item is graded, and the right option and its reason come back with it.
+func (q *Question) GradeMatch(choices []int) (MatchResult, error) {
+	if q.Mode != ModeMatch {
+		return MatchResult{}, errors.New("not a matching question")
+	}
+	if len(choices) != len(q.Items) {
+		return MatchResult{}, fmt.Errorf("answer all %d items", len(q.Items))
+	}
+	out := MatchResult{Items: make([]MatchItemResult, len(q.Items))}
+	for i, it := range q.Items {
+		if choices[i] < 0 || choices[i] >= len(it.Options) {
+			return MatchResult{}, fmt.Errorf("item %d: choose one of the %d options", i+1, len(it.Options))
+		}
+		ok := choices[i] == it.answer
+		out.Items[i] = MatchItemResult{Correct: ok, Answer: it.answer, Explain: it.why}
+		if ok {
+			out.Correct++
+		}
+	}
+	out.Stars = matchStars(out.Correct, len(q.Items))
+	return out, nil
+}
+
+// matchStars: three stars for all right, or for at most one miss when there are enough items for that to mean
+// something; two for two thirds right; one for half.
+func matchStars(correct, total int) int {
+	switch {
+	case total == 0:
+		return 0
+	case correct == total, total >= 3 && correct >= total-1:
+		return 3
+	case correct*3 >= total*2:
+		return 2
+	case correct*2 >= total:
+		return 1
+	}
+	return 0
 }
 
 type FieldResult struct {

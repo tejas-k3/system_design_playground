@@ -118,6 +118,8 @@ func (s *Server) reviewQuestion(w http.ResponseWriter, r *http.Request) {
 type answerReq struct {
 	Answers map[string]float64 `json:"answers"` // estimate questions
 	Choice  *int               `json:"choice"`  // multiple-choice questions
+	Choices []int              `json:"choices"` // matching questions: one choice per item
+	Picks   []int              `json:"picks"`   // requirements prompts: the questions the learner would ask
 }
 
 // answerQuestion grades a submission. Only now do the expected values and workings leave the server.
@@ -129,6 +131,32 @@ func (s *Server) answerQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 	var req answerReq
 	if !decode(w, r, &req) {
+		return
+	}
+	if q.Mode == scenarios.ModeAsk {
+		if req.Choice != nil || req.Choices != nil {
+			writeErr(w, 400, "send the questions you would ask as picks")
+			return
+		}
+		res, err := q.GradeAsk(req.Picks)
+		if err != nil {
+			writeErr(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, res)
+		return
+	}
+	if q.Mode == scenarios.ModeMatch {
+		if req.Choice != nil {
+			writeErr(w, 400, "send one choice for each item")
+			return
+		}
+		res, err := q.GradeMatch(req.Choices)
+		if err != nil {
+			writeErr(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, res)
 		return
 	}
 	if q.Mode == scenarios.ModeDiagnose || q.Mode == scenarios.ModeTradeoff {
@@ -144,7 +172,7 @@ func (s *Server) answerQuestion(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, res)
 		return
 	}
-	if q.Mode != scenarios.ModeEstimate || req.Choice != nil {
+	if q.Mode != scenarios.ModeEstimate || req.Choice != nil || req.Choices != nil || req.Picks != nil {
 		writeErr(w, 400, "this kind of question is not answered that way")
 		return
 	}

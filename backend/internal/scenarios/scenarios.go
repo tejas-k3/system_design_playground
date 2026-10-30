@@ -44,8 +44,17 @@ type PublicScenario struct {
 	ConfigOnly  bool                             `json:"configOnly,omitempty"`
 	Open        bool                             `json:"open,omitempty"`
 	HintCount   int                              `json:"hintCount"`
+	Starter     []StarterStep                    `json:"starter,omitempty"`
 	Predictions []PublicPrediction               `json:"predictions,omitempty"`
 	Concepts    []string                         `json:"concepts,omitempty"`
+}
+
+// StarterStep is one line of a guided brief's checklist. The learner sees the need in plain words; the step is
+// ticked once a component of Kind that the users can reach is on the canvas. Nudge is shown on request.
+type StarterStep struct {
+	Need  string `json:"need"`
+	Kind  string `json:"kind"`
+	Nudge string `json:"nudge"`
 }
 
 // Public is the first-load view of the challenge.
@@ -53,7 +62,7 @@ func (s *Scenario) Public() PublicScenario {
 	p := PublicScenario{
 		ID: s.ID, Title: s.Title, Difficulty: s.Difficulty, Level: s.Level, Summary: s.Summary, Story: s.Story, Diagram: s.Diagram, Goals: s.Goals,
 		Traffic: s.Traffic, Chaos: s.Chaos, DurationSec: s.DurationSec, WarmupSec: s.WarmupSec, Speed: s.Speed,
-		ConfigOnly: s.ConfigOnly, Open: s.Open, HintCount: len(s.Hints), Concepts: s.Concepts,
+		ConfigOnly: s.ConfigOnly, Open: s.Open, HintCount: len(s.Hints), Starter: s.Starter, Concepts: s.Concepts,
 	}
 	for i := range s.Predictions {
 		q := &s.Predictions[i]
@@ -101,6 +110,7 @@ type Scenario struct {
 	Speed       float64                          `json:"speed"`
 	ConfigOnly  bool                             `json:"configOnly,omitempty"`
 	Open        bool                             `json:"open,omitempty"` // build from a blank canvas; the traffic and failures are hidden and there is no reference solution to show
+	Starter     []StarterStep                    `json:"-"`              // a guided brief's checklist; served in the public view only
 	Hints       [3]string                        `json:"hints"`
 	Answer      string                           `json:"-"` // what hint 3 used to say outright; served only by the answer-hint endpoint, behind an extra click
 	Predictions []Prediction                     `json:"predictions,omitempty"`

@@ -2,6 +2,8 @@ package scenarios
 
 import "sysdesign/internal/engine"
 
+const guidedID = "first-design-links"
+
 // Open challenges give a blank canvas and a list of requirements. The traffic curve and the failures are hidden
 // from the client (see the API) and no reference solution is ever served; Solution here is a witness that
 // proves the requirements can be met, used only by the tests.
@@ -60,4 +62,37 @@ func init() {
 		Debrief: "Writes are the capacity question: a cache does not remove them, so the database's concurrency has to match the write rate, and the servers have to stay healthy while it stumbles. Raising the database's concurrent queries was worth more than adding servers.",
 		Deeper:  "With a write-heavy mix the database is the capacity question: a cache helps the reads but every write still reaches the database, so its concurrency has to match the write rate before extra servers help at all. A write-through cache keeps what it serves consistent with what was written, at the cost of every write paying for both; the servers need timeouts and a circuit breaker so that a slow database produces fast errors and not a pile of stuck threads. At larger scale you would queue the writes that need not be synchronous, shard the order data, and shed the least important traffic first. An interviewer will ask what you do with checkout while the database is slow, whether you accept orders and process them later, and how you avoid charging twice when clients retry. The failure pattern is the slow dependency: it holds threads, the retries pile on, and a stumble becomes an outage.",
 	})
+
+	links := P{"rps": 80.0, "readPct": 90.0, "keySpace": 20000.0, "keyDist": "zipf"}
+	register(&Scenario{
+		ID: guidedID, Title: "First design: a link shortener", Difficulty: "Easy", Open: true,
+		Summary:  "A guided blank page: place the first components, then size them.",
+		Story:    "People paste a long web address and get a short one back; anyone who opens the short one is sent to the long one. Nine in ten requests are people following links. Build it from a blank canvas: at least 95% of requests must succeed, p95 latency must stay under 500 ms, and it must cost no more than $0.55 an hour. The checklist shows what any design like this needs; how many of each, and how they are joined, is up to you. A server can fail while people are using it.",
+		Diagram:  (&bld{}).n("users", engine.KClient, cols[0], rowMid, links).done(),
+		Solution: guidedDesign(3),
+		Starter: []StarterStep{
+			{Need: "Something that sends the requests", Kind: engine.KClient, Nudge: "It is already on the canvas: the people using your service."},
+			{Need: "Something that runs your code for every request", Kind: engine.KAppServer, Nudge: "Look in the Compute group of the library. Each request holds one of its threads until it is finished."},
+			{Need: "Somewhere to keep every link for good", Kind: engine.KDatabase, Nudge: "Look in the Data group. It must survive a restart, so memory alone is not enough."},
+		},
+		Traffic:     map[string][]engine.TrafficPoint{"users": {{0, 80}, {10, 80}, {25, 300}, {45, 300}, {55, 80}, {60, 80}}},
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "random:appServer", AtSec: 30, DownSec: 15}},
+		Goals:       engine.Goals{MinSuccessRate: 0.95, MaxP95Ms: f(500), MaxCostPerHour: f(0.55)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Estimate first: one 8-thread server handles roughly how many requests a second? Compare that with a rush of about 300.",
+			"A server can fail while the rush is on. If one is lost, will the others still carry the load?",
+			"Each server costs money all day. Which number of servers keeps the success rate up but stays inside the budget?",
+		},
+		Answer:  "The answer: a load balancer, three 8-thread app servers and one database. Two servers cannot carry the rush when one of them fails, and a fourth goes over the budget. That is the reference witness the tests use; other shapes can pass too.",
+		Debrief: "The first design has three parts: something that takes requests, something that runs the code, and something that keeps the data. Then comes the sizing: divide the peak by what one server handles, add one so a failure does not hurt, and check the bill before adding anything more.",
+	})
+}
+
+// guidedDesign is the link shortener with n app servers behind a balancer, all using one database.
+func guidedDesign(n int) engine.Diagram {
+	return (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 80.0, "readPct": 90.0, "keySpace": 20000.0, "keyDist": "zipf"}).
+		n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb").
+		n("db", engine.KDatabase, cols[4], rowMid, nil).
+		servers(n, cols[2], rowTop, 70, P{"threads": 8.0}).done()
 }
