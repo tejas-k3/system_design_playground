@@ -19,6 +19,7 @@ const (
 	ModeTradeoff = "tradeoff"
 	ModeReview   = "review"
 	ModeMatch    = "match"
+	ModeAsk      = "ask"
 )
 
 // Verdicts for one estimated number.
@@ -63,6 +64,8 @@ type Question struct {
 	BuildHint  string          `json:"buildHint,omitempty"`  // estimate: how the numbers become a design, if the question can be built and tested
 	Options    []string        `json:"options,omitempty"`    // diagnose: the candidate explanations
 	Items      []MatchItem     `json:"items,omitempty"`      // match: several needs, each with its own options
+	Asks       []AskOption     `json:"asks,omitempty"`       // ask: the clarifying questions on offer
+	Picks      int             `json:"picks,omitempty"`      // ask: how many of them may be asked
 	Symptoms   *Symptoms       `json:"symptoms,omitempty"`   // diagnose: what the learner gets to look at
 	Candidates []Candidate     `json:"candidates,omitempty"` // tradeoff: designs to run and compare
 	Diagram    *engine.Diagram `json:"diagram,omitempty"`    // review: the design to critique
