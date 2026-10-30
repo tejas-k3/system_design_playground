@@ -89,6 +89,30 @@ func init() {
 		Fields:  []EstimateField{{Key: "bandwidthGbps", Label: "Outbound bandwidth", Unit: "Gbit/s", Expected: 10, Explain: "2,500 images/s x 500 KB x 1,000 bytes/KB x 8 bits/byte = 10,000,000,000 bits/s; divide by 1,000,000,000 = 10 Gbit/s."}},
 	})
 
+	registerQuestion(&Question{
+		ID: "yearly-storage-replicated", Title: "How much storage does a year need?", Mode: ModeEstimate, Difficulty: "Easy",
+		Summary: "Turn daily data into a year of storage, with every byte kept on several machines.",
+		Prompt:  "A service adds 200 GB of new data each day, and every byte is kept on 3 copies so a machine can fail. Use 365 days per year and 1,000 GB per TB. How many terabytes of disk does one year of data need?",
+		Facts:   []Fact{{"New data each day", "200 GB"}, {"Copies of every byte", "3"}},
+		Fields:  []EstimateField{{Key: "storageTBPerYear", Label: "Disk needed for one year", Unit: "TB", Expected: 219, Explain: "200 GB x 3 copies = 600 GB a day; x 365 days = 219,000 GB; divide by 1,000 GB per TB = 219 TB. Replication multiplies the disk you buy, not the data you have."}},
+	})
+
+	registerQuestion(&Question{
+		ID: "peak-load-estimate", Title: "How big is the peak?", Mode: ModeEstimate, Difficulty: "Easy",
+		Summary: "Turn an average request rate and a peak factor into the load to design for.",
+		Prompt:  "A service averages 1,200 requests per second over the day. Its busiest minutes run at 4 times the average. How many requests per second must it handle at the peak?",
+		Facts:   []Fact{{"Average load", "1,200 requests per second"}, {"Peak factor", "4 x average"}},
+		Fields:  []EstimateField{{Key: "peakRequestsPerSecond", Label: "Peak requests per second", Unit: "per second", Expected: 4800, Explain: "1,200 x 4 = 4,800 requests per second. Servers must be sized for this peak, because users arrive in bursts and a queue that overflows turns the excess into errors."}},
+	})
+
+	registerQuestion(&Question{
+		ID: "cache-size-estimate", Title: "How big must the cache be?", Mode: ModeEstimate, Difficulty: "Easy",
+		Summary: "Size a cache to hold the popular share of the data.",
+		Prompt:  "A shop has 10 million items of 2 KB each. The hottest 20% of items get most of the reads, and the team wants all of them in the cache. Use 1,000,000 KB per GB. How many gigabytes of cache is that?",
+		Facts:   []Fact{{"Items", "10 million"}, {"Size per item", "2 KB"}, {"Share to keep in the cache", "20%"}},
+		Fields:  []EstimateField{{Key: "cacheGB", Label: "Cache size", Unit: "GB", Expected: 4, Explain: "20% of 10 million = 2 million items; x 2 KB = 4,000,000 KB; divide by 1,000,000 KB per GB = 4 GB. A machine's memory holds that easily, which is why caching the hot set works."}},
+	})
+
 	registerDiagnose("cut-off-threads", diagSource{"cut-off", 1, 60}, &Question{
 		Title: "Everything slows, then stops", Difficulty: "Medium",
 		Summary: "Success falls off a cliff and the latency chart goes blank. What is going on?",

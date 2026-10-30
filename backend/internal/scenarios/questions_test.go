@@ -121,6 +121,9 @@ func TestNewEasyEstimatesMatchTheirPrompts(t *testing.T) {
 		{"daily-storage-estimate", "storageGBPerDay", 20e6 * 500 / 1e9, []string{"20 million", "500 bytes", "1,000,000,000 bytes"}},
 		{"daily-users-rps", "requestsPerSecond", 8.64e6 * 10 / 86400, []string{"8.64 million", "10 requests", "86,400 seconds"}},
 		{"image-egress-bandwidth", "bandwidthGbps", 2500 * 500e3 * 8 / 1e9, []string{"2,500 images", "500 KB", "1,000 bytes per KB", "8 bits per byte"}},
+		{"yearly-storage-replicated", "storageTBPerYear", 200 * 3 * 365 / 1000.0, []string{"200 GB", "3 copies", "365 days", "1,000 GB per TB"}},
+		{"peak-load-estimate", "peakRequestsPerSecond", 1200 * 4, []string{"1,200 requests", "4 times"}},
+		{"cache-size-estimate", "cacheGB", 10e6 * 0.2 * 2 / 1e6, []string{"10 million items", "2 KB", "20%", "1,000,000 KB per GB"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.id, func(t *testing.T) {
