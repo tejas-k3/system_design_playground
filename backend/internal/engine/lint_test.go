@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -79,6 +80,33 @@ func TestLintRulesFireOnTheRiskyShapeAndStaySilentOtherwise(t *testing.T) {
 			t.Errorf("%s: finding must say what, how to fix, and where: %+v", c.name, got)
 		}
 	}
+}
+
+func TestLintFlagsWriteQuorumsThatCanConflict(t *testing.T) {
+	const rule = "write-quorum-no-overlap"
+	cases := []struct {
+		name string
+		d    Diagram
+		want bool
+	}{
+		{"overlapping reads but disjoint writes", kvLintDiagram(3, 3, 1), true},
+		{"majority writes overlap", kvLintDiagram(3, 2, 2), false},
+		{"read quorum does not overlap writes", kvLintDiagram(3, 2, 1), false},
+		{"no key-value store", Diagram{Nodes: []Node{{ID: "db", Kind: KDatabase}}}, false},
+	}
+	for _, c := range cases {
+		f, ok := rules(Lint(c.d))[rule]
+		if ok != c.want {
+			t.Errorf("%s: rule fired=%v, want %v", c.name, ok, c.want)
+		}
+		if ok && (f.Severity != "warn" || !strings.Contains(f.Message, "N=3") || !strings.Contains(f.Message, "W=1") || !strings.Contains(f.Message, "two writes can succeed without meeting") || !strings.Contains(f.Message, "conflict")) {
+			t.Errorf("%s: finding must name the counts and explain the conflict: %+v", c.name, f)
+		}
+	}
+}
+
+func kvLintDiagram(replicas, readQuorum, writeQuorum float64) Diagram {
+	return Diagram{Nodes: []Node{{ID: "kv", Kind: KKVStore, Params: Params{"replicas": replicas, "readQuorum": readQuorum, "writeQuorum": writeQuorum}}}}
 }
 
 func TestLintDanglingAndSynchronisedExpiry(t *testing.T) {

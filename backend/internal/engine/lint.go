@@ -178,6 +178,19 @@ func Lint(d Diagram) []Finding {
 		}
 	}
 
+	for _, n := range d.Nodes {
+		if n.Kind != KKVStore {
+			continue
+		}
+		p := res[n.ID]
+		copies, readQuorum, writeQuorum := pf(p, "replicas", 3), pf(p, "readQuorum", 2), pf(p, "writeQuorum", 2)
+		if readQuorum+writeQuorum <= copies || writeQuorum > copies/2 {
+			continue
+		}
+		msg := fmt.Sprintf("With N=%.0f and W=%.0f, two writes can succeed without meeting, so they can conflict.", copies, writeQuorum)
+		add("write-quorum-no-overlap", "warn", msg, "Raise the write quorum above half the copies.", n.ID)
+	}
+
 	// a payload the queue cannot carry: the users' request size against each queue's message limit
 	biggest := 0.0
 	for _, id := range clients {
