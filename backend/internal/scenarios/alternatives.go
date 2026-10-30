@@ -42,6 +42,9 @@ func applyChanges(d engine.Diagram, cs []Change) engine.Diagram {
 	return out
 }
 
+// ApplyAlternative applies a stored alternative to a learner's diagram.
+func ApplyAlternative(d engine.Diagram, cs []Change) engine.Diagram { return applyChanges(d, cs) }
+
 func alt(label string, pass bool, success, p95, cost float64, why string, cs ...Change) Alternative {
 	return Alternative{Label: label, Changes: cs, Pass: pass, SuccessPct: success, P95Ms: p95, CostPerHour: cost, Why: why}
 }
