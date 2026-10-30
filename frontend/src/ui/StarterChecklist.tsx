@@ -18,7 +18,7 @@ export function StarterChecklist({ steps }: { steps: StarterStep[] }) {
           </li>
         ))}
       </ul>
-      <p className="muted small" role="status">{done ? 'All three are in place. Now size them: run it and read the goals.' : 'Place each one and connect it so the users can reach it.'}</p>
+      <p className="muted small" role="status">{done ? 'Every part is in place and connected. Now size them: run it and read the goals.' : 'Place each one and connect it to the one above it.'}</p>
     </section>
   )
 }

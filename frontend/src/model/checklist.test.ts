@@ -31,4 +31,20 @@ describe('checklistProgress', () => {
   it('copes with a design that has no users at all', () => {
     expect(checklistProgress(design([['app', 'appServer']], []), steps).map((s) => s.done)).toEqual([false, false, false])
   })
+  it('needs each step to be reached from the one above it, not just to exist', () => {
+    const direct = design([['users', 'client'], ['db', 'database']], [['users', 'db']])
+    expect(checklistProgress(direct, steps).map((s) => s.done)).toEqual([true, false, false])
+  })
+  it('does not tick the last step when it hangs off a different path than the app server', () => {
+    const d = design([['users', 'client'], ['app', 'appServer'], ['cache', 'cache'], ['db', 'database']], [['users', 'app'], ['users', 'db']])
+    expect(checklistProgress(d, steps).map((s) => s.done)).toEqual([true, true, false])
+  })
+  it('ticks the last step once the app server feeds it, even through another component', () => {
+    const d = design([['users', 'client'], ['app', 'appServer'], ['cache', 'cache'], ['db', 'database']], [['users', 'app'], ['app', 'cache'], ['cache', 'db']])
+    expect(checklistProgress(d, steps).every((s) => s.done)).toBe(true)
+  })
+  it('ignores an edge that points back at the users', () => {
+    const d = design([['users', 'client'], ['app', 'appServer']], [['app', 'users']])
+    expect(checklistProgress(d, steps).map((s) => s.done)).toEqual([true, false, false])
+  })
 })

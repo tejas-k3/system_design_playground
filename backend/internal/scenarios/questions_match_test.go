@@ -153,3 +153,25 @@ func TestGradingMatchRefusesAMalformedSubmission(t *testing.T) {
 		t.Error("only a match question can be graded this way")
 	}
 }
+
+// An explanation that says another option "also works" while grading it wrong punishes sound reasoning.
+func TestMatchExplanationsDoNotConcedeAnotherOption(t *testing.T) {
+	for i, it := range matchQuestion(t).Items {
+		for _, phrase := range []string{"also works", "also work", "would also", "can also"} {
+			if strings.Contains(strings.ToLower(it.why), phrase) {
+				t.Errorf("item %d: the reason says %q, so another option may be defensible", i+1, phrase)
+			}
+		}
+	}
+}
+
+// A one-miss allowance only makes sense with a few items to miss; a tiny set must not hand out stars for nothing.
+func TestMatchStarsAreFairForSmallSets(t *testing.T) {
+	for _, c := range []struct{ correct, total, stars int }{
+		{0, 0, 0}, {0, 1, 0}, {1, 1, 3}, {0, 2, 0}, {1, 2, 1}, {2, 2, 3}, {2, 3, 3}, {1, 3, 0}, {12, 12, 3}, {11, 12, 3}, {8, 12, 2}, {6, 12, 1}, {5, 12, 0},
+	} {
+		if got := matchStars(c.correct, c.total); got != c.stars {
+			t.Errorf("%d of %d: %d stars, want %d", c.correct, c.total, got, c.stars)
+		}
+	}
+}

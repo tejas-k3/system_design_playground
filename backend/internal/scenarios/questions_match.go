@@ -7,8 +7,8 @@ func init() {
 		Prompt:  "Each line describes something a system has to do. Pick the component you would add to do it.",
 		Items: []MatchItem{
 			{Need: "Remember a user's shopping cart for 30 minutes and read it back very fast. It can be thrown away afterwards.",
-				Options: []string{"Cache", "Database", "Load Balancer", "Object Store"}, answer: 0,
-				why: "A cache keeps recent data in fast memory and drops it after a set time. A database also works but is slower and keeps the cart for ever."},
+				Options: []string{"Cache", "CDN", "Load Balancer", "Object Store"}, answer: 0,
+				why: "A cache keeps recent data in fast memory and drops it after a set time, which suits a cart that only needs to live for 30 minutes."},
 			{Need: "Keep every order for years and answer \"which orders did this customer place?\".",
 				Options: []string{"Message Queue", "CDN", "Database", "Rate Limiter"}, answer: 2,
 				why: "A database stores data durably and can search it. A queue only holds messages until someone takes them."},

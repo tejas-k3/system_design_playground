@@ -195,10 +195,13 @@ func (q *Question) GradeMatch(choices []int) (MatchResult, error) {
 	return out, nil
 }
 
-// matchStars: three stars for at most one miss, two for two thirds right, one for half.
+// matchStars: three stars for all right, or for at most one miss when there are enough items for that to mean
+// something; two for two thirds right; one for half.
 func matchStars(correct, total int) int {
 	switch {
-	case correct >= total-1:
+	case total == 0:
+		return 0
+	case correct == total, total >= 3 && correct >= total-1:
 		return 3
 	case correct*3 >= total*2:
 		return 2
