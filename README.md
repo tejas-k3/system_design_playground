@@ -5,6 +5,8 @@ system design: drag servers, caches, databases, queues and more onto a canvas, w
 press Play, and see queues fill, connection pools run dry, retries pile up and stale reads appear.
 Guided challenges start from a broken design and score your fix from one to three stars.
 
+**Try it online:** https://system-design-playground-5yon.onrender.com (a free server that sleeps when idle, so the first load can take up to a minute).
+
 ```
 frontend/   React + TypeScript + Vite + zustand + roughjs (hand-drawn canvas)
 backend/    Go: deterministic discrete-event simulation engine, REST API, WebSocket live sessions
