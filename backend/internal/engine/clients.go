@@ -140,7 +140,7 @@ type logical struct {
 	user      int   // the account sending the request (0 = identities not modelled)
 	heavy     bool  // an expensive request (heavyPct), chosen from the request number
 	tok       int32 // tokens the request carries, for a limiter that counts them
-	sawWrite  int   // per-client models: what the client knew of its own writes and reads of this key when it asked
+	sawWrite  int   // known own-write version; negative marks an already-counted write-order violation
 	sawRead   int
 	high      bool // an urgent request (priorityPct): chosen from the request number, no random draw
 	tr        *tracer
