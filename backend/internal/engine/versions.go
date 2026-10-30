@@ -82,29 +82,37 @@ func (s *Sim) countFreshness(lg *logical, res Result) {
 	}
 }
 
-// countSession checks a read against what this client already knows, for the per-client models: read-your-writes
-// (a read must not be older than the client's own last acknowledged write of the key), monotonic reads (a read must
-// not be older than one the client already had), and causal, which asks for both.
+// ensureSessionMaps lazily creates the maps used only by clients with per-client consistency guarantees.
+func (cl *node) ensureSessionMaps() {
+	if cl.sessWrite == nil {
+		cl.sessWrite, cl.sessRead = map[int]int{}, map[int]int{}
+	}
+}
+
+// countSession checks reads against what this client already knows and records reads for later session checks.
 func (s *Sim) countSession(lg *logical, res Result) {
 	if res.Ver < 0 {
 		return
 	}
 	cl := lg.client
 	model := cl.s("consistency")
-	if model != "readYourWrites" && model != "monotonic" && model != "causal" {
+	if model != "readYourWrites" && model != "monotonic" && model != "causal" && model != "monotonicWrites" && model != "writesFollowReads" {
 		return
 	}
-	if cl.sessWrite == nil {
-		cl.sessWrite, cl.sessRead = map[int]int{}, map[int]int{}
-	}
+	cl.ensureSessionMaps()
 	if lg.write {
+		if model == "monotonicWrites" || model == "writesFollowReads" {
+			return
+		}
 		if res.Ver > cl.sessWrite[lg.key] {
 			cl.sessWrite[lg.key] = res.Ver
 		}
 		return
 	}
 	if lg.counted {
-		s.runSessReads++
+		if model != "monotonicWrites" {
+			s.runSessReads++
+		}
 		if (model == "readYourWrites" || model == "causal") && res.Ver < lg.sawWrite {
 			s.runRYW++
 		}
@@ -114,6 +122,35 @@ func (s *Sim) countSession(lg *logical, res Result) {
 	}
 	if res.Ver > cl.sessRead[lg.key] {
 		cl.sessRead[lg.key] = res.Ver
+	}
+}
+
+func (s *Sim) countMonotonicWrite(c *call) {
+	lg := c.lg
+	if lg == nil || lg.client.s("consistency") != "monotonicWrites" {
+		return
+	}
+	cl := lg.client
+	cl.ensureSessionMaps()
+	if lg.id < cl.sessWrite[c.key] {
+		if lg.sawWrite >= 0 {
+			lg.sawWrite = -1 // a negative value marks this logical write as already counted
+			if lg.counted {
+				s.runMonoWriteBroken++
+			}
+		}
+		return
+	}
+	cl.sessWrite[c.key] = lg.id
+}
+
+func (s *Sim) countWritesFollowReads(lg *logical, version int) {
+	if lg == nil || lg.client.s("consistency") != "writesFollowReads" || lg.sawRead <= version || lg.sawWrite < 0 {
+		return
+	}
+	lg.sawWrite = -1 // a negative value marks this logical write as already counted
+	if lg.counted {
+		s.runFollowReadBroken++
 	}
 }
 
@@ -135,6 +172,7 @@ func (s *Sim) commit(n *node, c *call) int {
 	if n.logWrites {
 		n.writeLog = append(n.writeLog, s.now)
 	}
+	s.countMonotonicWrite(c)
 	return s.bumpVer(c.key)
 }
 

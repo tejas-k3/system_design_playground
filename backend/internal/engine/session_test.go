@@ -1,6 +1,124 @@
 package engine
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestCausalOptionIsNamedForItsSessionGuarantees(t *testing.T) {
+	var help string
+	var storedID bool
+	for _, p := range Spec(KClient).Params {
+		if p.Key != "consistency" {
+			continue
+		}
+		help = p.Help
+		for _, option := range p.Options {
+			if option.Value == "causal" {
+				storedID = true
+				if option.Label != "Read your writes + monotonic reads" {
+					t.Errorf("causal option label = %q", option.Label)
+				}
+			}
+		}
+	}
+	if !storedID {
+		t.Fatal("consistency option id causal must remain for saved designs")
+	}
+	if strings.Contains(strings.ToLower(help), "causal") {
+		t.Errorf("consistency help still calls the session guarantees causal: %q", help)
+	}
+}
+
+func TestSessionOptionsIncludeTheOtherClientGuarantees(t *testing.T) {
+	options := map[string]bool{}
+	for _, p := range Spec(KClient).Params {
+		if p.Key == "consistency" {
+			for _, option := range p.Options {
+				options[option.Value] = true
+			}
+		}
+	}
+	for _, id := range []string{"monotonicWrites", "writesFollowReads"} {
+		if !options[id] {
+			t.Errorf("consistency option %q is missing", id)
+		}
+	}
+}
+
+func TestMonotonicWritesFollowTheClientIssueOrder(t *testing.T) {
+	ordered := monotonicWriteViolations(t, []int{1, 2})
+	reversed := monotonicWriteViolations(t, []int{2, 1})
+	if ordered != "0" || reversed != "1" {
+		t.Fatalf("ordered commits should have 0 violations and reversed commits 1, got %s and %s", ordered, reversed)
+	}
+}
+
+func monotonicWriteViolations(t *testing.T, ids []int) string {
+	t.Helper()
+	s, client, kv := sessionSimulation("monotonicWrites", nil)
+	for _, id := range ids {
+		lg := &logical{id: id, client: client, write: true, counted: true, key: 1}
+		ver := s.commit(kv, &call{lg: lg, key: lg.key})
+		s.countSession(lg, Result{OK: true, Ver: ver})
+	}
+	return sessionViolation(s)
+}
+
+func TestWritesFollowReadsOnlyApplyToCopiesAtLeastAsNew(t *testing.T) {
+	stale := writesFollowReadViolations(t, 4)
+	current := writesFollowReadViolations(t, 5)
+	if stale != "1" || current != "0" {
+		t.Fatalf("writing to copies older than the read should count one violation, got %s; current copies got %s", stale, current)
+	}
+}
+
+func writesFollowReadViolations(t *testing.T, copyVersion int) string {
+	t.Helper()
+	s, client, kv := sessionSimulation("writesFollowReads", Params{
+		"nodes": 3.0, "replicas": 3.0, "readQuorum": 1.0, "writeQuorum": 1.0,
+		"readMs": 0.1, "writeMs": 0.1, "variability": "steady",
+	})
+	client.down = true
+	for i := 0; i < 5; i++ {
+		s.bumpVer(1)
+	}
+	s.countSession(&logical{client: client, counted: true, key: 1}, Result{OK: true, Ver: 5})
+	kv.kvEnsure(3, 1)
+	for _, versions := range kv.kvVer {
+		versions[1] = copyVersion
+	}
+	lg := &logical{id: 6, client: client, write: true, counted: true, key: 1, sawRead: client.sessRead[1]}
+	var got Result
+	s.procKV(kv, &call{lg: lg, write: true, key: 1, cmd: cmdWrite}, func(r Result) { got = r }, func() {})
+	s.Advance(1)
+	if !got.OK {
+		t.Fatalf("write did not complete: %+v", got)
+	}
+	s.countSession(lg, got)
+	return sessionViolation(s)
+}
+
+func sessionSimulation(model string, kv Params) (*Sim, *node, *node) {
+	d := Diagram{Nodes: []Node{
+		{ID: "users", Kind: KClient, Params: Params{"consistency": model, "rps": 50.0, "readPct": 0.0, "keySpace": 1.0, "keyDist": "uniform"}},
+		{ID: "kv", Kind: KKVStore, Params: kv},
+	}}
+	d, _ = Sanitize(d)
+	s := New(d, Options{Seed: 1})
+	return s, s.nodes["users"], s.nodes["kv"]
+}
+
+func sessionViolation(s *Sim) string {
+	zero := 0
+	score := Evaluate(Goals{MaxSessionViolations: &zero}, Diagram{}, s.RunSnapshot(), 1)
+	for _, check := range score.Checks {
+		if check.Label == "Per-client guarantees broken" {
+			return check.Actual
+		}
+	}
+	return "missing"
+}
 
 // Per-client guarantees, counted against what the same client has already written or read. A client that keeps
 // asking for its own latest data sees a violation when a read returns something older than what it knows.

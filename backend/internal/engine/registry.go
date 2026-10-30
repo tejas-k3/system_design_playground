@@ -155,9 +155,10 @@ func init() {
 					opt("zipf", "Skewed (Zipf)"), opt("uniform", "Uniform"), opt("scan", "Sequential scan")),
 				num("keySpace", "Distinct items", "What they do", 10000, 1, 1000000, 100, "", "Size of the item universe."),
 				num("zipfS", "Skew", "What they do", 1, 0, 2, 0.1, "", "Zipf exponent: higher means a few items dominate.").showIf("keyDist", "zipf"),
-				sel("consistency", "Freshness needed", "Consistency", "eventual", "How fresh a read must be. Strong compares with the latest write by anyone; bounded allows a set age; read-your-writes means a client must see its own writes, monotonic that it never sees data go backwards; causal asks for both. The last three are checked per client.",
+				sel("consistency", "Freshness needed", "Consistency", "eventual", "How fresh a read must be. Strong compares with the latest write by anyone; bounded allows a set age; read-your-writes means a client must see its own writes, and monotonic reads must not go backwards. The combined option asks for both. Monotonic writes keep one client's writes in issue order; writes follow reads applies a write only to copies at least as new as the client's last read. The last five are checked per client.",
 					opt("eventual", "Eventual (stale is fine)"), opt("bounded", "Bounded staleness"), opt("strong", "Strong (always fresh)"),
-					opt("readYourWrites", "Read your writes"), opt("monotonic", "Monotonic reads"), opt("causal", "Causal: both of those")),
+					opt("readYourWrites", "Read your writes"), opt("monotonic", "Monotonic reads"), opt("causal", "Read your writes + monotonic reads"),
+					opt("monotonicWrites", "Monotonic writes"), opt("writesFollowReads", "Writes follow reads")),
 				num("maxStaleMs", "Max staleness", "Consistency", 1000, 0, 60000, 100, "ms", "Reads older than this count as too stale.").showIf("consistency", "bounded"),
 				num("hotKeyPct", "Hot item share", "What they do", 0, 0, 100, 1, "%", "Share of requests hitting one single item.").adv(),
 				num("crawlHosts", "Sites", "Crawl", 20, 1, 1000, 1, "", "How many sites the pages belong to. Page counts are Zipf-skewed, so a few sites are huge.").showIf("workload", "crawl"),
@@ -538,7 +539,7 @@ func init() {
 			cost: func(p Params) float64 { return 0.1 * pf(p, "nodes", 5) },
 		},
 		{
-			Kind: KCoordinator, Name: "Coordinator", Description: "A small cluster (Raft or ZooKeeper style) that agrees on a leader. State written through it is strongly consistent, but it answers nothing without a leader.",
+			Kind: KCoordinator, Name: "Coordinator", Description: "The simulator models a leader-based cluster, as Raft does: writes wait for a majority. Real ZooKeeper may serve reads from a follower, so they can be stale. It answers nothing without a leader.",
 			Lesson: "Losing the leader costs an election; losing the majority costs the service. An odd number of nodes tolerates (n-1)/2 failures.",
 			Accent: "#364fc7", Width: 160, Height: 72, CanConnect: nil,
 			Params: []ParamSpec{

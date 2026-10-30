@@ -9,6 +9,21 @@ import (
 
 var sentenceEnd = regexp.MustCompile(`[.?!]( |$)`)
 
+func TestQuorumOverlapExplainsBothQuorumRules(t *testing.T) {
+	sc := Get("quorum-overlap")
+	for name, text := range map[string]string{"debrief": sc.Debrief, "deeper": sc.Deeper} {
+		if !strings.Contains(text, "latest completed write") {
+			t.Errorf("%s must limit the read guarantee to completed writes", name)
+		}
+		if !strings.Contains(text, "W > N/2") {
+			t.Errorf("%s must explain that write quorums exceed half of N", name)
+		}
+		if strings.Contains(strings.ToLower(text), "never goes backwards") {
+			t.Errorf("%s must not claim quorums alone prevent reads going backwards", name)
+		}
+	}
+}
+
 // Every Hard challenge carries a longer debrief for an experienced engineer, shown on request next to the
 // ordinary one: trade-offs, what changes at scale, what an interviewer asks next.
 func TestEveryHardChallengeHasADeeperDebrief(t *testing.T) {

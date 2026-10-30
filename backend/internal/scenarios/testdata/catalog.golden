@@ -61,7 +61,7 @@ fence-the-old-primary 79dc42967e5e7c6bd7de7281b9fe725cc4fefdac4826d6364892282285
 search-tail 62392213085023911c6cae3d62fb843bb6f3d33d9904bb86d9620615c920383d start=false/0/0.9982/559.4 solution=true/3/1.0000/170.5
 nobody-on-call 0455f362e184abdf90d939cbc1d837fabc2f33f63bc59504b14cf32e788e4ba9 start=false/0/1.0000/199.8 solution=true/3/0.9976/203.8
 lost-cart 01c8b963e59d5c1f6094c139d6e06e3de552ff07d47d96f71dec89dd71ad4bd5 start=false/0/1.0000/177.4 solution=true/3/1.0000/177.4
-quorum-overlap 9e283ad4c858a87f0c38b94ebf3652e29e281e1d9ac4f3137311b6623c679c8a start=false/0/1.0000/160.7 solution=true/3/1.0000/216.2
+quorum-overlap 4e03d43d292a37dba955b10519e25eea5e05856373e96c0e6f9d07ca06413031 start=false/0/1.0000/160.7 solution=true/3/1.0000/216.2
 lease-expired f9db534e439db6226bbe40f456336db2ebcd4be8410fda299d97ec3f05116d41 start=false/0/0.9790/2327.9 solution=true/2/0.9790/2327.9
 who-is-the-leader 838c0e580fb2ed7f92b2eac175a9a6e8be994e0029cd94ce6cf988804e15f404 start=false/0/0.6771/173.9 solution=true/3/0.9292/177.4
 launch-day 6234a2c45b9220751085eba879fd9fc0c833bfa081be46f88799ed649948f8f3 start=false/0/0.0000/0.0 solution=true/2/1.0000/184.6

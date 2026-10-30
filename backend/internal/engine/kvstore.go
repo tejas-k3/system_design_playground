@@ -134,6 +134,7 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 				kx.hintSibs[r.target] = append(kx.hintSibs[r.target], kvHintSib{c.key, kvSib{nvv, ver, who}})
 			}
 		} else {
+			s.countWritesFollowReads(c.lg, n.kvVer[r.node][c.key])
 			if ver > n.kvVer[r.node][c.key] {
 				n.kvVer[r.node][c.key] = ver
 			}
