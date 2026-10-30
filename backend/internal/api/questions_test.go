@@ -237,8 +237,8 @@ func TestOpenChallengeHidesItsLoadAndHasNoSolutionToServe(t *testing.T) {
 			open++
 		}
 	}
-	if open != 2 {
-		t.Errorf("the list should flag the two open challenges, flagged %d", open)
+	if open != 3 {
+		t.Errorf("the list should flag the three open challenges, flagged %d", open)
 	}
 	// and it still runs with its hidden profile: a session scores it
 	var run runResp
@@ -327,5 +327,29 @@ func TestAnsweringAMatchQuestionGradesEveryItemAndRevealsTheKeyOnlyAfterwards(t 
 	}
 	if c := post(t, ts.URL+"/api/questions/cut-off-threads/answer", map[string]any{"choices": zeros}, nil); c != 400 {
 		t.Errorf("a list of choices sent to a diagnosis: %d", c)
+	}
+}
+
+func TestGuidedBriefServesItsChecklistButNotTheHiddenLoadOrTheAnswer(t *testing.T) {
+	ts := newTestServer(t)
+	var sc map[string]any
+	if code := get(t, ts.URL+"/api/scenarios/first-design-links", &sc); code != 200 {
+		t.Fatalf("status %d", code)
+	}
+	steps, _ := sc["starter"].([]any)
+	if len(steps) != 3 {
+		t.Fatalf("served %d starter steps, want 3", len(steps))
+	}
+	for _, hidden := range []string{"traffic", "chaos", "answer", "solution"} {
+		if _, leaks := sc[hidden]; leaks {
+			t.Errorf("an open brief serves %q", hidden)
+		}
+	}
+	var list []map[string]any
+	get(t, ts.URL+"/api/scenarios", &list)
+	for _, s := range list {
+		if _, ok := s["starter"]; ok {
+			t.Error("the checklist belongs to the challenge view, not the first-load list")
+		}
 	}
 }
