@@ -2,6 +2,7 @@ package api
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"sysdesign/internal/scenarios"
@@ -40,6 +41,12 @@ func TestBottleneckGradesAGuessAgainstARealLoadSweep(t *testing.T) {
 	var wrong, right bottleneckResp
 	if code := post(t, ts.URL+"/api/bottleneck", map[string]any{"diagram": slow, "guess": "app"}, &wrong); code != 200 || wrong.Correct || len(wrong.Points) != 5 {
 		t.Fatalf("a wrong guess: status %d %+v", code, wrong)
+	}
+	if !strings.Contains(wrong.Explain, "at today's traffic") || strings.Contains(wrong.Explain, "1 times") {
+		t.Errorf("a part that is already full today should say so plainly: %q", wrong.Explain)
+	}
+	if wrong.Points[0].Hottest != "db" {
+		t.Errorf("the busiest part is the one doing the work, not the server waiting on it: %q", wrong.Points[0].Hottest)
 	}
 	if !reflect.DeepEqual(wrong.Culprits, []string{"db"}) || wrong.At < 0 || wrong.Explain == "" {
 		t.Fatalf("the answer should name the database and where it saturates: %+v", wrong)

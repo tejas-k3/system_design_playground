@@ -58,35 +58,60 @@ func reaches(calls map[string][]string, id string) map[string]bool {
 	return seen
 }
 
+// deepest names the saturated components at one load that are not merely waiting on a saturated callee, sorted.
+func deepest(u map[string]float64, calls map[string][]string) []string {
+	saturated := map[string]bool{}
+	for id, v := range u {
+		if v >= saturatedAt {
+			saturated[id] = true
+		}
+	}
+	var who []string
+	for id := range saturated {
+		waiting := false
+		for below := range reaches(calls, id) {
+			if saturated[below] && below != id && !reaches(calls, below)[id] {
+				waiting = true
+			}
+		}
+		if !waiting {
+			who = append(who, id)
+		}
+	}
+	sort.Strings(who)
+	return who
+}
+
 // firstToFail finds the lightest load at which some component is saturated, and which components are. utils
 // holds each component's busy share at each load, lightest first; calls says who calls whom. A component whose
 // own callee is saturated is only waiting on it (a server's threads sit busy behind a slow database), so it is
 // not named: the culprits are the deepest saturated components.
 func firstToFail(utils []map[string]float64, calls map[string][]string) (at int, who []string) {
 	for i, u := range utils {
-		saturated := map[string]bool{}
-		for id, v := range u {
-			if v >= saturatedAt {
-				saturated[id] = true
-			}
-		}
-		for id := range saturated {
-			waiting := false
-			for below := range reaches(calls, id) {
-				if saturated[below] && below != id && !reaches(calls, below)[id] {
-					waiting = true
-				}
-			}
-			if !waiting {
-				who = append(who, id)
-			}
-		}
-		if len(who) > 0 {
-			sort.Strings(who)
+		if who = deepest(u, calls); len(who) > 0 {
 			return i, who
 		}
 	}
 	return -1, nil
+}
+
+// hottest is the part that is doing the work at one load: the busiest of the deepest saturated components, or if
+// none is saturated, simply the busiest part.
+func hottest(u map[string]float64, calls map[string][]string) (string, float64) {
+	pool := deepest(u, calls)
+	if len(pool) == 0 {
+		for id := range u {
+			pool = append(pool, id)
+		}
+		sort.Strings(pool)
+	}
+	best := ""
+	for _, id := range pool {
+		if best == "" || u[id] > u[best] {
+			best = id
+		}
+	}
+	return best, u[best]
 }
 
 // subjectOf names the culprits as one phrase and gives the verb that agrees with it: "App Server ×3 reach".
@@ -165,12 +190,8 @@ func (s *Server) bottleneck(w http.ResponseWriter, r *http.Request) {
 		util := map[string]float64{}
 		pt := bottleneckPoint{Load: m, Rps: offered(pd)}
 		for id, ns := range sim.Snapshot().Nodes {
-			if _, ok := label[id]; !ok {
-				continue
-			}
-			util[id] = ns.Util
-			if ns.Util > pt.HottestUtil || (ns.Util == pt.HottestUtil && id < pt.Hottest) {
-				pt.Hottest, pt.HottestUtil = id, ns.Util
+			if _, ok := label[id]; ok {
+				util[id] = ns.Util
 			}
 		}
 		for !sim.Finished() && sim.Now() < opts.StopTrafficAtMs+60000 {
@@ -190,6 +211,9 @@ func (s *Server) bottleneck(w http.ResponseWriter, r *http.Request) {
 	for _, e := range d.Edges {
 		calls[e.From] = append(calls[e.From], e.To)
 	}
+	for i, u := range utils {
+		resp.Points[i].Hottest, resp.Points[i].HottestUtil = hottest(u, calls)
+	}
 	resp.At, resp.Culprits = firstToFail(utils, calls)
 	switch {
 	case resp.At < 0:
@@ -205,7 +229,12 @@ func (s *Server) bottleneck(w http.ResponseWriter, r *http.Request) {
 			names[i] = label[id]
 		}
 		subject, verb := subjectOf(names)
-		resp.Explain = fmt.Sprintf("%s %s 95%% busy at %g times today's traffic (about %.0f requests a second): the first to run out.", subject, verb, resp.Points[resp.At].Load, resp.Points[resp.At].Rps)
+		at := resp.Points[resp.At]
+		when := "today's traffic"
+		if at.Load != 1 {
+			when = fmt.Sprintf("%g× today's traffic", at.Load)
+		}
+		resp.Explain = fmt.Sprintf("%s %s 95%% busy at %s (about %.0f requests a second): the first to run out.", subject, verb, when, at.Rps)
 	}
 	writeJSON(w, 200, resp)
 }
