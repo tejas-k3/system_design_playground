@@ -1,4 +1,4 @@
-import type { Alternative, BuildResult, ChoiceResult, Diagram, MatchResult, ReviewResult, RunSummary, EstimateResult, Finding, PredictionAnswer, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { Alternative, BuildResult, AskResult, BottleneckResult, ChoiceResult, Diagram, MatchResult, ReviewResult, RunSummary, EstimateResult, Finding, PredictionAnswer, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 import { loadSummaries, saveSummaries } from '../model/summaries'
 
@@ -66,6 +66,12 @@ export async function sweepLoad(diagram: Diagram, loads: number[], durationSec =
   return json(res)
 }
 
+/** Which component runs out first at twice today's traffic? The answer comes back only with a guess ('' means none). */
+export async function checkBottleneck(diagram: Diagram, guess: string): Promise<BottleneckResult> {
+  const res = await fetch('/api/bottleneck', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, guess }) })
+  return json(res)
+}
+
 export interface RunResult {
   stats: Stats
   costPerHour: number
@@ -97,6 +103,11 @@ export async function answerChoice(id: string, choice: number): Promise<ChoiceRe
 
 export async function answerMatch(id: string, choices: number[]): Promise<MatchResult> {
   const res = await fetch(`/api/questions/${encodeURIComponent(id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ choices }) })
+  return json(res)
+}
+
+export async function answerAsk(id: string, picks: number[]): Promise<AskResult> {
+  const res = await fetch(`/api/questions/${encodeURIComponent(id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ picks }) })
   return json(res)
 }
 

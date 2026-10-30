@@ -353,3 +353,43 @@ func TestGuidedBriefServesItsChecklistButNotTheHiddenLoadOrTheAnswer(t *testing.
 		}
 	}
 }
+
+func TestAnsweringARequirementsPromptGradesThePicksAndRevealsTheKeyAfterwards(t *testing.T) {
+	ts := newTestServer(t)
+	const path = "/api/questions/ask-photo-feed"
+	var served struct {
+		Asks  []map[string]any `json:"asks"`
+		Picks int              `json:"picks"`
+	}
+	if code := get(t, ts.URL+path, &served); code != 200 || len(served.Asks) != 8 || served.Picks != 3 {
+		t.Fatalf("served: status %d, %d asks, %d picks", code, len(served.Asks), served.Picks)
+	}
+	for _, a := range served.Asks {
+		if len(a) != 1 {
+			t.Fatalf("an ask is served with more than its text: %v", a)
+		}
+	}
+	var res scenarios.AskResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"picks": []int{0, 1}}, &res); code != 200 || res.Wasted != 2 || len(res.Items) != 8 || res.Stars != 0 {
+		t.Fatalf("graded: status %d %+v", code, res)
+	}
+	var best scenarios.AskResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"picks": []int{2, 5}}, &best); code != 200 || best.Found != 2 || best.Stars != 3 || best.Items[2].Flip == "" {
+		t.Fatalf("best picks: status %d %+v", code, best)
+	}
+	for name, body := range map[string]map[string]any{
+		"none":              {},
+		"too many":          {"picks": []int{0, 1, 2, 3}},
+		"a repeat":          {"picks": []int{2, 2}},
+		"out of range":      {"picks": []int{9}},
+		"a single choice":   {"choice": 1},
+		"numbers to a menu": {"answers": map[string]float64{"a": 1}},
+	} {
+		if c := post(t, ts.URL+path+"/answer", body, nil); c != 400 {
+			t.Errorf("%s: status %d, want 400", name, c)
+		}
+	}
+	if c := post(t, ts.URL+"/api/questions/cut-off-threads/answer", map[string]any{"picks": []int{0}}, nil); c != 400 {
+		t.Errorf("picks sent to a diagnosis: %d", c)
+	}
+}

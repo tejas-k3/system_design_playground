@@ -63,6 +63,21 @@ export interface SweepPoint {
   costPerHour: number
   truncated?: boolean
 }
+export interface BottleneckPoint {
+  load: number
+  rps: number
+  successRate: number
+  p95: number
+  hottest: string // the busiest component at this load
+  hottestUtil: number
+}
+export interface BottleneckResult {
+  correct: boolean
+  culprits: string[]
+  at: number // index of the first load where something runs out, -1 for none
+  points: BottleneckPoint[]
+  explain: string
+}
 export interface SweepResponse {
   points: SweepPoint[]
   truncated?: boolean
@@ -520,8 +535,18 @@ export interface MatchResult {
   correct: number
   stars: number
 }
+export interface AskResult {
+  items: { chosen: boolean; decisive: boolean; explain: string; flip?: string }[]
+  found: number
+  wasted: number
+  missed: number
+  score: number
+  stars: number
+}
 export interface Question extends QuestionSummary {
   items?: MatchItem[]
+  asks?: { text: string }[]
+  picks?: number
   buildHint?: string
   diagram?: Diagram
   candidates?: { label: string; detail: string }[]
