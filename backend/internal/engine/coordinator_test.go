@@ -1,6 +1,22 @@
 package engine
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestCoordinatorDescriptionSeparatesSimulatorFromZooKeeperReads(t *testing.T) {
+	spec := Spec(KCoordinator)
+	if !strings.Contains(spec.Description, "simulator models a leader-based cluster") || !strings.Contains(spec.Description, "writes wait for a majority") {
+		t.Errorf("coordinator description must explain the simulated leader and majority: %q", spec.Description)
+	}
+	if !strings.Contains(spec.Description, "Real ZooKeeper may serve reads from a follower, so they can be stale.") {
+		t.Errorf("coordinator description must distinguish ZooKeeper follower reads: %q", spec.Description)
+	}
+	if !strings.Contains(spec.Lesson, "(n-1)/2 failures") {
+		t.Errorf("coordinator lesson must retain odd-cluster failure tolerance: %q", spec.Lesson)
+	}
+}
 
 // A three-node coordination cluster (Raft/ZooKeeper-like) that an app server writes small pieces of state to. While
 // it has no leader it answers nothing.

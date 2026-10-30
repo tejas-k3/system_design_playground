@@ -538,7 +538,7 @@ func init() {
 			cost: func(p Params) float64 { return 0.1 * pf(p, "nodes", 5) },
 		},
 		{
-			Kind: KCoordinator, Name: "Coordinator", Description: "A small cluster (Raft or ZooKeeper style) that agrees on a leader. State written through it is strongly consistent, but it answers nothing without a leader.",
+			Kind: KCoordinator, Name: "Coordinator", Description: "The simulator models a leader-based cluster, as Raft does: writes wait for a majority. Real ZooKeeper may serve reads from a follower, so they can be stale. It answers nothing without a leader.",
 			Lesson: "Losing the leader costs an election; losing the majority costs the service. An odd number of nodes tolerates (n-1)/2 failures.",
 			Accent: "#364fc7", Width: 160, Height: 72, CanConnect: nil,
 			Params: []ParamSpec{
