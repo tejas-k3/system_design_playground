@@ -286,3 +286,46 @@ func TestBuildRunsShareTheRunSlots(t *testing.T) {
 	}
 	waitSlotsFree(t, srv, "the slot was not released after a build")
 }
+
+func TestAnsweringAMatchQuestionGradesEveryItemAndRevealsTheKeyOnlyAfterwards(t *testing.T) {
+	ts := newTestServer(t)
+	const path = "/api/questions/what-does-each-box-do"
+	var served struct {
+		Items []map[string]any `json:"items"`
+	}
+	if code := get(t, ts.URL+path, &served); code != 200 || len(served.Items) != 12 {
+		t.Fatalf("served: status %d, %d items", code, len(served.Items))
+	}
+	for _, it := range served.Items {
+		if _, leaks := it["answer"]; leaks {
+			t.Fatal("an item carries its answer before the learner has chosen")
+		}
+	}
+	zeros := make([]int, 12)
+	var res scenarios.MatchResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"choices": zeros}, &res); code != 200 || len(res.Items) != 12 || res.Items[0].Explain == "" {
+		t.Fatalf("graded: status %d %+v", code, res)
+	}
+	right := make([]int, 12)
+	for i, it := range res.Items {
+		right[i] = it.Answer
+	}
+	var full scenarios.MatchResult
+	if code := post(t, ts.URL+path+"/answer", map[string]any{"choices": right}, &full); code != 200 || full.Correct != 12 || full.Stars != 3 {
+		t.Fatalf("all right: status %d %+v", code, full)
+	}
+	for name, body := range map[string]map[string]any{
+		"too few":           {"choices": []int{0, 1}},
+		"out of range":      {"choices": []int{0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0}},
+		"none given":        {},
+		"a single choice":   {"choice": 1},
+		"numbers to a menu": {"answers": map[string]float64{"a": 1}},
+	} {
+		if c := post(t, ts.URL+path+"/answer", body, nil); c != 400 {
+			t.Errorf("%s: status %d, want 400", name, c)
+		}
+	}
+	if c := post(t, ts.URL+"/api/questions/cut-off-threads/answer", map[string]any{"choices": zeros}, nil); c != 400 {
+		t.Errorf("a list of choices sent to a diagnosis: %d", c)
+	}
+}
