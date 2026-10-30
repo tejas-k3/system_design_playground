@@ -141,6 +141,34 @@ func init() {
 		explanation: "Offered load stays flat (about 380 requests a second), yet requests in flight jump from about 50 to about 600 and stay there. A trigger (a slow database) pushed the queues over, every failure was retried immediately, and the servers kept working on the oldest queued requests, whose users had already left. The effort is wasted and the retries keep the queues full: a metastable failure that outlives its cause. The fixes are retry limits with backoff, newest-first queues, a maximum queue wait, and a circuit breaker.",
 	})
 
+	registerDiagnose("watch-server-down", diagSource{"server-down", 1, 60}, &Question{
+		Title: "Who is at fault when a server dies?", Difficulty: "Easy",
+		Summary: "A server crashes and half the requests fail. Pick the component behind most of the errors.",
+		Prompt:  "This is a minute of a web shop's dashboard: a load balancer, two app servers and a database. At 20 seconds one app server crashes for 25 seconds. The failed request below is the first one to fail. Which component's behaviour explains most of the errors?",
+		Options: []string{
+			"The database, which dropped its connections when a server died.",
+			"The load balancer, which kept sending requests to the dead server.",
+			"The surviving app server, which cannot carry the whole load alone.",
+			"The users, whose traffic jumped just as the server died.",
+		},
+		answer:      2,
+		explanation: "Arrivals stay near 350 a second the whole time, so there was no surge. While one server is down the successes fall to about 190 a second, which is all one server can do. Of the roughly 3,800 failures, about 3,500 are 'Queue full' on the surviving server and only about 350 are 'Node down' from the balancer still sending to the dead one for a moment. Losing one of two servers leaves half the capacity for the whole load: size the survivors to carry the peak.",
+	})
+
+	registerDiagnose("watch-slow-query", diagSource{"slow-query", 1, 30}, &Question{
+		Title: "The error is here, the cause is not", Difficulty: "Easy",
+		Summary: "Requests are refused at the front, yet the app server is not the problem.",
+		Prompt:  "This is half a minute of a service with users, one app server and one database. The failed request below was refused at the app server. Which component is really the problem?",
+		Options: []string{
+			"The users, who are sending more than the service was built for.",
+			"The app server, whose queue is full and refuses requests.",
+			"The database, which answers slowly, so server threads sit waiting.",
+			"The network between them, which is dropping some requests.",
+		},
+		answer:      2,
+		explanation: "The refusal is reported by the app server, but the cause is further along. Latency climbs from about 130 ms at the start to about 570 ms and the number of requests in flight roughly triples, while arrivals stay near 150 a second: every request is spending its time waiting for the database. A thread that waits for the database cannot take a new request, so the app server's queue fills and the refusals show up at the front. Where a symptom appears is not where the cause is: ask what the busy component is waiting for.",
+	})
+
 	registerDiagnose("stampede-spikes", diagSource{"cache-stampede", 1, 60}, &Question{
 		Title: "A short outage that fixes itself", Difficulty: "Hard",
 		Summary: "Latency climbs for a few seconds, everything fails for a few more, then all is well.",
