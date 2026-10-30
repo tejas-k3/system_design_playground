@@ -325,6 +325,7 @@ type Sim struct {
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int
+	runMonoWriteBroken, runFollowReadBroken   int
 	shardAdds                                 int
 	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
 	runInconsistent, runCompensated, runStuck int   // multi-step writes left half done, rolled back, and rolled back unsuccessfully
