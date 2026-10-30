@@ -62,6 +62,16 @@ Crash (with automatic restart), slow-down (steady or pulsing), network partition
 
 The defaults (8 threads, 16 database slots, a 50-request queue, and so on) are round, plausible numbers chosen so that interesting failures appear at loads that run comfortably in a browser. They are not benchmarks of any real server or database, and you should not read "a server handles 400 requests a second" as a fact about the world. The *shape* (utilisation rises, queues build, timeouts follow, retries amplify) is the point.
 
+## Out of scope on purpose
+
+- Omission, wrong-answer and Byzantine faults are not simulated; tolerating k Byzantine faults requires at least 3k+1 members.
+- Clock skew and drift are not simulated; Lamport and vector clocks appear only in challenge text.
+- Stateful servers, per-client sessions and sticky routing are not simulated.
+- DNS and service discovery, peer-to-peer systems and blockchains are not simulated.
+- Authentication, authorisation and encryption are not simulated.
+- Container and virtual-machine behaviour is not simulated.
+- Reliable and atomic multicast, gossip and three-phase commit are not simulated.
+
 ## What is not modelled yet
 
 downloads from the object store, and storage or egress cost (replicas per search shard; a link can have a bandwidth limit, a queue a message limit and a cache or CDN a byte capacity, once the users set request or response sizes); clock skew and fsync loss of unflushed writes (disk IOPS as a queue for writes exists; GC pauses, packet loss, jitter, CPU burst credits and out-of-memory kills exist); (write skew and isolation levels, data volume, storage engines and coarse data-model presets exist; secondary indexes and isolation levels exist); regions, zones and deployments; consensus and distributed data; stream windows and approximate data structures; LLM serving. These are tracked as GitHub issues #11, #13, #16, #17, #18, #19, #20 and #21.
