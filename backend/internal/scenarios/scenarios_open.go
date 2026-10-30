@@ -65,7 +65,7 @@ func init() {
 
 	links := P{"rps": 80.0, "readPct": 90.0, "keySpace": 20000.0, "keyDist": "zipf"}
 	register(&Scenario{
-		ID: guidedID, Title: "Your first design: a link shortener", Difficulty: "Easy", Open: true,
+		ID: guidedID, Title: "First design: a link shortener", Difficulty: "Easy", Open: true,
 		Summary:  "A guided blank page: place the first components, then size them.",
 		Story:    "People paste a long web address and get a short one back; anyone who opens the short one is sent to the long one. Nine in ten requests are people following links. Build it from a blank canvas: at least 95% of requests must succeed, p95 latency must stay under 500 ms, and it must cost no more than $0.55 an hour. The checklist shows what any design like this needs; how many of each, and how they are joined, is up to you. A server can fail while people are using it.",
 		Diagram:  (&bld{}).n("users", engine.KClient, cols[0], rowMid, links).done(),
