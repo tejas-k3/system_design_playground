@@ -84,7 +84,7 @@ func (s *Sim) countFreshness(lg *logical, res Result) {
 
 // countSession checks a read against what this client already knows, for the per-client models: read-your-writes
 // (a read must not be older than the client's own last acknowledged write of the key), monotonic reads (a read must
-// not be older than one the client already had), and causal, which asks for both.
+// not be older than one the client already had), and the combined option, which asks for both.
 func (s *Sim) countSession(lg *logical, res Result) {
 	if res.Ver < 0 {
 		return

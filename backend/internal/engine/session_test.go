@@ -1,6 +1,34 @@
 package engine
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestCausalOptionIsNamedForItsSessionGuarantees(t *testing.T) {
+	var help string
+	var storedID bool
+	for _, p := range Spec(KClient).Params {
+		if p.Key != "consistency" {
+			continue
+		}
+		help = p.Help
+		for _, option := range p.Options {
+			if option.Value == "causal" {
+				storedID = true
+				if option.Label != "Read your writes + monotonic reads" {
+					t.Errorf("causal option label = %q", option.Label)
+				}
+			}
+		}
+	}
+	if !storedID {
+		t.Fatal("consistency option id causal must remain for saved designs")
+	}
+	if strings.Contains(strings.ToLower(help), "causal") {
+		t.Errorf("consistency help still calls the session guarantees causal: %q", help)
+	}
+}
 
 // Per-client guarantees, counted against what the same client has already written or read. A client that keeps
 // asking for its own latest data sees a violation when a read returns something older than what it knows.
