@@ -29,6 +29,15 @@ describe('glossary', () => {
       expect(t.long.length, t.id).toBeGreaterThan(t.short.length)
     }
   })
+  it('explains both read and write quorum overlap rules', () => {
+    const quorum = termById('quorum')!
+    expect(quorum.short).toContain('copies that must answer')
+    expect(quorum.long).toContain('R + W > N')
+    expect(quorum.long).toContain('latest completed write')
+    expect(quorum.long).toContain('W > N/2')
+    expect(quorum.long).toContain('majority quorum')
+    expect(quorum.long.trim().split(/\s+/).length).toBeLessThanOrEqual(70)
+  })
   it('looks a term up by id', () => expect(termById('p95')?.name).toBe('p95'))
 })
 
