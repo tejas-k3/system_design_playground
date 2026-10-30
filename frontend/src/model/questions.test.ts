@@ -52,10 +52,11 @@ describe('mode filter', () => {
     expect(showsMode('review', 'fix')).toBe(false)
   })
   it('names every filter in words', () => {
-    expect(MODE_FILTERS.map((f) => f.label)).toEqual(['All', 'Fix a design', 'Build from scratch', 'Warm-up', 'Estimate', 'Diagnose', 'Trade-off', 'Review'])
+    expect(MODE_FILTERS.map((f) => f.label)).toEqual(['All', 'Fix a design', 'Build from scratch', 'Warm-up', 'Requirements', 'Estimate', 'Diagnose', 'Trade-off', 'Review'])
   })
   it('labels a question by its kind on the card', () => {
     expect(questionModeLabel('match')).toBe('warm-up')
+    expect(questionModeLabel('ask')).toBe('requirements')
     expect(questionModeLabel('tradeoff')).toBe('trade-off')
     expect(questionModeLabel('estimate')).toBe('estimate')
   })

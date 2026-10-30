@@ -518,8 +518,18 @@ export interface MatchResult {
   correct: number
   stars: number
 }
+export interface AskResult {
+  items: { chosen: boolean; decisive: boolean; explain: string; flip?: string }[]
+  found: number
+  wasted: number
+  missed: number
+  score: number
+  stars: number
+}
 export interface Question extends QuestionSummary {
   items?: MatchItem[]
+  asks?: { text: string }[]
+  picks?: number
   buildHint?: string
   diagram?: Diagram
   candidates?: { label: string; detail: string }[]
