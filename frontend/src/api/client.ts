@@ -1,4 +1,4 @@
-import type { Alternative, BuildResult, ChoiceResult, Diagram, ReviewResult, RunSummary, EstimateResult, Finding, PredictionAnswer, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
+import type { Alternative, BuildResult, ChoiceResult, Diagram, MatchResult, ReviewResult, RunSummary, EstimateResult, Finding, PredictionAnswer, Question, QuestionSummary, Stats, SweepResponse, Registry, Scenario, ScenarioSummary } from './types'
 
 import { loadSummaries, saveSummaries } from '../model/summaries'
 
@@ -92,6 +92,11 @@ export async function answerEstimate(id: string, answers: Record<string, number>
 
 export async function answerChoice(id: string, choice: number): Promise<ChoiceResult> {
   const res = await fetch(`/api/questions/${encodeURIComponent(id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ choice }) })
+  return json(res)
+}
+
+export async function answerMatch(id: string, choices: number[]): Promise<MatchResult> {
+  const res = await fetch(`/api/questions/${encodeURIComponent(id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ choices }) })
   return json(res)
 }
 

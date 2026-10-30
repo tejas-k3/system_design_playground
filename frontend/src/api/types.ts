@@ -501,7 +501,17 @@ export interface BuildResult {
   rightSized: RunSummary
   verdict: 'under' | 'right' | 'over'
 }
+export interface MatchItem {
+  need: string
+  options: string[]
+}
+export interface MatchResult {
+  items: { correct: boolean; answer: number; explain: string }[]
+  correct: number
+  stars: number
+}
 export interface Question extends QuestionSummary {
+  items?: MatchItem[]
   buildHint?: string
   diagram?: Diagram
   candidates?: { label: string; detail: string }[]
