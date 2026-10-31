@@ -233,6 +233,13 @@ describe('pct', () => {
     expect(pct(0.0002)).toBe('0.02%')
     expect(pct(0.0009)).toBe('0.09%')
   })
+  it('does not show a limit under a hundredth of a percent as zero either', () => {
+    expect(pct(0.00005)).toBe('<0.01%')
+  })
+  it('rounds down the same way the server does, whatever the floating point does', () => {
+    expect(pct(0.057)).toBe('5.7%') // 0.057 * 1000 is 56.99999999999999
+    expect(pct(0.003)).toBe('0.3%')
+  })
   it('keeps one decimal everywhere else, rounding down', () => {
     expect(pct(0)).toBe('0.0%')
     expect(pct(0.001)).toBe('0.1%')
