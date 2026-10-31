@@ -13,8 +13,8 @@ func init() {
 	dbUsers := P{"rps": 100.0, "readPct": 40.0, "keyDist": "uniform", "keySpace": 20000.0}
 	register(&Scenario{
 		ID: "open-database-failure", Title: "Survive the database dying", Difficulty: "Hard", Open: true,
-		Summary: "Build a service whose only database is going to fail for a minute.",
-		Story:   "A service takes 100 requests a second, six in ten of them writes. Build it from a blank canvas: at least 85% of requests must succeed, p95 latency must stay under 800 ms, no more than 100 acknowledged writes may be lost, and it must cost no more than $2.50 an hour. You are not told when, or what, will fail.",
+		Summary: "Build a service whose only database is going to fail for a while.",
+		Story:   "A service takes 100 requests a second, six in ten of them writes. Build it from a blank canvas: at least 85% of requests must succeed, p95 latency must stay under 800 ms, no more than 100 acknowledged writes may be lost, and it must cost no more than $2.50 an hour. You are not told when, or for how long, something will fail.",
 		Diagram: blank(dbUsers),
 		Solution: (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, dbUsers).
@@ -22,7 +22,7 @@ func init() {
 			n("db", engine.KDatabase, cols[4], rowTop, P{"onFailure": "promote", "detectSec": 3.0, "promoteSec": 5.0}).
 			n("replica", engine.KReplica, cols[4], rowBot, P{"replicationLagMs": 500.0}).
 			servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done(),
-		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "db", AtSec: 25, DownSec: 40}},
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "random:database", AtSec: 25, DownSec: 40}},
 		Goals:       engine.Goals{MinSuccessRate: 0.85, MaxP95Ms: f(800), MaxLostWrites: i(100), MaxCostPerHour: f(2.5)},
 		DurationSec: 70, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
@@ -49,7 +49,7 @@ func init() {
 			n("pay", engine.KExternalAPI, cols[2], rowTop, P{"latencyMs": 70.0, "errorPct": 0.0}).label("pay", "Payments API").
 			n("db", engine.KDatabase, cols[2], rowBot, P{"connections": 32.0}).
 			e("users", "app").e("app", "pay").e("app", "db").done(),
-		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 8, Factor: 6, DurationSec: 25}},
+		Chaos:       []engine.ChaosEvent{{Type: "slow", NodeID: "random:database", AtSec: 8, Factor: 6, DurationSec: 25}},
 		Goals:       engine.Goals{MinSuccessRate: 0.95, MaxDuplicates: i(0), MaxP95Ms: f(1500), MaxCostPerHour: f(1.5)},
 		DurationSec: 40, WarmupSec: 4, Speed: 1,
 		Hints: [3]string{
