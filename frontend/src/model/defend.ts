@@ -10,3 +10,8 @@ export function selectDefendAlternative(alternatives: Alternative[]): number | n
 export function defendQuestion(label: string): string {
   return `Why not ${label.charAt(0).toLowerCase()}${label.slice(1)}?`
 }
+
+/** A value that was made for one key (a challenge id, a design) is shown only while that key is still the current one. */
+export function forKey<K, V>(entry: { key: K; value: V } | null, key: K): V | null {
+  return entry !== null && Object.is(entry.key, key) ? entry.value : null
+}

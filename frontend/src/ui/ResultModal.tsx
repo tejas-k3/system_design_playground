@@ -54,7 +54,7 @@ export function ResultModal() {
           </tbody>
         </table>
         {r.pass && sc.debrief && <p className="debrief"><Rich text={sc.debrief} /></p>}
-        {r.pass && sc.debrief && <WeakPointChecklist points={sc.weakPoints} />}
+        {r.pass && sc.debrief && <WeakPointChecklist key={sc.def.id} points={sc.weakPoints} />}
         {r.pass && sc.debrief && sc.deeper && <Deeper key={sc.def.id} text={sc.deeper} />}
         {r.pass && <Alternatives id={sc.def.id} />}
         {r.pass && <DefendDesign id={sc.def.id} diagram={diagram} seed={sc.dailySeed} />}
