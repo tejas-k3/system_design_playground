@@ -41,7 +41,7 @@ export const fetchAlternatives = (id: string) => fetch(`/api/scenarios/${encodeU
 export const defendDesign = (id: string, diagram: Diagram, alternative: number, seed?: number) =>
   fetch(`/api/scenarios/${encodeURIComponent(id)}/defend`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ diagram, alternative, seed }) }).then((r) => json<DefendResponse>(r))
 export const fetchHint = (id: string, level: number) => fetch(`/api/scenarios/${encodeURIComponent(id)}/hints/${level}`).then((r) => json<{ level: number; hint: string }>(r))
-export const fetchDebrief = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/debrief`).then((r) => json<{ debrief: string; deeper?: string }>(r))
+export const fetchDebrief = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/debrief`).then((r) => json<{ debrief: string; deeper?: string; weakPoints?: string[] }>(r))
 /** The full answer, kept apart from the hints (the server sends it as `answer`). An older server has no such route and answers 404. */
 export const fetchAnswerHint = (id: string) => fetch(`/api/scenarios/${encodeURIComponent(id)}/answer-hint`).then((r) => json<{ answer?: string; hint?: string }>(r)).then((d) => ({ hint: d.answer ?? d.hint }))
 export const answerPrediction = (id: string, predictionId: string, choice: number) =>

@@ -40,7 +40,7 @@ export const learningActions = (set: Set) => ({
     set({ level })
   },
   importProgress: (progress: State['progress'], records: State['records']) => set({ progress, records }),
-  setDebrief: (text: string, deeper?: string) => set((s) => (s.scenario ? { scenario: { ...s.scenario, debrief: text, deeper: typeof deeper === 'string' && deeper.trim() ? deeper : null } } : {})),
+  setDebrief: (text: string, deeper?: string, weakPoints?: string[]) => set((s) => (s.scenario ? { scenario: { ...s.scenario, debrief: text, deeper: typeof deeper === 'string' && deeper.trim() ? deeper : null, weakPoints: weakPoints ?? [] } } : {})),
   setResult: (score: Parameters<State['setResult']>[0]) =>
     set((s) => {
       if (!s.scenario) return {}

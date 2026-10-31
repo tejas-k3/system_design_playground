@@ -28,6 +28,7 @@ export interface ScenarioState {
   hints: string[] // the hints revealed so far, each fetched when asked for
   debrief: string | null // fetched when the result is shown
   deeper: string | null // the optional deeper paragraph that came with the debrief
+  weakPoints: string[] // open-challenge risks fetched with the debrief after a pass
   answer: string | null // the full answer, fetched only when "Show the answer" is pressed
   result: Score | null
   predictions: Record<string, PredictionAnswer> // answered prediction questions, with what the server said
@@ -157,7 +158,7 @@ export interface State {
   showAnswer(text: string): void
   setLevel(level: LearnerLevel): void
   importProgress(progress: Record<string, number>, records: Record<string, ChallengeRecord>): void
-  setDebrief(text: string, deeper?: string): void
+  setDebrief(text: string, deeper?: string, weakPoints?: string[]): void
   showSolution(d: Diagram): void
   compareWithReference(reference: Diagram): void
   adoptDiagram(d: Diagram): void
@@ -540,7 +541,7 @@ export const useStore = create<State>()((set, get) => {
         selection: [],
         stats: emptyStats(),
         traces: null,
-        scenario: { def, hintLevel: 0, hints: [], debrief: null, deeper: null, answer: null, result: null, predictions: {}, solved: false, compare: null, ...(opts?.dailySeed !== undefined ? { dailySeed: opts.dailySeed } : {}) },
+        scenario: { def, hintLevel: 0, hints: [], debrief: null, deeper: null, weakPoints: [], answer: null, result: null, predictions: {}, solved: false, compare: null, ...(opts?.dailySeed !== undefined ? { dailySeed: opts.dailySeed } : {}) },
         sim: { ...s.sim, status: 'stopped', speed: def.speed || 1, seed: opts?.dailySeed ?? DEFAULT_SEED },
         ui: { ...s.ui, picker: false, welcome: false, result: false, library: !def.configOnly && !isNarrow() },
       })

@@ -30,7 +30,7 @@ describe('scenario entry and exit', () => {
     expect(st().sandbox).toBe(sandbox)
     expect(st().diagram.notes).toHaveLength(1)
     expect(st().diagram).not.toBe(def.diagram)
-    expect(st().scenario).toEqual({ def, hintLevel: 0, hints: [], debrief: null, deeper: null, answer: null, result: null, predictions: {}, solved: false, compare: null })
+    expect(st().scenario).toEqual({ def, hintLevel: 0, hints: [], debrief: null, deeper: null, answer: null, result: null, predictions: {}, solved: false, compare: null, weakPoints: [] })
     expect(st().sim).toMatchObject({ status: 'stopped', speed: 2 })
     expect(st().ui).toMatchObject({ picker: false, welcome: false, result: false })
     expect(st().past).toEqual([])

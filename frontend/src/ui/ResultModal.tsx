@@ -9,6 +9,7 @@ import { starTargets } from '../model/goals'
 import { Stars } from './Stars'
 import { Alternatives } from './Alternatives'
 import { DefendDesign } from './DefendDesign'
+import { WeakPointChecklist } from './WeakPointChecklist'
 import { Rich } from './Term'
 import { useEscapeKey } from './useEscapeKey'
 
@@ -53,6 +54,7 @@ export function ResultModal() {
           </tbody>
         </table>
         {r.pass && sc.debrief && <p className="debrief"><Rich text={sc.debrief} /></p>}
+        {r.pass && sc.debrief && <WeakPointChecklist points={sc.weakPoints} />}
         {r.pass && sc.debrief && sc.deeper && <Deeper key={sc.def.id} text={sc.deeper} />}
         {r.pass && <Alternatives id={sc.def.id} />}
         {r.pass && <DefendDesign id={sc.def.id} diagram={diagram} seed={sc.dailySeed} />}
