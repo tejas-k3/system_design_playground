@@ -31,6 +31,7 @@ export interface ScenarioState {
   weakPoints: string[] // open-challenge risks fetched with the debrief after a pass
   answer: string | null // the full answer, fetched only when "Show the answer" is pressed
   result: Score | null
+  resultFindings?: Finding[] // the design warnings at the moment the result arrived
   predictions: Record<string, PredictionAnswer> // answered prediction questions, with what the server said
   solved: boolean
   dailySeed?: number // set only when the run was started from the daily card: the seed derived from the date

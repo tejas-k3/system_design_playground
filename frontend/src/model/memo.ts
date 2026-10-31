@@ -6,9 +6,9 @@ export const EMPTY_MEMO: Memo = { design: '', cost: '', watch: '' }
 const key = (id: string) => `sdp.memo.${id}`
 
 /** A memo kept in this browser only; a blocked or empty store gives an empty memo. */
-export function loadMemo(id: string, storage: Storage = localStorage): Memo {
+export function loadMemo(id: string, storage?: Storage): Memo {
   try {
-    const raw = storage.getItem(key(id))
+    const raw = (storage ?? window.localStorage).getItem(key(id))
     if (!raw) return EMPTY_MEMO
     const m = JSON.parse(raw) as Partial<Memo>
     return { design: String(m.design ?? ''), cost: String(m.cost ?? ''), watch: String(m.watch ?? '') }
@@ -17,11 +17,13 @@ export function loadMemo(id: string, storage: Storage = localStorage): Memo {
   }
 }
 
-export function saveMemo(id: string, memo: Memo, storage: Storage = localStorage): void {
+/** False when the browser would not keep it: the memo then lasts only as long as the page. */
+export function saveMemo(id: string, memo: Memo, storage?: Storage): boolean {
   try {
-    storage.setItem(key(id), JSON.stringify(memo))
+    ;(storage ?? window.localStorage).setItem(key(id), JSON.stringify(memo))
+    return true
   } catch {
-    /* the memo then lasts only as long as the page */
+    return false
   }
 }
 
@@ -39,7 +41,7 @@ export function runEvidence(score: Score, seconds: number): string[] {
   const r = score.run
   const out: string[] = []
   const per = costPerThousand(score, seconds)
-  out.push(`Cost: $${score.costPerHour.toFixed(2)} an hour${per === null ? '' : `, about $${per < 0.01 ? per.toFixed(4) : per.toFixed(3)} per 1,000 requests`}.`)
+  out.push(`Cost: $${score.costPerHour.toFixed(2)} an hour${per === null ? '' : `, about $${per < 0.01 ? per.toFixed(4) : per.toFixed(3)} per 1,000 requests at this run's average load`}.`)
   out.push(`Speed: a p95 of ${Math.round(r.p95)} ms.`)
   if (r.resolved > 0) out.push(`Success: ${pct(r.ok / r.resolved)} of requests succeeded.`)
   const top = Object.entries(r.errors ?? {}).sort((a, b) => b[1] - a[1])[0]
@@ -48,7 +50,7 @@ export function runEvidence(score: Score, seconds: number): string[] {
     ['Orders left stuck', r.stuck], ['Orders left half done', r.inconsistent], ['Transactions waiting on a dead coordinator', r.inDoubt],
     ['Acknowledged writes lost', r.lostWrites], ['Requests let through unchecked', r.unchecked], ['Requests that found their user signed out', r.reauth],
     ['Wrong answers accepted', r.wrongAnswers], ['Newer writes lost to a clock', r.clockLost], ['Outputs repeated after a crash', r.repeatedOutputs],
-    ['Messages handled out of order', r.jobs?.orderViolations],
+    ['Messages handled out of order', r.jobs?.orderViolations], ['Login sessions lost', r.sessionsLost], ['Double bookings and write conflicts', r.conflicts], ['Duplicate writes', r.duplicates], ['Stale reads', r.staleReads], ['Partial answers', r.partial], ['Write-skew anomalies', r.writeSkew],
   ]
   for (const [what, n] of facts) if (n && n > 0) out.push(`${what}: ${n.toLocaleString()}.`)
   return out
@@ -57,14 +59,12 @@ export function runEvidence(score: Score, seconds: number): string[] {
 export interface OnCall { alerts: string[]; budgetUsedPct: number | null }
 
 /** Alerts the design would raise (its lint warnings and errors) and the share of the error budget the run used. */
-export function onCallView(score: Score, findings: Finding[]): OnCall {
-  const alerts = findings.filter((f) => f.severity !== 'info').map((f) => f.rule)
-  const c = score.checks.find((x) => x.label === 'Success rate')
-  const target = c ? parseFloat(c.target.replace(/[^\d.]/g, '')) / 100 : NaN
+export function onCallView(score: Score, findings: Finding[], minSuccessRate?: number): OnCall {
+  const alerts = findings.filter((f) => f.severity !== 'info').map((f) => f.message)
   let budgetUsedPct: number | null = null
-  if (Number.isFinite(target) && target < 1 && score.run.resolved > 0) {
+  if (minSuccessRate !== undefined && score.run.resolved > 0) {
     const failed = 1 - score.run.ok / score.run.resolved
-    budgetUsedPct = Math.round((failed / (1 - target)) * 100)
+    budgetUsedPct = minSuccessRate >= 1 ? (failed > 0 ? 100 : 0) : Math.round((failed / (1 - minSuccessRate)) * 100)
   }
   return { alerts, budgetUsedPct }
 }

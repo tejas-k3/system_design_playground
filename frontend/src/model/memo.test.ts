@@ -36,12 +36,14 @@ describe('runEvidence', () => {
 
 describe('onCallView', () => {
   it('counts warnings and errors as alerts and the error budget a run used', () => {
-    const v = onCallView(score({ resolved: 1000, ok: 985 }, { checks: [{ label: 'Success rate', target: '≥ 97.0%', actual: '98.5%', pass: true }] }), [finding('spof-server', 'warn'), finding('no-call-timeout', 'warn'), finding('x', 'info')])
-    expect(v.alerts).toEqual(['spof-server', 'no-call-timeout'])
+    const v = onCallView(score({ resolved: 1000, ok: 985 }), [finding('spof-server', 'warn'), finding('no-call-timeout', 'warn'), finding('x', 'info')], 0.97)
+    expect(v.alerts).toEqual(['spof-server', 'no-call-timeout']) // the findings' messages
     expect(v.budgetUsedPct).toBe(50) // 1.5% failed of the 3% the goal allows
   })
-  it('has no budget when the goal states no success target', () => {
-    expect(onCallView(score({}, { checks: [] }), []).budgetUsedPct).toBeNull()
+  it('has no budget when no success target is given, and a goal of 100% allows no failure', () => {
+    expect(onCallView(score({}), []).budgetUsedPct).toBeNull()
+    expect(onCallView(score({ resolved: 10, ok: 10 }), [], 1).budgetUsedPct).toBe(0)
+    expect(onCallView(score({ resolved: 10, ok: 9 }), [], 1).budgetUsedPct).toBe(100)
   })
 })
 
@@ -54,7 +56,7 @@ describe('memos', () => {
     expect(loadMemo('c1', storage)).toEqual({ design: 'a', cost: 'b', watch: 'c' })
     const broken = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } } as unknown as Storage
     expect(loadMemo('c1', broken)).toEqual(EMPTY_MEMO)
-    expect(() => saveMemo('c1', EMPTY_MEMO, broken)).not.toThrow()
+    expect(saveMemo('c1', EMPTY_MEMO, broken)).toBe(false)
   })
   it('writes the memo as text with the evidence under it', () => {
     const text = memoText('Slow news', { design: 'Gossip every second', cost: 'More messages', watch: 'Time to reach all nodes' }, ['Cost: $1 an hour'], ['Alerts: none'])

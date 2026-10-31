@@ -17,7 +17,6 @@ import { useEscapeKey } from './useEscapeKey'
 export function ResultModal() {
   const sc = useStore((s) => s.scenario)
   const diagram = useStore((s) => s.diagram)
-  const findings = useStore((s) => s.findings)
   const open = useStore((s) => s.ui.result)
   const setUi = useStore((s) => s.setUi)
   const [list, setList] = useState<ScenarioSummary[]>([])
@@ -60,7 +59,7 @@ export function ResultModal() {
         {r.pass && sc.debrief && sc.deeper && <Deeper key={sc.def.id} text={sc.deeper} />}
         {r.pass && <Alternatives id={sc.def.id} />}
         {r.pass && <DefendDesign id={sc.def.id} diagram={diagram} seed={sc.dailySeed} />}
-        {r.pass && <TradeOffMemo key={sc.def.id} id={sc.def.id} title={sc.def.title} score={r} findings={findings} seconds={Math.max(1, sc.def.durationSec - sc.def.warmupSec)} />}
+        {r.pass && <TradeOffMemo key={sc.def.id} id={sc.def.id} title={sc.def.title} score={r} findings={sc.resultFindings ?? []} seconds={Math.max(1, sc.def.durationSec - sc.def.warmupSec)} minSuccessRate={sc.def.goals.minSuccessRate} />}
         <div className="row-btns end">
           <button autoFocus onClick={close}>Keep tweaking</button>
           <button onClick={() => { close(); reset() }}>Try again</button>

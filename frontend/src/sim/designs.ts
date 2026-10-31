@@ -7,7 +7,7 @@ import { reset } from './bridge'
 const CLIPBOARD_TIMEOUT_MS = 1500
 
 /** Copy text to the clipboard; false if that was refused, unavailable or did not answer in time. */
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try {
     const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('clipboard timed out')), CLIPBOARD_TIMEOUT_MS))
     await Promise.race([navigator.clipboard.writeText(text), timeout]) // writeText can wait forever behind a permission prompt
