@@ -45,3 +45,23 @@ func TestACoordinatorCrashLeavesServicesLocked(t *testing.T) {
 		t.Errorf("a saga holds no locks across steps: %d", saga.InDoubt)
 	}
 }
+
+// Three-phase commit adds a pre-commit round so that no service is ever uncertain while locked: if the coordinator dies,
+// the services finish or abort on their own after a timeout instead of waiting for it. It costs one more round.
+func TestThreePhaseCommitDoesNotBlockOnACoordinatorCrash(t *testing.T) {
+	two, three := twoPhaseRun("twoPhase", true), twoPhaseRun("threePhase", true)
+	t.Logf("2pc: %d in doubt, %.1f s blocked; 3pc: %d in doubt, %.1f s blocked", two.InDoubt, two.BlockedSec, three.InDoubt, three.BlockedSec)
+	if three.InDoubt != 0 {
+		t.Errorf("the services decide on their own, so none is left in doubt: %d", three.InDoubt)
+	}
+	if three.BlockedSec <= 0 || three.BlockedSec >= two.BlockedSec/2 {
+		t.Errorf("they still wait out one timeout each, far less than the coordinator's downtime: %.1f against %.1f s", three.BlockedSec, two.BlockedSec)
+	}
+}
+
+func TestThreePhaseCommitCostsAnExtraRound(t *testing.T) {
+	two, three := twoPhaseRun("twoPhase", false), twoPhaseRun("threePhase", false)
+	if three.Inconsistent != 0 || three.P50 <= two.P50+20 {
+		t.Errorf("still atomic, but the extra round is slower: %.0f against %.0f ms, %d half done", three.P50, two.P50, three.Inconsistent)
+	}
+}

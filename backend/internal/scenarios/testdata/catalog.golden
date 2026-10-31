@@ -49,6 +49,7 @@ add-a-shard fe26edd70bf303ba3ef7ebaa0094bcd3db99d7d46d1e0a118dc80e5226aca253 sta
 noisy-tenant b3a0bc72d661e61040698af36c23df8042a351eab9b346d2af3c48d5081d89a3 start=false/0/0.3337/154.4 solution=true/3/0.5033/151.4
 notification-fan-out f5cebcce6861704f37e9a578a2ac7ce6ebe4125a3ec725446d3ea33c64bb1a3f start=false/0/1.0000/129.2 solution=true/3/1.0000/131.8
 go-global c1d439ce3196bf0a9cba8012a14bae78a23d6cbc35d9409cd31e1fe8c3efbd6d start=false/0/1.0000/291.0 solution=true/3/1.0000/151.4
+restart-the-counter 1245e20a30c82877ed43be5b316f3eabb84cf73152b13867b443a24fa9beea73 start=false/0/0.9642/129.2 solution=true/3/0.9642/131.8
 reconnect-storm c99649e50b9da6de0c724feafdb24d55544c9fed8751fb4cfa954a6374cc3ad4 start=false/0/0.5112/537.7 solution=true/3/0.9764/121.8
 bad-deploy 6d3073a1a9fb177b767fcb7b3fa77f22cc45ae26e0c01302e177fbc15ddcae91 start=false/0/0.6946/151.4 solution=true/3/0.9698/151.4
 zone-outage 3ea11dcf282bae958e6e8827860e243e2cb7f6c7cf822a5d5bbc581a8a6c3c39 start=false/0/0.5684/151.4 solution=true/3/0.9923/157.5
@@ -81,6 +82,7 @@ the-gpu-budget 33800b668dad9f2957249f4d190a7d26dd21876b70e89998b8dc2add37c52813 
 heavy-tail 1f14018deaecc1030723cf03432e6404a4c896d66cf8e99b1a114a9f80f4326c start=false/0/1.0000/263.6 solution=true/2/1.0000/207.8
 payment-saga 433aec484821a57f473b778629cd5cef74c92c2aa75662a712c5caae191de3bd start=false/0/0.8519/321.3 solution=true/2/0.8503/327.8
 frozen-checkout 2ab30ee93253f912fc9cf32b40ffa4b3ca2e680766adf4fe18fb1885a180bb9d start=false/0/0.6975/516.8 solution=true/2/0.7285/321.3
+nobody-to-wait-for 7882ca280ab99545542e771fa3bca246009304e926169b5b8e5d282313e548d5 start=false/0/0.6975/516.8 solution=true/3/0.6508/695.6
 retry-storm 47819e11c263a2c61c88737758c8b90e1f6680f47ef9e9581fb65600fe5e9360 start=false/0/0.1658/203.8 solution=true/3/0.8126/203.8
 split-the-database 4d8bb1461f7728eb4368cdb22497dd0859b38c2f1cc0208e9f5f0906e310f334 start=false/0/0.6185/752.9 solution=true/3/1.0000/220.6
 launch-day-capstone 0c98f8ea17ec98cd4399117d3ed5c242a32eeda1e03fae6b60ddbd5cef3d80c8 start=false/0/0.4494/1013.4 solution=true/2/0.9599/468.1

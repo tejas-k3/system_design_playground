@@ -89,6 +89,8 @@ type RunStats struct {
 	CountErrorPct        float64         `json:"countErrorPct,omitempty"`           // error of an approximate visitor count
 	EventDups            int             `json:"eventDups,omitempty"`               // events a queue accepted a second time
 	InDoubt              int             `json:"inDoubt,omitempty"`                 // two-phase commits left waiting for a crashed coordinator
+	RepeatedOutputs      int             `json:"repeatedOutputs,omitempty"`         // stream outputs produced a second time after a crash
+	RecoverySec          float64         `json:"recoverySec,omitempty"`             // longest time a stream job took to catch up after a crash
 	BlockedSec           float64         `json:"blockedSec,omitempty"`              // lock-seconds those transactions held
 	RpoSec               float64         `json:"rpoSec,omitempty"`                  // seconds of writes lost by the last restore
 	RtoSec               float64         `json:"rtoSec,omitempty"`                  // seconds the database was unavailable restoring
@@ -261,6 +263,12 @@ func (s *Sim) Snapshot() Stats {
 			ex["lateDropped"] = float64(n.win.LateDropped)
 			ex["windowUpdates"] = float64(n.win.Updates)
 			ex["duplicateWindows"] = float64(n.winDup)
+			if n.winLogged > 0 {
+				ex["loggedEvents"] = float64(n.winLogged)
+			}
+			if n.winRecSec > 0 {
+				ex["recoverySec"] = n.winRecSec
+			}
 			memory := 0.0
 			if r, kb, ok := s.topStats(n); ok {
 				ex["topKRecall"] = r
@@ -383,7 +391,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, DNSLookups: s.runDNSLookups, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.Quantile(0.95), ITLMs: s.itlHist.Quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Revalidated: s.runRevalidated, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, DNSLookups: s.runDNSLookups, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.Quantile(0.95), ITLMs: s.itlHist.Quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, RepeatedOutputs: s.streamRepeated(), RecoverySec: s.streamRecovery(), Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Revalidated: s.runRevalidated, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {

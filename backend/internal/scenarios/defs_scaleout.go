@@ -293,4 +293,68 @@ func registerScaleOut() {
 		Debrief: "Two-phase commit is atomic but blocking: its weak point is the coordinator. Production systems replicate the coordinator, or avoid distributed transactions and accept {{consistency-levels|eventual consistency}} with sagas, where each step is a small local transaction and failures are compensated.",
 		Deeper:  "Two-phase commit is atomic but blocking: after a participant votes yes it must hold its locks until the coordinator's decision arrives, and a coordinator that dies in that gap leaves them in doubt and everything touching those rows waits. The fixes are to replicate the coordinator with a {{quorum|consensus protocol}}, as some distributed databases do, or to avoid the distributed transaction and use a saga with its own trade-offs. Two-phase commit also assumes every participant supports prepare, which a card processor or shipping service almost never does, so across services you do not control it is often not an option at all. An interviewer will ask when you would still choose it, and the answer is inside one system where the coordinator is replicated and the locks are short. The failure pattern is in-doubt transactions holding locks that block unrelated traffic until someone resolves them by hand.",
 	})
+
+	// Nobody to wait for: the same checkout, but the stock must stay all-or-nothing and the services must not wait for a dead server
+	nobodyToWait := func(fixed bool) engine.Diagram {
+		d := frozenCheckout(false)
+		if fixed {
+			for k := range d.Nodes {
+				if d.Nodes[k].ID == "app" {
+					d.Nodes[k].Params["workflow"] = "threePhase"
+					d.Nodes[k].Params["termTimeoutMs"] = 300.0
+				}
+			}
+		}
+		return d
+	}
+	register(&Scenario{
+		ID: "nobody-to-wait-for", Title: "Nobody to wait for", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Keep checkout all-or-nothing, but let the services decide alone when the server dies.",
+		Story:   "Checkout is a two-phase commit across the stock database, the card processor and shipping, and when the server dies between the votes and the decision the services sit locked until it returns. Operations prefers not to use a saga, because other customers can then see stock reserved for an order that later vanishes. The services should instead settle on their own when the server stays silent, and the total time rows stay locked must stay small. Operations still wants every order to stay {{consistency-levels|consistent}}.",
+		Diagram: nobodyToWait(false), Solution: nobodyToWait(true),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app", AtSec: 15, DownSec: 8}},
+		Goals:       engine.Goals{MinSuccessRate: 0.6, MaxInDoubt: i(0), MaxInconsistent: i(0), MaxBlockedSec: f(15), MaxP95Ms: f(900), MaxCostPerHour: f(1.6), StarP95Ms: f(800), StarCostPerHour: f(1.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the goals panel after the crash: how many transactions wait, and for how many lock-seconds?",
+			"The services are stuck because after voting yes they cannot tell whether the others voted yes too. What if there were a step between the votes and the commit that removes that doubt?",
+			"The app server's setting for writes that span services has a third kind of commit. It adds a round, and it has a timer: how long should the services wait before they decide alone?",
+		},
+		Answer: "The answer: use three-phase commit and shorten the time the services wait before deciding alone. A pre-commit round means no service is ever unsure while it holds a lock, so when the server dies they finish or abort by themselves after the timeout.",
+		Predictions: []Prediction{{ID: "p1", Question: "What does three-phase commit cost compared with two-phase?", Options: []string{"Nothing: it is strictly better than two-phase commit", "A third round of calls, and a wrong decision if a slow server looks dead", "Lost data whenever the server restarts after a crash"}, Answer: 1,
+			Explain: "The extra round makes the wait unnecessary, but the services must guess that a silent server is dead. In a partition the guess can be wrong and two sides can decide differently."}},
+		Debrief: "Three-phase commit removes the uncertain state: after the pre-commit round everyone knows the outcome, so the services can finish alone when the coordinator dies. It pays a third round on every transaction, and it assumes bounded delays and crashes without partitions, which real networks do not guarantee. That is why practice replicates the coordinator with consensus, or avoids the distributed transaction with sagas.",
+		Deeper:  "Two-phase commit blocks because a participant that voted yes cannot tell whether the others voted yes too, so it cannot decide alone. Three-phase commit adds a pre-commit round: once a participant has seen it, everybody has voted yes, so on silence it commits; if it has not seen it, nobody has committed, so it aborts. That removes the blocking on a coordinator crash, at the cost of a round on every transaction, but it works only if the network delivers within known bounds and a silent coordinator really is dead. With a partition or a long pause, one side can commit while the other times out and aborts, and the atomicity is gone, which is why it is rarely used. The practical routes are a replicated coordinator that agrees on its decision with a consensus protocol, so there is no single machine to wait for, or a saga that accepts that other readers see the intermediate states. An interviewer will ask what a participant does after it has voted yes and then lost the coordinator, and why timeouts alone cannot settle it.",
+	})
+
+	// Restart the counter: a stream job crashes and must catch up fast without sending outputs twice
+	restartCounter := func(fixed bool) engine.Diagram {
+		st := P{"windowSec": 2.0, "watermarkDelaySec": 1.0, "checkpointSec": 20.0}
+		if fixed {
+			st["recovery"] = "messageLog"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 0.0, "keySpace": 1000.0, "keyDist": "uniform", "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 500.0}).
+			n("counter", engine.KStream, cols[2], rowMid, st).label("counter", "Orders per 2 seconds").
+			e("users", "app").e("app", "counter").done()
+	}
+	register(&Scenario{
+		ID: "restart-the-counter", Title: "Restart the counter", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "After a crash the stream job repeats outputs and takes too long to catch up.",
+		Story:   "A stream job counts orders in two-second windows and saves its place every twenty seconds. When it crashes, it reloads the last save and handles everything since again: the billing system receives some totals twice, and the dashboard is stale for over two seconds. Billing wants no repeated totals and the dashboard wants the job caught up within one and a half seconds, without saving more often.",
+		Diagram: restartCounter(false), Solution: restartCounter(true),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "counter", AtSec: 33, DownSec: 2}},
+		Goals:       engine.Goals{MinSuccessRate: 0.95, MaxRepeatedOutputs: i(0), MaxRecoverySec: f(1.5), MaxP95Ms: f(200), MaxCostPerHour: f(1.0), StarP95Ms: f(150), StarCostPerHour: f(0.95)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the stream job's stats after the crash: how many outputs repeat and how long did the catch-up take?",
+			"After a restart the job has the state of its last save. Everything it handled since then has to be handled again, at full cost, and its outputs go out a second time.",
+			"If every event were written to a log before it was handled, the job could replay the log. The stream job's recovery setting has that option: what does it cost per event?",
+		},
+		Answer: "The answer: switch the job's recovery to a message log. Every event is written to the log first, so after a crash the job reloads its save and replays the log quickly and without sending outputs again, for a small write on every event.",
+		Predictions: []Prediction{{ID: "p1", Question: "What does logging every event buy over saving more often?", Options: []string{"A replay of what happened since the last save, with no repeated outputs", "Nothing: a log is the same as a save, only slower", "A free recovery, since the log is written later"}, Answer: 0,
+			Explain: "A save captures state at one moment; a log records everything after it, so the job can be brought back to just before the crash. The price is a log write on every event."}},
+		Debrief: "Checkpointing alone restarts from the last saved state and repeats the work since, so a long gap between saves means a long recovery and repeated outputs. Message logging (a {{write-ahead-log|log}} of the input) records each event before it is handled, so recovery replays deterministically from the last save and receivers can discard what they already saw. You pay one log write per event; the alternative is saving more often, which also costs.",
+	})
 }

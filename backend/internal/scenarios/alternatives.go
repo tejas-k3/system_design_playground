@@ -132,6 +132,14 @@ var alternatives = map[string][]Alternative{
 		alt("Let clients retry a failed order twice", false, 79.3, 848, 1.00, "More requests get through once the server is back, but the transactions that were mid-flight when it died are still locked: 13 in doubt on this seed, and the retries push the p95 to 848 ms.", Change{"users", "retries", 2.0}),
 		alt("Give the app server 96 threads", false, 70.4, 517, 2.46, "Capacity does not change what happens when the coordinator dies: 12 transactions are still in doubt, and the bill goes up.", Change{"app", "threads", 96.0}),
 	},
+	"nobody-to-wait-for": {
+		alt("Use a saga instead", true, 72.8, 321, 1.00, "It passes: nothing is locked across steps, so a dead server blocks nobody, and it is faster. The price is not in the goals: other customers can see stock reserved for an order that is later undone, which two- and three-phase commit never show.", Change{"app", "workflow", "saga"}),
+		alt("Use three-phase commit and keep the one-second wait", false, 65.0, 696, 1.00, "No transaction is in doubt, but each of the services that were mid-transaction waits a full second before deciding: 24 lock-seconds against a limit of 12. The timeout is the price of guessing that a silent server is dead.", Change{"app", "workflow", "threePhase"}),
+	},
+	"restart-the-counter": {
+		alt("Deliver exactly once", false, 96.4, 132, 0.90, "Nothing is repeated, but the job still reloads its save and handles the last twenty seconds again at full cost: 2.21 s to catch up against a limit of 1.5.", Change{"counter", "delivery", "exactlyOnce"}),
+		alt("Save every 5 seconds", false, 96.4, 129, 0.90, "Less work is left to redo, so the catch-up takes 1.28 s, but the windows emitted since the last save are still sent twice: 1 repeated output against a limit of 0.", Change{"counter", "checkpointSec", 5.0}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),

@@ -240,6 +240,9 @@ type node struct {
 	winCP      int              // stream job: how many outputs had been emitted at the last checkpoint
 	winCPAt    float64          // stream job: when that checkpoint was taken
 	winDup     int              // stream job: outputs sent a second time after a crash
+	winLogged  int              // stream job: events written to the message log
+	winEvCP    int              // stream job: events taken in since the last checkpoint
+	winRecSec  float64          // stream job: how long the last crash took to recover from
 	uniqExact  map[int]struct{} // stream job: every visitor id seen, for the exact count and as the truth for the estimate
 	uniqHLL    *HLL             // stream job: the HyperLogLog sketch
 	hostTokens float64          // external service: calls it will still accept this second

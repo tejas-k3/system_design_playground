@@ -320,7 +320,7 @@ func (s *Sim) appWrite(n *node, c *call, done func(Result)) {
 				return
 			}
 		default:
-			if m := n.s("workflow"); (m == "naive" || m == "saga" || m == "twoPhase") && s.workflowWrite(n, c, m, done) {
+			if m := n.s("workflow"); (m == "naive" || m == "saga" || m == "twoPhase" || m == "threePhase") && s.workflowWrite(n, c, m, done) {
 				return
 			}
 			if m := n.s("eventPublish"); (m == "dualWrite" || m == "outbox") && s.eventWrite(n, c, m, done) {
