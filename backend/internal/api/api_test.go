@@ -648,6 +648,23 @@ func TestAlternativesEndpoint(t *testing.T) {
 	}
 }
 
+func TestOpenBriefWeakPointsAreOnlyServedWithTheDebrief(t *testing.T) {
+	ts := newTestServer(t)
+	var raw map[string]json.RawMessage
+	if code := get(t, ts.URL+"/api/scenarios/ten-thousand-students", &raw); code != 200 {
+		t.Fatal(code)
+	}
+	if _, leaked := raw["weakPoints"]; leaked {
+		t.Fatal("weak points appeared on first load")
+	}
+	var result struct {
+		WeakPoints []string `json:"weakPoints"`
+	}
+	if code := get(t, ts.URL+"/api/scenarios/ten-thousand-students/debrief", &result); code != 200 || len(result.WeakPoints) < 2 || len(result.WeakPoints) > 4 {
+		t.Fatalf("debrief weak points: status %d, %v", code, result.WeakPoints)
+	}
+}
+
 // The first load of a challenge must not carry what gives it away: the hints, the answers to the prediction
 // questions and their explanations, and the debrief come only when asked for.
 func TestAChallengeLoadsWithoutItsHintsAnswersOrDebrief(t *testing.T) {
@@ -667,6 +684,29 @@ func TestAChallengeLoadsWithoutItsHintsAnswersOrDebrief(t *testing.T) {
 		for _, key := range []string{"hints", "debrief", "solution"} {
 			if _, leaked := raw[key]; leaked {
 				t.Errorf("%s: the first load carries %q", sc.ID, key)
+			}
+		}
+		if sc.Open {
+			for _, key := range []string{"traffic", "chaos", "weakPoints"} {
+				if _, leaked := raw[key]; leaked {
+					t.Errorf("%s: the first load carries hidden %q", sc.ID, key)
+				}
+			}
+			var debrief struct {
+				WeakPoints []string `json:"weakPoints"`
+			}
+			if code := get(t, ts.URL+"/api/scenarios/"+sc.ID+"/debrief", &debrief); code != 200 || len(debrief.WeakPoints) < 2 || len(debrief.WeakPoints) > 4 {
+				t.Errorf("%s: debrief weak points status=%d values=%v", sc.ID, code, debrief.WeakPoints)
+			}
+			resp, err := http.Get(ts.URL + "/api/scenarios/" + sc.ID + "/alternatives")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var alternatives []scenarios.Alternative
+			_ = json.NewDecoder(resp.Body).Decode(&alternatives)
+			resp.Body.Close()
+			if len(alternatives) != 0 {
+				t.Errorf("%s: open challenge has %d alternatives", sc.ID, len(alternatives))
 			}
 		}
 		var hc int

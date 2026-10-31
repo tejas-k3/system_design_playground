@@ -285,7 +285,11 @@ func (s *Server) getDebrief(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "no such scenario")
 		return
 	}
-	writeJSON(w, 200, map[string]string{"debrief": sc.Debrief, "deeper": sc.Deeper})
+	writeJSON(w, 200, struct {
+		Debrief    string   `json:"debrief"`
+		Deeper     string   `json:"deeper"`
+		WeakPoints []string `json:"weakPoints,omitempty"`
+	}{sc.Debrief, sc.Deeper, sc.WeakPoints})
 }
 
 func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {

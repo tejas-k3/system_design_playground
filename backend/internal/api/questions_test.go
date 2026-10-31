@@ -237,8 +237,8 @@ func TestOpenChallengeHidesItsLoadAndHasNoSolutionToServe(t *testing.T) {
 			open++
 		}
 	}
-	if open != 3 {
-		t.Errorf("the list should flag the three open challenges, flagged %d", open)
+	if open != 8 {
+		t.Errorf("the list should flag all eight open challenges, flagged %d", open)
 	}
 	// and it still runs with its hidden profile: a session scores it
 	var run runResp

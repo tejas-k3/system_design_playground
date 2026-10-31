@@ -116,6 +116,7 @@ type Scenario struct {
 	Predictions []Prediction                     `json:"predictions,omitempty"`
 	Debrief     string                           `json:"debrief"`
 	Deeper      string                           `json:"-"`                  // optional longer debrief for an experienced engineer, served with the debrief on request
+	WeakPoints  []string                         `json:"-"`                  // open-challenge risks shown only after the learner passes
 	Concepts    []string                         `json:"concepts,omitempty"` // ideas it practises, from the fixed Concepts list
 }
 
