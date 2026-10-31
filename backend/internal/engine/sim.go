@@ -330,6 +330,7 @@ type Sim struct {
 	runCausalBroken                           int
 	runCacheMsgs                              int               // messages the origin sent to caches about writes
 	causalDeps                                map[[2]int][2]int // item and version of a write -> the item and version its writer had last read
+	causalPruneAt                             int               // how many records make it worth looking for old ones again
 	shardAdds                                 int
 	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
 	runInconsistent, runCompensated, runStuck int   // multi-step writes left half done, rolled back, and rolled back unsuccessfully

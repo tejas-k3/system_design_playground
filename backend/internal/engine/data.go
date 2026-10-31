@@ -398,7 +398,7 @@ func (s *Sim) invalidate(n *node, c *call, ver int, then func()) {
 		for ; i < len(caches); i++ {
 			switch caches[i].to.s("writePolicy") {
 			case "lease": // tell only a cache that holds the item: its entry is the lease, and a cache without one will fetch afresh
-				if !caches[i].to.store.Live(s.now, c.key) {
+				if to := caches[i].to; !to.store.Live(s.now, c.key) && to.f("rangeKB") <= 0 { // pieces are held under other keys: always tell
 					continue
 				}
 				fallthrough

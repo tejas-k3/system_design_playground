@@ -122,19 +122,47 @@ func (s *Sim) countCausalRead(lg *logical, res Result) {
 	cz.lastKey, cz.lastVer = lg.key, res.Ver
 }
 
-// recordCause remembers, for a write by a client that asks for causal order, the read it was built on.
-func (s *Sim) recordCause(c *call, ver int) {
-	if c.lg == nil || c.lg.client.s("consistency") != "causalOrder" {
-		return
+// stampSeen notes on a request what its client knew when it was issued: the newest version it had of this item, and, for
+// a write by a client asking for causal order, the last thing it read, which the write is built on (so a read made
+// while the write is in flight does not become its cause).
+func (c *node) stampSeen(lg *logical) {
+	lg.sawWrite, lg.sawRead = c.sessWrite[lg.key], c.sessRead[lg.key] // nil maps read as 0
+	if lg.write && c.causal != nil {
+		lg.sawWrite, lg.sawRead = c.causal.lastKey, c.causal.lastVer // here: the item and version it read last
 	}
-	cz := c.lg.client.causal
-	if cz == nil || cz.lastVer == 0 {
+}
+
+// recordCause remembers, for a write by a client that asks for causal order, the read it was built on. Version 0 is an
+// item never written, which no read can be older than, so it is not a cause worth keeping.
+func (s *Sim) recordCause(c *call, ver int) {
+	if c.lg == nil || !c.lg.write || c.lg.client.s("consistency") != "causalOrder" || c.lg.sawRead <= 0 {
 		return
 	}
 	if s.causalDeps == nil {
 		s.causalDeps = map[[2]int][2]int{}
 	}
-	s.causalDeps[[2]int{c.key, ver}] = [2]int{cz.lastKey, cz.lastVer}
+	s.causalDeps[[2]int{c.key, ver}] = [2]int{c.lg.sawWrite, c.lg.sawRead}
+	if len(s.causalDeps) >= max(causalKeepMax, s.causalPruneAt) {
+		s.pruneCauses()
+	}
+}
+
+// causalKeepMax is how many dependency records are kept before the old ones are looked for, and causalWindow how many
+// versions back from an item's newest a read can still return (copies lag by a few versions, not by hundreds).
+const (
+	causalKeepMax = 4096
+	causalWindow  = 64
+)
+
+// pruneCauses drops the dependencies of versions too old for any read to return. The next look comes when the records
+// have doubled, so a design with many live items is not scanned on every write.
+func (s *Sim) pruneCauses() {
+	for k := range s.causalDeps {
+		if k[1] < s.itemVer(k[0])-causalWindow {
+			delete(s.causalDeps, k)
+		}
+	}
+	s.causalPruneAt = 2 * len(s.causalDeps)
 }
 
 // ensureSessionMaps lazily creates the maps used only by clients with per-client consistency guarantees.

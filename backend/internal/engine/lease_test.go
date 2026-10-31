@@ -19,14 +19,24 @@ func TestLiveReadsAStoreWithoutChangingIt(t *testing.T) {
 
 // leaseRun: four caches in front of one database, a third of the traffic writes, items spread over more keys than a
 // cache holds, so any one write is of interest to only some of the caches.
-func leaseRun(policy string) RunStats {
+func leaseRun(policy string) RunStats { return leaseRunWith(policy, nil, nil) }
+
+func leaseRunWith(policy string, cache, users Params) RunStats {
+	u := Params{"rps": 200.0, "readPct": 70.0, "keySpace": 2000.0, "keyDist": "uniform", "consistency": "bounded", "maxStaleMs": 200.0, "timeoutMs": 3000.0}
+	for k, v := range users {
+		u[k] = v
+	}
 	d := Diagram{Nodes: []Node{
-		{ID: "users", Kind: KClient, Params: Params{"rps": 200.0, "readPct": 70.0, "keySpace": 2000.0, "keyDist": "uniform", "consistency": "bounded", "maxStaleMs": 200.0, "timeoutMs": 3000.0}},
+		{ID: "users", Kind: KClient, Params: u},
 		{ID: "app", Kind: KAppServer, Params: Params{"threads": 64.0, "dbPool": 64.0}},
 		{ID: "db", Kind: KDatabase},
 	}, Edges: []Edge{{ID: "u", From: "users", To: "app", LatencyMs: 20}, {ID: "d", From: "app", To: "db", LatencyMs: 2}}}
 	for _, id := range []string{"c1", "c2", "c3", "c4"} {
-		d.Nodes = append(d.Nodes, Node{ID: id, Kind: KCache, Params: Params{"capacityItems": 300.0, "ttlSec": 30.0, "writePolicy": policy}})
+		p := Params{"capacityItems": 300.0, "ttlSec": 30.0, "writePolicy": policy}
+		for k, v := range cache {
+			p[k] = v
+		}
+		d.Nodes = append(d.Nodes, Node{ID: id, Kind: KCache, Params: p})
 		d.Edges = append(d.Edges, Edge{ID: "a" + id, From: "app", To: id, LatencyMs: 2})
 	}
 	d, _ = Sanitize(d)
@@ -52,5 +62,18 @@ func TestALeaseTellsOnlyTheCachesThatHoldTheItem(t *testing.T) {
 	}
 	if lease.Stale > push.Stale+push.Stale/10+2 {
 		t.Errorf("a lease should be as fresh as push: %d stale reads against %d", lease.Stale, push.Stale)
+	}
+}
+
+// A cache that keeps big objects in pieces holds them under other keys, so the origin cannot tell from the item's own
+// key whether it holds anything: a lease must still reach it, as pushing does.
+func TestALeaseStillReachesACacheThatKeepsPieces(t *testing.T) {
+	cache, users := Params{"rangeKB": 100.0}, Params{"respKB": 500.0}
+	push, lease := leaseRunWith("invalidate", cache, users), leaseRunWith("lease", cache, users)
+	if push.CacheMsgs == 0 {
+		t.Fatal("pushing should send messages")
+	}
+	if lease.CacheMsgs != push.CacheMsgs {
+		t.Errorf("a cache that keeps pieces cannot be skipped: %d messages against %d for push", lease.CacheMsgs, push.CacheMsgs)
 	}
 }
