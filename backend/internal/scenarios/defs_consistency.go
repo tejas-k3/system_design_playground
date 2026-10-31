@@ -70,6 +70,37 @@ func registerConsistencyAndStreams() {
 		Deeper:  "With several writers, concurrent writes to one item are normal, and the conflict rule decides what survives; last-writer-wins is simple and drops data without any error. Merging types such as a set that adds, or a counter, keep every update, but they only work when the data model can be merged, and removals need extra care or a deleted item comes back. Shortening the {{replication-lag|replication delay}} only makes conflicts rarer, and routing all writes for a cart to one home region removes them at the cost of a slow write for far users. At larger scale you need version vectors or similar to tell concurrent writes from ordered ones, because relying on clocks lets skew pick the wrong winner. An interviewer will ask what you do with a conflict that cannot be merged, such as a stock count, and how a user would be shown it.",
 	})
 
+	// The older write wins: two leaders stamp writes with their own clocks, and one clock runs ahead
+	olderWins := func(fixed bool) engine.Diagram {
+		policy := "lastWriterWins"
+		if fixed {
+			policy = "logicalVersion"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 0.0, "keySpace": 50.0, "keyDist": "uniform", "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "topology": "multiLeader", "leaders": 2.0, "syncLagMs": 100.0, "conflictPolicy": policy, "clockDriftMsPerMin": 6000.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "older-write-wins", Title: "The older write wins", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "Profile edits made later are overwritten by earlier ones, though the leaders had long exchanged them.",
+		Story:   "A profile database has two leaders, one per region, and keeps the write with the later time stamp. The two machines' clocks are not synchronised and the second runs further ahead every minute. After a few minutes the second region's edits carry stamps from the future, and an edit made later in the first region loses to an older one that arrived long before. Users see their last change vanish, with no error. No newer write may lose to an older one.",
+		Diagram: olderWins(false), Solution: olderWins(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxClockLost: i(0), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.0)},
+		DurationSec: 60, WarmupSec: 0, Speed: 1,
+		Hints: [3]string{
+			"Look at the writes lost to a clock on the goals panel: the writes are not concurrent, so why does the older one win?",
+			"Each leader stamps a write with its own clock. If one clock is ahead, what does comparing stamps say about which write is newer?",
+			"Synchronising clocks shrinks the error but never removes it. What could order the writes without looking at any clock at all?",
+		},
+		Answer: "The answer: order the writes with logical versions instead of clock time: a write that saw the previous one is ordered after it whatever the clocks say. Synchronising clocks only shrinks the window in which a newer write can lose.",
+		Predictions: []Prediction{{ID: "p1", Question: "Why can a physical clock not order writes at two machines?", Options: []string{"Their clocks differ by an error that can exceed the gap", "Clocks stop whenever the network is slow for a while", "Time stamps are too long to compare in a database"}, Answer: 0,
+			Explain: "Clocks drift and are only synchronised to within some error. Two writes closer together than that error can be ordered the wrong way round."}},
+		Debrief: "Time stamps from different machines cannot order events closer together than the error between their clocks, and last-writer-wins trusts them completely. A {{logical-clock|logical clock}} counts events instead: a write that has seen another is numbered after it. It orders what is causally related and leaves truly concurrent writes as conflicts to resolve.",
+		Deeper:  "Physical clocks drift and are corrected by a synchronisation protocol only to within some error, so a timestamp can order two events reliably only when they are further apart than that error. Last-writer-wins treats the stamp as truth, so the machine with the fastest clock wins every close contest, and a newer write is dropped without any error. Logical clocks avoid the problem: a Lamport clock gives every event a number larger than any it has seen, so causally related events are ordered correctly, while a vector clock also tells you when two writes are concurrent so both can be kept and merged by the application. Systems that do need real time, such as globally ordered transactions, pay for it with special hardware and by waiting out the uncertainty. An interviewer will ask why synchronising clocks is not enough, and what you would do for two writes that are really concurrent.",
+	})
+
 	// Quorum overlap: a key-value store that answers quickly but sometimes shows a client its own old data
 	quorumOverlap := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0

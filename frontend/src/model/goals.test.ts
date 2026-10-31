@@ -276,3 +276,11 @@ describe('signed out by a lost session goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Users signed out by a lost session').state).toBe('pass')
   })
 })
+
+describe('newer writes lost to a clock goal', () => {
+  it('counts writes dropped because a leader clock was behind', () => {
+    const g = { minSuccessRate: 0.5, maxClockLost: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, clockLost: 2334 }), 1, true), 'Newer writes lost to a clock')).toMatchObject({ actual: '2334', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Newer writes lost to a clock').state).toBe('pass')
+  })
+})

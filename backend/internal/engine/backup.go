@@ -1,5 +1,7 @@
 package engine
 
+import "math"
+
 // Backups and restore. A database with backupEverySec set takes a backup that often. A restore (chaos "restore")
 // puts it back to the last backup taken before the damage began, so every write since is lost (the recovery point,
 // RPO), and the database answers nothing while the backup streams back (the recovery time, RTO).
@@ -66,11 +68,42 @@ func (s *Sim) multiLeaderWrite(n *node, c *call) {
 	if n.mlLast == nil {
 		n.mlLast = map[int]mlWrite{}
 	}
-	if prev, ok := n.mlLast[c.key]; ok && prev.leader != leader && s.now-prev.t < n.f("syncLagMs") {
+	policy := n.s("conflictPolicy")
+	prev, seen := n.mlLast[c.key]
+	concurrent := seen && prev.leader != leader && s.now-prev.t < n.f("syncLagMs")
+	if concurrent {
 		n.mlConflicts++
-		if n.s("conflictPolicy") != "merge" && c.counted {
+		if policy != "merge" && c.counted {
 			s.runLostUpdates++
 		}
 	}
-	n.mlLast[c.key] = mlWrite{s.now, leader}
+	stamp := 0.0
+	if policy == "lastWriterWins" {
+		stamp = s.now + s.leaderClockError(n, leader)
+		// Last-writer-wins keeps the write with the later time stamp, wherever it came from: a leader whose clock is
+		// behind loses to an older write of the other leader, and its write is dropped without being recorded, so later
+		// writes at that leader keep losing until the leader that is ahead writes the key again. Logical versions and
+		// merging do not look at the clock. A drop that is also a true conflict is already counted as a lost update.
+		if seen && prev.leader != leader && stamp < prev.stamp {
+			if c.counted && !concurrent {
+				s.runClockLost++
+			}
+			return
+		}
+	}
+	n.mlLast[c.key] = mlWrite{t: s.now, leader: leader, stamp: stamp}
+}
+
+// leaderClockError is how far a leader's clock is ahead of true time. The first leader is the reference; leader i is
+// ahead by i times the offset, plus i times the drift since its last synchronisation.
+func (s *Sim) leaderClockError(n *node, leader int) float64 {
+	spread, drift := n.f("clockSpreadMs"), n.f("clockDriftMsPerMin")
+	if leader == 0 || (spread == 0 && drift == 0) {
+		return 0
+	}
+	since := s.now
+	if sync := n.f("clockSyncSec") * 1000; sync > 0 {
+		since = math.Mod(s.now, sync)
+	}
+	return float64(leader) * (spread + drift*since/60000)
 }
