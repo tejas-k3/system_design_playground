@@ -182,6 +182,15 @@ var alternatives = map[string][]Alternative{
 		alt("Let it idle for 1 second before it stops", false, 100.0, 1311, 0.19, "Requests come twice a second on average, but gaps of a second or more are not rare, and each one that follows finds the function stopped: enough requests wait 1.2 s to show in the 95th percentile.", Change{"fn", "idleSec", 1.0}),
 		alt("Let it idle for 2 seconds before it stops", true, 100.0, 148, 0.19, "It passes: a gap of two seconds between requests is rare at this rate, so the function almost never stops. A quieter service would need a longer time.", Change{"fn", "idleSec", 2.0}),
 	},
+	"ranked-feed": {
+		alt("Give the feed service 32 threads", false, 98.6, 1054, 1.26, "Enough threads for the work, so the requests mostly get through, but every read still spends half a second in the model: a p95 of 1,054 ms, and a bill more than double the budget.", Change{"app", "threads", 32.0}),
+		alt("Score 2,000 candidates", false, 28.0, 1391, 0.56, "A third of the work, but still 200 ms of model time per read: forty reads a second need eight threads for the model alone, and only 28% are answered.", Change{"app", "rankCandidates", 2000.0}),
+		alt("Score 800 candidates", false, 100.0, 280, 0.56, "Every read is answered, but 80 ms of model time on top of the ordinary work puts the p95 at 280 ms, over the 250 ms goal. Fewer candidates still would pass.", Change{"app", "rankCandidates", 800.0}),
+	},
+	"chat-order": {
+		alt("Use a single partition", false, 100.0, 132, 0.54, "Everything is in order, since one worker reads one partition, but one worker cannot keep up: only 28% of the messages are delivered.", Change{"log", "partitions", 1.0}),
+		alt("Use eight partitions, still spread evenly", false, 100.0, 132, 0.59, "More partitions and more places for one conversation's messages to land: 915 messages are handled out of order instead of 298.", Change{"log", "partitions", 8.0}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),
