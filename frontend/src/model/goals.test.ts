@@ -284,3 +284,11 @@ describe('newer writes lost to a clock goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Newer writes lost to a clock').state).toBe('pass')
   })
 })
+
+describe('wrong answers accepted goal', () => {
+  it('counts wrong answers a group returned as correct', () => {
+    const g = { minSuccessRate: 0.5, maxWrongAnswers: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, wrongAnswers: 1240 }), 1, true), 'Wrong answers accepted')).toMatchObject({ actual: '1240', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Wrong answers accepted').state).toBe('pass')
+  })
+})

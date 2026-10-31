@@ -163,6 +163,7 @@ export interface Goals {
   maxUnchecked?: number
   maxReauth?: number
   maxClockLost?: number
+  maxWrongAnswers?: number
   maxBlockedSec?: number
   maxRepeatedOutputs?: number
   maxRecoverySec?: number
@@ -373,6 +374,7 @@ export interface RunStats {
   compensated?: number // multi-step writes rolled back
   crawl?: CrawlStats // only when the users run the crawl workload
   eventDups?: number // events a queue accepted a second time (a producer retried after a lost answer)
+  wrongAnswers?: number // wrong answers a group of members accepted and returned as correct
   clockLost?: number // newer writes dropped by last-writer-wins because a leader's clock was behind
   sessionsLost?: number // login sessions destroyed by a crash or by expiring
   reauth?: number // requests that found their user signed out
