@@ -121,6 +121,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		return
 	}
 	cpu := s.service(n, n.f("cpuMs")*s.classMult(c, n)+s.securityMs(n, c)) * n.slow
+	cpu += s.coldStartWait(n)
 	n.cpuWork += cpu
 	if n.throttled {
 		cpu *= 100 / n.f("burstBaselinePct")

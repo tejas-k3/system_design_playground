@@ -429,4 +429,66 @@ func registerScaleOut() {
 			Explain: "Stickiness only keeps a user's requests on the same server. It does not copy anything, so the memory of a restarted server is gone."}},
 		Debrief: "A {{stateless-service|stateless}} server keeps nothing between requests, so any healthy server can take the next one. Keeping a session in one server's memory makes the user depend on that server. Sticky routing keeps the requests together but not the state: it loads servers unevenly and does not survive a restart. A shared store lets any server find the session, adding a call to every request and a dependency that must itself stay up; a session that expires when idle is soft state, which the user notices only when it is gone.",
 	})
+
+	// The front door: the balancer in front of plenty of servers is the first thing to fill up
+	frontDoorFull := func(fixed bool) engine.Diagram {
+		lb := P{"maxRps": 1200.0, "layer": "layer7"}
+		if fixed {
+			lb["layer"] = "layer4"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 2500.0, "readPct": 100.0, "keySpace": 5000.0, "keyDist": "uniform", "timeoutMs": 1500.0, "retries": 0.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, lb).label("lb", "Entry balancer").
+			n("app1", engine.KAppServer, cols[2], 60, P{"threads": 32.0, "cpuMs": 5.0, "queueCap": 300.0}).
+			n("app2", engine.KAppServer, cols[2], 200, P{"threads": 32.0, "cpuMs": 5.0, "queueCap": 300.0}).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "readMs": 1.0}).
+			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
+	}
+	register(&Scenario{
+		ID: "front-door", Title: "The front door", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Half the traffic is turned away at the balancer while the servers behind it sit idle.",
+		Story:   "All traffic enters through one load balancer that reads every request, which is what lets it route on content. Its {{throughput|throughput}} is about 1,200 requests a second. 2,500 arrive. Behind it two app servers could take 6,000 between them and are nearly idle, and the database is bored. Nothing here needs content-aware routing: every request goes to either server. Serve at least 97% of requests within the budget.",
+		Diagram: frontDoorFull(false), Solution: frontDoorFull(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(300), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.7)},
+		DurationSec: 30, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Open the bottleneck check or look at each component's busy level: what is full, and what is not?",
+			"More app servers will not help if the requests never reach them. What limits how many requests the balancer passes?",
+			"A balancer that reads every request does more work per request than one that only forwards connections. Does anything in this design need the balancer to read requests?",
+		},
+		Answer: "The answer: switch the balancer to layer 4. It forwards connections without reading the request, so the same machine passes about four times as many and costs less. It can no longer route by content, which nothing here needs.",
+		Predictions: []Prediction{{ID: "p1", Question: "Two more app servers are added behind the full balancer. What happens to the success rate?", Options: []string{"It stays about the same, since the balancer is the limit", "It doubles, since there is twice the capacity", "It falls, since traffic is split thinner"}, Answer: 0,
+			Explain: "A request must pass the balancer before any server sees it, so capacity behind it cannot raise what gets through."}},
+		Debrief: "Every request passes the entry point, so it is the first place a design can saturate, and adding servers behind it changes nothing. A layer-7 balancer reads the request, which allows routing by path, header or user, at the price of more work per request; a layer-4 balancer forwards connections and passes far more. Choose layer 7 only when you route on content, or run several balancers behind DNS or anycast when one is not enough.",
+	})
+
+	// The first request after a pause: a function that scales to zero starts cold
+	coldFunction := func(fixed bool) engine.Diagram {
+		app := P{"threads": 8.0, "cpuMs": 20.0, "coldStartMs": 1200.0, "idleSec": 0.3}
+		if fixed {
+			app["idleSec"] = 30.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 2.0, "readPct": 100.0, "keySpace": 100.0, "keyDist": "uniform", "timeoutMs": 3000.0, "retries": 0.0}).
+			n("fn", engine.KAppServer, cols[1], rowMid, app).label("fn", "Function").
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 8.0, "readMs": 5.0}).
+			e("users", "fn").e("fn", "db").done()
+	}
+	register(&Scenario{
+		ID: "cold-start", Title: "The first request after a pause", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "A function that scales to zero makes nearly every user wait for it to start.",
+		Story:   "An endpoint runs as a function that stops after 0.3 seconds without a request, so that nothing is paid for while it is idle. Starting it takes 1.2 seconds. Two requests a second arrive, with gaps that are often longer than 0.3 seconds, so many requests find it stopped. Users should see an answer within 400 ms at the 95th percentile, and the bill should stay under $0.20 an hour.",
+		Diagram: coldFunction(false), Solution: coldFunction(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxP95Ms: f(400), MaxCostPerHour: f(0.2), StarP95Ms: f(300), StarCostPerHour: f(0.19)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the latency of a single request: where do the extra 1,200 ms come from?",
+			"The function stops when it has been idle for the idle time. How often does a request arrive compared with that time?",
+			"Two things keep it warm: not letting it stop so quickly, or paying for one instance that never stops. Which costs less here?",
+		},
+		Answer: "The answer: lengthen the idle time to a few seconds. Requests arrive twice a second, so the function never stops, and you still pay nothing while it is idle for longer. Keeping one instance warm also works, at a fixed cost.",
+		Predictions: []Prediction{{ID: "p1", Question: "What decides whether a request finds a function cold?", Options: []string{"Whether it was idle longer than the idle time", "Whether it is the first request of the whole day", "Whether the database is slow just then"}, Answer: 0,
+			Explain: "A function stops after its idle time, so a request after a longer gap pays the start-up; steady traffic keeps it warm."}},
+		Debrief: "A function that {{autoscaling|scales to zero}} trades cost for latency: it costs nothing while idle, and the first request after an idle spell waits for it to start. Steady traffic keeps it warm; sparse traffic meets a cold start almost every time. The levers are the idle time, a smaller and quicker image, and paying for an instance that stays warm. A container starts in seconds, a virtual machine in tens of seconds, which is why functions run in containers.",
+	})
 }

@@ -72,6 +72,8 @@ var conceptTags = map[string][]string{
 	"liar-in-the-group":      {"replication", "failure-handling"},
 	"old-leaders-writes":     {"replication", "failure-handling"},
 	"slow-news":              {"failure-handling", "replication"},
+	"front-door":             {"capacity", "overload-control"},
+	"cold-start":             {"capacity", "autoscaling"},
 	"who-is-the-leader":      {"replication", "failure-handling"},
 	"launch-day":             {"sharding", "capacity"},
 	"count-the-clicks":       {"queues", "consistency"},

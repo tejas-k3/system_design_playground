@@ -1,5 +1,7 @@
 package engine
 
+import "math"
+
 // Who is calling. Every request carries a token. The app server either asks the auth service whether it is valid (and may
 // remember a yes for a while, per user), or verifies the signature itself. When the auth service fails, the server
 // refuses the request (closed) or lets it through unchecked (open). Encryption is a time cost only; nothing is encrypted.
@@ -58,4 +60,18 @@ func (s *Sim) authenticate(n *node, e *edge, c *call, then func(Result)) {
 		}
 		then(res)
 	})
+}
+
+// coldStartWait is how long this request waits for a function that scales to zero to start. The first request after an
+// idle spell starts it, and the ones that arrive while it boots wait for the same start.
+func (s *Sim) coldStartWait(n *node) float64 {
+	cs := n.f("coldStartMs")
+	if cs <= 0 || n.b("keepWarm") {
+		return 0
+	}
+	if n.coldLast == 0 || s.now-n.coldLast > n.f("idleSec")*1000 {
+		n.coldWarmAt = s.now + cs
+	}
+	n.coldLast = s.now
+	return math.Max(0, n.coldWarmAt-s.now)
 }

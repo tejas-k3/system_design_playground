@@ -1130,11 +1130,11 @@ func (s *Sim) pickBackendFor(n *node, user int) *edge {
 		}
 	}
 	if n.kind == KLoadBalancer {
-		if pct := n.f("canaryPct"); pct > 0 {
+		if pct := n.f("canaryPct"); pct > 0 && n.s("layer") != "layer4" {
 			cand = s.canarySplit(n, cand, pct)
 		}
 	}
-	sticky := user != 0 && n.kind == KLoadBalancer && n.b("sticky")
+	sticky := user != 0 && n.kind == KLoadBalancer && n.b("sticky") && n.s("layer") != "layer4"
 	if sticky {
 		if home := n.stickyHome[user]; home != nil {
 			for _, e := range cand {
@@ -1177,7 +1177,26 @@ func (s *Sim) chooseFrom(n *node, cand []*edge) *edge {
 }
 
 func (s *Sim) procRoute(n *node, c *call, cb func(Result), release func()) {
-	s.hold(n, 0.2*n.slow, release, cb, func() {
+	base, wait := 0.2, 0.0
+	if n.kind == KLoadBalancer {
+		if n.s("layer") == "layer4" {
+			base = 0.05 // it forwards connections without reading the request
+		}
+		if rps := n.f("maxRps"); rps > 0 {
+			per := 1000 / rps
+			if n.s("layer") == "layer4" {
+				per /= 4
+			}
+			start := math.Max(s.now, n.lbFree)
+			if start-s.now > n.f("lbQueueMs") {
+				release()
+				s.failAt(n, RQueueFull, cb)
+				return
+			}
+			n.lbFree, wait = start+per, start-s.now
+		}
+	}
+	s.hold(n, wait+base*n.slow, release, cb, func() {
 		release()
 		e := s.pickBackendFor(n, c.user)
 		if e == nil {

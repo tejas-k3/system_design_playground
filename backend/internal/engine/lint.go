@@ -58,6 +58,15 @@ func Lint(d Diagram) []Finding {
 			add("spof-database", "warn", "The only copy of the data lives on one database: if it crashes, every request that needs it fails.", "Add a read replica and set the database to promote it on failure.", id)
 		}
 	}
+	var ignoredRouting []string
+	for _, n := range d.Nodes {
+		if n.Kind == KLoadBalancer && ps(res[n.ID], "layer") == "layer4" && (pf(res[n.ID], "canaryPct", 0) > 0 || pb(res[n.ID], "sticky")) {
+			ignoredRouting = append(ignoredRouting, n.ID)
+		}
+	}
+	if len(ignoredRouting) > 0 {
+		add("layer4-ignores-content-routing", "warn", "A layer-4 balancer does not read requests, so its canary share and sticky routing are ignored.", "Use layer 7 if you need to route by content, or remove the setting.", ignoredRouting...)
+	}
 	var smallVote []string
 	for _, n := range d.Nodes {
 		if n.Kind == KCoordinator && ps(res[n.ID], "faultModel") == "arbitrary" && math.Min(9, pf(res[n.ID], "nodes", 3)) < 3*pf(res[n.ID], "faultsTolerated", 1)+1 {

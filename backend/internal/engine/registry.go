@@ -192,8 +192,18 @@ func init() {
 				flag("outlierEjection", "Eject outliers", "Health", false, "Temporarily remove servers that error a lot or are much slower than their peers."),
 				num("canaryPct", "Canary share", "Release", 0, 0, 100, 1, "%", "Send this share of requests to the servers running the new version (v2) and the rest to the old one (v1). 0 = every server gets its fair share.").adv(),
 				num("healthCheckSec", "Health check interval", "Health", 2, 1, 30, 1, "s", "How long a dead server keeps receiving traffic before the balancer notices."),
+				sel("layer", "Works at", "Capacity", "layer7", "Layer 7 reads each request, so it can route on what it contains (a canary share, a sticky user) and costs more per request. Layer 4 only forwards connections: cheaper, quicker and about four times the throughput, but it cannot route by content, so canary shares and sticky users are ignored.",
+					opt("layer7", "Layer 7 (reads the request)"), opt("layer4", "Layer 4 (forwards connections)")).adv(),
+				num("maxRps", "Most requests a second", "Capacity", 0, 0, 100000, 100, "/s", "The balancer is one machine: past this many requests a second (four times as many at layer 4) requests wait, and when the wait is longer than the queue allows they are refused. A bigger one costs more. 0 = never the bottleneck.").adv(),
+				num("lbQueueMs", "Longest wait", "Capacity", 200, 1, 5000, 10, "ms", "How long a request may wait for the balancer before it is refused (503).").adv().showIf("layer", "layer7", "layer4"),
 			},
-			cost: func(Params) float64 { return 0.02 },
+			cost: func(p Params) float64 {
+				c := 0.02
+				if ps(p, "layer") == "layer4" {
+					c = 0.01
+				}
+				return c + pf(p, "maxRps", 0)*0.00001
+			},
 		},
 		{
 			Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
@@ -209,6 +219,12 @@ func init() {
 				num("minInstances", "Min servers", "Scaling", 1, 1, 32, 1, "", "Never fewer than this many.").adv().showIf("autoscale", "true"),
 				num("maxInstances", "Max servers", "Scaling", 8, 1, 32, 1, "", "Never more than this many.").adv().showIf("autoscale", "true"),
 				num("targetUtilPct", "Target busy level", "Scaling", 60, 20, 95, 5, "%", "Add servers when threads are busier than this, over the last 30 s.").adv().showIf("autoscale", "true"),
+				sel("runtime", "Runs as", "Scaling", "vm", "A virtual machine takes the boot time above to start; a container shares its host, starts in seconds and costs a fifth less for the same threads.",
+					opt("vm", "Virtual machine"), opt("container", "Container")).adv().showIf("autoscale", "true"),
+				num("containerBootSec", "Container start time", "Scaling", 3, 0.5, 60, 0.5, "s", "How long a new container takes before it can take requests.").adv().showIf("runtime", "container"),
+				num("coldStartMs", "Cold start", "Scaling", 0, 0, 30000, 50, "ms", "A function that scales to zero: the first request after it has been idle waits this long for it to start, and so do the ones that arrive meanwhile. 0 = always running.").adv(),
+				num("idleSec", "Idle before it stops", "Scaling", 30, 0.1, 900, 0.1, "s", "How long without a request before the function is stopped to save money. Only with a cold start.").adv(),
+				flag("keepWarm", "Keep one warm", "Scaling", false, "Pay for one instance that never stops, so there is no cold start. Only with a cold start.").adv(),
 				num("scaleUpDelaySec", "Boot time", "Scaling", 30, 1, 300, 1, "s", "How long a new server takes before it can take requests.").adv().fixed().showIf("autoscale", "true"),
 				num("scaleDownDelaySec", "Scale-down wait", "Scaling", 120, 0, 900, 5, "s", "How long load must stay low before one server is removed (stops it flapping).").adv().showIf("autoscale", "true"),
 				num("queueCap", "Queue size", "Capacity", 50, 0, 2000, 10, "", "Requests that may wait for a thread. When full, new ones get a 503."),
@@ -287,7 +303,16 @@ func init() {
 				num("lockWaitMs", "Lock wait", "Locks (Redis)", 0, 0, 5000, 25, "ms", "How long to keep retrying a busy lock before giving up (0 = fail fast).").needs(KRedis),
 				num("lockTtlMs", "Lock lease (TTL)", "Locks (Redis)", 2000, 100, 30000, 100, "ms", "Locks expire after this long even if never released.").needs(KRedis).adv(),
 			},
-			cost: func(p Params) float64 { return 0.1 * math.Pow(pf(p, "threads", 8)/8, 1.5) },
+			cost: func(p Params) float64 {
+				c := 0.1 * math.Pow(pf(p, "threads", 8)/8, 1.5)
+				if ps(p, "runtime") == "container" {
+					c *= 0.8 // containers share a host
+				}
+				if pb(p, "keepWarm") && pf(p, "coldStartMs", 0) > 0 {
+					c += 0.05 // one instance that never stops
+				}
+				return c
+			},
 		},
 		{
 			Kind: KCache, Name: "Cache", Description: "In-memory cache. Misses go on to the data store.",

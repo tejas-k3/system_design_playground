@@ -313,3 +313,21 @@ func TestLintFindsAVotingGroupThatIsTooSmall(t *testing.T) {
 		t.Errorf("four members can")
 	}
 }
+
+func TestLintFindsContentRoutingOnALayerFourBalancer(t *testing.T) {
+	d := func(lb Params) Diagram {
+		b := &builder{}
+		b.node("u", KClient, Params{})
+		b.node("lb", KLoadBalancer, lb)
+		b.node("a", KAppServer, Params{})
+		b.edge("u", "lb").edge("lb", "a")
+		out, _ := Sanitize(b.d)
+		return out
+	}
+	if _, ok := rules(Lint(d(Params{"layer": "layer4", "canaryPct": 10.0})))["layer4-ignores-content-routing"]; !ok {
+		t.Errorf("a canary share on a layer-4 balancer is ignored, so it is flagged")
+	}
+	if _, ok := rules(Lint(d(Params{"canaryPct": 10.0})))["layer4-ignores-content-routing"]; ok {
+		t.Errorf("layer 7 reads the request")
+	}
+}
