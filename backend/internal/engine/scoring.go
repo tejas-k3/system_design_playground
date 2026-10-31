@@ -266,7 +266,7 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 		checks = append(checks, Check{"Time to restore (RTO)", fmt.Sprintf("≤ %.0f s", *g.MaxRtoSec), fmt.Sprintf("%.1f s", run.RtoSec), run.RtoSec <= *g.MaxRtoSec+eps})
 	}
 	if g.MaxSessionViolations != nil {
-		broken := run.ReadYourWritesBroken + run.MonotonicBroken + run.MonoWritesBroken + run.FollowReadBroken
+		broken := run.ReadYourWritesBroken + run.MonotonicBroken + run.MonoWritesBroken + run.FollowReadBroken + run.CausalBroken
 		checks = append(checks, Check{"Per-client guarantees broken", fmt.Sprintf("≤ %d", *g.MaxSessionViolations), fmt.Sprint(broken), broken <= *g.MaxSessionViolations})
 	}
 	if g.MinJobsCompleted != nil {

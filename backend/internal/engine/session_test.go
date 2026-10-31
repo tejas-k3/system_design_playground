@@ -243,3 +243,37 @@ func TestWritesFollowReadsIsJudgedOnHintedCopies(t *testing.T) {
 		t.Errorf("a stale hinted copy was counted in %d of 5 cases, want the 3 where the down node holds a copy of the key", total)
 	}
 }
+
+// Causal order: a client that has seen an effect must not then see an older version of its cause.
+func TestCausalOrderCountsACauseReadOlderThanAnEffectAlreadySeen(t *testing.T) {
+	run := func(causeAfter int) string {
+		s, client, kv := sessionSimulation("causalOrder", nil)
+		read := func(key, ver int) {
+			s.countSession(&logical{client: client, counted: true, key: key}, Result{OK: true, Ver: ver})
+		}
+		read(1, 5) // the client reads item 1 at version 5 ...
+		write := &logical{id: 7, client: client, write: true, counted: true, key: 2}
+		effect := s.commit(kv, &call{lg: write, key: 2}) // ... and then writes item 2, which depends on that read
+		read(2, effect)                                  // it sees the effect
+		read(1, causeAfter)                              // and then reads the cause again
+		return sessionViolation(s)
+	}
+	if got := run(4); got != "1" {
+		t.Errorf("a cause older than the one the effect was built on should count once, got %s", got)
+	}
+	if got := run(5); got != "0" {
+		t.Errorf("the same cause is not a violation, got %s", got)
+	}
+	if got := run(6); got != "0" {
+		t.Errorf("a newer cause is not a violation, got %s", got)
+	}
+}
+
+func TestCausalDependenciesAreOnlyKeptForClientsThatAskForThem(t *testing.T) {
+	s, client, kv := sessionSimulation("eventual", nil)
+	s.countSession(&logical{client: client, counted: true, key: 1}, Result{OK: true, Ver: 5})
+	s.commit(kv, &call{lg: &logical{id: 7, client: client, write: true, counted: true, key: 2}, key: 2})
+	if s.causalDeps != nil {
+		t.Error("a client that did not ask for causal order should leave no dependency records")
+	}
+}

@@ -123,3 +123,17 @@ func TestEventualClientsAreStillNotJudgedForFreshness(t *testing.T) {
 		t.Errorf("an eventual client was judged: %d of %d", r.Stale, r.Fresh)
 	}
 }
+
+// In a real run, effects are seen before their causes when a read can land on a copy that has not caught up.
+func TestCausalOrderBreaksOnLaggingCopiesAndQuorumsReduceIt(t *testing.T) {
+	causal := func(q []float64) int {
+		return numericRun(Params{"consistency": "causalOrder"}, q).CausalBroken
+	}
+	loose, strict := causal([]float64{1, 1}), causal([]float64{2, 2})
+	if loose == 0 {
+		t.Fatal("at R=W=1 some read must show an effect and then an older cause")
+	}
+	if strict >= loose {
+		t.Errorf("overlapping quorums should reduce it: %d at R=W=2 against %d at R=W=1", strict, loose)
+	}
+}

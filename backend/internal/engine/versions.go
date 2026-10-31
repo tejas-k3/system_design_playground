@@ -92,6 +92,51 @@ func (s *Sim) countFreshness(lg *logical, res Result) {
 	}
 }
 
+// causalState is what a client that asks for causal order has seen: the last version it read, and for each item the
+// oldest version it may still be shown, because an effect it saw was built on that.
+type causalState struct {
+	lastKey, lastVer int
+	min              map[int]int
+}
+
+// countCausalRead counts a read of a cause that is older than an effect this client has already seen, then notes what
+// the read implies: the item itself may not go backwards, and what a write it shows was built on may not either.
+func (s *Sim) countCausalRead(lg *logical, res Result) {
+	if lg.write {
+		return
+	}
+	cl := lg.client
+	if cl.causal == nil {
+		cl.causal = &causalState{min: map[int]int{}}
+	}
+	cz := cl.causal
+	if lg.counted && res.Ver < cz.min[lg.key] {
+		s.runCausalBroken++
+	}
+	if res.Ver > cz.min[lg.key] {
+		cz.min[lg.key] = res.Ver
+	}
+	if dep, ok := s.causalDeps[[2]int{lg.key, res.Ver}]; ok && dep[1] > cz.min[dep[0]] {
+		cz.min[dep[0]] = dep[1]
+	}
+	cz.lastKey, cz.lastVer = lg.key, res.Ver
+}
+
+// recordCause remembers, for a write by a client that asks for causal order, the read it was built on.
+func (s *Sim) recordCause(c *call, ver int) {
+	if c.lg == nil || c.lg.client.s("consistency") != "causalOrder" {
+		return
+	}
+	cz := c.lg.client.causal
+	if cz == nil || cz.lastVer == 0 {
+		return
+	}
+	if s.causalDeps == nil {
+		s.causalDeps = map[[2]int][2]int{}
+	}
+	s.causalDeps[[2]int{c.key, ver}] = [2]int{cz.lastKey, cz.lastVer}
+}
+
 // ensureSessionMaps lazily creates the maps used only by clients with per-client consistency guarantees.
 func (cl *node) ensureSessionMaps() {
 	if cl.sessWrite == nil {
@@ -106,6 +151,10 @@ func (s *Sim) countSession(lg *logical, res Result) {
 	}
 	cl := lg.client
 	model := cl.s("consistency")
+	if model == "causalOrder" {
+		s.countCausalRead(lg, res)
+		return
+	}
 	if model != "readYourWrites" && model != "monotonic" && model != "causal" && model != "monotonicWrites" && model != "writesFollowReads" {
 		return
 	}
@@ -190,7 +239,9 @@ func (s *Sim) commit(n *node, c *call) int {
 		n.writeLog = append(n.writeLog, s.now)
 	}
 	s.countMonotonicWrite(c)
-	return s.bumpVer(c.key)
+	v := s.bumpVer(c.key)
+	s.recordCause(c, v)
+	return v
 }
 
 func (s *Sim) pruneCommitted() {

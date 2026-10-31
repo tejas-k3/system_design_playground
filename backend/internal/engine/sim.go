@@ -117,6 +117,7 @@ type node struct {
 	corruptAt       float64          // database: when silent corruption began (0 = none)
 	sessWrite       map[int]int      // client: the newest version of each key this client has had acknowledged for its own writes
 	sessRead        map[int]int      // client: the newest version of each key this client has read
+	causal          *causalState     // client asking for causal order: what it has seen and what it may no longer be shown
 	kvFree          [][]float64      // quorum store: when each slot of each cluster node is next free
 	kvVer           []map[int]int    // quorum store: the version of each key each cluster node holds
 	kvDownUntil     []float64        // quorum store: when each cluster node comes back (0 = up)
@@ -326,6 +327,8 @@ type Sim struct {
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int
 	runMonoWriteBroken, runFollowReadBroken   int
+	runCausalBroken                           int
+	causalDeps                                map[[2]int][2]int // item and version of a write -> the item and version its writer had last read
 	shardAdds                                 int
 	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
 	runInconsistent, runCompensated, runStuck int   // multi-step writes left half done, rolled back, and rolled back unsuccessfully
