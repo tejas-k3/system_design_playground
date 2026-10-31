@@ -248,7 +248,7 @@ func registerServicePatterns() {
 		Story:   "A catalogue serves suggestions as people type. Most reads search by a name prefix, while new and changed names must still be written. Keep p95 below 300 ms and the hourly cost under $1.20. This exercise models a prefix lookup as a lookup by another indexed field; it does not simulate a trie or matching each prefix length.",
 		Diagram: typeahead(0), Solution: typeahead(1),
 		Traffic: map[string][]engine.TrafficPoint{"users": {{0, 100}, {10, 100}, {20, 180}, {40, 180}, {50, 100}, {60, 100}}},
-		Goals:   engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarP95Ms: f(300), StarCostPerHour: f(1.05)}, DurationSec: 60, WarmupSec: 5,
+		Goals:   engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.05)}, DurationSec: 60, WarmupSec: 5,
 		Hints: [3]string{
 			"Which field does each suggestion query search, and how much work does an unindexed lookup ask the database to do?",
 			"An index makes alternate-field reads cheaper, but the database must update each index when a row changes.",

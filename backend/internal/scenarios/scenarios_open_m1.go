@@ -25,7 +25,7 @@ func init() {
 	register(&Scenario{
 		ID: "open-link-shortener", Title: "Design a link shortener", Difficulty: "Medium", Open: true,
 		Summary: "Build a fast redirect service that keeps links durable and stays inside its budget.",
-		Story:   "Build a link shortener for a product launch. At least 98% of requests must succeed, p95 must stay below 250 ms, and the service must cost no more than $1.60 an hour. A link must keep working after an app server restarts, and popular links must still redirect quickly. Start with the users and choose the rest of the design.",
+		Story:   "Build a link shortener for a product launch. At least 98% of requests must succeed, p95 must stay below 250 ms, and the service must cost no more than $1.60 an hour. A server may fail during the launch, and popular links must still redirect quickly. Start with the users and choose the rest of the design.",
 		Diagram: open(P{"rps": 100.0, "readPct": 95.0, "keySpace": 30000.0, "keyDist": "zipf", "timeoutMs": 1200.0}), Solution: shortener(),
 		Traffic: map[string][]engine.TrafficPoint{"users": {{0, 100}, {10, 100}, {20, 420}, {45, 420}, {55, 100}, {65, 100}}},
 		Chaos:   []engine.ChaosEvent{{Type: "crash", NodeID: "random:appServer", AtSec: 30, DownSec: 12}},
@@ -85,18 +85,18 @@ func init() {
 	register(&Scenario{
 		ID: "open-news-feed", Title: "Design a news feed", Difficulty: "Medium", Open: true,
 		Summary: "Balance feed write fan-out against the cost of building timelines on reads.",
-		Story:   "Build a news feed for a growing community. At least 98% of requests must succeed, p95 must stay below 350 ms, and the system must cost no more than $1.50 an hour. Most authors have small audiences, but a few have far more followers. The service must keep ordinary posts fresh without letting one large audience overwhelm the rest. Start with the users and choose the design.",
+		Story:   "Build a news feed for a growing community. At least 98% of requests must succeed, p95 must stay below 350 ms, and the system must cost no more than $1.50 an hour. Most authors have small audiences, but a few have far more followers. The service must keep serving ordinary readers without letting one large audience overwhelm the rest. Start with the users and choose the design.",
 		Diagram: open(P{"rps": 40.0, "readPct": 70.0, "workload": "feed", "keySpace": 5000.0, "followersMean": 50.0, "followersSkew": 1.2}), Solution: feed(),
 		Traffic: map[string][]engine.TrafficPoint{"users": {{0, 40}, {10, 40}, {20, 90}, {40, 90}, {50, 40}, {60, 40}}},
 		Chaos:   []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 30, Factor: 3, DurationSec: 8}},
-		Goals:   engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(350), StarP95Ms: f(350), MaxCostPerHour: f(1.5), StarCostPerHour: f(1.5)}, DurationSec: 60, WarmupSec: 5,
+		Goals:   engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(350), MaxCostPerHour: f(1.5)}, DurationSec: 60, WarmupSec: 5,
 		Hints: [3]string{
 			"Compare the work caused by a post with the work caused by a timeline read. Which depends on the author's audience size?",
 			"Pushing every post to every follower makes reads cheap, but a celebrity post can create a large write burst. Pulling everything reverses that cost.",
 			"Can the design use one strategy for small audiences and another for very large ones? Which workload metric would show the trade-off?",
 		},
 		Answer:     "The answer: A workable feed uses push for ordinary authors and pulls large-audience posts when a reader builds a timeline. Compare fan-out writes and reads, then verify the latency and cost goals.",
-		Debrief:    "Push makes timeline reads cheap but makes a post's write cost grow with its audience. Pull makes writes cheap but moves work to each read. A hybrid uses {{sharding|different paths}} for each audience size.",
+		Debrief:    "Push makes timeline reads cheap but makes a post's write cost grow with its audience, so an author with a very large audience behaves like a {{hot-key|hot key}}. Pull makes writes cheap but moves work to each read. A hybrid uses different paths for each audience size.",
 		Deeper:     "Fan-out on write pays once per follower and can make celebrity posts create huge bursts. Fan-out on read pays once per reader and can make timelines slower. A hybrid threshold is a trade-off, not a universal constant; change it and compare the measured fan-out counters. This model does not include ranking quality or freshness guarantees across all followers.",
 		WeakPoints: []string{"The threshold can become wrong as follower counts change.", "A timeline read may still be slow when it pulls many authors.", "Ranking quality and stale posts are outside this simulation."},
 	})
@@ -113,7 +113,7 @@ func init() {
 	register(&Scenario{
 		ID: "open-nearby-search", Title: "Design nearby search", Difficulty: "Medium", Open: true,
 		Summary: "Serve location searches quickly when demand concentrates in one busy area.",
-		Story:   "A local service helps people find nearby couriers. At least 98% of searches must succeed, p95 must stay below 250 ms, and the system must cost no more than $1.50 an hour. Couriers send frequent location updates, and demand is concentrated in a busy city centre. Keep results current while the centre is busy. Build from the users outward.",
+		Story:   "A local service helps people find nearby couriers. At least 98% of searches must succeed, p95 must stay below 250 ms, and the system must cost no more than $1.50 an hour. Couriers send frequent location updates, and demand is concentrated in a busy city centre. Searches in the busy centre must stay fast while couriers keep sending updates. Build from the users outward.",
 		Diagram: open(P{"rps": 100.0, "readPct": 85.0, "workload": "geo", "keySpace": 5000.0, "hotKeyPct": 40.0, "timeoutMs": 1000.0}), Solution: nearby(),
 		Traffic: map[string][]engine.TrafficPoint{"users": {{0, 100}, {10, 100}, {20, 220}, {40, 220}, {50, 100}, {60, 100}}},
 		Chaos:   []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 30, Factor: 3, DurationSec: 8}},
