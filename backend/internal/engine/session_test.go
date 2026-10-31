@@ -25,8 +25,12 @@ func TestCausalOptionIsNamedForItsSessionGuarantees(t *testing.T) {
 	if !storedID {
 		t.Fatal("consistency option id causal must remain for saved designs")
 	}
-	if strings.Contains(strings.ToLower(help), "causal") {
+	// "causal order" is its own option now (the data-centric model); nothing else in the help may be called causal
+	if strings.Contains(strings.ReplaceAll(strings.ToLower(help), "causal order", ""), "causal") {
 		t.Errorf("consistency help still calls the session guarantees causal: %q", help)
+	}
+	if !strings.Contains(strings.ToLower(help), "causal order") {
+		t.Errorf("the real causal option should be explained in the help: %q", help)
 	}
 }
 
