@@ -257,7 +257,9 @@ func (s *Sim) startAttempt(lg *logical) {
 	var e *edge
 	if ttl > 0 {
 		if c.dnsNextLookup <= s.now {
-			s.runDNSLookups++
+			if lg.counted {
+				s.runDNSLookups++
+			}
 			c.dnsNextLookup = s.now + ttl*1000
 		}
 		e = s.pickCyclic(c, "out", c.out, func(edge *edge) bool {
@@ -277,10 +279,6 @@ func (s *Sim) startAttempt(lg *logical) {
 		s.resolve(lg, Result{Reason: RNoRoute})
 		return
 	}
-	if ttl > 0 && e.to.down && s.now-e.to.downAt < ttl*1000 {
-		s.resolve(lg, Result{Reason: RStaleDNS})
-		return
-	}
 	lg.attempts++
 	s.attempts.Push(s.now, true, 0)
 	at := &attempt{lg: lg, at: s.now, n: lg.attempts}
@@ -293,7 +291,11 @@ func (s *Sim) startAttempt(lg *logical) {
 		if res.OK {
 			s.resolve(lg, res)
 		} else {
-			s.attemptFailed(at, res.Reason)
+			reason := res.Reason
+			if ttl > 0 && reason == RNodeDown && e.to.down && s.now-e.to.downAt < ttl*1000 { // the answer it had cached still pointed at a server that is gone
+				reason = RStaleDNS
+			}
+			s.attemptFailed(at, reason)
 		}
 	})
 	s.after(c.f("timeoutMs"), func() {
@@ -435,9 +437,6 @@ func (s *Sim) nearestEdgeDNS(c *node, ttl float64) *edge {
 		}
 	}
 	if best < 0 {
-		if ttl > 0 {
-			return nil
-		}
 		return s.pickCyclic(c, "out", c.out, nil)
 	}
 	return s.pickCyclic(c, "geo", c.out, func(e *edge) bool { return usable(e) && regionMs(c.region, e.to.region) == best })

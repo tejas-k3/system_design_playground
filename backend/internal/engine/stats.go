@@ -402,9 +402,7 @@ func (s *Sim) Snapshot() Stats {
 			cost += Spec(n.kind).cost(n.p) * float64(s.instancesOf(n))
 		}
 	}
-	if s.now > 0 {
-		cost += float64(s.runDNSLookups) / (s.now / 1000) * 3600 * dnsLookupCost
-	}
+	cost += s.dnsCostPerHour()
 	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: cost, AvgCost: s.CostPerHour(), Run: run}
 	st.Series = append(make([]SeriesPoint, 0, len(s.series)), s.series...) // never nil: JSON must be [] not null
 	st.Events = append(make([]Event, 0, len(s.events)), s.events...)
