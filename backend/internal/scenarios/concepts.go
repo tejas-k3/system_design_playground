@@ -69,6 +69,7 @@ var conceptTags = map[string][]string{
 	"everyone-asks-auth":     {"overload-control", "failure-handling"},
 	"where-do-sessions-live": {"failure-handling", "replication"},
 	"older-write-wins":       {"consistency", "replication"},
+	"liar-in-the-group":      {"replication", "failure-handling"},
 	"who-is-the-leader":      {"replication", "failure-handling"},
 	"launch-day":             {"sharding", "capacity"},
 	"count-the-clicks":       {"queues", "consistency"},

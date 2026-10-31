@@ -101,6 +101,38 @@ func registerConsistencyAndStreams() {
 		Deeper:  "Physical clocks drift and are corrected by a synchronisation protocol only to within some error, so a timestamp can order two events reliably only when they are further apart than that error. Last-writer-wins treats the stamp as truth, so the machine with the fastest clock wins every close contest, and a newer write is dropped without any error. Logical clocks avoid the problem: a Lamport clock gives every event a number larger than any it has seen, so causally related events are ordered correctly, while a vector clock also tells you when two writes are concurrent so both can be kept and merged by the application. Systems that do need real time, such as globally ordered transactions, pay for it with special hardware and by waiting out the uncertainty. An interviewer will ask why synchronising clocks is not enough, and what you would do for two writes that are really concurrent.",
 	})
 
+	// The member that lies: a group of three members that believes what it hears, and one of them starts giving wrong answers
+	liarInTheGroup := func(fixed bool) engine.Diagram {
+		p := P{"nodes": 3.0}
+		if fixed {
+			p = P{"nodes": 4.0, "faultModel": "arbitrary", "faultsTolerated": 1.0}
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 50.0, "readPct": 0.0, "keySpace": 1000.0, "keyDist": "uniform", "timeoutMs": 1500.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("config", engine.KCoordinator, cols[2], rowMid, p).label("config", "Configuration group").
+			e("users", "app").e("app", "config").done()
+	}
+	register(&Scenario{
+		ID: "liar-in-the-group", Title: "The member that lies", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "One member of the configuration group starts giving wrong answers and the group believes it.",
+		Story:   "Three machines keep the configuration, and a request is answered with the first reply once a majority is alive. That survives a machine that stops. Tonight a machine's disk is faulty and it keeps answering, with the wrong values, and the group passes them on as if they were right. Nothing is down and nothing errors. No wrong answer may get through, and the group should still answer almost every request while the faulty member is on. Adding machines is allowed within the budget.",
+		Diagram: liarInTheGroup(false), Solution: liarInTheGroup(true),
+		Chaos:       []engine.ChaosEvent{{Type: "memberLies", NodeID: "config", AtSec: 10, DurationSec: 25, Factor: 1}},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxWrongAnswers: i(0), MaxP95Ms: f(160), MaxCostPerHour: f(1.0), StarCostPerHour: f(0.8)},
+		DurationSec: 45, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the wrong answers on the goals panel: every request succeeds, so what is being accepted?",
+			"A group that stops being believed when a majority is gone does nothing about a member that answers wrongly. How could the group tell which answer is right?",
+			"The group can compare the answers and keep the one that enough members agree on. How many members does it need so that one liar cannot outvote the rest and still leave enough honest ones?",
+		},
+		Answer: "The answer: have the group vote and tolerate arbitrary answers: with one faulty member it needs 3k+1 = 4 members, waits for three replies and keeps the answer that at least two agree on. Three members are one short, and checksums only catch damage, not a member that lies.",
+		Predictions: []Prediction{{ID: "p1", Question: "Why does tolerating one lying member need four members when tolerating one crashed member needs three?", Options: []string{"The group must outvote a liar while unable to wait for all", "A liar always takes the place of two honest members", "Four is simply the smallest group that is able to vote"}, Answer: 0,
+			Explain: "A crashed member is simply absent. A liar is present and wrong, so the group must be able to outvote it even when it cannot wait for the slowest member."}},
+		Debrief: "A member that stops is easy to survive with a {{quorum|majority}}. A member that gives wrong answers, an {{arbitrary-fault|arbitrary or Byzantine fault}}, must be outvoted, and that takes more members: to tolerate k of them the group needs 3k+1, waits for all but k replies, and needs k+1 matching ones. It also costs an extra round. A checksum catches accidental damage but not a member that sends a wrong value with a valid checksum.",
+		Deeper:  "Crash faults are masked by a majority: with 2k+1 members any two majorities overlap in at least one member, and a member that stops never says anything false. Arbitrary faults break that, because a faulty member can say different things to different members. To tolerate k of them, a group cannot wait for more than n-k replies, since k may never come, and among those n-k at most k can be wrong, so it needs n-k-k at least k+1 honest ones to be a match that cannot be forged: n at least 3k+1. Practical protocols pay for it with extra message rounds and signatures, which is why they are used where members do not trust each other, such as blockchains, and rarely inside one company, where the usual answer is checksums, replication of the data itself, and treating a member that returns bad data as crashed. An interviewer will ask why 2f+1 is not enough and what a signature changes.",
+	})
+
 	// Quorum overlap: a key-value store that answers quickly but sometimes shows a client its own old data
 	quorumOverlap := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0

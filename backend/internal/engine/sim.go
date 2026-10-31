@@ -128,8 +128,9 @@ type node struct {
 	kvAERepairs     int  // copies brought up to date by anti-entropy
 	kx              *kvExtra
 	kvRepairs       int
-	coordDown       []float64 // coordinator: when each cluster node comes back (0 = up)
-	coordLeader     int       // coordinator: the leader, -1 while there is none
+	coordDown       []float64    // coordinator: when each cluster node comes back (0 = up)
+	coordFaults     *coordFaults // coordinator: members that drop messages or give wrong answers, once a chaos event makes one
+	coordLeader     int          // coordinator: the leader, -1 while there is none
 	coordTerm       int
 	coordElecting   bool
 	outboxBacklog   int               // events saved with the data and not yet taken by the queue
@@ -332,6 +333,7 @@ type Sim struct {
 
 	runResolved, runOK, runFailed, runPending int
 	runDNSLookups                             int
+	runWrongAnswers                           int              // answers a group of members accepted although they were wrong
 	runClockLost                              int              // newer writes dropped because a leader's clock was behind
 	runLoginsLost, runLoginRefused            int              // login sessions destroyed (crash or expiry); requests that found their user signed out
 	loginSeen                                 map[int]struct{} // users who have ever signed in

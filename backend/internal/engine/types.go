@@ -171,7 +171,7 @@ func (r Reason) String() string {
 
 // ChaosEvent is a scheduled failure injected into a run.
 type ChaosEvent struct {
-	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown | configPush (Key of every component of Kind, or of NodeID, is set to Value; DurationSec > 0 pushes the old value back) | replay (a log's consumer groups read the last Factor seconds again) | addNode (a shard router gets one more shard, a copy of its first) | regionDown
+	Type        string  `json:"type"` // crash | slow | partition | linkDown | purge | zoneDown | badDeploy | rollingRestart | kvNodeDown (Factor = how many nodes of the cluster) | clusterNodeDown (coordinator cluster; Mode "follower" spares the leader) | leaderDown | configPush (Key of every component of Kind, or of NodeID, is set to Value; DurationSec > 0 pushes the old value back) | replay (a log's consumer groups read the last Factor seconds again) | addNode (a shard router gets one more shard, a copy of its first) | memberOmission (coordinator group: Factor members, the last ones, drop FractionPct of requests (default 100) for DurationSec) | memberLies (coordinator group: Factor members answer FractionPct of requests wrongly; Mode "corrupt" makes the damage visible to a checksum) | regionDown
 	NodeID      string  `json:"nodeId"`
 	AtSec       float64 `json:"atSec"`
 	DownSec     float64 `json:"downSec,omitempty"`

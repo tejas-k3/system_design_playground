@@ -29,6 +29,7 @@ type Goals struct {
 	MaxBlockedSec           *float64 `json:"maxBlockedSec,omitempty"`           // lock-seconds held waiting for a crashed coordinator
 	MaxRepeatedOutputs      *int     `json:"maxRepeatedOutputs,omitempty"`      // stream outputs produced a second time after a crash
 	MaxRecoverySec          *float64 `json:"maxRecoverySec,omitempty"`          // longest time a stream job took to catch up after a crash
+	MaxWrongAnswers         *int     `json:"maxWrongAnswers,omitempty"`         // wrong answers returned as correct
 	MaxClockLost            *int     `json:"maxClockLost,omitempty"`            // newer writes dropped because a clock was behind
 	MaxReauth               *int     `json:"maxReauth,omitempty"`               // requests that found their user signed out
 	MaxUnchecked            *int     `json:"maxUnchecked,omitempty"`            // requests let through without a token check
@@ -276,6 +277,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxRecoverySec != nil {
 		checks = append(checks, Check{"Time to catch up after a crash", fmt.Sprintf("≤ %.1f s", *g.MaxRecoverySec), fmt.Sprintf("%.2f s", run.RecoverySec), run.RecoverySec <= *g.MaxRecoverySec+eps})
+	}
+	if g.MaxWrongAnswers != nil {
+		checks = append(checks, Check{"Wrong answers accepted", fmt.Sprintf("≤ %d", *g.MaxWrongAnswers), fmt.Sprint(run.WrongAnswers), run.WrongAnswers <= *g.MaxWrongAnswers})
 	}
 	if g.MaxClockLost != nil {
 		checks = append(checks, Check{"Newer writes lost to a clock", fmt.Sprintf("≤ %d", *g.MaxClockLost), fmt.Sprint(run.ClockLost), run.ClockLost <= *g.MaxClockLost})

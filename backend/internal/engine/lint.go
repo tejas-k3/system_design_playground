@@ -1,6 +1,9 @@
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Finding is one piece of advice about a design. Lint is advisory: it never changes a simulation.
 type Finding struct {
@@ -54,6 +57,15 @@ func Lint(d Diagram) []Finding {
 		if !hasReplica && in[id] > 0 {
 			add("spof-database", "warn", "The only copy of the data lives on one database: if it crashes, every request that needs it fails.", "Add a read replica and set the database to promote it on failure.", id)
 		}
+	}
+	var smallVote []string
+	for _, n := range d.Nodes {
+		if n.Kind == KCoordinator && ps(res[n.ID], "faultModel") == "arbitrary" && math.Min(9, pf(res[n.ID], "nodes", 3)) < 3*pf(res[n.ID], "faultsTolerated", 1)+1 {
+			smallVote = append(smallVote, n.ID)
+		}
+	}
+	if len(smallVote) > 0 {
+		add("group-too-small-to-vote", "warn", "To outvote k members that give wrong answers a group needs at least 3k+1 members. With fewer, it cannot find enough matching answers and refuses requests while a member gives wrong answers.", "Add members, or lower the number of faulty members to tolerate.", smallVote...)
 	}
 	var noStore, noIdentity []string
 	anyIdentity := false
