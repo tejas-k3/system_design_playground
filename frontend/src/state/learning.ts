@@ -5,7 +5,7 @@ import { useStore } from './store'
 export async function loadDebrief(id: string, fetcher: typeof fetchDebrief = fetchDebrief): Promise<void> {
   try {
     const d = await fetcher(id)
-    useStore.getState().setDebrief(d.debrief, d.deeper)
+    useStore.getState().setDebrief(d.debrief, d.deeper, d.weakPoints)
   } catch {
     /* no debrief is shown */
   }

@@ -40,6 +40,8 @@ rag-under-load 668d9a8f4bb8223b5e89ec1324e1a888ea901ff7e47d275d6f5a93c53c46dc2f 
 shed-the-cheap-traffic adfaee39dfd9d7f299f389a5e2708f9dd2c0f960fb1db58d813185ffe76e3d75 start=false/0/0.0000/0.0 solution=true/2/0.4987/334.3
 url-shortener 9ee10db61372004e6ebc3bfc12f7baf75d2f5610bfadac285be167c3627575bf start=false/0/0.0000/0.0 solution=true/2/1.0000/151.4
 rate-limiter-showdown 2d4373dc650a6418f321f5edd3e1aca85cd606b67218748a124e83a0dcc23483 start=false/0/0.3758/1391.1 solution=true/2/0.2411/630.0
+typeahead-index 879889ba5eaec9bbe74cc65fb6c955befddac8a5db33ef54a5cc8a0e341fb81b start=false/0/0.3039/1363.8 solution=true/2/1.0000/225.0
+crawl-dedup 066f3dee0367d1fb008f271ac1045b918390528ae5ebdd754697fbeef9abd0de start=false/0/1.0000/142.7 solution=true/3/1.0000/142.7
 multi-region-reads 2a0c10f003fddcdabed12d7246fa37a1de98a9f7162972dd05ef27d488d7f72d start=false/0/1.0000/279.7 solution=true/2/1.0000/142.7
 add-a-shard fe26edd70bf303ba3ef7ebaa0094bcd3db99d7d46d1e0a118dc80e5226aca253 start=false/0/1.0000/2952.4 solution=true/3/1.0000/154.4
 noisy-tenant b3a0bc72d661e61040698af36c23df8042a351eab9b346d2af3c48d5081d89a3 start=false/0/0.3337/154.4 solution=true/3/0.5033/151.4
@@ -52,6 +54,11 @@ bot-flood 01c7711d8684a6ce8c160683602d8deee72fff15c140002ee7b21ba350f263cc start
 upload-500kb b88e1031183dac862cefe6583fcef7a78f2e26ac08a35f0f13b8e5aca74f0708 start=false/0/0.0000/0.0 solution=true/3/1.0000/234.1
 one-slow-server ceed12fb13d2405d2172698edb07489175e54035a64094ed0a40ea279c0d8a89 start=false/0/0.8957/1447.3 solution=true/2/1.0000/243.5
 restore-window 0ca9207c98176f927cf47d3a8b2afe5ac188f59be06f58eb07578c17da8410b9 start=false/0/0.1796/167.2 solution=true/3/0.5894/167.2
+open-link-shortener e5c64a8665e2809e2f347b281a5070eacfcc810db5c8bbebfd719e6a09adafc1 start=false/0/0.0000/0.0 solution=true/1/0.9831/154.4
+open-notifications 2acd13552a43bf0821532efd9fb059bd7466d5d33fdd6cecfc0095bad70879e4 start=false/0/0.0000/0.0 solution=true/2/1.0000/131.8
+open-news-feed 4278a68dd37aeddde0c2b956243b646546543f8ee16a7a7e3ad8654b429aa41e start=false/0/0.0000/0.0 solution=true/3/1.0000/207.8
+open-nearby-search a1325a1e4033eaeb294b1f40d88a3d6f24b8409588896d2103efea303875beab start=false/0/0.0000/0.0 solution=true/2/1.0000/177.4
+open-chat 5ac09cea0dc77f7de11f51e27394fe7f5876e2b81cd32bd0f1b22c2407ca3150 start=false/0/0.0000/0.0 solution=true/1/0.9929/173.9
 vendor-wait cddad74793fd8396d7bcd92473cc067efad5c86956a460d5425ae933395ef118 start=false/0/0.0078/1986.9 solution=true/3/1.0000/145.5
 live-scoreboard dffd7d9c157ec38dcfcb793f5bb94b15de5a0f347bc16d706d31466e7ee29015 start=false/0/0.6162/1164.0 solution=true/2/1.0000/139.9
 nearby-drivers f86ffda7f2a0fe81a236b38078c136edd0af1a0985c22b698fc027037ef1213d start=false/0/0.4068/1986.9 solution=true/2/1.0000/160.7

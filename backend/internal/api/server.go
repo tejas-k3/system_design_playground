@@ -93,6 +93,7 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/scenarios/{id}", s.getScenario)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/solution", s.getSolution)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/alternatives", s.getAlternatives)
+	s.mux.HandleFunc("POST /api/scenarios/{id}/defend", s.defend)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/hints/{n}", s.getHint)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/answer-hint", s.getAnswerHint)
 	s.mux.HandleFunc("POST /api/scenarios/{id}/predictions/{pid}", s.answerPrediction)
@@ -284,7 +285,11 @@ func (s *Server) getDebrief(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "no such scenario")
 		return
 	}
-	writeJSON(w, 200, map[string]string{"debrief": sc.Debrief, "deeper": sc.Deeper})
+	writeJSON(w, 200, struct {
+		Debrief    string   `json:"debrief"`
+		Deeper     string   `json:"deeper"`
+		WeakPoints []string `json:"weakPoints,omitempty"`
+	}{sc.Debrief, sc.Deeper, sc.WeakPoints})
 }
 
 func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {
