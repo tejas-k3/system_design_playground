@@ -1091,6 +1091,14 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 // ---- load balancer / rate limiter -----------------------------------------------------
 
 func (s *Sim) believedDown(lb, t *node) bool {
+	if lb.kind == KLoadBalancer && lb.s("membership") == "registry" {
+		// worst case: a dead server stays listed (still receives traffic) until the entry outlives the crash by its lifetime and the read after that is as late as it can be;
+		// a restarted server registers at once but is used only from the next read
+		if t.down {
+			return s.now-t.downAt >= (lb.f("registryTtlSec")+lb.f("registryRefreshSec"))*1000
+		}
+		return t.upAt > 0 && s.now-t.upAt < lb.f("registryRefreshSec")*1000 && t.upAt > t.downAt && t.downAt > 0
+	}
 	if !t.down {
 		return false
 	}

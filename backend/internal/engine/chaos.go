@@ -283,7 +283,7 @@ func (s *Sim) RestartNode(id string) {
 	if n == nil || !n.down {
 		return
 	}
-	n.down = false
+	n.down, n.upAt = false, s.now
 	n.slow = 1
 	s.releaseInDoubt(n)
 	if n.store != nil { // a restarted cache or CDN comes back empty
