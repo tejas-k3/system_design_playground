@@ -8,12 +8,14 @@ import { loadAnswer } from '../state/learning'
 import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
 import { plain } from '../model/glossary'
+import { guaranteeNotJudged } from '../model/judged'
 import { StarterChecklist } from './StarterChecklist'
 import { Rich } from './Term'
 
 export function ScenarioPanel() {
   const sc = useStore((s) => s.scenario)
   const stats = useStore((s) => s.stats)
+  const diagram = useStore((s) => s.diagram)
   const cost = useStore((s) => s.cost)
   const status = useStore((s) => s.sim.status)
   const ui = useStore((s) => s.ui)
@@ -59,6 +61,9 @@ export function ScenarioPanel() {
               </li>
             ))}
           </ul>
+          {def.goals.maxSessionViolations !== undefined && guaranteeNotJudged(diagram) && (
+            <p className="muted small" role="note">Writes follow reads is only judged against a key-value store's copies. With a plain database behind the users, the guarantees count stays at 0, and a 0 here is not a pass.</p>
+          )}
           {stars && <p className="muted small">{stars}</p>}
           {sc.dailySeed !== undefined && <p className="muted small">Today's run: seed {sc.dailySeed}</p>}
           {sc.result && !ui.result && (
