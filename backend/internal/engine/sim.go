@@ -102,6 +102,7 @@ type job struct {
 type mlWrite struct {
 	t      float64
 	leader int
+	stamp  float64 // the time the leader's own clock put on the write
 }
 
 type node struct {
@@ -331,6 +332,7 @@ type Sim struct {
 
 	runResolved, runOK, runFailed, runPending int
 	runDNSLookups                             int
+	runClockLost                              int              // newer writes dropped because a leader's clock was behind
 	runLoginsLost, runLoginRefused            int              // login sessions destroyed (crash or expiry); requests that found their user signed out
 	loginSeen                                 map[int]struct{} // users who have ever signed in
 	runAuthCalls, runAuthCached, runUnchecked int              // requests that asked the auth service, were answered from memory, or were let through unchecked
