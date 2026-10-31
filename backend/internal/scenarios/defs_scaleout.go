@@ -509,7 +509,7 @@ func registerScaleOut() {
 		Summary: "Ranking 5,000 posts for every read leaves the feed service far behind.",
 		Story:   "A feed is ranked before it is shown: for every read the service scores 5,000 candidate posts with a model, 0.1 ms each, so a read costs half a second of work and the service has eight {{thread-pool|threads}}. Forty reads a second arrive and most time out. Product wants the feed ranked, so the model stays. Keep at least 97% of reads answered, within 250 ms at the 95th percentile, and the bill under $0.70 an hour.",
 		Diagram: rankedFeed(false), Solution: rankedFeed(true),
-		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(250), MaxCostPerHour: f(0.7), StarCostPerHour: f(0.6)},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(250), MaxCostPerHour: f(0.7), StarP95Ms: f(200), StarCostPerHour: f(0.6)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
 			"Look at the feed service's busy level and a single request's time: where does a read spend it?",

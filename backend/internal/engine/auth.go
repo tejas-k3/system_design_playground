@@ -24,15 +24,6 @@ func (s *Sim) securityMs(n *node, c *call) float64 {
 	return ms
 }
 
-// rankingMs is the model time a read spends scoring the candidate posts of a feed before it shows the best: it grows with
-// the number of candidates, and a write is not ranked.
-func (s *Sim) rankingMs(n *node, c *call) float64 {
-	if c.write || !n.b("ranking") {
-		return 0
-	}
-	return n.f("rankCandidates") * n.f("rankUsPerCandidate") / 1000
-}
-
 // authenticate asks the auth service about the request's token, unless a yes for that user is still remembered.
 func (s *Sim) authenticate(n *node, e *edge, c *call, then func(Result)) {
 	user := int(Hash32(uint32(c.rid)*40503+9) % uint32(max(1, int(n.f("tokenUsers")))))

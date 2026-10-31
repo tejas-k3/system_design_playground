@@ -183,7 +183,7 @@ var alternatives = map[string][]Alternative{
 		alt("Let it idle for 2 seconds before it stops", true, 100.0, 148, 0.19, "It passes: a gap of two seconds between requests is rare at this rate, so the function almost never stops. A quieter service would need a longer time.", Change{"fn", "idleSec", 2.0}),
 	},
 	"ranked-feed": {
-		alt("Give the feed service 32 threads", false, 98.6, 1054, 1.26, "Enough threads for the work, so the requests mostly get through, but every read still spends half a second in the model: a p95 of 1,054 ms, and a bill more than double the budget.", Change{"app", "threads", 32.0}),
+		alt("Give the feed service 32 threads", false, 98.6, 1054, 1.26, "Enough threads for the work, so the requests mostly get through, but every read still spends half a second in the model: a p95 of 1,054 ms, and a bill almost twice the budget.", Change{"app", "threads", 32.0}),
 		alt("Score 2,000 candidates", false, 28.0, 1391, 0.56, "A third of the work, but still 200 ms of model time per read: forty reads a second need eight threads for the model alone, and only 28% are answered.", Change{"app", "rankCandidates", 2000.0}),
 		alt("Score 800 candidates", false, 100.0, 280, 0.56, "Every read is answered, but 80 ms of model time on top of the ordinary work puts the p95 at 280 ms, over the 250 ms goal. Fewer candidates still would pass.", Change{"app", "rankCandidates", 800.0}),
 	},
