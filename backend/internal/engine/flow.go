@@ -118,6 +118,9 @@ func (s *Sim) hopVia(e, via *edge, target *node, oneWay float64, c *call, cb fun
 func (s *Sim) hopArrive(e, via *edge, target *node, oneWay float64, resp float64, c *call, cb func(Result)) {
 	{
 		s.arrive(target, c, func(res Result) {
+			if !res.OK && res.Reason == RNodeDown && e.from.kind == KClient && target.down && s.now-target.downAt < e.from.f("dnsTtlSec")*1000 {
+				res.Reason = RStaleDNS // the answer the client had cached still pointed at a server that is gone
+			}
 			back := oneWay + s.transmit(e, 1, resp) + s.nic(e.to, resp)
 			if via != nil {
 				back += s.transmit(via, 1, resp)

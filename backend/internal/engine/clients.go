@@ -291,11 +291,7 @@ func (s *Sim) startAttempt(lg *logical) {
 		if res.OK {
 			s.resolve(lg, res)
 		} else {
-			reason := res.Reason
-			if ttl > 0 && reason == RNodeDown && e.to.down && s.now-e.to.downAt < ttl*1000 { // the answer it had cached still pointed at a server that is gone
-				reason = RStaleDNS
-			}
-			s.attemptFailed(at, reason)
+			s.attemptFailed(at, res.Reason)
 		}
 	})
 	s.after(c.f("timeoutMs"), func() {
