@@ -638,7 +638,7 @@ func registerScaleOut() {
 	}
 	register(&Scenario{
 		ID: "who-is-online", Title: "Who is online", Difficulty: "Medium",
-		Summary: "Every user's heartbeat is a database write, and the database cannot keep up.",
+		Summary: "Every user's heartbeat is a database write, and the design cannot keep up.",
 		Story:   "A chat app shows a green dot next to friends who are online. Each connected user sends a heartbeat every few seconds, 1,500 a second in all, and the app writes each one to the database. Most of the traffic is writes of a value that is useless a minute later; the occasional read asks who is online. The database does a write in 15 ms and has 16 connections. Serve at least 97% of requests with a {{p95|95th percentile}} under 300 ms.",
 		Diagram: presence(false), Solution: presence(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(300), MaxCostPerHour: f(3.5), StarCostPerHour: f(3.0)},
@@ -651,6 +651,6 @@ func registerScaleOut() {
 		Answer: "The answer: keep presence in a key-value store that acknowledges after one copy, instead of the database. A heartbeat is a short-lived, constantly replaced value, so a lost copy costs a few seconds of wrong green dots, while a durable write per heartbeat costs more than one database can do.",
 		Predictions: []Prediction{{ID: "p1", Question: "Heartbeats are sent every 10 seconds instead of every 5. What happens to the writes?", Options: []string{"They halve, and a departure is noticed later", "They halve, and a departure is noticed sooner", "They stay the same, since the same users are connected"}, Answer: 0,
 			Explain: "Each user sends half as many heartbeats, so there are half as many writes. The last heartbeat of a user who left is older for longer before it counts as missing, so the dot stays green longer."}},
-		Debrief: "Presence is soft state: it is rewritten every few seconds, it is wrong the moment it is read, and losing it costs nothing lasting. Paying for durable writes on it wastes the database. A store that spreads writes over several nodes and acknowledges after one fits, ideally with an expiry per entry: a user whose heartbeats stop disappears after the expiry, which sets how long a green dot stays wrong. The interval is a trade-off in its own right: a shorter heartbeat finds departures sooner and multiplies the writes, and telling every friend on each change multiplies them again, so large systems send changes only to friends who are looking.",
+		Debrief: "Presence is soft state: it is rewritten every few seconds, it is wrong the moment it is read, and losing it costs nothing lasting. Paying for durable writes on it wastes the database. A store that spreads writes over several nodes and acknowledges after one fits. In a real store an expiry per entry (not modelled here) removes a user whose heartbeats stop, and its length sets how long a green dot stays wrong. The interval is a trade-off in its own right: a shorter heartbeat finds departures sooner and multiplies the writes, and telling every friend on each change multiplies them again, so large systems send changes only to friends who are looking.",
 	})
 }
