@@ -37,7 +37,7 @@ var levelOf = func() map[string]string {
 			"shed-the-cheap-traffic", "notification-fan-out", "add-a-shard", "reconnect-storm", "bad-deploy", "flaky-neighbour",
 			"cut-off", "multi-region-reads", "slow-first-token", "rag-under-load", "live-scoreboard", "nearby-drivers",
 			"ten-thousand-students", "restore-window", "stale-dns"),
-		levelList("sde3", "primary-dies", "fence-the-old-primary", "who-is-the-leader", "lease-expired", "quorum-overlap", "effect-before-cause", "older-write-wins", "liar-in-the-group", "old-leaders-writes",
+		levelList("sde3", "primary-dies", "fence-the-old-primary", "who-is-the-leader", "lease-expired", "quorum-overlap", "effect-before-cause", "open-database-failure", "open-pay-once", "older-write-wins", "liar-in-the-group", "old-leaders-writes",
 			"lost-cart", "payment-saga", "failing-refund", "frozen-checkout", "nobody-to-wait-for", "disappearing-money", "restore-drill", "retry-storm", "heavy-tail",
 			"nobody-on-call", "vendor-wait", "scoreboard-survives", "search-tail", "top-ten", "the-gpu-budget", "zone-outage",
 			"go-global", "split-the-database", "morning-rush", "launch-day", "launch-day-capstone", "bot-flood",
