@@ -126,6 +126,7 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 	}
 	apply := func(r reply, ver int) {
 		if r.target >= 0 {
+			s.countWritesFollowReads(c.lg, n.kvVer[r.target][c.key]) // the copy it is held for is the one it will land on
 			n.kvHints[r.target] = append(n.kvHints[r.target], [2]int{c.key, ver})
 			if siblings {
 				if kx.hintSibs == nil {

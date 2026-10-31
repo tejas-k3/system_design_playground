@@ -206,3 +206,40 @@ func TestSessionGoalFailsOnLooseQuorumsAndPassesOnOverlapping(t *testing.T) {
 		t.Fatalf("R=W=2 keeps them: %+v", c)
 	}
 }
+
+// A write kept as a hint for a copy that is down is judged against that copy's own version: when the copy is older
+// than a value the client read, the write will land on a stale copy once it is handed back.
+func TestWritesFollowReadsIsJudgedOnHintedCopies(t *testing.T) {
+	total := 0
+	for down := 0; down < 5; down++ {
+		s, client, kv := sessionSimulation("writesFollowReads", Params{
+			"nodes": 5.0, "replicas": 3.0, "readQuorum": 1.0, "writeQuorum": 1.0, "hintedHandoff": true,
+			"readMs": 0.1, "writeMs": 0.1, "variability": "steady",
+		})
+		client.down = true
+		for i := 0; i < 5; i++ {
+			s.bumpVer(1)
+		}
+		s.countSession(&logical{client: client, counted: true, key: 1}, Result{OK: true, Ver: 5})
+		kv.kvEnsure(5, 1)
+		for _, versions := range kv.kvVer {
+			versions[1] = 5
+		}
+		kv.kvVer[down][1] = 4 // the copy that is down is behind what the client read
+		kv.kvDownUntil[down] = 1e12
+		lg := &logical{id: 6, client: client, write: true, counted: true, key: 1, sawRead: client.sessRead[1]}
+		var got Result
+		s.procKV(kv, &call{lg: lg, write: true, key: 1, cmd: cmdWrite}, func(r Result) { got = r }, func() {})
+		s.Advance(1)
+		if !got.OK {
+			t.Fatalf("node %d down: the write did not complete: %+v", down, got)
+		}
+		s.countSession(lg, got)
+		if v := sessionViolation(s); v != "0" {
+			total++
+		}
+	}
+	if total != 3 { // the down node is one of the key's three copies in three of the five cases
+		t.Errorf("a stale hinted copy was counted in %d of 5 cases, want the 3 where the down node holds a copy of the key", total)
+	}
+}
