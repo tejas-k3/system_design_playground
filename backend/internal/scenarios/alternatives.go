@@ -176,6 +176,11 @@ var alternatives = map[string][]Alternative{
 	"front-door": {
 		alt("Give both app servers 64 threads", false, 48.0, 309, 5.66, "The servers were never the limit: the balancer still passes 1,200 requests a second, so 48% get through and the bill doubles.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}),
 	},
+	"stale-registry": {
+		alt("Give both servers 64 threads", false, 72.3, 110, 5.61, "The survivor was never short of threads; the requests are lost on the way to the dead server.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}),
+		alt("Let clients retry twice", false, 93.0, 571, 2.68, "Most failed requests are rescued by a retry, since the balancer picks the live server about half the time, but each rescue has waited out a timeout: 93% is short of the goal and the p95 is more than a half second.", Change{"users", "retries", 2.0}),
+		alt("Use health checks instead of the registry", true, 97.6, 110, 2.68, "It passes: the balancer drops the server after one failed probe, two seconds, instead of waiting for an entry to expire. Every balancer must then be told about each server by hand.", Change{"lb", "membership", "health"}),
+	},
 	"cold-start": {
 		alt("Keep one instance warm", false, 100.0, 129, 0.24, "There is no cold start any more, but the instance that never stops costs more than the whole budget of $0.20 an hour.", Change{"fn", "keepWarm", true}),
 		alt("Make the function start in 300 ms", false, 100.0, 424, 0.19, "Requests that find it cold wait a quarter as long, but there are still enough of them for the p95 of 424 ms to be just over the 400 ms goal.", Change{"fn", "coldStartMs", 300.0}),

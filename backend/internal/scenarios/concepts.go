@@ -74,6 +74,7 @@ var conceptTags = map[string][]string{
 	"old-leaders-writes":     {"replication", "failure-handling"},
 	"slow-news":              {"failure-handling", "replication"},
 	"front-door":             {"capacity", "overload-control"},
+	"stale-registry":         {"failure-handling"},
 	"cold-start":             {"capacity", "autoscaling"},
 	"ranked-feed":            {"capacity", "overload-control"},
 	"chat-order":             {"queues", "sharding"},

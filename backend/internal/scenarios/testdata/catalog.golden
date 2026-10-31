@@ -54,6 +54,7 @@ restart-the-counter 1245e20a30c82877ed43be5b316f3eabb84cf73152b13867b443a24fa9be
 everyone-asks-auth 2dca6bc1d62f632166d643553f8ed2f8778d3af17e634ba17b56f639b352299d start=false/0/0.0662/1391.1 solution=true/3/1.0000/134.4
 where-do-sessions-live 94df494f4cd79c0acc2ea27f23f4f3051124e16e0eb5dcca144329f0a1729d11 start=false/0/0.8678/145.5 solution=true/3/0.9851/154.4
 front-door d296d3d0a80592ef21ba2973925583626a21fdef13814c7f1de6e06df3ee6148 start=false/0/0.4807/308.9 solution=true/3/1.0000/110.3
+stale-registry a6eacc7750f4a966f6fbd86f0c8e673b58939f60a8e754b6d3c4317a6527dc94 start=false/0/0.7231/110.3 solution=true/3/0.9653/110.3
 cold-start 9eb4f10588690f4d221a129d115ca70b2ece02cd6727e20c9e6ab9f2d721721b start=false/0/1.0000/1337.1 solution=true/3/1.0000/129.2
 ranked-feed 2c196031b448c8227bd1bb0cb85330d82a4399f9c85c8a91f12f96363ba1ee75 start=false/0/0.0000/0.0 solution=true/3/1.0000/177.4
 chat-order 8255acef18e02a29d8a328f7c922d42d67eb8b1da90b839ab7f0ea8dfb679107 start=false/0/1.0000/131.8 solution=true/3/1.0000/129.2

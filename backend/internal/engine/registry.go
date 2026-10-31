@@ -192,6 +192,10 @@ func init() {
 				flag("outlierEjection", "Eject outliers", "Health", false, "Temporarily remove servers that error a lot or are much slower than their peers."),
 				num("canaryPct", "Canary share", "Release", 0, 0, 100, 1, "%", "Send this share of requests to the servers running the new version (v2) and the rest to the old one (v1). 0 = every server gets its fair share.").adv(),
 				num("healthCheckSec", "Health check interval", "Health", 2, 1, 30, 1, "s", "How long a dead server keeps receiving traffic before the balancer notices."),
+				sel("membership", "Who is in the pool", "Health", "health", "Health checks: the balancer probes every server and drops the ones that fail. Service registry: servers announce themselves and keep their entry alive with a heartbeat; the balancer reads the registry now and then. A dead server stays listed until its entry expires and the next read, and a restarted one is used only from the next read. It costs a little a day and lets the pool change without touching the balancer.",
+					opt("health", "Health checks"), opt("registry", "Service registry")).adv(),
+				num("registryTtlSec", "Entry lifetime", "Health", 6, 1, 60, 1, "s", "How long a registry entry lives without a heartbeat. After a crash the server stays listed this long, at the longest.").showIf("membership", "registry").adv(),
+				num("registryRefreshSec", "Registry read interval", "Health", 3, 1, 60, 1, "s", "How often the balancer reads the registry. A change (an entry expiring, a server coming back) reaches it up to this long later.").showIf("membership", "registry").adv(),
 				sel("layer", "Works at", "Capacity", "layer7", "Layer 7 reads each request, so it can route on what it contains (a canary share, a sticky user) and costs more per request. Layer 4 only forwards connections: cheaper, quicker and about four times the throughput, but it cannot route by content, so canary shares and sticky users are ignored.",
 					opt("layer7", "Layer 7 (reads the request)"), opt("layer4", "Layer 4 (forwards connections)")).adv(),
 				num("maxRps", "Most requests a second", "Capacity", 0, 0, 100000, 100, "/s", "The balancer is one machine: past this many requests a second (four times as many at layer 4) requests wait, and when the wait is longer than the queue allows they are refused. A bigger one costs more. 0 = never the bottleneck.").adv().fixed(),
@@ -201,6 +205,9 @@ func init() {
 				c := 0.02
 				if ps(p, "layer") == "layer4" {
 					c = 0.01
+				}
+				if ps(p, "membership") == "registry" {
+					c += 0.005 // the registry cluster the pool is read from
 				}
 				return c + pf(p, "maxRps", 0)*0.00005
 			},

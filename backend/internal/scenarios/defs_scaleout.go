@@ -462,6 +462,39 @@ func registerScaleOut() {
 		Debrief: "Every request passes the entry point, so it is the first place a design can saturate, and adding servers behind it changes nothing. A layer-7 balancer reads the request, which allows routing by path, header or user, at the price of more work per request; a layer-4 balancer forwards connections and passes far more. Choose layer 7 only when you route on content, or run several balancers behind DNS or anycast when one is not enough.",
 	})
 
+	// A service registry: a dead server stays listed until its entry expires and the balancer reads the registry again
+	registryPool := func(fixed bool) engine.Diagram {
+		lb := P{"membership": "registry", "registryTtlSec": 15.0, "registryRefreshSec": 10.0}
+		if fixed {
+			lb["registryTtlSec"], lb["registryRefreshSec"] = 2.0, 1.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 120.0, "readPct": 100.0, "keySpace": 2000.0, "keyDist": "uniform", "timeoutMs": 1000.0, "retries": 0.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, lb).label("lb", "Balancer").
+			n("app1", engine.KAppServer, cols[2], 60, P{"threads": 32.0, "cpuMs": 5.0}).
+			n("app2", engine.KAppServer, cols[2], 200, P{"threads": 32.0, "cpuMs": 5.0}).
+			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "readMs": 1.0}).
+			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
+	}
+	register(&Scenario{
+		ID: "stale-registry", Title: "Still on the list", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The balancer keeps sending requests to a server the registry still lists.",
+		Story:   "The balancer does not probe its servers. It reads a {{service-registry|service registry}} every 10 seconds, and a server's entry lives 15 seconds after its last heartbeat. At ten seconds one of the two app servers crashes. The other could carry all the traffic, but until the entry expires and the balancer reads the registry again, about half the requests still go to the dead one. Serve at least 95% of requests.",
+		Diagram: registryPool(false), Solution: registryPool(true),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app1", AtSec: 10, DownSec: 40}},
+		Goals:       engine.Goals{MinSuccessRate: 0.95, MaxP95Ms: f(300), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.9)},
+		DurationSec: 50, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"The second server is healthy. Where do the failures start, and for how long do they last?",
+			"Two delays add up between a crash and the balancer's last request to the dead server. Find both on the balancer.",
+			"Shorter times find a dead server sooner, but cost more registry traffic. How short can they be and still stay inside the budget?",
+		},
+		Answer: "The answer: shorten the registry entry lifetime and the balancer's read interval. A dead server stays in the pool for both times added together, so a few seconds each leaves only a short burst of failures.",
+		Predictions: []Prediction{{ID: "p1", Question: "The entry lifetime is 15 s and the read interval is 10 s. At worst, how long after a crash does the balancer still send to the dead server?", Options: []string{"About 15 seconds", "About 25 seconds", "About 10 seconds"}, Answer: 1,
+			Explain: "The entry must expire first, and the balancer only notices at its next read, so the two waits add."}},
+		Debrief: "A {{service-registry|service registry}} lets servers join and leave a pool without anyone editing the balancer: each one announces itself and keeps its entry alive with a heartbeat. The price is delay. A crashed server stays listed until its entry expires, and the balancer sees that only at its next read; a restarted server is used from the next read as well. Short times shrink the window but add heartbeats and reads. A health check on the balancer reacts to a failed probe instead, which is quicker, but every balancer must be told about each server.",
+	})
+
 	// The first request after a pause: a function that scales to zero starts cold
 	coldFunction := func(fixed bool) engine.Diagram {
 		app := P{"threads": 8.0, "cpuMs": 20.0, "coldStartMs": 1200.0, "idleSec": 0.3}

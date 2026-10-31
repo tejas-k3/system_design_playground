@@ -176,6 +176,7 @@ type node struct {
 	zone            string          // availability zone, kept in step with the 'zone' setting
 	down            bool
 	downAt          float64
+	upAt            float64 // when it last came back from a crash (0 = never crashed)
 	epoch           int
 	slow            float64
 	slowUntil       float64

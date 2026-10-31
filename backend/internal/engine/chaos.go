@@ -261,7 +261,7 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 		ep := n.epoch
 		s.after(n.f("leaderElectionSec")*1000, func() { // a follower becomes the leader while the old one is still down
 			if n.down && n.epoch == ep {
-				n.down = false
+				n.down, n.upAt = false, s.now
 				s.logEvent("promotion", n, 0)
 				s.dispatch(n)
 			}
@@ -283,7 +283,7 @@ func (s *Sim) RestartNode(id string) {
 	if n == nil || !n.down {
 		return
 	}
-	n.down = false
+	n.down, n.upAt = false, s.now
 	n.slow = 1
 	s.releaseInDoubt(n)
 	if n.store != nil { // a restarted cache or CDN comes back empty
