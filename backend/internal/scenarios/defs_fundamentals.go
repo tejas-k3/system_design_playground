@@ -1,6 +1,7 @@
 package scenarios
 
 import (
+	"fmt"
 	"sysdesign/internal/engine"
 )
 
@@ -280,5 +281,39 @@ func registerFundamentals() {
 		Predictions: []Prediction{{ID: "p1", Question: "Moving to a stronger isolation level will…", Options: []string{"Make every transfer slower, overlapping or not", "Make overlapping transfers wait or abort", "Stop transfers from ever being aborted"}, Answer: 1,
 			Explain: "Stronger isolation turns silent overwrites into waiting (locks) or errors (aborts and deadlocks): correctness is paid for with latency under contention."}},
 		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how hot the shared rows are.",
+	})
+	// Who needs telling: four caches in front of one database; leaving them alone serves stale items, telling all of them costs messages
+	tellWho := func(fixed bool) engine.Diagram {
+		policy := "none"
+		if fixed {
+			policy = "lease"
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 200.0, "readPct": 70.0, "keySpace": 2000.0, "keyDist": "uniform", "consistency": "bounded", "maxStaleMs": 200.0, "timeoutMs": 3000.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 64.0, "dbPool": 64.0}).
+			n("db", engine.KDatabase, cols[3], rowMid, nil).
+			e("users", "app").e("app", "db")
+		for k := 1; k <= 4; k++ {
+			id := fmt.Sprintf("cache%d", k)
+			b.n(id, engine.KCache, cols[2], rowTop+float64(k-1)*70, P{"capacityItems": 300.0, "ttlSec": 30.0, "writePolicy": policy}).e("app", id)
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "who-needs-telling", Title: "Who needs telling?", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Four caches serve old prices, and telling all of them about every change costs too many messages.",
+		Story:   "A catalogue is served from four caches in front of one database. Items change all the time and shoppers tolerate at most 200 ms of staleness. Today the caches are left alone when an item changes, so they keep the old one until it expires. Telling every cache about every change would fix that, but each message is a round trip the origin waits for during the write, and the caches can take only a few thousand of them in this run.",
+		Diagram: tellWho(false), Solution: tellWho(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxStaleReadPct: f(0.0005), MaxCacheMessages: i(3000), MaxP95Ms: f(185), MaxCostPerHour: f(3.0), StarP95Ms: f(175), StarCostPerHour: f(2.8)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"The goals count stale reads and the messages the origin sends to the caches. Which setting decides what happens to cached copies when data is written?",
+			"Telling every cache about every write makes reads fresh, but it also messages caches that do not hold the item at all: each cache holds only a small part of the catalogue.",
+			"What if the origin told only the caches that actually hold the item? What would an entry's time to live then stand for?",
+		},
+		Answer: "The answer: set every cache's write policy to 'Lease'. An entry is a lease for as long as its time to live, and the origin tells only the caches holding one, so the copies stay fresh and the messages fall from about 9,000 to about 1,500.",
+		Predictions: []Prediction{{ID: "p1", Question: "Telling every cache about every write will…", Options: []string{"Keep reads fresh at the price of many messages", "Leave reads stale, because the caches hear too late", "Send few messages, because a cache needs only some"}, Answer: 0,
+			Explain: "Every write reaches all four caches, so reads stay fresh, but a cache that holds nothing for the item gets a message anyway: about 9,000 messages in the run, over three times the limit."}},
+		Debrief: "Pulling is simple (each cache looks again when its time to live ends) but stale until then. Pushing tells every cache about every write: fresh, but a message per cache per write, mostly wasted when a cache holds a small part of the data. A {{lease|lease}} is a promise that holds for a limited time: the origin tells only the caches that hold an unexpired copy, and a cache without one simply fetches afresh. The price is that the origin must remember who holds what; this simulator does not charge for that.",
 	})
 }

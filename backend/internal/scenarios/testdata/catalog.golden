@@ -10,6 +10,7 @@ stale-prices 680494132b41cad21f86e3c4f3097da26c86baabbf11e17ccce5cece5dc836ba st
 double-booked 8a1e9026664443b9aead9fc2c4eb8aa06c39d1dd5283cf717b67e51ecb739f35 start=false/0/1.0000/145.5 solution=true/3/1.0000/148.4
 charged-twice 671ed522c183f9059d9a9d91f469119d765df5143478e358cae2fb293aacd8ca start=false/0/0.9991/799.0 solution=true/3/0.9991/783.4
 disappearing-money 753f2e354334c6d634fea417895dacf8b47cce7692d162c9bc917446175f4353 start=false/0/1.0000/258.4 solution=true/3/1.0000/334.3
+who-needs-telling e8e2fc31b73250b115d38c7d300c7c1f235d78d8ce7898b33e462a5e2f910df2 start=false/0/1.0000/160.7 solution=true/3/1.0000/167.2
 write-flood cc2d1da19f0978d1e8669eba477ba5b3856a95029d2b2f66dfbf893c0354cf24 start=false/0/0.8849/407.5 solution=true/3/1.0000/129.2
 server-down 1773febafe3ba0eb3f1bf6ac90d109511eb9e80a903ac58ee7e5c66f62fdfc75 start=false/0/0.7859/407.5 solution=true/3/0.9901/157.5
 cut-off 3d0d20504634164ead9899b1f0e1e5634a163eecd0f432649771bbcc925aaa2c start=false/0/0.6728/170.5 solution=true/3/0.8558/167.2

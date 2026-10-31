@@ -30,7 +30,7 @@ var levelOf = func() map[string]string {
 		levelList("sde1", "hello-world", "edge-cache", "slow-reads", "opening-night", "slow-query", "server-down", "write-flood",
 			"one-slow-server", "upload-500kb", "video-upload", "first-design-links"),
 		levelList("sde2", "open-link-shortener", "open-notifications", "open-news-feed", "open-nearby-search", "open-chat", "typeahead-index", "crawl-dedup",
-			"connection-crunch", "retry-pileup", "stale-prices", "double-booked", "charged-twice", "sync-or-async",
+			"connection-crunch", "retry-pileup", "stale-prices", "who-needs-telling", "double-booked", "charged-twice", "sync-or-async",
 			"wave-rider", "flash-crowd", "passed-the-load-test", "cache-stampede", "hot-shard", "scan-pollution", "celebrity-post",
 			"image-egress", "gc-storm", "disk-writes", "one-heavy-query", "pick-the-store", "poison-pill", "consumer-lag", "hot-cell",
 			"count-the-clicks", "unique-visitors", "polite-crawler", "url-shortener", "rate-limiter-showdown", "noisy-tenant",

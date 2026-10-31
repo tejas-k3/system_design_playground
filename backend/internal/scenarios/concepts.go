@@ -14,6 +14,7 @@ var conceptTags = map[string][]string{
 	"connection-crunch":      {"capacity", "overload-control"},
 	"retry-pileup":           {"overload-control", "failure-handling"},
 	"stale-prices":           {"replication", "consistency"},
+	"who-needs-telling":      {"caching", "consistency"},
 	"double-booked":          {"consistency"},
 	"charged-twice":          {"consistency", "failure-handling"},
 	"disappearing-money":     {"consistency"},
