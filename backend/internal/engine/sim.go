@@ -331,6 +331,7 @@ type Sim struct {
 	runMonoWriteBroken, runFollowReadBroken   int
 	runCausalBroken                           int
 	runCacheMsgs                              int               // messages the origin sent to caches about writes
+	runRevalidated                            int               // expired cache entries renewed after a version check
 	causalDeps                                map[[2]int][2]int // item and version of a write -> the item and version its writer had last read
 	causalPruneAt                             int               // how many records make it worth looking for old ones again
 	shardAdds                                 int

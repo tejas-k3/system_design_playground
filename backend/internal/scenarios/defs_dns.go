@@ -27,6 +27,6 @@ func registerDNS() {
 		Answer: "The answer: shorten the Users' DNS record TTL. A cached address can keep pointing at a failed server until it expires, while a shorter TTL means more DNS lookups.",
 		Predictions: []Prediction{{ID: "p1", Question: "After a server fails, what does a shorter DNS TTL change?", Options: []string{"It makes the healthy server process each request faster", "It lets users refresh the address sooner, with more lookups", "It prevents the server from failing again"}, Answer: 1,
 			Explain: "A shorter TTL makes clients resolve the name more often, so they can stop using a failed address sooner. It does not change the server's processing time or prevent failures."}},
-		Debrief: "DNS turns a service name into an address. Caching that answer saves lookups, but a long TTL can leave callers using an old address after a server fails. Choose the TTL to balance recovery time and lookup cost.",
+		Debrief: "DNS turns a service name into an address. Caching that answer saves lookups, but a long TTL can leave callers using an old address after a server fails. Choose the TTL to balance recovery time and lookup cost. A virtual IP that moves to the survivor avoids the wait altogether, because callers keep the same address.",
 	})
 }

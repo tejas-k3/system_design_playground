@@ -474,6 +474,11 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 	if c.cmd == cmdCacheInv || c.cmd == cmdCacheSet {
 		ms = 0.1
 	}
+	if c.cmd == cmdCacheGet && n.b("revalidate") {
+		if _, stale := n.store.Expired(s.now, c.key); stale {
+			ms += n.f("revalidateMs") // the version check goes to the origin before the entry is answered or dropped
+		}
+	}
 	s.hold(n, ms*n.slow, release, cb, func() {
 		release()
 		switch c.cmd {
@@ -525,6 +530,17 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 				}
 				s.okAt(n, Result{Ver: -1}, cb)
 				return
+			}
+			if n.b("revalidate") {
+				if sv, stale := n.store.Expired(s.now, c.key); stale && s.itemVer(c.key) == sv {
+					n.store.Set(s.now, c.key, sv) // still current: renewed without fetching it again
+					n.c.hit++
+					if c.counted {
+						s.runRevalidated++
+					}
+					s.okAt(n, Result{Ver: sv, Hit: true, Done: true, Src: n}, cb)
+					return
+				}
 			}
 			ver, hit, expired := n.store.Get(s.now, c.key)
 			if expired {
