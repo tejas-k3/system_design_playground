@@ -124,6 +124,7 @@ type node struct {
 	kvDownAt        []float64        // quorum store: when each cluster node last went down
 	kvMemberMsgs    float64          // quorum store: messages spent telling the cluster about failures
 	kvTimeToAll     float64          // quorum store: ms until every node knew of the latest failure
+	kvHear          []int            // quorum store: gossip rounds after which the 1st, 2nd, ... node to hear has heard
 	kvStaleView     int              // quorum store: copies a request was sent to that its coordinator did not yet know were down
 	kvDownUntil     []float64        // quorum store: when each cluster node comes back (0 = up)
 	kvHints         map[int][][2]int // quorum store: writes held for a node that is down (key, version), by that node

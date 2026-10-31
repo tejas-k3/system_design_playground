@@ -179,7 +179,7 @@ func registerConsistencyAndStreams() {
 	}
 	register(&Scenario{
 		ID: "slow-news", Title: "Slow news", Difficulty: "Medium", ConfigOnly: true,
-		Summary: "A node dies and the cluster takes half a minute to find out.",
+		Summary: "A node dies and the cluster takes more than a minute to find out.",
 		Story:   "A thirty-two node store keeps three copies of every key and needs all three to acknowledge a write, with stand-ins for a copy that is down. The nodes learn about a failure by {{gossip|gossip}}: every ten seconds a node that knows tells one other. At ten seconds one node dies. Until a node has heard, the requests it receives are sent to the dead node and wait a second for a reply that never comes. Keep at least 98.5% of the writes succeeding.",
 		Diagram: slowNews(false), Solution: slowNews(true),
 		Chaos:       []engine.ChaosEvent{{Type: "kvNodeDown", NodeID: "kv", AtSec: 10, Factor: 1}},

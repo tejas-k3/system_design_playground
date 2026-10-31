@@ -169,7 +169,7 @@ var alternatives = map[string][]Alternative{
 		alt("Let the cut-off leader step down after half a second", false, 98.9, 134, 0.52, "Much better, but half a second of acknowledged writes is still 32 lost writes against a limit of 20: the step-down time is the loss.", Change{"config", "stepDownSec", 0.5}),
 	},
 	"slow-news": {
-		alt("Tell three peers per round, still every ten seconds", false, 95.7, 137, 5.46, "Each round multiplies the nodes that know by four instead of two, so all 32 know after about three rounds instead of five, but a round still takes ten seconds: 95.7% against 98.5%.", Change{"kv", "gossipFanout", 3.0}),
+		alt("Tell three peers per round, still every ten seconds", false, 95.8, 137, 5.46, "Each round multiplies the nodes that know by four instead of two, so all 32 know after three rounds instead of seven, but a round still takes ten seconds: 95.8% against 98.5%.", Change{"kv", "gossipFanout", 3.0}),
 		alt("Gossip every second to two peers", true, 99.4, 137, 5.46, "It passes: three or four one-second rounds reach all 32 nodes in a few seconds, with each node telling only two.", Change{"kv", "gossipIntervalMs", 1000.0}, Change{"kv", "gossipFanout", 2.0}),
 		alt("Tell every node directly", true, 99.9, 137, 5.46, "It passes and is the quickest, about half a second. The node that notices sends 31 messages, and that grows with the cluster; gossip keeps each node's share the same.", Change{"kv", "failureDetection", "broadcast"}),
 	},

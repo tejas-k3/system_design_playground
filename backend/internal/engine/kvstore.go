@@ -102,6 +102,11 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 	next := copies // where stand-ins are looked for: the nodes after the preference list
 	counting := 0
 	coord, stale := kvCoordinator(c, nodes), 0
+	if m := n.s("failureDetection"); m == "gossip" || m == "broadcast" {
+		for tries := 0; tries < nodes && n.kvDownUntil[coord] > s.now; tries++ {
+			coord = (coord + 1) % nodes // a dead node receives nothing: the request lands on the next one
+		}
+	}
 	for j := 0; j < copies; j++ {
 		i := at(j)
 		if n.kvDownUntil[i] <= s.now {
@@ -240,13 +245,20 @@ func (s *Sim) kvNodesDown(n *node, count int, dur float64) {
 	if dur > 0 {
 		until = s.now + dur
 	}
+	fresh := false
 	for i := 0; i < count && i < nodes; i++ {
+		if n.kvDownUntil[i] > s.now { // already down: nothing new to tell
+			continue
+		}
 		n.kvDownUntil[i], n.kvDownAt[i] = until, s.now
-		s.kvSpreadNews(n, nodes)
+		fresh = true
 		if dur > 0 {
 			i := i
 			s.at(until, func() { s.kvReplayHints(n, i) })
 		}
+	}
+	if fresh {
+		s.kvSpreadNews(n, nodes)
 	}
 }
 
@@ -334,10 +346,7 @@ func kvCoordinator(c *call, nodes int) int {
 func gossipInformed(n int, fanout float64, r int) float64 {
 	know := 1.0
 	for ; r > 0 && know < float64(n); r-- {
-		know = math.Min(float64(n), know+fanout*know*(1-know/float64(n)))
-		if know > float64(n)-0.5 {
-			know = float64(n)
-		}
+		know = math.Min(float64(n), math.Ceil(know+fanout*know*(1-know/float64(n)))) // whole nodes
 	}
 	return know
 }
@@ -358,6 +367,7 @@ func (s *Sim) kvSpreadNews(n *node, nodes int) {
 		return
 	}
 	detect := n.f("detectMs")
+	n.kvHear = nil // recomputed from the settings the first time a request needs it
 	if mode == "broadcast" {
 		n.kvTimeToAll = detect + n.f("broadcastMs")
 		n.kvMemberMsgs += float64(nodes - 1)
@@ -382,8 +392,14 @@ func (s *Sim) kvKnowsDown(n *node, coord, dead int) bool {
 	if mode == "broadcast" {
 		delay += n.f("broadcastMs")
 	} else {
-		rank := ((coord-dead+nodes)%nodes - 1) // 0..nodes-2: the order in which the others hear
-		delay += float64(gossipRounds(nodes, n.f("gossipFanout"), rank+2)) * n.f("gossipIntervalMs")
+		if len(n.kvHear) != nodes-1 { // rounds after which the 1st, 2nd, ... node to hear has heard
+			n.kvHear = make([]int, nodes-1)
+			for r := range n.kvHear {
+				n.kvHear[r] = gossipRounds(nodes, n.f("gossipFanout"), r+2)
+			}
+		}
+		rank := (coord-dead+nodes)%nodes - 1 // 0..nodes-2: the order in which the others hear
+		delay += float64(n.kvHear[rank]) * n.f("gossipIntervalMs")
 	}
 	return s.now >= n.kvDownAt[dead]+delay
 }
