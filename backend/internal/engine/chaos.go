@@ -90,6 +90,11 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 			s.addShard(t)
 		}
 		return
+	case "memberOmission", "memberLies":
+		if t.kind == KCoordinator {
+			s.coordMembersFault(t, ev)
+		}
+		return
 	case "clusterNodeDown":
 		if t.kind == KCoordinator {
 			s.coordNodesDown(t, int(ev.Factor), ev.DurationSec*1000, ev.Mode)

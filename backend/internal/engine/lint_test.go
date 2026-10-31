@@ -295,3 +295,21 @@ func TestSessionLintFindsMissingIdentitiesAndStore(t *testing.T) {
 		t.Errorf("users with identities are fine")
 	}
 }
+
+func TestLintFindsAVotingGroupThatIsTooSmall(t *testing.T) {
+	d := func(nodes float64) Diagram {
+		b := &builder{}
+		b.node("u", KClient, Params{})
+		b.node("a", KAppServer, Params{})
+		b.node("zk", KCoordinator, Params{"nodes": nodes, "faultModel": "arbitrary", "faultsTolerated": 1.0})
+		b.edge("u", "a").edge("a", "zk")
+		out, _ := Sanitize(b.d)
+		return out
+	}
+	if _, ok := rules(Lint(d(3)))["group-too-small-to-vote"]; !ok {
+		t.Errorf("three members cannot outvote one liar")
+	}
+	if _, ok := rules(Lint(d(4)))["group-too-small-to-vote"]; ok {
+		t.Errorf("four members can")
+	}
+}

@@ -157,6 +157,12 @@ var alternatives = map[string][]Alternative{
 		alt("Merge the writes (a counter)", true, 100.0, 177, 0.74, "Nothing is dropped, so the clocks cannot lose anything. It only works for data that can be merged, such as a counter or a set that adds; a profile field cannot.", Change{"db", "conflictPolicy", "merge"}),
 		alt("Use one leader", true, 100.0, 177, 0.74, "One machine orders every write, so no clock is compared. This run does not show the price: the far region now writes across the distance and loses its writes if that leader fails.", Change{"db", "topology", "singleLeader"}),
 	},
+	"liar-in-the-group": {
+		alt("Vote with three members (one short)", false, 37.0, 137, 0.52, "No wrong answer gets through, but with three members the group waits for two replies, and when one is the liar it cannot find two that agree: it refuses most requests while the member lies (37% succeed).", Change{"config", "faultModel", "arbitrary"}),
+		alt("Add two more members and keep believing the first answer", false, 100.0, 134, 0.68, "Five members survive two crashes, but they still believe the first reply, and a liar's reply is believed just the same: 1,240 wrong answers.", Change{"config", "nodes", 5.0}),
+		alt("Add checksums to the answers", false, 100.0, 134, 0.52, "A checksum would show data damaged on the way or on the disk, and the damaged answer would be dropped. This member lies with a matching checksum, so nothing changes: 1,240 wrong answers.", Change{"config", "answerChecksums", true}),
+		alt("Four members, built for two liars", false, 11.8, 134, 0.60, "To tolerate two liars the group needs seven members, waits for all but two replies and needs three matching. Four members cannot find three, so almost every request is refused.", Change{"config", "nodes", 4.0}, Change{"config", "faultModel", "arbitrary"}, Change{"config", "faultsTolerated", 2.0}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),
