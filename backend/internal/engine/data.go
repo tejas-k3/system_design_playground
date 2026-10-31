@@ -381,6 +381,13 @@ func (s *Sim) localStore(n *node) *Store {
 	return n.local
 }
 
+// countCacheMsg counts a message the origin sent to a cache about a write, once the run is past its warm-up.
+func (s *Sim) countCacheMsg(c *call) {
+	if c.counted {
+		s.runCacheMsgs++
+	}
+}
+
 func (s *Sim) invalidate(n *node, c *call, ver int, then func()) {
 	if n.local != nil {
 		n.local.Delete(c.key)
@@ -390,12 +397,19 @@ func (s *Sim) invalidate(n *node, c *call, ver int, then func()) {
 	step = func(i int) {
 		for ; i < len(caches); i++ {
 			switch caches[i].to.s("writePolicy") {
+			case "lease": // tell only a cache that holds the item: its entry is the lease, and a cache without one will fetch afresh
+				if !caches[i].to.store.Live(s.now, c.key) {
+					continue
+				}
+				fallthrough
 			case "invalidate":
 				e, next := caches[i], i+1
+				s.countCacheMsg(c)
 				s.callCmd(n, e, c, cmdCacheInv, 0, func(Result) { step(next) })
 				return
 			case "writeThrough":
 				e, next := caches[i], i+1
+				s.countCacheMsg(c)
 				s.callCmd(n, e, c, cmdCacheSet, ver, func(Result) { step(next) })
 				return
 			}

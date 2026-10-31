@@ -328,6 +328,7 @@ type Sim struct {
 	runSessReads, runRYW, runMono             int
 	runMonoWriteBroken, runFollowReadBroken   int
 	runCausalBroken                           int
+	runCacheMsgs                              int               // messages the origin sent to caches about writes
 	causalDeps                                map[[2]int][2]int // item and version of a write -> the item and version its writer had last read
 	shardAdds                                 int
 	tenantTotal, tenantOK                     []int // requests of each tenant and how many succeeded
