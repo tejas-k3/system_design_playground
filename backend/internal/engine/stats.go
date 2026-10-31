@@ -299,6 +299,10 @@ func (s *Sim) Snapshot() Stats {
 			ex["term"] = float64(n.coordTerm)
 			ex["leader"] = float64(n.coordLeader)
 			ex["nodesUp"] = float64(s.coordUpCount(n))
+			ex["elections"] = float64(n.coordElections)
+			if n.coordStaleAcks > 0 {
+				ex["staleLeaderWrites"] = float64(n.coordStaleAcks)
+			}
 		}
 		if n.kvRepairs > 0 {
 			ex["repairs"] = float64(n.kvRepairs)

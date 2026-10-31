@@ -64,6 +64,7 @@ func (s *Sim) coordScheduleElection(n *node) {
 			}
 		}
 		n.coordTerm++
+		n.coordElections++
 		s.logEvent("elected", n, n.coordTerm)
 	})
 }
@@ -86,6 +87,22 @@ func (s *Sim) coordNodesDown(n *node, count int, dur float64, mode string) {
 	if dur > 0 {
 		s.at(until, func() { s.coordChanged(n) })
 	}
+}
+
+// coordLeaderCut cuts the leader off from the other members for dur. The others elect a new leader after the usual
+// timeout. The old leader goes on answering for stepDownSec before it notices it has lost its majority.
+func (s *Sim) coordLeaderCut(n *node, dur float64) {
+	s.coordInit(n)
+	if n.coordLeader < 0 {
+		return
+	}
+	if stale := n.f("stepDownSec") * 1000; stale > 0 {
+		n.coordStaleUntil = s.now + stale
+		if dur > 0 {
+			n.coordStaleUntil = s.now + min(stale, dur)
+		}
+	}
+	s.coordLeaderDown(n, dur)
 }
 
 func (s *Sim) coordLeaderDown(n *node, dur float64) {
@@ -111,6 +128,16 @@ func (s *Sim) procCoord(n *node, c *call, cb func(Result), release func()) {
 		return
 	}
 	s.coordInit(n)
+	if s.now < n.coordStaleUntil && c.cmd == cmdWrite { // the old leader has not noticed it was replaced
+		s.after(s.service(n, n.f("opMs")+n.f("rttMs"))*n.slow, func() {
+			n.coordStaleAcks++
+			if c.counted {
+				s.runLost++ // acknowledged, but only the old leader has it
+			}
+			s.okAt(n, Result{Ver: -1, Done: true, Src: n}, cb)
+		})
+		return
+	}
 	if n.coordLeader < 0 {
 		s.failAt(n, RNoQuorum, cb)
 		return

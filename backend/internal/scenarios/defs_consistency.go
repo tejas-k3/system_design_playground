@@ -133,6 +133,38 @@ func registerConsistencyAndStreams() {
 		Deeper:  "Crash faults are masked by a majority: with 2k+1 members any two majorities overlap in at least one member, and a member that stops never says anything false. Arbitrary faults break that, because a faulty member can say different things to different members. To tolerate k of them, a group cannot wait for more than n-k replies, since k may never come, and among those n-k at most k can be wrong, so it needs n-k-k at least k+1 honest ones to be a match that cannot be forged: n at least 3k+1. Practical protocols pay for it with extra message rounds and signatures, which is why they are used where members do not trust each other, such as blockchains, and rarely inside one company, where the usual answer is checksums, replication of the data itself, and treating a member that returns bad data as crashed. An interviewer will ask why 2f+1 is not enough and what a signature changes.",
 	})
 
+	// The old leader's write: a leader cut off from the others goes on acknowledging writes that are then lost
+	oldLeaderWrites := func(fixed bool) engine.Diagram {
+		step := 8.0
+		if fixed {
+			step = 0.2
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 50.0, "readPct": 0.0, "keySpace": 1000.0, "keyDist": "uniform", "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("config", engine.KCoordinator, cols[2], rowMid, P{"nodes": 3.0, "electionTimeoutMs": 500.0, "stepDownSec": step}).label("config", "Configuration group").
+			e("users", "app").e("app", "config").done()
+	}
+	register(&Scenario{
+		ID: "old-leaders-writes", Title: "The old leader's writes", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "A leader cut off from the others keeps saying yes, and its writes disappear.",
+		Story:   "A three-member group keeps the configuration, with one {{leader-election|leader}} that the others follow. At fifteen seconds the leader's network is cut for twenty seconds. The other two elect a new leader for a higher term within a second or two, but the old one has not noticed anything: for eight seconds it goes on acknowledging writes that nobody else has, and when it rejoins they are gone. Users were told their change was saved. At most twenty acknowledged writes may be lost.",
+		Diagram: oldLeaderWrites(false), Solution: oldLeaderWrites(true),
+		Chaos:       []engine.ChaosEvent{{Type: "leaderCut", NodeID: "config", AtSec: 15, DurationSec: 20}},
+		Goals:       engine.Goals{MinSuccessRate: 0.9, MaxLostWrites: i(20), MaxP95Ms: f(150), MaxCostPerHour: f(0.6), StarCostPerHour: f(0.55)},
+		DurationSec: 45, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the lost writes on the goals panel and at the group's timeline: when did the new leader take over, and what was the old one doing until then?",
+			"The old leader cannot tell a quiet network from a dead one. How long does it keep acting as leader after it can no longer reach a majority?",
+			"A leader should stop acknowledging writes soon after it stops hearing from a majority. The group has a setting for how long a cut-off leader keeps answering: what happens to the losses and to the gap without a leader if it is short?",
+		},
+		Answer: "The answer: make the cut-off leader step down quickly (a fraction of a second). A write is safe only once a majority has it, so a leader that cannot reach a majority must stop acknowledging. More members or a shorter election do not shorten the time the old leader keeps answering.",
+		Predictions: []Prediction{{ID: "p1", Question: "A leader is cut off, and another is elected in a higher term. What happens to the writes the old leader acknowledged meanwhile?", Options: []string{"They are lost, since only the old leader had them", "The new leader copies them from the old one", "They are kept because the old leader's term was first"}, Answer: 0,
+			Explain: "A write counts as committed once a majority has it. The new leader was elected by the other members, which never saw those writes, so the log it continues does not contain them."}},
+		Debrief: "A leader is only the leader while a majority follows it, and each election starts a higher {{leader-election|term}}. A leader that does not notice it has lost its majority acknowledges writes that no majority holds, and they vanish when the new leader's log wins. The cure is to step down on missing heartbeats, and for clients and storage to refuse a leader from an older term, which is also how fencing tokens work.",
+		Deeper:  "Consensus protocols such as Raft number every leadership with a term and let a write count as committed only when a majority has stored it, so two leaders can never both commit. A leader cut off from the majority can still receive client requests, but it cannot commit them, and a correct implementation does not acknowledge before commit. The danger in this scenario is a leader that acknowledges early, or a read served locally from a leader that has been replaced. The usual defences are a step-down rule (leave leadership when no majority has answered for an election timeout), leader leases whose length is shorter than the election timeout so a replaced leader stops serving before a new one starts, and terms or fencing tokens checked by whoever receives the writes. The cost of stepping down quickly is a gap without a leader and false step-downs during a slow network. An interviewer will ask what happens to a write that reached only some followers, and why a read from the leader may still be stale.",
+	})
+
 	// Quorum overlap: a key-value store that answers quickly but sometimes shows a client its own old data
 	quorumOverlap := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0
