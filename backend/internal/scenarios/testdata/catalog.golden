@@ -99,3 +99,5 @@ split-the-database 4d8bb1461f7728eb4368cdb22497dd0859b38c2f1cc0208e9f5f0906e310f
 launch-day-capstone 0c98f8ea17ec98cd4399117d3ed5c242a32eeda1e03fae6b60ddbd5cef3d80c8 start=false/0/0.4494/1013.4 solution=true/2/0.9599/468.1
 ten-thousand-students 2b420d6208e9a9b5817eb8990f5add6e5ad5afa3d4b6b3e6da76f5e611e2e716 start=false/0/0.0000/0.0 solution=true/1/0.9879/163.9
 checkout-during-a-sale 5a7fd69242fc30038f00a828ec7a7ff3e47459b9a751ddef9d2b4288859386cf start=false/0/0.0000/0.0 solution=true/1/0.9646/605.6
+open-database-failure 09a423eb09b80be9e184e8741b40ea39df7fbd3e9df95c360fc5f3ecb88fbdf4 start=false/0/0.0000/0.0 solution=true/3/0.9276/177.4
+open-pay-once a23dfcd512c41b37e3cf6d66142a939b77befbd904f34b3485bbfea85aacd242 start=false/0/0.0000/0.0 solution=true/3/0.9900/864.9
