@@ -68,24 +68,30 @@ func (s *Sim) multiLeaderWrite(n *node, c *call) {
 	if n.mlLast == nil {
 		n.mlLast = map[int]mlWrite{}
 	}
-	stamp := s.now + s.leaderClockError(n, leader)
 	policy := n.s("conflictPolicy")
 	prev, seen := n.mlLast[c.key]
-	if seen && prev.leader != leader && s.now-prev.t < n.f("syncLagMs") {
+	concurrent := seen && prev.leader != leader && s.now-prev.t < n.f("syncLagMs")
+	if concurrent {
 		n.mlConflicts++
 		if policy != "merge" && c.counted {
 			s.runLostUpdates++
 		}
 	}
-	// Last-writer-wins keeps the write with the later time stamp, wherever it came from: a leader whose clock is behind
-	// loses to an older write of the other leader. Logical versions and merging do not look at the clock.
-	if seen && policy == "lastWriterWins" && prev.leader != leader && stamp < prev.stamp {
-		if c.counted {
-			s.runClockLost++
+	stamp := 0.0
+	if policy == "lastWriterWins" {
+		stamp = s.now + s.leaderClockError(n, leader)
+		// Last-writer-wins keeps the write with the later time stamp, wherever it came from: a leader whose clock is
+		// behind loses to an older write of the other leader, and its write is dropped without being recorded, so later
+		// writes at that leader keep losing until the leader that is ahead writes the key again. Logical versions and
+		// merging do not look at the clock. A drop that is also a true conflict is already counted as a lost update.
+		if seen && prev.leader != leader && stamp < prev.stamp {
+			if c.counted && !concurrent {
+				s.runClockLost++
+			}
+			return
 		}
-		return // the write that was stamped later stays
 	}
-	n.mlLast[c.key] = mlWrite{s.now, leader, stamp}
+	n.mlLast[c.key] = mlWrite{t: s.now, leader: leader, stamp: stamp}
 }
 
 // leaderClockError is how far a leader's clock is ahead of true time. The first leader is the reference; leader i is
