@@ -215,3 +215,14 @@ describe('goals that need a measurement first', () => {
     expect(row(rows, 'Time to first token (p95)').actual).toBe('—')
   })
 })
+
+describe('messages to caches goal', () => {
+  const goals = { minSuccessRate: 0.9, maxCacheMessages: 1000 }
+  it('compares the messages sent with the limit', () => {
+    expect(row(goalRows(goals, stats({ resolved: 100, ok: 100, cacheMessages: 1000 }), 1, true), 'Messages to caches')).toMatchObject({ actual: '1,000', state: 'pass' })
+    expect(row(goalRows(goals, stats({ resolved: 100, ok: 100, cacheMessages: 1001 }), 1, true), 'Messages to caches').state).toBe('fail')
+  })
+  it('is pending before the run starts', () => {
+    expect(row(goalRows(goals, stats({}), 1, false), 'Messages to caches').state).toBe('pending')
+  })
+})

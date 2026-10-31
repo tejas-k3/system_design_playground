@@ -156,6 +156,7 @@ export interface Goals {
   maxLostWrites?: number
   maxLostUpdates?: number
   maxSessionViolations?: number
+  maxCacheMessages?: number
   maxLostEvents?: number
   maxInconsistent?: number
   maxInDoubt?: number
@@ -384,6 +385,7 @@ export interface RunStats {
   monotonicWritesBroken?: number // writes applied out of the client's issue order
   writesFollowReadsBroken?: number // writes applied to a copy older than a value the client read
   causalBroken?: number // reads of a cause older than an effect the same client had already seen
+  cacheMessages?: number // messages the origin sent to caches about writes
   lostUpdates?: number // transfers that silently overwrote a concurrent commit (read committed)
   txAborts?: number // transactions aborted by a write conflict or as a deadlock victim
   deadlocks?: number
