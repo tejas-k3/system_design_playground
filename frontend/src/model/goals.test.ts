@@ -67,6 +67,14 @@ describe('orders left half done goal', () => {
   })
 })
 
+describe('ledger goal', () => {
+  it('fails while entries do not balance and passes when they all do', () => {
+    const g = { minSuccessRate: 0.5, maxUnbalanced: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, unbalanced: 4 }), 1, true), 'Entries that do not balance')).toMatchObject({ actual: '4', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Entries that do not balance').state).toBe('pass')
+  })
+})
+
 describe('goalRows', () => {
   const goals = { minSuccessRate: 0.99, maxP95Ms: 500, maxCostPerHour: 1, maxConflicts: 0 }
 

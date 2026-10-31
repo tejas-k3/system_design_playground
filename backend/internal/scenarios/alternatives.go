@@ -181,6 +181,10 @@ var alternatives = map[string][]Alternative{
 		alt("Let clients retry twice", false, 93.0, 571, 2.68, "Most failed requests are rescued by a retry, since the balancer picks the live server about half the time, but each rescue has waited out a timeout: 93% is short of the goal and the p95 is more than a half second.", Change{"users", "retries", 2.0}),
 		alt("Use health checks instead of the registry", true, 97.6, 110, 2.68, "It passes: the balancer drops the server after one failed probe, two seconds, instead of waiting for an entry to expire. Every balancer must then be told about each server by hand.", Change{"lb", "membership", "health"}),
 	},
+	"books-balance": {
+		alt("Switch to two-phase commit", false, 47.2, 497, 1.00, "It does not help: the release of a step that the card processor declines is not retried, so the same orders are left unbalanced (46 against 45), and the p95 is higher.", Change{"app", "workflow", "twoPhase"}),
+		alt("Retry the undo once", false, 66.3, 315, 1.00, "It almost works: 3 of the 45 stranded entries remain, because the retry can be declined as well. The goal allows none, so one more try is the difference.", Change{"app", "compensationRetries", 1.0}),
+	},
 	"cold-start": {
 		alt("Keep one instance warm", false, 100.0, 129, 0.24, "There is no cold start any more, but the instance that never stops costs more than the whole budget of $0.20 an hour.", Change{"fn", "keepWarm", true}),
 		alt("Make the function start in 300 ms", false, 100.0, 424, 0.19, "Requests that find it cold wait a quarter as long, but there are still enough of them for the p95 of 424 ms to be just over the 400 ms goal.", Change{"fn", "coldStartMs", 300.0}),

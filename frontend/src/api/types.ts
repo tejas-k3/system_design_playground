@@ -159,6 +159,7 @@ export interface Goals {
   maxCacheMessages?: number
   maxLostEvents?: number
   maxInconsistent?: number
+  maxUnbalanced?: number
   maxInDoubt?: number
   maxUnchecked?: number
   maxReauth?: number
@@ -372,6 +373,7 @@ export interface RunStats {
   tenants?: number
   worstTenantSuccess?: number // the worst-served of the quiet tenants
   inconsistent?: number // multi-step writes left half done
+  unbalanced?: number // ledger entries that do not balance: left half done, or saved and never announced
   compensated?: number // multi-step writes rolled back
   crawl?: CrawlStats // only when the users run the crawl workload
   eventDups?: number // events a queue accepted a second time (a producer retried after a lost answer)

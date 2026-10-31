@@ -47,7 +47,7 @@ export function runEvidence(score: Score, seconds: number): string[] {
   const top = Object.entries(r.errors ?? {}).sort((a, b) => b[1] - a[1])[0]
   if (top && top[1] > 0) out.push(`Most failures were ${top[0]} (${top[1].toLocaleString()}).`)
   const facts: [string, number | undefined][] = [
-    ['Orders left stuck', r.stuck], ['Orders left half done', r.inconsistent], ['Transactions waiting on a dead coordinator', r.inDoubt],
+    ['Orders left stuck', r.stuck], ['Orders left half done', r.inconsistent], ['Books: entries that do not balance', r.unbalanced], ['Transactions waiting on a dead coordinator', r.inDoubt],
     ['Acknowledged writes lost', r.lostWrites], ['Requests let through unchecked', r.unchecked], ['Requests that found their user signed out', r.reauth],
     ['Wrong answers accepted', r.wrongAnswers], ['Newer writes lost to a clock', r.clockLost], ['Outputs repeated after a crash', r.repeatedOutputs],
     ['Messages handled out of order', r.jobs?.orderViolations], ['Login sessions lost', r.sessionsLost], ['Double bookings and write conflicts', r.conflicts], ['Duplicate writes', r.duplicates], ['Stale reads', r.staleReads], ['Partial answers', r.partial], ['Write-skew anomalies', r.writeSkew],

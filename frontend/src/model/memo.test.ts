@@ -23,11 +23,12 @@ describe('costPerThousand', () => {
 
 describe('runEvidence', () => {
   it('states what the run measured, and only the failure behaviours that happened', () => {
-    const lines = runEvidence(score({ stuck: 4, inDoubt: 0, unchecked: 12, errors: { 'Timeouts': 30, 'Queue full (503)': 6 } }), 60)
+    const lines = runEvidence(score({ stuck: 4, unbalanced: 7, inDoubt: 0, unchecked: 12, errors: { 'Timeouts': 30, 'Queue full (503)': 6 } }), 60)
     expect(lines.join('\n')).toContain('$1.20 an hour')
     expect(lines.join('\n')).toContain('p95 of 180 ms')
     expect(lines.join('\n')).toContain('99.0% of requests succeeded')
     expect(lines.join('\n')).toContain('Orders left stuck: 4.')
+    expect(lines.join('\n')).toContain('Books: entries that do not balance: 7.')
     expect(lines.join('\n')).toContain('Requests let through unchecked: 12.')
     expect(lines.join('\n')).not.toContain('dead coordinator')
     expect(lines.join('\n')).toContain('Most failures were Timeouts (30)')
