@@ -70,12 +70,14 @@ export function onCallView(score: Score, findings: Finding[], minSuccessRate?: n
 }
 
 /** The memo and the evidence next to it as plain text, for a study partner or a note. */
-export function memoText(title: string, m: Memo, evidence: string[], onCall: string[]): string {
+export interface Line { text: string; sub?: boolean }
+
+export function memoText(title: string, m: Memo, evidence: string[], onCall: Line[]): string {
   const line = (label: string, v: string) => `${label}: ${v.trim() || '(not written)'}`
   return [
     `Trade-off memo: ${title}`, '',
     line('Chosen design', m.design), line('What it costs', m.cost), line('What to monitor', m.watch), '',
     'What the run showed', ...evidence.map((e) => `- ${e}`), '',
-    'On call', ...onCall.map((e) => `- ${e}`), '',
+    'On call', ...onCall.map((e) => `${e.sub ? '  ' : ''}- ${e.text}`), '',
   ].join('\n')
 }
