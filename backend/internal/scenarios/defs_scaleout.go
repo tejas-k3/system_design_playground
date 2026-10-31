@@ -297,6 +297,11 @@ func registerScaleOut() {
 	// Nobody to wait for: the same checkout, but the stock must stay all-or-nothing and the services must not wait for a dead server
 	nobodyToWait := func(fixed bool) engine.Diagram {
 		d := frozenCheckout(false)
+		for k := range d.Nodes {
+			if d.Nodes[k].ID == "card" {
+				d.Nodes[k].Params["errorPct"] = 0.0 // an undo that fails would leave an order stuck whichever protocol runs
+			}
+		}
 		if fixed {
 			for k := range d.Nodes {
 				if d.Nodes[k].ID == "app" {
@@ -313,7 +318,7 @@ func registerScaleOut() {
 		Story:   "Checkout is a two-phase commit across the stock database, the card processor and shipping, and when the server dies between the votes and the decision the services sit locked until it returns. Operations prefers not to use a saga, because other customers can then see stock reserved for an order that later vanishes. The services should instead settle on their own when the server stays silent, and the total time rows stay locked must stay small. Operations still wants every order to stay {{consistency-levels|consistent}}.",
 		Diagram: nobodyToWait(false), Solution: nobodyToWait(true),
 		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app", AtSec: 15, DownSec: 8}},
-		Goals:       engine.Goals{MinSuccessRate: 0.6, MaxInDoubt: i(0), MaxInconsistent: i(0), MaxBlockedSec: f(15), MaxP95Ms: f(900), MaxCostPerHour: f(1.6), StarP95Ms: f(800), StarCostPerHour: f(1.4)},
+		Goals:       engine.Goals{MinSuccessRate: 0.6, MaxInDoubt: i(0), MaxInconsistent: i(0), MaxBlockedSec: f(15), MaxP95Ms: f(900), MaxCostPerHour: f(1.6), StarP95Ms: f(860), StarCostPerHour: f(1.4)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
 			"Look at the goals panel after the crash: how many transactions wait, and for how many lock-seconds?",

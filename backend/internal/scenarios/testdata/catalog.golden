@@ -83,7 +83,7 @@ the-gpu-budget 33800b668dad9f2957249f4d190a7d26dd21876b70e89998b8dc2add37c52813 
 heavy-tail 1f14018deaecc1030723cf03432e6404a4c896d66cf8e99b1a114a9f80f4326c start=false/0/1.0000/263.6 solution=true/2/1.0000/207.8
 payment-saga 433aec484821a57f473b778629cd5cef74c92c2aa75662a712c5caae191de3bd start=false/0/0.8519/321.3 solution=true/2/0.8503/327.8
 frozen-checkout 2ab30ee93253f912fc9cf32b40ffa4b3ca2e680766adf4fe18fb1885a180bb9d start=false/0/0.6975/516.8 solution=true/2/0.7285/321.3
-nobody-to-wait-for 6d821028f0829ec086dec146602209528871556a93d96744e664eae7df22c64c start=false/0/0.6975/516.8 solution=true/3/0.6448/709.5
+nobody-to-wait-for 51bd255cae3c83b7ef19018ec40011f37f29109457d1ce8357e699b024a1ff2e start=false/0/0.7503/516.8 solution=true/3/0.7719/738.2
 retry-storm 47819e11c263a2c61c88737758c8b90e1f6680f47ef9e9581fb65600fe5e9360 start=false/0/0.1658/203.8 solution=true/3/0.8126/203.8
 split-the-database 4d8bb1461f7728eb4368cdb22497dd0859b38c2f1cc0208e9f5f0906e310f334 start=false/0/0.6185/752.9 solution=true/3/1.0000/220.6
 launch-day-capstone 0c98f8ea17ec98cd4399117d3ed5c242a32eeda1e03fae6b60ddbd5cef3d80c8 start=false/0/0.4494/1013.4 solution=true/2/0.9599/468.1

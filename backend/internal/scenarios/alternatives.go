@@ -133,8 +133,8 @@ var alternatives = map[string][]Alternative{
 		alt("Give the app server 96 threads", false, 70.4, 517, 2.46, "Capacity does not change what happens when the coordinator dies: 12 transactions are still in doubt, and the bill goes up.", Change{"app", "threads", 96.0}),
 	},
 	"nobody-to-wait-for": {
-		alt("Use a saga instead", true, 72.8, 321, 1.00, "It passes: nothing is locked across steps, so a dead server blocks nobody, and it is faster. The price is not in the goals: other customers can see stock reserved for an order that is later undone, which two- and three-phase commit never show.", Change{"app", "workflow", "saga"}),
-		alt("Use three-phase commit and keep the one-second wait", false, 64.4, 710, 1.00, "No transaction is in doubt, but every service that held a row waits a full second before deciding alone: 65 lock-seconds against a limit of 15. The timeout is the price of guessing that a silent server is dead.", Change{"app", "workflow", "threePhase"}),
+		alt("Use a saga instead", true, 75.2, 321, 1.00, "It passes: nothing is locked across steps, so a dead server blocks nobody, and it is faster. The price is not in the goals: other customers can see stock reserved for an order that is later undone, which two- and three-phase commit never show.", Change{"app", "workflow", "saga"}),
+		alt("Use three-phase commit and keep the one-second wait", false, 77.1, 738, 1.00, "No transaction is in doubt, but every service that held a row waits a full second before deciding alone: 60 lock-seconds against a limit of 15. The timeout is the price of guessing that a silent server is dead.", Change{"app", "workflow", "threePhase"}),
 	},
 	"restart-the-counter": {
 		alt("Deliver exactly once", false, 96.4, 132, 0.90, "Nothing is repeated, but the job still reloads its save and handles the last twenty seconds again at full cost: 2.21 s to catch up against a limit of 1.5.", Change{"counter", "delivery", "exactlyOnce"}),

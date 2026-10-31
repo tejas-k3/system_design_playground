@@ -224,6 +224,7 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	n.epoch++
 	n.txl, n.txWaits = map[int]*txLock{}, map[int]int{} // a crash drops every lock
 	s.dropSessions(n)
+	n.authTokens = nil // remembered token answers live in memory
 	s.failQueued(n, RNodeDown)
 	s.closePools(n)
 	s.dropConns(n)

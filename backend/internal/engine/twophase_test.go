@@ -5,12 +5,14 @@ import "testing"
 // Two-phase commit: every service first votes (prepare) and holds its row, then all of them commit. A failed vote
 // aborts everyone, so nothing is left half done, but if the coordinator (the app server) dies after the votes and
 // before the decision, the services sit locked and cannot decide on their own until it returns.
-func twoPhaseRun(mode string, crash bool) RunStats {
+func twoPhaseRun(mode string, crash bool) RunStats { return twoPhaseRunErr(mode, crash, 20) }
+
+func twoPhaseRunErr(mode string, crash bool, payErrPct float64) RunStats {
 	b := &builder{}
 	b.node("u", KClient, Params{"rps": 50.0, "readPct": 0.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0})
 	b.node("a", KAppServer, Params{"threads": 64.0, "queueCap": 2000.0, "dbPool": 100.0, "workflow": mode, "termTimeoutMs": 200.0})
 	b.node("stock", KDatabase, Params{"connections": 32.0, "writeMs": 10.0})
-	b.node("pay", KExternalAPI, Params{"latencyMs": 40.0, "errorPct": 20.0})
+	b.node("pay", KExternalAPI, Params{"latencyMs": 40.0, "errorPct": payErrPct})
 	b.node("ship", KExternalAPI, Params{"latencyMs": 30.0, "errorPct": 0.0})
 	b.edge("u", "a").edge("a", "stock").edge("a", "pay").edge("a", "ship")
 	d, _ := Sanitize(b.d)
@@ -60,7 +62,8 @@ func TestThreePhaseCommitDoesNotBlockOnACoordinatorCrash(t *testing.T) {
 }
 
 func TestThreePhaseCommitCostsAnExtraRound(t *testing.T) {
-	two, three := twoPhaseRun("twoPhase", false), twoPhaseRun("threePhase", false)
+	// a refund that itself fails would leave an order stuck in any protocol, so the card is reliable here
+	two, three := twoPhaseRunErr("twoPhase", false, 0), twoPhaseRunErr("threePhase", false, 0)
 	if three.Inconsistent != 0 || three.P50 <= two.P50+20 {
 		t.Errorf("still atomic, but the extra round is slower: %.0f against %.0f ms, %d half done", three.P50, two.P50, three.Inconsistent)
 	}

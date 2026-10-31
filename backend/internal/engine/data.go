@@ -604,7 +604,6 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 	})
 }
 
-// readThroughEdge is where a cache fetches misses from, preferring a replica.
 // revalidatable returns the version of a held but expired entry that a revalidating cache may check. The check is a cost
 // model (the origin is not sent a request), so it needs a read-through origin that is up, and it is not used with Range size.
 func (s *Sim) revalidatable(n *node, key int) (int, bool) {
@@ -614,6 +613,7 @@ func (s *Sim) revalidatable(n *node, key int) (int, bool) {
 	return n.store.Expired(s.now, key)
 }
 
+// readThroughEdge is where a cache fetches misses from, preferring a replica.
 func (s *Sim) readThroughEdge(n *node) *edge {
 	if e := s.first(n, KReplica); e != nil {
 		return e
