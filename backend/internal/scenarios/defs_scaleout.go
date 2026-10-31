@@ -43,7 +43,7 @@ func registerScaleOut() {
 		Answer: "The answer: put a read replica in Europe and one in Asia, in their regions, and wire each region's app server to its replica. Reads are answered locally, writes still go to the US primary, and {{replication-lag|a replica runs a little behind}}, which a read that may be a second old can live with.",
 		Predictions: []Prediction{{ID: "p1", Question: "A read replica in Asia will make reads there faster, and writes from Asia…", Options: []string{"Faster as well, since the replica is closer", "No faster: they still go to the primary", "Slower, as the replica must also copy them"}, Answer: 1,
 			Explain: "A replica serves reads only. Every write still has to reach the one primary, so a write from Asia keeps paying the distance."}},
-		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add {{replication-lag|replication lag}} that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or {{sharding|sharding}} users by home region.",
+		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add {{replication-lag|replication lag}} that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or {{sharding|sharding}} users by home region. The extra round trips show why {{distributed-system-pitfalls|latency is not zero}}.",
 	})
 
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
@@ -224,7 +224,7 @@ func registerScaleOut() {
 		Answer: "The answer: run a stack (balancer, app, database) in each region, connect every user group to all of them, and turn on 'Send users to the nearest region' for the users. Remember the stacks cost money too.",
 		Predictions: []Prediction{{ID: "p1", Question: "Adding more servers in the US would make users in Asia…", Options: []string{"Much faster, as the queues in the US shrink", "No faster: the delay is the distance, not the load", "Slower, since the US servers then take more of the traffic"}, Answer: 1,
 			Explain: "Latency to a far region is dominated by the distance each way. Capacity helps when servers are busy, not when the wait is the speed of light."}},
-		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to {{consistency-levels|keeping their data consistent}} (which the multi-region database challenges are about).",
+		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to {{consistency-levels|keeping their data consistent}} (which the multi-region database challenges are about). Do not assume {{distributed-system-pitfalls|latency is zero}}: users far from the stack pay for the distance.",
 	})
 
 	// Payment saga: checkout spans stock, card and shipping; a failed step must not leave a half-done order

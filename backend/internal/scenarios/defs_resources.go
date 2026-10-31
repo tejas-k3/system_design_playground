@@ -102,7 +102,7 @@ func registerResourceLimits() {
 		Answer: "The answer: put a CDN in front of the app server and give it room for the popular pictures (there are about 2,000 distinct ones).",
 		Predictions: []Prediction{{ID: "p1", Question: "A CDN that can only hold a quarter of the pictures will…", Options: []string{"Cut the bill to almost nothing, as the CDN is free", "Cut it somewhat: popular pictures hit, the rest still pay", "Make no difference, since a quarter is too few"}, Answer: 1,
 			Explain: "Views are skewed, so a small cache catches the popular ones, but every miss still downloads from the store and pays for it."}},
-		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN {{cache-hit-rate|sized to the popular set}} turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest.",
+		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN {{cache-hit-rate|sized to the popular set}} turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest. Data transfer has a cost, so {{distributed-system-pitfalls|transport is not free}}.",
 	})
 
 	// Video uploads of 10 MB at 6 a second need 480 Mbit/s on every hop: the link to the store is sized for far less
@@ -138,7 +138,7 @@ func registerResourceLimits() {
 		Answer: "The answer: select the connection from the app server to the video store and raise its bandwidth above what the peak needs (1,000 Mbit/s leaves room).",
 		Predictions: []Prediction{{ID: "p1", Question: "More app-server threads will…", Options: []string{"Fix it, since more uploads then run in parallel", "Not help: they all share the same saturated link", "Lower the bandwidth each upload needs, as work is shared"}, Answer: 1,
 			Explain: "Parallel uploads still squeeze through one link. When a link is the limit, adding workers only adds more bytes waiting for it."}},
-		Debrief: "Bandwidth is a capacity like any other: {{throughput|bytes per second in must be less than the link can carry}}. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones.",
+		Debrief: "Bandwidth is a capacity like any other: {{throughput|bytes per second in must be less than the link can carry}}. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones. {{distributed-system-pitfalls|Bandwidth is finite}}.",
 	})
 
 	// GC storm: long stop-the-world pauses on every app server. Config only: tune the pauses, do not paper over them.

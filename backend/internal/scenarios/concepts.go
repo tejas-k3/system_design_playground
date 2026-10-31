@@ -9,6 +9,7 @@ var Concepts = []string{
 // conceptTags says which concepts each challenge exercises, most central first.
 var conceptTags = map[string][]string{
 	"hello-world":            {"capacity"},
+	"stale-dns":              {"failure-handling"},
 	"opening-night":          {"capacity"},
 	"slow-reads":             {"caching"},
 	"connection-crunch":      {"capacity", "overload-control"},

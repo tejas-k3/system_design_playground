@@ -52,6 +52,10 @@ func alt(label string, pass bool, success, p95, cost float64, why string, cs ...
 // The numbers are what the engine measured when they were written; TestAlternativesMatchTheEngine runs every one
 // again, so they cannot drift from the simulator.
 var alternatives = map[string][]Alternative{
+	"stale-dns": {
+		alt("Shorten TTL to 5 seconds", true, 94.3, 143, 5.59, "Traffic finds the live server sooner, at the cost of more lookups.", Change{"users", "dnsTtlSec", 5.0}),
+		alt("Give the survivor more threads", false, 68.9, 143, 5.58, "Extra capacity cannot help requests that still use the failed address.", Change{"app2", "threads", 128.0}),
+	},
 	"gc-storm": {
 		alt("Let clients retry twice", false, 99.1, 1013, 1.07, "Retries reach a healthy server, so nearly everything succeeds, but each rescued request has already waited out its timeout: the tail is a second.", Change{"users", "retries", 2.0}),
 		alt("Give each server 32 threads", false, 91.6, 167, 2.62, "More threads do nothing for a server that is frozen, and they cost more.", Change{"app1", "threads", 32.0}, Change{"app2", "threads", 32.0}, Change{"app3", "threads", 32.0}),
