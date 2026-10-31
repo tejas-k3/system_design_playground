@@ -63,3 +63,11 @@ describe('eventMarks', () => {
     expect(eventMarks([ev(5, 'crash')], { t0: 5, t1: 5, left: 0, width: 100 })).toEqual([])
   })
 })
+
+describe('leader election events', () => {
+  it('names the term of a new leader and the loss of a leader', () => {
+    expect(eventLabel(ev(16, 'elected', 'Database', { lost: 3 }))).toBe('Database: a new leader was elected for term 3')
+    expect(eventLabel(ev(15, 'noLeader'))).toBe('Database has no leader')
+    expect(eventGlyph('elected')).toBe('L')
+  })
+})
