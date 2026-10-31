@@ -584,7 +584,7 @@ func registerScaleOut() {
 			"A saga only helps if its undo calls succeed. The undo of the charge goes through the same flaky processor. What would you do when a refund fails?",
 			"A failed refund can be tried again, since it can be made safe to repeat. The saga has a setting for how many times it tries an undo again.",
 		},
-		Answer: "The answer: have the saga try a failed undo again a few times (the retries for compensation). Each retry has the same chance of success, so a few retries make a stuck order rare; the undo must be safe to repeat, or a retry could refund twice.",
+		Answer: "The answer: have the saga try a failed undo again a few times (the setting for how many times it tries an undo again). Each retry has the same chance of success, so a few retries make a stuck order rare; a real undo must also be safe to repeat, which this simulation assumes.",
 		Predictions: []Prediction{{ID: "p1", Question: "A refund is declined one time in four. With three retries, about how many refunds still fail?", Options: []string{"About one in two hundred and fifty", "About one in eight, give or take", "About one in four, same as before"}, Answer: 0,
 			Explain: "All four tries must fail: a quarter to the fourth power is about 1 in 256, if failures are independent."}},
 		Debrief: "A saga moves the problem from the transaction to the undo, which can fail like any step. Make each compensation {{idempotency|idempotent}} so it can be retried safely, retry it with a limit, and send what still fails to a queue a person works through. Count the orders that end up stuck, because that is the real size of the problem.",

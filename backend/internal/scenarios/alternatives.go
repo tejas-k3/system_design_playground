@@ -193,7 +193,7 @@ var alternatives = map[string][]Alternative{
 	},
 	"failing-refund": {
 		alt("Try a failed refund once more", false, 60.1, 321, 1.00, "Down from 59 stuck orders to 9, but a refund that fails twice in a row (one time in sixteen) still strands an order: 9 against a limit of 3.", Change{"app", "compensationRetries", 1.0}),
-		alt("Try a failed refund twice more", false, 62.8, 328, 1.00, "5 stuck orders: each retry cuts the chance by a factor of four, but three tries all failing still happens once in 64 refunds.", Change{"app", "compensationRetries", 2.0}),
+		alt("Try a failed refund twice more", true, 59.1, 321, 1.00, "It passes on this seed with 2 stuck orders, but the margin is thin: three tries all failing still happens once in 64 refunds, and other seeds show 4 stuck. The reference tries five times.", Change{"app", "compensationRetries", 2.0}),
 		alt("Skip the undo and run the steps naively", false, 62.1, 328, 1.00, "No undo can fail because none is tried, but 661 orders are left half done: a charge with nothing to show for it.", Change{"app", "workflow", "naive"}),
 		alt("Use two-phase commit", false, 36.3, 517, 1.00, "Nothing is undone by hand, but a failed vote still has to release what the others held, and those calls fail too: 68 stuck, a p95 over budget and a success rate of 36%.", Change{"app", "workflow", "twoPhase"}),
 	},

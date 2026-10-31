@@ -91,3 +91,22 @@ func TestRetryingAFailedCompensationLeavesFewerOrdersStuck(t *testing.T) {
 		t.Errorf("a refund declined 30%% of the time strands orders unless it is tried again: %d against %d", none.Stuck, three.Stuck)
 	}
 }
+
+func TestUndoRetriesBelongToSagasOnly(t *testing.T) {
+	run := func(mode string, retries float64) int {
+		b := &builder{}
+		b.node("u", KClient, Params{"rps": 50.0, "readPct": 0.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0})
+		b.node("a", KAppServer, Params{"threads": 64.0, "queueCap": 2000.0, "dbPool": 100.0, "workflow": mode, "compensationRetries": retries})
+		b.node("stock", KDatabase, Params{"connections": 32.0, "writeMs": 10.0})
+		b.node("pay", KExternalAPI, Params{"latencyMs": 40.0, "errorPct": 30.0})
+		b.node("ship", KExternalAPI, Params{"latencyMs": 30.0, "errorPct": 20.0})
+		b.edge("u", "a").edge("a", "stock").edge("a", "pay").edge("a", "ship")
+		d, _ := Sanitize(b.d)
+		s := New(d, Options{Seed: 22})
+		s.Advance(30000)
+		return s.RunSnapshot().Stuck
+	}
+	if a, b := run("twoPhase", 0), run("twoPhase", 5); a != b {
+		t.Errorf("two-phase commit does not retry its releases: %d against %d", a, b)
+	}
+}

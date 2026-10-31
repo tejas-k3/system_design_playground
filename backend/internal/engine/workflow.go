@@ -1,5 +1,7 @@
 package engine
 
+import "math"
+
 // A write that takes several steps in several services (reserve stock, charge the card, book shipping). If a step
 // fails after earlier ones succeeded, the earlier work either stays (naive: the order is left half done) or is undone
 // by a compensating call to each of those services, newest first (a saga). A compensation that itself fails leaves
@@ -164,14 +166,22 @@ func (s *Sim) compensate(n *node, c *call, steps []*edge, i int, stuck bool, the
 	})
 }
 
-// undoStep calls the undo of step i, and when it fails tries again after a short pause, up to compensationRetries times.
+// undoStep calls the undo of step i, and when it fails (in a saga) tries again after a pause of 50 ms that doubles each
+// time, up to compensationRetries times.
 func (s *Sim) undoStep(n *node, c *call, steps []*edge, i, tries int, then func(ok bool)) {
+	ep := n.epoch
 	s.callCmd(n, steps[i], c, stepCmd(steps[i]), 0, func(res Result) {
-		if res.OK || tries >= int(n.f("compensationRetries")) {
+		if res.OK || n.s("workflow") != "saga" || tries >= int(n.f("compensationRetries")) {
 			then(res.OK)
 			return
 		}
-		s.after(50, func() { s.undoStep(n, c, steps, i, tries+1, then) })
+		s.after(50*math.Pow(2, float64(tries)), func() { // a pause that doubles with every try
+			if n.epoch != ep || n.removed {
+				then(false) // the server died while waiting: the request fails as node down
+				return
+			}
+			s.undoStep(n, c, steps, i, tries+1, then)
+		})
 	})
 }
 
