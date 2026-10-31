@@ -329,6 +329,11 @@ ul.templates button { display: grid; gap: 6px; text-align: left; width: 100%; pa
 .defend-results > div { padding: 8px; background: var(--panel); border-radius: 6px; }
 .defend-metrics { margin: 6px 0 0; padding-left: 18px; }
 .weak-points { display: grid; gap: 6px; margin: 10px 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.memo { display: grid; gap: 8px; margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.memo h3 { margin: 0; font-size: 1rem; }
+.memo-field { display: grid; gap: 2px; }
+.memo-field input { width: 100%; box-sizing: border-box; }
+.memo-evidence ul { margin: 4px 0 8px; padding-left: 18px; }
 .weak-points label { display: flex; align-items: flex-start; gap: 8px; }
 .level-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; } .welcome .level-switch { justify-content: center; }
 .card em.lvl { font-weight: 600; letter-spacing: .02em; color: var(--text, inherit); border: 1px solid var(--border, #888); border-radius: 4px; padding: 0 5px; align-self: flex-start; }
