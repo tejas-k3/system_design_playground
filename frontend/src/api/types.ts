@@ -160,6 +160,9 @@ export interface Goals {
   maxLostEvents?: number
   maxInconsistent?: number
   maxInDoubt?: number
+  maxBlockedSec?: number
+  maxRepeatedOutputs?: number
+  maxRecoverySec?: number
   maxLateDropped?: number
   maxStateKB?: number
   maxTTFTMs?: number
@@ -377,6 +380,8 @@ export interface RunStats {
   countErrorPct?: number // error of an approximate visitor count
   resultDelaySec?: number // seconds after a window ends before a stream job first emits it
   blockedSec?: number // lock-seconds those transactions held
+  repeatedOutputs?: number // stream outputs produced a second time after a crash
+  recoverySec?: number // longest time a stream job took to catch up after a crash
   stuck?: number // rolled back unsuccessfully
   eventsLost?: number // saved writes whose event never reached the queue
   rpoSec?: number // seconds of writes the last restore lost

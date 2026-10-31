@@ -117,3 +117,26 @@ func TestASketchFindsTheTopTenInFarLessMemory(t *testing.T) {
 		t.Errorf("less memory should cost recall: %v vs %v", tiny["topKRecall"], sk["topKRecall"])
 	}
 }
+
+// Message logging: the job writes every event to a log before it handles it, so after a crash it restores the last
+// checkpoint and replays the log, without producing the outputs again. Recovery is shorter, and checkpoints can be
+// rarer, at the price of one log write per event.
+func TestAMessageLogReplaysWithoutRepeatingOutputs(t *testing.T) {
+	_, cp := streamRun(Params{"windowSec": 2.0, "checkpointSec": 20.0}, true)
+	_, lg := streamRun(Params{"windowSec": 2.0, "checkpointSec": 20.0, "recovery": "messageLog"}, true)
+	t.Logf("checkpoint only: %.0f repeated outputs, recovered in %.2f s; message log: %.0f, %.2f s", cp["duplicateWindows"], cp["recoverySec"], lg["duplicateWindows"], lg["recoverySec"])
+	if cp["duplicateWindows"] == 0 || lg["duplicateWindows"] != 0 {
+		t.Errorf("only the log keeps the replay from repeating outputs: %v against %v", cp["duplicateWindows"], lg["duplicateWindows"])
+	}
+	if cp["recoverySec"] <= 0 || lg["recoverySec"] <= 0 || lg["recoverySec"] >= cp["recoverySec"] {
+		t.Errorf("replaying a log is quicker than reprocessing the input: %.2f against %.2f s", lg["recoverySec"], cp["recoverySec"])
+	}
+}
+
+func TestAMessageLogWritesEveryEventBeforeHandlingIt(t *testing.T) {
+	_, plain := streamRun(nil, false)
+	_, logged := streamRun(Params{"recovery": "messageLog"}, false)
+	if plain["loggedEvents"] != 0 || logged["loggedEvents"] < 5000 {
+		t.Errorf("a minute at 100 events a second is about 6,000 log writes: %v without a log, %v with", plain["loggedEvents"], logged["loggedEvents"])
+	}
+}

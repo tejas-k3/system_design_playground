@@ -26,6 +26,9 @@ type Goals struct {
 	MinDeliveriesPerMessage *float64 `json:"minDeliveriesPerMessage,omitempty"` // copies of each accepted message that were delivered (fan-out)
 	MinWorstTenant          *float64 `json:"minWorstTenant,omitempty"`          // the worst-served of the quiet tenants must still succeed at least this often
 	MaxInconsistent         *int     `json:"maxInconsistent,omitempty"`         // multi-step writes left half done
+	MaxBlockedSec           *float64 `json:"maxBlockedSec,omitempty"`           // lock-seconds held waiting for a crashed coordinator
+	MaxRepeatedOutputs      *int     `json:"maxRepeatedOutputs,omitempty"`      // stream outputs produced a second time after a crash
+	MaxRecoverySec          *float64 `json:"maxRecoverySec,omitempty"`          // longest time a stream job took to catch up after a crash
 	MaxInDoubt              *int     `json:"maxInDoubt,omitempty"`              // two-phase commits left waiting for a crashed coordinator
 	MaxTTFTMs               *float64 `json:"maxTTFTMs,omitempty"`               // time to first token (p95) of LLM answers
 	MinRecall               *float64 `json:"minRecall,omitempty"`               // recall of a vector search or crawl workload
@@ -261,6 +264,15 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxResultDelaySec != nil {
 		checks = append(checks, Check{"Wait for a window's first result", fmt.Sprintf("≤ %.0f s", *g.MaxResultDelaySec), fmt.Sprintf("%.0f s", run.ResultDelaySec), run.ResultDelaySec <= *g.MaxResultDelaySec+eps})
+	}
+	if g.MaxBlockedSec != nil {
+		checks = append(checks, Check{"Lock-seconds held for a dead coordinator", fmt.Sprintf("≤ %.1f s", *g.MaxBlockedSec), fmt.Sprintf("%.1f s", run.BlockedSec), run.BlockedSec <= *g.MaxBlockedSec+eps})
+	}
+	if g.MaxRepeatedOutputs != nil {
+		checks = append(checks, Check{"Outputs repeated after a crash", fmt.Sprintf("≤ %d", *g.MaxRepeatedOutputs), fmt.Sprint(run.RepeatedOutputs), run.RepeatedOutputs <= *g.MaxRepeatedOutputs})
+	}
+	if g.MaxRecoverySec != nil {
+		checks = append(checks, Check{"Time to catch up after a crash", fmt.Sprintf("≤ %.1f s", *g.MaxRecoverySec), fmt.Sprintf("%.2f s", run.RecoverySec), run.RecoverySec <= *g.MaxRecoverySec+eps})
 	}
 	if g.MaxInDoubt != nil {
 		checks = append(checks, Check{"Transactions waiting on a dead coordinator", fmt.Sprintf("≤ %d", *g.MaxInDoubt), fmt.Sprint(run.InDoubt), run.InDoubt <= *g.MaxInDoubt})

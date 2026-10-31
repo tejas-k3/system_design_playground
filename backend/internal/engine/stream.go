@@ -25,9 +25,14 @@ func (s *Sim) arriveStream(n *node, c *call, cb func(Result)) {
 	s.countVisitor(n, c.key)
 	s.trackTop(n, c.key)
 	if s.now-n.winCPAt >= n.f("checkpointSec")*1000 {
-		n.winCPAt, n.winCP = s.now, len(n.win.Emitted)
+		n.winCPAt, n.winCP, n.winEvCP = s.now, len(n.win.Emitted), 0
 	}
+	n.winEvCP++
 	ms := n.f("opMs")
+	if n.s("recovery") == "messageLog" {
+		n.winLogged++
+		ms += n.f("logMs") // each event is written to the log before it is handled
+	}
 	if n.s("delivery") == "exactlyOnce" {
 		ms += 2 // the output is committed together with the checkpoint
 	}
@@ -37,7 +42,18 @@ func (s *Sim) arriveStream(n *node, c *call, cb func(Result)) {
 // streamCrashed: the job restarts from its last checkpoint. With at-least-once delivery every window it had emitted
 // since then is emitted again; with exactly-once the sink never saw them.
 func (s *Sim) streamCrashed(n *node) {
-	if n.win == nil || n.s("delivery") == "exactlyOnce" {
+	if n.win == nil {
+		return
+	}
+	// It reloads the checkpoint (a second), then catches up on the events since: reprocessing them in full, or with a
+	// log replaying them without their side effects, so no output is produced twice.
+	perEvent, logged := n.f("opMs"), n.s("recovery") == "messageLog"
+	if logged {
+		perEvent = n.f("replayMs")
+	}
+	n.winRecSec = max(n.winRecSec, 1+float64(n.winEvCP)*perEvent/1000) // reported, not played out: the job is down only for the chaos event's downtime
+	n.winEvCP, n.winCPAt = 0, s.now
+	if logged || n.s("delivery") == "exactlyOnce" {
 		return
 	}
 	for _, e := range n.win.Emitted[n.winCP:] {
@@ -45,6 +61,25 @@ func (s *Sim) streamCrashed(n *node) {
 			n.winDup++
 		}
 	}
+}
+
+// streamRepeated and streamRecovery sum the outputs sent twice and take the slowest catch-up of all stream jobs.
+func (s *Sim) streamRepeated() (n int) {
+	for _, nd := range s.order {
+		if nd.kind == KStream && !nd.removed {
+			n += nd.winDup
+		}
+	}
+	return
+}
+
+func (s *Sim) streamRecovery() (sec float64) {
+	for _, nd := range s.order {
+		if nd.kind == KStream && !nd.removed {
+			sec = max(sec, nd.winRecSec)
+		}
+	}
+	return
 }
 
 // streamLate is the events every stream job has dropped for arriving after their window closed for good.
