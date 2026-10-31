@@ -131,19 +131,20 @@ const (
 	RNoQuorum
 	RStaleToken
 	RStaleDNS
+	RSignedOut
 	NumReasons
 )
 
 var reasonNames = [NumReasons]string{
 	"timeout", "queueFull", "nodeDown", "noRoute", "noBackend", "rateLimited",
 	"callTimeout", "circuitOpen", "dependencyError", "lockBusy", "queueTimeout", "connRefused",
-	"noPrimary", "syncReplica", "messageTooLarge", "connLost", "txAborted", "poisonJob", "badRelease", "bulkheadFull", "deadlinePassed", "shed", "quorum", "noQuorum", "staleToken", "staleDNS",
+	"noPrimary", "syncReplica", "messageTooLarge", "connLost", "txAborted", "poisonJob", "badRelease", "bulkheadFull", "deadlinePassed", "shed", "quorum", "noQuorum", "staleToken", "staleDNS", "signedOut",
 }
 
 var reasonLabels = [NumReasons]string{
 	"Timeouts", "Queue full (503)", "Node down", "No route", "No healthy backend", "Rate limited (429)",
 	"Call timeouts (504)", "Circuit open", "Vendor errors", "Lock busy", "Waited too long in queue", "DB connections refused",
-	"No primary: failing over", "Sync replica unreachable", "Message too large", "Connection lost", "Transaction aborted", "Poison job", "Bad release (5xx)", "Bulkhead full", "Deadline passed (skipped)", "Shed (load too high)", "Not enough copies for a quorum", "No leader (election or lost quorum)", "Stale lock token (fenced out)", "Stale DNS record",
+	"No primary: failing over", "Sync replica unreachable", "Message too large", "Connection lost", "Transaction aborted", "Poison job", "Bad release (5xx)", "Bulkhead full", "Deadline passed (skipped)", "Shed (load too high)", "Not enough copies for a quorum", "No leader (election or lost quorum)", "Stale lock token (fenced out)", "Stale DNS record", "Signed out (session not found)",
 }
 
 // ReasonInfo names a failure reason for clients: a stable id and a human label.

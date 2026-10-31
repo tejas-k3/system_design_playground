@@ -268,3 +268,11 @@ describe('requests let through unchecked goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Requests let through unchecked').state).toBe('pass')
   })
 })
+
+describe('signed out by a lost session goal', () => {
+  it('counts requests refused because the session was gone', () => {
+    const g = { minSuccessRate: 0.5, maxReauth: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, reauth: 150 }), 1, true), 'Users signed out by a lost session')).toMatchObject({ actual: '150', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Users signed out by a lost session').state).toBe('pass')
+  })
+})

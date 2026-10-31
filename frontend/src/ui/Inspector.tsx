@@ -84,6 +84,8 @@ function Overview({ count }: { count: number }) {
             {(run.hottestKeyShare ?? 0) >= 0.05 && (<><dt>Busiest item's share</dt><dd>{(run.hottestKeyShare! * 100).toFixed(0)}% of requests</dd></>)}
             {(run.hedged ?? 0) > 0 && (<><dt>Hedged queries</dt><dd>{run.hedged!.toLocaleString()}</dd></>)}
             {(run.dnsLookups ?? 0) > 0 && (<><dt>DNS lookups</dt><dd>{run.dnsLookups!.toLocaleString()}</dd></>)}
+            {(run.sessionsLost ?? 0) > 0 && (<><dt>Login sessions lost</dt><dd className="bad">{run.sessionsLost!.toLocaleString()}</dd></>)}
+            {(run.reauth ?? 0) > 0 && (<><dt>Signed out and refused</dt><dd className="bad">{run.reauth!.toLocaleString()}</dd></>)}
             {(run.authCalls ?? 0) > 0 && (<><dt>Auth service checks</dt><dd>{run.authCalls!.toLocaleString()}{(run.authCached ?? 0) > 0 ? ` (${run.authCached!.toLocaleString()} answered from memory)` : ''}</dd></>)}
             {(run.unchecked ?? 0) > 0 && (<><dt>Let through unchecked</dt><dd className="bad">{run.unchecked!.toLocaleString()}</dd></>)}
             {(run.repeatedOutputs ?? 0) > 0 && (<><dt>Outputs repeated after a crash</dt><dd className="bad">{run.repeatedOutputs!.toLocaleString()}</dd></>)}

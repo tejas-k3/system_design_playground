@@ -146,6 +146,11 @@ var alternatives = map[string][]Alternative{
 		alt("Remember a valid token for only 5 seconds", false, 86.7, 171, 1.05, "Most checks are saved, but a token expires in the middle of the outage and its user is refused: 86.7% against 97%.", Change{"app", "tokenCacheSec", 5.0}),
 		alt("Verify the signature on the app server", true, 100.0, 134, 1.05, "It passes: there is no call to wait for and nothing to go down. The price is not in the goals: a revoked token is accepted until it expires, because no server asks anyone.", Change{"app", "authMode", "localSignature"}),
 	},
+	"where-do-sessions-live": {
+		alt("Make the balancer sticky", false, 94.8, 146, 0.87, "Users stay on the server that signed them in, so the cross-server sign-outs stop, but the 150 sessions on the server that restarted are gone: 150 users are signed out against a limit of 0.", Change{"lb", "sticky", true}),
+		alt("Keep sessions in the store, but only for 5 seconds when idle", false, 80.3, 154, 0.87, "Any server finds the session, but a user who pauses for five seconds finds it gone: 725 sign-outs. Soft state is only as long-lived as its timer.", Change{"app1", "sessionState", "shared"}, Change{"app2", "sessionState", "shared"}, Change{"app1", "sessionTtlSec", 5.0}, Change{"app2", "sessionTtlSec", 5.0}),
+		alt("Make the servers stateless", true, 98.5, 146, 0.87, "It passes: nothing is kept on any server, so nothing is lost. A real system still has to keep the login somewhere, in a token the user carries or in a store; this run does not charge for that.", Change{"app1", "sessionState", "none"}, Change{"app2", "sessionState", "none"}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),
