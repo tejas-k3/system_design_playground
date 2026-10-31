@@ -8,12 +8,12 @@ package engine
 // sessionGate looks up the request's session, then lets it continue or refuses it.
 func (s *Sim) sessionGate(n *node, c *call, then func(Result)) {
 	mode := n.s("sessionState")
-	if (mode != "local" && mode != "shared") || c.user == 0 {
+	if !n.keepsLoginSessions() || c.user == 0 {
 		then(Result{OK: true, Ver: -1, Done: true, Src: n})
 		return
 	}
 	if mode == "local" {
-		s.sessionLookup(n, &n.sessStore, c, then)
+		s.sessionLookup(n, &n.loginStore, c, then)
 		return
 	}
 	re := s.first(n, KRedis)
@@ -26,7 +26,7 @@ func (s *Sim) sessionGate(n *node, c *call, then func(Result)) {
 			then(res)
 			return
 		}
-		s.sessionLookup(n, &re.to.sessStore, c, then)
+		s.sessionLookup(n, &re.to.loginStore, c, then)
 	})
 }
 
@@ -45,44 +45,46 @@ func (s *Sim) sessionLookup(n *node, store *map[int]float64, c *call, then func(
 		return
 	}
 	if held { // idle for too long: it expired
-		s.runSessLost++
+		s.runLoginsLost++
 	}
 	if ttl > 0 {
 		m[c.user] = s.now + ttl
 	} else {
 		m[c.user] = 0
 	}
-	if s.sessSeen == nil {
-		s.sessSeen = map[int]struct{}{}
+	if s.loginSeen == nil {
+		s.loginSeen = map[int]struct{}{}
 	}
-	if _, known := s.sessSeen[c.user]; known {
+	if _, known := s.loginSeen[c.user]; known {
 		if c.counted {
-			s.runReauth++
+			s.runLoginRefused++
 		}
 		then(fail(RSignedOut))
 		return
 	}
-	s.sessSeen[c.user] = struct{}{}
-	s.after(s.service(n, n.f("loginMs"))*n.slow, func() { then(Result{OK: true, Ver: -1, Done: true, Src: n}) })
+	s.loginSeen[c.user] = struct{}{}
+	ep := n.epoch
+	s.after(s.service(n, n.f("loginMs"))*n.slow, func() {
+		if n.epoch != ep || n.removed {
+			then(fail(RNodeDown)) // crashed while signing the user in: do not start downstream work
+			return
+		}
+		then(Result{OK: true, Ver: -1, Done: true, Src: n})
+	})
 }
 
 // dropLoginSessions forgets the sessions a crashed app server or Redis held in memory.
 func (s *Sim) dropLoginSessions(n *node) {
-	s.runSessLost += len(n.sessStore)
-	n.sessStore = nil
+	for _, exp := range n.loginStore {
+		if exp == 0 || exp > s.now { // one that had already lapsed was counted when it did
+			s.runLoginsLost++
+		}
+	}
+	n.loginStore = nil
 }
 
-// stickyBackend sends a user to the backend they were sent to before, as long as it is still in rotation.
-func (s *Sim) stickyBackend(n *node, user int) *edge {
-	if e := n.stickyHome[user]; e != nil && !e.removed && !e.to.removed && !s.believedDown(n, e.to) && e.ejectTill <= s.now {
-		return e
-	}
-	e := s.pickBackend(n)
-	if e != nil {
-		if n.stickyHome == nil {
-			n.stickyHome = map[int]*edge{}
-		}
-		n.stickyHome[user] = e
-	}
-	return e
+// keepsLoginSessions is whether this app server looks up a login session for requests from users with an identity.
+func (n *node) keepsLoginSessions() bool {
+	m := n.s("sessionState")
+	return m == "local" || m == "shared"
 }

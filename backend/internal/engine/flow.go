@@ -281,7 +281,7 @@ func (s *Sim) resolveTarget(e *edge, c *call, cm cmd) (*node, float64, *edge) {
 }
 
 func cmdIsRedis(c cmd) bool {
-	return c == cmdLock || c == cmdUnlock || c == cmdGeo || c == cmdRank || c == cmdScore
+	return c == cmdLock || c == cmdUnlock || c == cmdGeo || c == cmdRank || c == cmdScore || c == cmdSession
 }
 
 // callCmd runs a command against edge e from node `from`, applying breaker, timeout and pooling.
@@ -291,7 +291,7 @@ func (s *Sim) callCmd(from *node, e *edge, c *call, cm cmd, ver int, cb func(Res
 	switch cm {
 	case cmdWrite, cmdCacheInv, cmdCacheSet, cmdScore, cmdEnqueue, cmdUnlock, cmdExternal, cmdPut:
 		cc.write = true
-	case cmdRead, cmdCacheGet, cmdGeo, cmdRank, cmdGet:
+	case cmdRead, cmdCacheGet, cmdGeo, cmdRank, cmdGet, cmdSession, cmdAuth:
 		cc.write = false
 	}
 	s.callDown(from, e, &cc, cm, cb)
@@ -1101,7 +1101,11 @@ func (s *Sim) believedDown(lb, t *node) bool {
 	return s.now-t.downAt >= wait
 }
 
-func (s *Sim) pickBackend(n *node) *edge {
+func (s *Sim) pickBackend(n *node) *edge { return s.pickBackendFor(n, 0) }
+
+// pickBackendFor chooses a backend for a request from this user (0 = unknown). A sticky balancer prefers the backend the
+// user was sent to before, when it is still among the candidates left by health, zone and canary rules.
+func (s *Sim) pickBackendFor(n *node, user int) *edge {
 	var cand []*edge
 	for _, e := range n.out {
 		if e.removed || e.to.removed || s.believedDown(n, e.to) || e.ejectTill > s.now {
@@ -1130,6 +1134,27 @@ func (s *Sim) pickBackend(n *node) *edge {
 			cand = s.canarySplit(n, cand, pct)
 		}
 	}
+	sticky := user != 0 && n.kind == KLoadBalancer && n.b("sticky")
+	if sticky {
+		if home := n.stickyHome[user]; home != nil {
+			for _, e := range cand {
+				if e == home {
+					return e
+				}
+			}
+		}
+	}
+	e := s.chooseFrom(n, cand)
+	if sticky {
+		if n.stickyHome == nil {
+			n.stickyHome = map[int]*edge{}
+		}
+		n.stickyHome[user] = e
+	}
+	return e
+}
+
+func (s *Sim) chooseFrom(n *node, cand []*edge) *edge {
 	alg := "roundRobin"
 	if n.kind == KLoadBalancer {
 		alg = n.s("algorithm")
@@ -1154,12 +1179,7 @@ func (s *Sim) pickBackend(n *node) *edge {
 func (s *Sim) procRoute(n *node, c *call, cb func(Result), release func()) {
 	s.hold(n, 0.2*n.slow, release, cb, func() {
 		release()
-		var e *edge
-		if n.b("sticky") && c.user != 0 {
-			e = s.stickyBackend(n, c.user)
-		} else {
-			e = s.pickBackend(n)
-		}
+		e := s.pickBackendFor(n, c.user)
 		if e == nil {
 			s.failAt(n, RNoBackend, cb)
 			return

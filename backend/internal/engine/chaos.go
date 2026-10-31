@@ -225,7 +225,7 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 	n.txl, n.txWaits = map[int]*txLock{}, map[int]int{} // a crash drops every lock
 	s.dropSessions(n)
 	n.authTokens = nil // remembered token answers live in memory
-	if n.kind == KAppServer || n.s("persistence") != "aof" {
+	if n.kind == KAppServer || (n.kind == KRedis && n.s("persistence") != "aof") {
 		s.dropLoginSessions(n) // a server's sessions, or a Redis without persistence, are memory only
 	}
 	s.failQueued(n, RNodeDown)

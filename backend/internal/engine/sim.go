@@ -145,7 +145,7 @@ type node struct {
 	reshards        int
 	sessConns       int // long-lived connections held open (sessions arrival)
 	sessions        map[*session]bool
-	sessStore       map[int]float64 // app server (local) or Redis (shared): when each user's login session runs out (0 = never)
+	loginStore      map[int]float64 // app server (local) or Redis (shared): when each user's login session runs out (0 = never)
 	stickyHome      map[int]*edge   // load balancer: the backend each user was sent to
 	authTokens      map[int]float64 // app server: when each user's remembered token answer runs out
 	id, kind, label string
@@ -331,8 +331,8 @@ type Sim struct {
 
 	runResolved, runOK, runFailed, runPending int
 	runDNSLookups                             int
-	runSessLost, runReauth                    int              // login sessions destroyed (crash or expiry); requests that found their user signed out
-	sessSeen                                  map[int]struct{} // users who have ever signed in
+	runLoginsLost, runLoginRefused            int              // login sessions destroyed (crash or expiry); requests that found their user signed out
+	loginSeen                                 map[int]struct{} // users who have ever signed in
 	runAuthCalls, runAuthCached, runUnchecked int              // requests that asked the auth service, were answered from memory, or were let through unchecked
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int

@@ -142,7 +142,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		}
 		ae := s.first(n, KAuth)
 		asks := ae != nil && n.s("authMode") == "service"
-		signedIn := cc.user != 0 && (n.s("sessionState") == "local" || n.s("sessionState") == "shared")
+		signedIn := cc.user != 0 && n.keepsLoginSessions()
 		if !asks && !signedIn { // the common case: nothing to check, and no closure to allocate
 			s.proceed(n, &cc, run, done)
 			return
