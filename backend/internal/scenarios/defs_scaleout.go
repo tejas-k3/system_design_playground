@@ -491,4 +491,70 @@ func registerScaleOut() {
 			Explain: "A function stops after its idle time, so a request after a longer gap pays the start-up; steady traffic keeps it warm."}},
 		Debrief: "A function that {{autoscaling|scales to zero}} trades cost for latency: it costs nothing while idle, and the first request after an idle spell waits for it to start. Steady traffic keeps it warm; sparse traffic meets a cold start almost every time. The levers are the idle time, a smaller and quicker image, and paying for an instance that stays warm. A container starts in seconds, a virtual machine in tens of seconds, which is why functions run in containers.",
 	})
+
+	// The ranked feed: a model scores thousands of candidate posts for every read
+	rankedFeed := func(fixed bool) engine.Diagram {
+		cand := 5000.0
+		if fixed {
+			cand = 300
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 95.0, "keySpace": 5000.0, "keyDist": "uniform", "timeoutMs": 1500.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 8.0, "cpuMs": 10.0, "queueCap": 100.0, "ranking": true, "rankCandidates": cand, "rankUsPerCandidate": 100.0}).label("app", "Feed service").
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "readMs": 3.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "ranked-feed", Title: "The feed that thinks too long", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Ranking 5,000 posts for every read leaves the feed service far behind.",
+		Story:   "A feed is ranked before it is shown: for every read the service scores 5,000 candidate posts with a model, 0.1 ms each, so a read costs half a second of work and the service has eight {{thread-pool|threads}}. Forty reads a second arrive and most time out. Product wants the feed ranked, so the model stays. Keep at least 97% of reads answered, within 250 ms at the 95th percentile, and the bill under $0.70 an hour.",
+		Diagram: rankedFeed(false), Solution: rankedFeed(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(250), MaxCostPerHour: f(0.7), StarP95Ms: f(200), StarCostPerHour: f(0.6)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the feed service's busy level and a single request's time: where does a read spend it?",
+			"The model's cost grows with the number of candidates it scores, and a hundred times as many candidates is a hundred times the work. Does it need to score 5,000 posts to find the best few?",
+			"A cheap first step can narrow thousands of posts to a few hundred before the model scores them. Which setting says how many candidates the model sees?",
+		},
+		Answer: "The answer: let a cheap retrieval step cut the candidates to a few hundred (the candidates scored per read) and rank only those. Adding threads buys capacity at a higher bill and leaves every read slow.",
+		Predictions: []Prediction{{ID: "p1", Question: "Scoring ten times as many candidates costs…", Options: []string{"About ten times the model time per read", "About the same, since the model is fast", "About the square root of ten times as much"}, Answer: 0,
+			Explain: "Each candidate is scored once, so the work grows in step with the number of candidates."}},
+		Debrief: "A ranking stage multiplies the cost of a read by the number of candidates it scores. Production feeds work in stages: a cheap candidate generator narrows millions of posts to hundreds, and the expensive model ranks only those. The number of candidates trades quality of choice against latency and cost, so choose it from the latency budget.",
+	})
+
+	// The chat that arrives out of order: messages of one conversation spread over several consumers
+	chatOrder := func(fixed bool) engine.Diagram {
+		by := "roundRobin"
+		if fixed {
+			by = "key"
+		}
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 60.0, "readPct": 0.0, "keySpace": 50.0, "keyDist": "uniform", "timeoutMs": 3000.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0}).
+			n("log", engine.KLog, cols[2], rowMid, P{"partitions": 4.0, "partitionBy": by, "capacity": 50000.0}).label("log", "Message log").
+			n("db", engine.KDatabase, cols[4], rowMid, nil).label("db", "Message store").
+			e("users", "app").e("app", "log")
+		for k := 0; k < 4; k++ {
+			id := fmt.Sprintf("c%d", k+1)
+			b.n(id, engine.KWorker, cols[3], float64(k)*70, P{"concurrency": 1.0, "processMs": 40.0}).label(id, fmt.Sprintf("Delivery %d", k+1)).e("log", id).e(id, "db")
+		}
+		return b.done()
+	}
+	register(&Scenario{
+		ID: "chat-order", Title: "Messages out of order", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Replies show up before the question they answer.",
+		Story:   "A chat service puts every message on a {{sharding|partitioned}} log read by four delivery workers. Each conversation is a key. Messages are spread evenly over the partitions, so two messages of one conversation are often delivered by different workers at the same moment, and the later one sometimes overtakes the earlier. Users see replies before the question. No more than five messages in a run may be handled out of order, and all must still be delivered.",
+		Diagram: chatOrder(false), Solution: chatOrder(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxOrderViolations: i(5), MinJobsCompleted: f(0.97), MaxCostPerHour: f(0.8), StarCostPerHour: f(0.7)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Open the log's counters: how many messages were handled after a newer message of the same conversation?",
+			"A partition is read by one worker in order. If the messages of one conversation are spread over all partitions, which workers handle them?",
+			"The log's partitioning setting decides where a message goes. Which choice keeps all messages of one key in the same place?",
+		},
+		Answer: "The answer: partition the log by key (the conversation). All messages of one conversation then go to one partition and one worker, in order. The price is that one very busy conversation cannot be spread over several workers.",
+		Predictions: []Prediction{{ID: "p1", Question: "Messages are spread evenly over four partitions. What does that do to ordering within one conversation?", Options: []string{"It is lost, since different workers handle them at once", "It is kept, since each partition is ordered", "It is kept, if there are enough workers"}, Answer: 0,
+			Explain: "A partition is ordered on its own. Messages of one conversation in different partitions are handled by different workers, in no particular order."}},
+		Debrief: "A log orders messages within a partition, not across partitions. To keep a conversation in order, send all its messages to the same partition by key. That caps how fast one key can be handled, because one worker reads its partition. A sequence number on each message lets the receiver detect and reorder what still arrives late.",
+	})
 }

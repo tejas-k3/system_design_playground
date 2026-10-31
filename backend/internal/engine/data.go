@@ -120,7 +120,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		s.after(s.service(n, n.f("handshakeMs"))*n.slow, func() { done(Result{OK: true, Ver: -1, Done: true, Src: n}) })
 		return
 	}
-	cpu := s.service(n, n.f("cpuMs")*s.classMult(c, n)+s.securityMs(n, c)) * n.slow
+	cpu := s.service(n, n.f("cpuMs")*s.classMult(c, n)+s.securityMs(n, c)+s.rankingMs(n, c)) * n.slow
 	cold := s.coldStartWait(n) // waiting for a function to start is not CPU work
 	n.cpuWork += cpu
 	if n.throttled {

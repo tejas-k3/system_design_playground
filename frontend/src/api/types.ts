@@ -164,6 +164,7 @@ export interface Goals {
   maxReauth?: number
   maxClockLost?: number
   maxWrongAnswers?: number
+  maxOrderViolations?: number
   maxBlockedSec?: number
   maxRepeatedOutputs?: number
   maxRecoverySec?: number
