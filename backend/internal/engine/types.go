@@ -24,6 +24,7 @@ const (
 	KStream       = "stream"
 	KLLMServer    = "llmServer"
 	KVectorStore  = "vectorStore"
+	KAuth         = "authService"
 )
 
 // Params holds user-editable settings: numbers, strings (select) and booleans.

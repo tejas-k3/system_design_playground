@@ -55,6 +55,33 @@ func Lint(d Diagram) []Finding {
 			add("spof-database", "warn", "The only copy of the data lives on one database: if it crashes, every request that needs it fails.", "Add a read replica and set the database to promote it on failure.", id)
 		}
 	}
+	var noAuth, askEvery, failOpen []string
+	for _, id := range apps {
+		if ps(res[id], "authMode") != "service" {
+			continue
+		}
+		connected := false
+		for _, e := range d.Edges {
+			connected = connected || (e.From == id && kind[e.To] == KAuth)
+		}
+		switch {
+		case !connected:
+			noAuth = append(noAuth, id)
+		case ps(res[id], "authFailMode") == "open":
+			failOpen = append(failOpen, id)
+		case pf(res[id], "tokenCacheSec", 0) == 0:
+			askEvery = append(askEvery, id)
+		}
+	}
+	if len(noAuth) > 0 {
+		add("auth-not-connected", "warn", "These servers are set to ask an auth service, but none is connected, so no request is checked.", "Connect an Auth Service, or set the check to a local signature check.", noAuth...)
+	}
+	if len(askEvery) > 0 {
+		add("auth-on-every-request", "warn", "Every request waits for the auth service, which then limits the whole site and takes it down with it.", "Remember a valid token for a short time, or verify the signature on the server itself.", askEvery...)
+	}
+	if len(failOpen) > 0 {
+		add("auth-fails-open", "warn", "If the auth service fails, these servers let every request through unchecked.", "Accept that risk only on purpose; otherwise fail closed and keep the auth service available.", failOpen...)
+	}
 	var noTimeout, breaker []string
 	for _, id := range apps {
 		if out[id] == 0 {

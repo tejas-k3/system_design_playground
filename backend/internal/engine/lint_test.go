@@ -235,3 +235,34 @@ func TestLintWarnsWhenAGuaranteeCannotBeJudgedOnTheConnectedStore(t *testing.T) 
 		t.Error("with no store at all there is nothing to say about the guarantee")
 	}
 }
+
+func TestAuthLintFindsTheServiceOnEveryRequestAndAFailOpenPolicy(t *testing.T) {
+	d := func(app Params, withAuth bool) Diagram {
+		b := &builder{}
+		b.node("u", KClient, Params{})
+		b.node("a", KAppServer, app)
+		b.node("db", KDatabase, Params{})
+		b.edge("u", "a").edge("a", "db")
+		if withAuth {
+			b.node("auth", KAuth, Params{})
+			b.edge("a", "auth")
+		}
+		out, _ := Sanitize(b.d)
+		return out
+	}
+	if _, ok := rules(Lint(d(Params{"authMode": "service"}, false)))["auth-not-connected"]; !ok {
+		t.Errorf("a check with nothing to ask is flagged")
+	}
+	if _, ok := rules(Lint(d(Params{"authMode": "service"}, true)))["auth-on-every-request"]; !ok {
+		t.Errorf("asking on every request is flagged")
+	}
+	if _, ok := rules(Lint(d(Params{"authMode": "service", "tokenCacheSec": 30.0}, true)))["auth-on-every-request"]; ok {
+		t.Errorf("remembering tokens is not flagged")
+	}
+	if _, ok := rules(Lint(d(Params{"authMode": "service", "authFailMode": "open"}, true)))["auth-fails-open"]; !ok {
+		t.Errorf("failing open is flagged")
+	}
+	if len(rules(Lint(d(Params{}, false)))) > 0 && func() bool { _, a := rules(Lint(d(Params{}, false)))["auth-not-connected"]; return a }() {
+		t.Errorf("no check, no finding")
+	}
+}

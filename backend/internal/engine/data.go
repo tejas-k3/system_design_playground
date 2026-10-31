@@ -120,7 +120,7 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 		s.after(s.service(n, n.f("handshakeMs"))*n.slow, func() { done(Result{OK: true, Ver: -1, Done: true, Src: n}) })
 		return
 	}
-	cpu := s.service(n, n.f("cpuMs")*s.classMult(c, n)) * n.slow
+	cpu := s.service(n, n.f("cpuMs")*s.classMult(c, n)+s.securityMs(n, c)) * n.slow
 	n.cpuWork += cpu
 	if n.throttled {
 		cpu *= 100 / n.f("burstBaselinePct")
@@ -140,50 +140,66 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 				s.appRead(n, &cc, done)
 			}
 		}
-		if ve := s.first(n, KVectorStore); ve != nil { // retrieval first; the answer, if there is a model, is written from what it found
-			s.callCmd(n, ve, &cc, cmdRead, 0, func(res Result) {
+		if ae := s.first(n, KAuth); ae != nil && n.s("authMode") == "service" {
+			s.authenticate(n, ae, &cc, func(res Result) {
 				if !res.OK {
 					done(res)
 					return
 				}
-				if le := s.first(n, KLLMServer); le != nil {
-					s.callCmd(n, le, &cc, cmdEnqueue, 0, done)
-					return
-				}
-				done(res)
+				s.proceed(n, &cc, run, done)
 			})
 			return
 		}
-		if le := s.first(n, KLLMServer); le != nil { // the answer is written by the LLM server
-			s.callCmd(n, le, &cc, cmdEnqueue, 0, done)
-			return
-		}
-		// claim check: a write with a body goes to the object store first; from then on only a pointer travels
-		if oe := s.first(n, KObjectStore); oe != nil && cc.write && cc.lg != nil && cc.lg.client.f("reqKB") > 0 {
-			s.callCmd(n, oe, &cc, cmdPut, 0, func(res Result) {
+		s.proceed(n, &cc, run, done)
+	})
+}
+
+// proceed is what a request does once the caller is known: retrieval and the model, a claim check, a call to an external
+// service, or the read or write itself.
+func (s *Sim) proceed(n *node, cc *call, run func(), done func(Result)) {
+	if ve := s.first(n, KVectorStore); ve != nil { // retrieval first; the answer, if there is a model, is written from what it found
+		s.callCmd(n, ve, cc, cmdRead, 0, func(res Result) {
+			if !res.OK {
+				done(res)
+				return
+			}
+			if le := s.first(n, KLLMServer); le != nil {
+				s.callCmd(n, le, cc, cmdEnqueue, 0, done)
+				return
+			}
+			done(res)
+		})
+		return
+	}
+	if le := s.first(n, KLLMServer); le != nil { // the answer is written by the LLM server
+		s.callCmd(n, le, cc, cmdEnqueue, 0, done)
+		return
+	}
+	// claim check: a write with a body goes to the object store first; from then on only a pointer travels
+	if oe := s.first(n, KObjectStore); oe != nil && cc.write && cc.lg != nil && cc.lg.client.f("reqKB") > 0 {
+		s.callCmd(n, oe, cc, cmdPut, 0, func(res Result) {
+			if !res.OK {
+				done(res)
+				return
+			}
+			cc.claim = true
+			run()
+		})
+		return
+	}
+	if ee := s.hostEdge(n, cc.key); ee != nil && !s.runsWorkflow(n) && (cc.write || ee.to.s("calledFor") == "all") {
+		s.politely(n, ee, func() {
+			s.callCmd(n, ee, cc, cmdExternal, 0, func(res Result) {
 				if !res.OK {
 					done(res)
 					return
 				}
-				cc.claim = true
 				run()
 			})
-			return
-		}
-		if ee := s.hostEdge(n, cc.key); ee != nil && !s.runsWorkflow(n) && (cc.write || ee.to.s("calledFor") == "all") {
-			s.politely(n, ee, func() {
-				s.callCmd(n, ee, &cc, cmdExternal, 0, func(res Result) {
-					if !res.OK {
-						done(res)
-						return
-					}
-					run()
-				})
-			})
-			return
-		}
-		run()
-	})
+		})
+		return
+	}
+	run()
 }
 
 // splitHotKey spreads the one hot item over several rows: a write goes to one of them, a read has to add all up.

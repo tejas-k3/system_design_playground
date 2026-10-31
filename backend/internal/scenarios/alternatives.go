@@ -140,6 +140,12 @@ var alternatives = map[string][]Alternative{
 		alt("Deliver exactly once", false, 96.4, 132, 0.90, "Nothing is repeated, but the job still reloads its save and handles the last twenty seconds again at full cost: 2.21 s to catch up against a limit of 1.5.", Change{"counter", "delivery", "exactlyOnce"}),
 		alt("Save every 5 seconds", false, 96.4, 129, 0.90, "Less work is left to redo, so the catch-up takes 1.28 s, but the windows emitted since the last save are still sent twice: 1 repeated output against a limit of 0.", Change{"counter", "checkpointSec", 5.0}),
 	},
+	"everyone-asks-auth": {
+		alt("Let requests through when the auth service fails", false, 25.0, 1311, 1.05, "The site stays up for the eight seconds, but 2,762 requests went through without any check, and the service is still overloaded the rest of the time, so most requests still time out.", Change{"app", "authFailMode", "open"}),
+		alt("Give the auth service 32 slots", false, 81.8, 171, 1.05, "It keeps up with the load, but while it is down every request still fails: 81.8% against 97%. Without the outage this would pass.", Change{"auth", "connections", 32.0}),
+		alt("Remember a valid token for only 5 seconds", false, 86.7, 171, 1.05, "Most checks are saved, but a token expires in the middle of the outage and its user is refused: 86.7% against 97%.", Change{"app", "tokenCacheSec", 5.0}),
+		alt("Verify the signature on the app server", true, 100.0, 134, 1.05, "It passes: there is no call to wait for and nothing to go down. The price is not in the goals: a revoked token is accepted until it expires, because no server asks anyone.", Change{"app", "authMode", "localSignature"}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),
