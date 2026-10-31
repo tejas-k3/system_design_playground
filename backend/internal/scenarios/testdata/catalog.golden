@@ -75,7 +75,7 @@ lease-expired f9db534e439db6226bbe40f456336db2ebcd4be8410fda299d97ec3f05116d41 s
 who-is-the-leader 838c0e580fb2ed7f92b2eac175a9a6e8be994e0029cd94ce6cf988804e15f404 start=false/0/0.6771/173.9 solution=true/3/0.9292/177.4
 launch-day 6234a2c45b9220751085eba879fd9fc0c833bfa081be46f88799ed649948f8f3 start=false/0/0.0000/0.0 solution=true/2/1.0000/184.6
 top-ten 02d56b98d10641e63939aa1fe5dedad670598982199aea9141683162485b0e7e start=false/0/1.0000/131.8 solution=true/3/1.0000/131.8
-effect-before-cause 529076d5f312cabcf2455dee8fe4aadf7bff99a812d6b45ab2a1dda3740d040c start=false/0/1.0000/160.7 solution=true/2/1.0000/212.0
+effect-before-cause 59fb3b2c01d950ea6efb2037657f01fdaa70c35498273dd1eb2bf842fc86bad5 start=false/0/1.0000/145.5 solution=true/2/1.0000/184.6
 the-gpu-budget 33800b668dad9f2957249f4d190a7d26dd21876b70e89998b8dc2add37c52813 start=false/0/1.0000/20155.1 solution=true/2/0.8829/2621.6
 heavy-tail 1f14018deaecc1030723cf03432e6404a4c896d66cf8e99b1a114a9f80f4326c start=false/0/1.0000/263.6 solution=true/2/1.0000/207.8
 payment-saga 433aec484821a57f473b778629cd5cef74c92c2aa75662a712c5caae191de3bd start=false/0/0.8519/321.3 solution=true/2/0.8503/327.8

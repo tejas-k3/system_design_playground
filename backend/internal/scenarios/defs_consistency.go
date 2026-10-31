@@ -297,26 +297,27 @@ func registerConsistencyAndStreams() {
 			r, w = 2, 2
 		}
 		return (&bld{}).
-			n("users", engine.KClient, cols[0], rowMid, P{"rps": 200.0, "readPct": 50.0, "keySpace": 20.0, "keyDist": "uniform", "consistency": "causalOrder", "timeoutMs": 3000.0, "retries": 0.0}).
+			n("authors", engine.KClient, cols[0], rowTop, P{"rps": 100.0, "readPct": 50.0, "keySpace": 20.0, "keyDist": "uniform", "consistency": "causalOrder", "timeoutMs": 3000.0, "retries": 0.0}).label("authors", "Authors").
+			n("readers", engine.KClient, cols[0], rowBot, P{"rps": 150.0, "readPct": 100.0, "keySpace": 20.0, "keyDist": "uniform", "consistency": "causalOrder", "timeoutMs": 3000.0, "retries": 0.0}).label("readers", "Readers").
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "dbPool": 200.0}).
 			n("kv", engine.KKVStore, cols[2], rowMid, P{"nodes": 5.0, "replicas": 3.0, "readQuorum": r, "writeQuorum": w, "readMs": 4.0, "writeMs": 60.0, "variability": "exponential", "concurrency": 32.0}).
-			e("users", "app").e("app", "kv").done()
+			e("authors", "app").e("readers", "app").e("app", "kv").done()
 	}
 	register(&Scenario{
 		ID: "effect-before-cause", Title: "The reply before the question", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Readers see a reply, then open the post it answers and find an older version.",
-		Story:   "A discussion app keeps posts and replies in a five-node key-value store with three copies of each item. A reply is written straight after its author has read the post it answers. Readers sometimes see the reply and then, when they open the post, an older version of it: the answer arrives before the question. Nothing fails, so nobody is told.",
+		Story:   "A discussion app keeps posts and replies in a five-node key-value store with three copies of each item. An author writes a reply straight after reading the post it answers. Readers then sometimes see the reply and, when they open the post it answers, an older version of it: the answer arrives before the question. Nothing fails, so nobody is told.",
 		Diagram: effectBeforeCause(false), Solution: effectBeforeCause(true),
-		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxSessionViolations: i(0), MaxP95Ms: f(260), MaxCostPerHour: f(1.6), StarP95Ms: f(190), StarCostPerHour: f(1.45)},
+		Goals:       engine.Goals{MinSuccessRate: 0.99, MaxSessionViolations: i(0), MaxP95Ms: f(220), MaxCostPerHour: f(1.6), StarP95Ms: f(160), StarCostPerHour: f(1.45)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
-			"The goals count reads that showed an older version of something after the same client had already seen a newer thing built on it. Where could an older copy come from?",
+			"The goals count reads that showed an older version of something after the reader had already seen a newer thing built on it. Where could an older copy come from?",
 			"With three copies, a write that one copy has acknowledged and a read answered by a different single copy need not meet: the read can reach a copy the write has not got to yet.",
 			"Which settings decide how many copies a read and a write must touch? Does changing only one of them make every read meet every write?",
 		},
 		Answer: "The answer: make reads and writes overlap, with a read quorum of 2 and a write quorum of 2 over three copies, so a read always meets the newest acknowledged write. Read repair helps (it brings a stale copy up to date when it is read, and removes most violations without a second copy's wait) but it does not reach zero, because the first read after a write can still hit a stale copy.",
 		Predictions: []Prediction{{ID: "p1", Question: "Raising only the read quorum to 2, and leaving writes at 1, will…", Options: []string{"Remove every violation, because a read now sees two copies", "Cut them sharply but not to zero, because a write may still sit on one copy", "Change nothing, because only the write quorum matters"}, Answer: 1,
-			Explain: "A read of two copies and a write on one copy can still miss each other when the write is on the third copy: 2 + 1 is not more than 3. Here it left 7 to 13 violations a run, down from about 60."}},
+			Explain: "A read of two copies and a write on one copy can still miss each other when the write is on the third copy: 2 + 1 is not more than 3. Here it left 11 to 25 violations a run, down from about 90."}},
 		Debrief: "A cause must never be shown older than an effect built on it. When a read and a write each touch only some of the copies, they can miss each other, so a reader can see a reply and then an older post. {{quorum|Overlapping quorums}} (R + W > N) make every read meet the latest acknowledged write. Read repair helps without a second copy's wait, but only after a read has found the copy behind.",
 		Deeper:  "Causal consistency says that if one write was built on what its author had read, nobody should see the later write without that earlier state. A key-value store gets there by making sure a read meets the newest acknowledged write, which R + W > N does; raising only one of the two narrows the gap but does not close it, and writing to every copy pays for it on every write and stops working when one copy is down. {{read-your-writes|Read-your-writes}} and monotonic reads are weaker, per-client guarantees; causal order also covers what one client's write was built on, for every reader. Read repair fixes a copy only after a read has found it behind, so it removes most violations without a quorum's latency, but it does not guarantee that the first read after a write is right. An interviewer will ask how you would keep cause and effect together without a quorum on every read; the usual answer is to carry a version or a dependency with each write and have the reader wait or retry until it holds.",
 	})
