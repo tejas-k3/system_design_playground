@@ -187,7 +187,7 @@ var alternatives = map[string][]Alternative{
 	},
 	"who-is-online": {
 		alt("Give the database 64 connections", false, 56.4, 643, 3.32, "It barely helps: success only reaches 56% and p95 stays at 643 ms, at a higher bill. Paying for more of a durable store does not fix writes that never needed to be durable.", Change{"db", "connections", 64.0}),
-		alt("Heartbeat every 10 seconds instead of 5", true, 100.0, 124, 2.46, "It passes, and it is the cheapest: half the writes fit the database. The price is not in the bill: a user who leaves stays green for twice as long.", Change{"users", "rps", 750.0}),
+		alt("Heartbeat every 10 seconds instead of 5", true, 100.0, 124, 2.46, "It passes, and it is the cheapest: half the heartbeats (and half the reads) fit the database. The price is not in the bill: a user who leaves stays green for twice as long.", Change{"users", "rps", 750.0}),
 	},
 	"cold-start": {
 		alt("Keep one instance warm", false, 100.0, 129, 0.24, "There is no cold start any more, but the instance that never stops costs more than the whole budget of $0.20 an hour.", Change{"fn", "keepWarm", true}),

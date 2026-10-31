@@ -28,7 +28,7 @@ describe('runEvidence', () => {
     expect(lines.join('\n')).toContain('p95 of 180 ms')
     expect(lines.join('\n')).toContain('99.0% of requests succeeded')
     expect(lines.join('\n')).toContain('Orders left stuck: 4.')
-    expect(lines.join('\n')).toContain('Books: entries that do not balance: 7.')
+    expect(lines.join('\n')).toContain('Books: entries that do not balance (these include the half-done orders): 7.')
     expect(lines.join('\n')).toContain('Requests let through unchecked: 12.')
     expect(lines.join('\n')).not.toContain('dead coordinator')
     expect(lines.join('\n')).toContain('Most failures were Timeouts (30)')
