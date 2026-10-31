@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Finding, Score } from '../api/types'
-import { type Memo, loadMemo, memoText, onCallView, runEvidence, saveMemo } from '../model/memo'
+import { type Line, type Memo, loadMemo, memoText, onCallView, runEvidence, saveMemo } from '../model/memo'
 import { copyText } from '../sim/designs'
 
 const FIELDS: { key: keyof Memo; label: string; hint: string }[] = [
@@ -16,9 +16,9 @@ export function TradeOffMemo({ id, title, score, findings, seconds, minSuccessRa
   const [saved, setSaved] = useState(true)
   const evidence = runEvidence(score, seconds)
   const view = onCallView(score, findings, minSuccessRate)
-  const onCall = [
-    ...(view.alerts.length === 0 ? ['No design warnings would page anyone.'] : [`${view.alerts.length} design ${view.alerts.length === 1 ? 'warning' : 'warnings'} would raise an alert:`, ...view.alerts.map((a) => `  ${a}`)]),
-    view.budgetUsedPct === null ? 'The goal states no success target, so there is no error budget to spend.' : `The run used ${view.budgetUsedPct}% of the error budget the success goal allows.`,
+  const onCall: Line[] = [
+    ...(view.alerts.length === 0 ? [{ text: 'No design warnings would page anyone.' }] : [{ text: `${view.alerts.length} design ${view.alerts.length === 1 ? 'warning' : 'warnings'} would raise an alert:` }, ...view.alerts.map((a) => ({ text: a, sub: true }))]),
+    { text: view.budgetUsedPct === null ? 'The goal states no success target, so there is no error budget to spend.' : `The run used ${view.budgetUsedPct}% of the error budget the success goal allows.` },
   ]
   const change = (key: keyof Memo, value: string) => {
     const next = { ...memo, [key]: value }
@@ -43,7 +43,7 @@ export function TradeOffMemo({ id, title, score, findings, seconds, minSuccessRa
         <b>What the run showed</b>
         <ul>{evidence.map((e) => <li key={e}>{e}</li>)}</ul>
         <b>On call</b>
-        <ul>{onCall.map((e) => <li key={e} className={e.startsWith('  ') ? 'memo-sub' : undefined}>{e.trim()}</li>)}</ul>
+        <ul>{onCall.map((e, k) => <li key={k} className={e.sub ? 'memo-sub' : undefined}>{e.text}</li>)}</ul>
       </div>
       <div className="row-btns">
         <button onClick={() => void copy()}>Copy as text</button>
