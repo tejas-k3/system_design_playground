@@ -702,7 +702,7 @@ func registerScaleOut() {
 	register(&Scenario{
 		ID: "friends-of-friends", Title: "Friends of friends", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "\"People you may know\" reads 40,000 rows for every user.",
-		Story:   "The suggestions page lists the friends of a user's friends. A user has about 200 friends, so one hop touches 200 rows and two hops touch 40,000. The social graph lives in a relational database that joins them, and 120 users a second ask. Answer at least 97% of requests with a p95 under 400 ms.",
+		Story:   "The suggestions page lists the friends of a user's friends. A user has about 200 friends, so one hop touches 200 rows and two hops touch 40,000. The social graph lives in a relational database that joins them, and 120 users a second ask. Answer at least 97% of requests with a {{p95|p95}} under 400 ms.",
 		Diagram: friendsOfFriends(false), Solution: friendsOfFriends(true),
 		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(400), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.6)},
 		DurationSec: 30, WarmupSec: 5, Speed: 1,
