@@ -123,6 +123,18 @@ const ICONS: Record<string, Draw> = {
     })
     for (const x of [-8, 8]) stroke(c, () => c.arc(x, -9, 2, 0, Math.PI * 2))
   },
+  authService: (c) => {
+    // a key: a ring and a toothed shaft
+    stroke(c, () => c.arc(-5, 0, 5, 0, Math.PI * 2))
+    stroke(c, () => {
+      c.moveTo(0, 0)
+      c.lineTo(10, 0)
+      c.moveTo(6, 0)
+      c.lineTo(6, 4)
+      c.moveTo(10, 0)
+      c.lineTo(10, 4)
+    })
+  },
   objectStore: (c) => {
     // a bucket: a tapered tub with an elliptical rim
     stroke(c, () => {
