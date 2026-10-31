@@ -56,3 +56,12 @@ func TestTheCacheMessageGoalComparesWithTheMessagesSent(t *testing.T) {
 		t.Errorf("the check should name what it counts: %+v", c)
 	}
 }
+
+// A limit below a tenth of a percent must not print as zero: "≤ 0.0%" would say no stale read is allowed.
+func TestSmallPercentagesAreNotShownAsZero(t *testing.T) {
+	for in, want := range map[float64]string{0: "0.0%", 0.0005: "0.05%", 0.0002: "0.02%", 0.0009: "0.09%", 0.001: "0.1%", 0.02: "2.0%", 0.995: "99.5%", 1: "100.0%"} {
+		if got := pct(in); got != want {
+			t.Errorf("pct(%v) = %q, want %q", in, got, want)
+		}
+	}
+}
