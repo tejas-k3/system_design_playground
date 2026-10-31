@@ -56,7 +56,7 @@ one-slow-server ceed12fb13d2405d2172698edb07489175e54035a64094ed0a40ea279c0d8a89
 restore-window 0ca9207c98176f927cf47d3a8b2afe5ac188f59be06f58eb07578c17da8410b9 start=false/0/0.1796/167.2 solution=true/3/0.5894/167.2
 open-link-shortener e5c64a8665e2809e2f347b281a5070eacfcc810db5c8bbebfd719e6a09adafc1 start=false/0/0.0000/0.0 solution=true/1/0.9831/154.4
 open-notifications 2acd13552a43bf0821532efd9fb059bd7466d5d33fdd6cecfc0095bad70879e4 start=false/0/0.0000/0.0 solution=true/2/1.0000/131.8
-open-news-feed d2668922584add1c6acf405334cbeca52057760510e879f5d61a4751f2503f5a start=false/0/0.0000/0.0 solution=true/3/1.0000/207.8
+open-news-feed 4278a68dd37aeddde0c2b956243b646546543f8ee16a7a7e3ad8654b429aa41e start=false/0/0.0000/0.0 solution=true/3/1.0000/207.8
 open-nearby-search a1325a1e4033eaeb294b1f40d88a3d6f24b8409588896d2103efea303875beab start=false/0/0.0000/0.0 solution=true/2/1.0000/177.4
 open-chat 5ac09cea0dc77f7de11f51e27394fe7f5876e2b81cd32bd0f1b22c2407ca3150 start=false/0/0.0000/0.0 solution=true/1/0.9929/173.9
 vendor-wait cddad74793fd8396d7bcd92473cc067efad5c86956a460d5425ae933395ef118 start=false/0/0.0078/1986.9 solution=true/3/1.0000/145.5

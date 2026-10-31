@@ -89,7 +89,7 @@ func init() {
 		Diagram: open(P{"rps": 40.0, "readPct": 70.0, "workload": "feed", "keySpace": 5000.0, "followersMean": 50.0, "followersSkew": 1.2}), Solution: feed(),
 		Traffic: map[string][]engine.TrafficPoint{"users": {{0, 40}, {10, 40}, {20, 90}, {40, 90}, {50, 40}, {60, 40}}},
 		Chaos:   []engine.ChaosEvent{{Type: "slow", NodeID: "db", AtSec: 30, Factor: 3, DurationSec: 8}},
-		Goals:   engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(350), MaxCostPerHour: f(1.5)}, DurationSec: 60, WarmupSec: 5,
+		Goals:   engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(350), StarP95Ms: f(280), MaxCostPerHour: f(1.5)}, DurationSec: 60, WarmupSec: 5,
 		Hints: [3]string{
 			"Compare the work caused by a post with the work caused by a timeline read. Which depends on the author's audience size?",
 			"Pushing every post to every follower makes reads cheap, but a celebrity post can create a large write burst. Pulling everything reverses that cost.",
