@@ -174,8 +174,7 @@ var alternatives = map[string][]Alternative{
 		alt("Tell every node directly", true, 99.9, 137, 5.46, "It passes and is the quickest, about half a second. The node that notices sends 31 messages, and that grows with the cluster; gossip keeps each node's share the same.", Change{"kv", "failureDetection", "broadcast"}),
 	},
 	"front-door": {
-		alt("Give both app servers 64 threads", false, 48.0, 309, 5.61, "The servers were never the limit: the balancer still passes 1,200 requests a second, so 48% get through and the bill doubles.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}),
-		alt("Buy a bigger balancer (3,000 requests a second)", true, 100.0, 112, 2.71, "It passes: the balancer now keeps up and everything is still read at layer 7. It costs a little more than switching to layer 4, and loses the star for cost.", Change{"lb", "maxRps", 3000.0}),
+		alt("Give both app servers 64 threads", false, 48.0, 309, 5.66, "The servers were never the limit: the balancer still passes 1,200 requests a second, so 48% get through and the bill doubles.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}),
 	},
 	"cold-start": {
 		alt("Keep one instance warm", false, 100.0, 129, 0.24, "There is no cold start any more, but the instance that never stops costs more than the whole budget of $0.20 an hour.", Change{"fn", "keepWarm", true}),

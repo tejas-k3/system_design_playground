@@ -238,7 +238,8 @@ type node struct {
 	egressBytes float64   // object store: bytes served to downloads (billed)
 	osRequests  int       // object store: requests served (billed per 1,000)
 	lbFree      float64   // load balancer: when it can next take a request (maxRps)
-	coldLast    float64   // app server with a cold start: when it last took a request (0 = never)
+	coldUp      bool      // app server with a cold start: it has taken a request since it last started
+	coldLast    float64   // ... and when it last took one
 	coldWarmAt  float64   // ... and when its latest cold start is over
 	nicFree     float64   // network card limit (nicMbps): when its transmitter is next free
 	fillBytes   float64   // ranged cache or CDN: bytes fetched from the origin to fill missing pieces
@@ -558,11 +559,7 @@ func (s *Sim) tick() {
 		case n.kind == KRateLimiter:
 			n.util[i] = math.Min(1, float64(n.c.adm)/math.Max(1e-9, n.f("limitRps")*tickMs/1000))
 		case n.kind == KLoadBalancer && n.f("maxRps") > 0:
-			per := 1000 / n.f("maxRps")
-			if n.s("layer") == "layer4" {
-				per /= 4
-			}
-			n.util[i] = math.Min(1, float64(n.c.arr)*per/tickMs)
+			n.util[i] = math.Min(1, float64(n.c.arr)*lbServiceMs(n)/tickMs)
 		case n.kind == KClient || n.kind == KLoadBalancer || capN > 1e6:
 			n.util[i] = 0
 		default:

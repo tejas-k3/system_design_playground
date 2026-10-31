@@ -69,9 +69,9 @@ func (s *Sim) coldStartWait(n *node) float64 {
 	if cs <= 0 || n.b("keepWarm") {
 		return 0
 	}
-	if n.coldLast == 0 || s.now-n.coldLast > n.f("idleSec")*1000 {
+	if !n.coldUp || s.now-n.coldLast > n.f("idleSec")*1000 {
 		n.coldWarmAt = s.now + cs
 	}
-	n.coldLast = s.now
+	n.coldUp, n.coldLast = true, s.now
 	return math.Max(0, n.coldWarmAt-s.now)
 }

@@ -1182,11 +1182,7 @@ func (s *Sim) procRoute(n *node, c *call, cb func(Result), release func()) {
 		if n.s("layer") == "layer4" {
 			base = 0.05 // it forwards connections without reading the request
 		}
-		if rps := n.f("maxRps"); rps > 0 {
-			per := 1000 / rps
-			if n.s("layer") == "layer4" {
-				per /= 4
-			}
+		if per := lbServiceMs(n); per > 0 {
 			start := math.Max(s.now, n.lbFree)
 			if start-s.now > n.f("lbQueueMs") {
 				release()
@@ -1430,4 +1426,18 @@ func (s *Sim) admitTokens(n *node, c *call) bool {
 	}
 	n.tokTokens -= w
 	return true
+}
+
+// lbServiceMs is the time a balancer spends on each request at its throughput limit (0 = no limit): a layer-4 switch,
+// which reads no content, passes four times as many requests as a layer-7 one.
+func lbServiceMs(n *node) float64 {
+	rps := n.f("maxRps")
+	if rps <= 0 {
+		return 0
+	}
+	per := 1000 / rps
+	if n.s("layer") == "layer4" {
+		per /= 4
+	}
+	return per
 }

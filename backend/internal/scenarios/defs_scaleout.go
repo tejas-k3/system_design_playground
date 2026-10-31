@@ -449,7 +449,7 @@ func registerScaleOut() {
 		Summary: "Half the traffic is turned away at the balancer while the servers behind it sit idle.",
 		Story:   "All traffic enters through one load balancer that reads every request, which is what lets it route on content. Its {{throughput|throughput}} is about 1,200 requests a second. 2,500 arrive. Behind it two app servers could take 6,000 between them and are nearly idle, and the database is bored. Nothing here needs content-aware routing: every request goes to either server. Serve at least 97% of requests within the budget.",
 		Diagram: frontDoorFull(false), Solution: frontDoorFull(true),
-		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(300), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.7)},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(300), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.75)},
 		DurationSec: 30, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
 			"Open the bottleneck check or look at each component's busy level: what is full, and what is not?",
