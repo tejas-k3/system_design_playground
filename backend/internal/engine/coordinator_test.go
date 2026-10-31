@@ -164,7 +164,7 @@ func TestALeaderThatDoesNotNoticeAcknowledgesWritesThatAreLost(t *testing.T) {
 		t.Errorf("about 6 s of writes at 50 a second are acknowledged by the old leader and lost: %d", sr.LostWrites)
 	}
 	if qr.LostWrites > sr.LostWrites/20+1 || none.RunSnapshot().LostWrites != 0 {
-		t.Errorf("the loss is the time the old leader keeps answering: 0.2 s loses about a thirtieth as much: %d", qr.LostWrites)
+		t.Errorf("the loss is the time the old leader keeps answering: 0.2 s loses a small fraction of the 6 s case: %d", qr.LostWrites)
 	}
 	if now := cutLeaderRun(0).RunSnapshot(); now.LostWrites != 0 {
 		t.Errorf("a leader that steps down at once acknowledges nothing it cannot commit: %d", now.LostWrites)
@@ -180,5 +180,13 @@ func TestAnElectionRaisesTheTermAndIsCounted(t *testing.T) {
 	quiet := coordRun(nil, nil, 30).Snapshot().Nodes["zk"].Extra
 	if quiet["elections"] != 0 || quiet["term"] != 1 {
 		t.Errorf("no failure, no election: term %v, elections %v", quiet["term"], quiet["elections"])
+	}
+}
+
+func TestTheOldLeaderStopsAnsweringWhenTheCutEnds(t *testing.T) {
+	// a 30 s step-down cannot outlast a cut of 3 s: about 3 s of writes at 50 a second are lost, not 30 s
+	s := coordRun(Params{"stepDownSec": 30.0}, []ChaosEvent{{Type: "leaderCut", NodeID: "zk", AtSec: 5, DurationSec: 3}}, 30)
+	if lost := s.RunSnapshot().LostWrites; lost < 100 || lost > 200 {
+		t.Errorf("the window is the shorter of the step-down time and the cut: %d", lost)
 	}
 }

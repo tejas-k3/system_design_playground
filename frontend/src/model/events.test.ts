@@ -31,7 +31,7 @@ describe('eventLabel', () => {
 
 describe('eventGlyph', () => {
   it('gives every known event a distinct one-character cue so markers do not rely on colour', () => {
-    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'scaleUp', 'serverUp', 'scaleDown', 'gc', 'compaction', 'configPush']
+    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'elected', 'noLeader', 'scaleUp', 'serverUp', 'scaleDown', 'gc', 'compaction', 'configPush']
     const glyphs = types.map(eventGlyph)
     expect(new Set(glyphs).size).toBe(types.length)
     expect(glyphs.every((g) => g.length === 1)).toBe(true)

@@ -134,7 +134,7 @@ type RunStats struct {
 // partitions starting and ending, failover steps, autoscaling steps. T is in seconds, like the series.
 type Event struct {
 	T      float64 `json:"t"`
-	Type   string  `json:"type"` // crash restart slow slowEnd partition heal failoverDetected promotion splitbrain scaleUp serverUp scaleDown
+	Type   string  `json:"type"` // crash restart slow slowEnd partition heal failoverDetected promotion splitbrain elected noLeader scaleUp serverUp scaleDown
 	NodeID string  `json:"nodeId"`
 	Label  string  `json:"label"`
 	Lost   int     `json:"lost,omitempty"` // promotion and split brain: acknowledged writes lost

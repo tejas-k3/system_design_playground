@@ -97,10 +97,10 @@ func (s *Sim) coordLeaderCut(n *node, dur float64) {
 		return
 	}
 	if stale := n.f("stepDownSec") * 1000; stale > 0 {
-		n.coordStaleUntil = s.now + stale
 		if dur > 0 {
-			n.coordStaleUntil = s.now + min(stale, dur)
+			stale = min(stale, dur)
 		}
+		n.coordStaleUntil = s.now + stale
 	}
 	s.coordLeaderDown(n, dur)
 }
@@ -128,10 +128,11 @@ func (s *Sim) procCoord(n *node, c *call, cb func(Result), release func()) {
 		return
 	}
 	s.coordInit(n)
-	if s.now < n.coordStaleUntil && c.cmd == cmdWrite { // the old leader has not noticed it was replaced
+	// the old leader has not noticed it was replaced; the others can only elect a new one with a majority and no vote
+	if s.now < n.coordStaleUntil && c.cmd == cmdWrite && s.coordMajority(n) && n.coordFaults == nil && n.s("faultModel") != "arbitrary" {
 		s.after(s.service(n, n.f("opMs")+n.f("rttMs"))*n.slow, func() {
-			n.coordStaleAcks++
 			if c.counted {
+				n.coordStaleAcks++
 				s.runLost++ // acknowledged, but only the old leader has it
 			}
 			s.okAt(n, Result{Ver: -1, Done: true, Src: n}, cb)
