@@ -111,8 +111,8 @@ func revalRun(revalidate bool) (RunStats, float64) {
 		{ID: "users", Kind: KClient, Params: Params{"rps": 200.0, "readPct": 95.0, "keySpace": 200.0, "keyDist": "uniform", "consistency": "bounded", "maxStaleMs": 200.0, "timeoutMs": 3000.0}},
 		{ID: "app", Kind: KAppServer, Params: Params{"threads": 64.0, "dbPool": 64.0}},
 		{ID: "db", Kind: KDatabase},
-		{ID: "c", Kind: KCache, Params: Params{"capacityItems": 1000.0, "ttlSec": 3.0, "writePolicy": "invalidate", "revalidate": revalidate}},
-	}, Edges: []Edge{{ID: "u", From: "users", To: "app", LatencyMs: 20}, {ID: "d", From: "app", To: "db", LatencyMs: 2}, {ID: "ac", From: "app", To: "c", LatencyMs: 2}}}
+		{ID: "c", Kind: KCache, Params: Params{"capacityItems": 1000.0, "ttlSec": 3.0, "writePolicy": "none", "revalidate": revalidate}},
+	}, Edges: []Edge{{ID: "u", From: "users", To: "app", LatencyMs: 20}, {ID: "d", From: "app", To: "db", LatencyMs: 2}, {ID: "ac", From: "app", To: "c", LatencyMs: 2}, {ID: "cd", From: "c", To: "db", LatencyMs: 2}}}
 	d, _ = Sanitize(d)
 	s := New(d, Options{Seed: 1, StopTrafficAtMs: 40000})
 	for !s.Finished() && s.Now() < 100000 {

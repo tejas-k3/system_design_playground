@@ -103,7 +103,7 @@ func (s *Store) Set(now float64, key, ver int) int {
 	if s.ttlMs > 0 {
 		life := s.ttlMs
 		if s.shortPct > 0 && s.shortMs > 0 && float64(Hash32(uint32(key)*2246822519+17)%100) < s.shortPct {
-			life = s.shortMs
+			life = min(life, s.shortMs)
 		}
 		if s.jitter > 0 {
 			u := float64(Hash32(uint32(key)*0x9e3779b1^uint32(now))) / 4294967296
