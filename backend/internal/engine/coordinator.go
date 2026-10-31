@@ -120,7 +120,8 @@ func (s *Sim) procCoord(n *node, c *call, cb func(Result), release func()) {
 		return
 	}
 	ms := n.f("opMs") + n.f("rttMs") // the leader answers once a majority has acknowledged
-	if n.coordFaults != nil && n.s("faultModel") == "arbitrary" {
+	voting := n.coordFaults != nil || n.s("faultModel") == "arbitrary"
+	if n.s("faultModel") == "arbitrary" {
 		ms += n.f("rttMs") // the extra round in which members compare what they heard
 	}
 	ep := n.coordTerm
@@ -129,7 +130,7 @@ func (s *Sim) procCoord(n *node, c *call, cb func(Result), release func()) {
 			s.failAt(n, RNoQuorum, cb)
 			return
 		}
-		if n.coordFaults != nil {
+		if voting {
 			answered, wrong := s.coordVote(n, c)
 			if !answered {
 				s.failAt(n, RNoQuorum, cb)
@@ -175,20 +176,28 @@ func (s *Sim) coordLock(n *node, c *call, cb func(Result)) {
 }
 
 // coordFaults are the members of a coordinator group that drop messages (omission) or give wrong answers, with the
-// share of requests affected. A member whose time is in the past is healthy again.
+// share of requests each affects. A member whose time is in the past is healthy again.
 type coordFaults struct {
 	muteUntil, lieUntil []float64
-	mutePct, liePct     float64
-	corrupt             bool // the wrong answers are damaged data, which a checksum catches; otherwise they are lies
+	mutePct, liePct     []float64
+	corrupt             []bool // the member's wrong answers are damaged data, which a checksum catches; otherwise lies
+}
+
+func (f *coordFaults) fit(members int) {
+	for len(f.muteUntil) < members {
+		f.muteUntil, f.lieUntil = append(f.muteUntil, 0), append(f.lieUntil, 0)
+		f.mutePct, f.liePct, f.corrupt = append(f.mutePct, 0), append(f.liePct, 0), append(f.corrupt, false)
+	}
 }
 
 func (s *Sim) coordMembersFault(n *node, ev ChaosEvent) {
 	s.coordInit(n)
 	m := len(n.coordDown)
 	if n.coordFaults == nil {
-		n.coordFaults = &coordFaults{muteUntil: make([]float64, m), lieUntil: make([]float64, m)}
+		n.coordFaults = &coordFaults{}
 	}
 	f := n.coordFaults
+	f.fit(m)
 	until := 1e18
 	if ev.DurationSec > 0 {
 		until = s.now + ev.DurationSec*1000
@@ -200,35 +209,46 @@ func (s *Sim) coordMembersFault(n *node, ev ChaosEvent) {
 	count := int(ev.Factor)
 	for i := m - 1; i >= 0 && count > 0; i-- { // the last members, so the leader (the first) is spared
 		if ev.Type == "memberOmission" {
-			f.muteUntil[i], f.mutePct = until, pct
+			f.muteUntil[i], f.mutePct[i] = until, pct
 		} else {
-			f.lieUntil[i], f.liePct, f.corrupt = until, pct, ev.Mode == "corrupt"
+			f.lieUntil[i], f.liePct[i], f.corrupt[i] = until, pct, ev.Mode == "corrupt"
 		}
 		count--
 	}
 }
 
+// memberHit is whether a fault that lasts until `until` and touches pct of requests hits this attempt at member j. The
+// verdict is a hash of the request, its attempt and the member, so a retry can get a different one and no random number
+// is drawn.
+func (s *Sim) memberHit(c *call, j int, until, pct float64, salt uint32) bool {
+	if until <= s.now {
+		return false
+	}
+	attempt := uint32(0)
+	if c.at != nil {
+		attempt = uint32(c.at.n)
+	}
+	return float64(Hash32(uint32(c.rid)*2654435761+salt+uint32(j)*97+attempt*7919)%100) < pct
+}
+
 // coordVote decides one request that goes to the group of members. It reports whether the group answered, and whether
-// the answer it accepted was wrong. With no fault injected it is not called, so existing designs are unchanged.
+// the answer it accepted was wrong. Under the crash model with no fault injected it is not called.
 func (s *Sim) coordVote(n *node, c *call) (answered, wrong bool) {
 	f := n.coordFaults
+	if f == nil {
+		f = &coordFaults{}
+	}
 	members := len(n.coordDown)
+	f.fit(members)
 	honest, liars := 0, 0
 	for j := 0; j < members; j++ {
-		if !s.coordUp(n, j) {
-			continue
+		if !s.coordUp(n, j) || s.memberHit(c, j, f.muteUntil[j], f.mutePct[j], 11) {
+			continue // down, or it drops this request
 		}
-		hit := func(until, pct float64, salt uint32) bool {
-			return until > s.now && float64(Hash32(uint32(c.rid)*2654435761+salt+uint32(j)*97)%100) < pct
-		}
-		if hit(f.muteUntil[j], f.mutePct, 11) {
-			continue // it drops this request
-		}
-		if hit(f.lieUntil[j], f.liePct, 29) {
-			if f.corrupt && n.b("answerChecksums") {
-				continue // the damage is seen and the answer dropped
+		if s.memberHit(c, j, f.lieUntil[j], f.liePct[j], 29) {
+			if !(f.corrupt[j] && n.b("answerChecksums")) { // damage is seen and the answer dropped
+				liars++
 			}
-			liars++
 			continue
 		}
 		honest++
@@ -241,7 +261,10 @@ func (s *Sim) coordVote(n *node, c *call) (answered, wrong bool) {
 		return true, liars > 0 // the first answer is believed, and a liar answers first
 	}
 	k := clampInt(int(n.f("faultsTolerated")), 1, 4)
-	got := min(alive, max(1, members-k)) // the group cannot wait for the k that may never answer
+	if alive < members-k {
+		return false, false // more members are silent than the group was built for
+	}
+	got := max(1, members-k) // the group cannot wait for the k that may never answer
 	liarsIn := min(liars, got)
 	honestIn := got - liarsIn // the liars answer first, as the worst case
 	switch {
