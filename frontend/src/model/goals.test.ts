@@ -292,3 +292,11 @@ describe('wrong answers accepted goal', () => {
     expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Wrong answers accepted').state).toBe('pass')
   })
 })
+
+describe('messages handled out of order goal', () => {
+  it('counts messages a consumer finished after a newer one of the same key', () => {
+    const g = { minSuccessRate: 0.5, maxOrderViolations: 5 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, jobs: { orderViolations: 298 } as never }), 1, true), 'Messages handled out of order')).toMatchObject({ actual: '298', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Messages handled out of order').state).toBe('pass')
+  })
+})
