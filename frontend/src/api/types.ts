@@ -345,6 +345,7 @@ export interface RunStats {
   latencyBuckets: LatencyBucket[] // distribution of successful requests
   mean: number
   errors: Record<string, number>
+  dnsLookups?: number // name resolutions after a cached DNS answer expires
   conflicts: number
   writeSkew?: number // on-call pairs left with the rule broken (two doctors off at once)
   fanoutWrites?: number // timeline inserts caused by posts (feed workload)
