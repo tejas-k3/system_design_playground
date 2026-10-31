@@ -25,8 +25,12 @@ func TestCausalOptionIsNamedForItsSessionGuarantees(t *testing.T) {
 	if !storedID {
 		t.Fatal("consistency option id causal must remain for saved designs")
 	}
-	if strings.Contains(strings.ToLower(help), "causal") {
+	// "causal order" is its own option now (the data-centric model); nothing else in the help may be called causal
+	if strings.Contains(strings.ReplaceAll(strings.ToLower(help), "causal order", ""), "causal") {
 		t.Errorf("consistency help still calls the session guarantees causal: %q", help)
+	}
+	if !strings.Contains(strings.ToLower(help), "causal order") {
+		t.Errorf("the real causal option should be explained in the help: %q", help)
 	}
 }
 
@@ -204,5 +208,76 @@ func TestSessionGoalFailsOnLooseQuorumsAndPassesOnOverlapping(t *testing.T) {
 	}
 	if c := check(2, 2); !c.Pass || c.Actual != "0" {
 		t.Fatalf("R=W=2 keeps them: %+v", c)
+	}
+}
+
+// A write kept as a hint for a copy that is down is judged against that copy's own version: when the copy is older
+// than a value the client read, the write will land on a stale copy once it is handed back.
+func TestWritesFollowReadsIsJudgedOnHintedCopies(t *testing.T) {
+	total := 0
+	for down := 0; down < 5; down++ {
+		s, client, kv := sessionSimulation("writesFollowReads", Params{
+			"nodes": 5.0, "replicas": 3.0, "readQuorum": 1.0, "writeQuorum": 1.0, "hintedHandoff": true,
+			"readMs": 0.1, "writeMs": 0.1, "variability": "steady",
+		})
+		client.down = true
+		for i := 0; i < 5; i++ {
+			s.bumpVer(1)
+		}
+		s.countSession(&logical{client: client, counted: true, key: 1}, Result{OK: true, Ver: 5})
+		kv.kvEnsure(5, 1)
+		for _, versions := range kv.kvVer {
+			versions[1] = 5
+		}
+		kv.kvVer[down][1] = 4 // the copy that is down is behind what the client read
+		kv.kvDownUntil[down] = 1e12
+		lg := &logical{id: 6, client: client, write: true, counted: true, key: 1, sawRead: client.sessRead[1]}
+		var got Result
+		s.procKV(kv, &call{lg: lg, write: true, key: 1, cmd: cmdWrite}, func(r Result) { got = r }, func() {})
+		s.Advance(1)
+		if !got.OK {
+			t.Fatalf("node %d down: the write did not complete: %+v", down, got)
+		}
+		s.countSession(lg, got)
+		if v := sessionViolation(s); v != "0" {
+			total++
+		}
+	}
+	if total != 3 { // the down node is one of the key's three copies in three of the five cases
+		t.Errorf("a stale hinted copy was counted in %d of 5 cases, want the 3 where the down node holds a copy of the key", total)
+	}
+}
+
+// Causal order: a client that has seen an effect must not then see an older version of its cause.
+func TestCausalOrderCountsACauseReadOlderThanAnEffectAlreadySeen(t *testing.T) {
+	run := func(causeAfter int) string {
+		s, client, kv := sessionSimulation("causalOrder", nil)
+		read := func(key, ver int) {
+			s.countSession(&logical{client: client, counted: true, key: key}, Result{OK: true, Ver: ver})
+		}
+		read(1, 5) // the client reads item 1 at version 5 ...
+		write := &logical{id: 7, client: client, write: true, counted: true, key: 2}
+		effect := s.commit(kv, &call{lg: write, key: 2}) // ... and then writes item 2, which depends on that read
+		read(2, effect)                                  // it sees the effect
+		read(1, causeAfter)                              // and then reads the cause again
+		return sessionViolation(s)
+	}
+	if got := run(4); got != "1" {
+		t.Errorf("a cause older than the one the effect was built on should count once, got %s", got)
+	}
+	if got := run(5); got != "0" {
+		t.Errorf("the same cause is not a violation, got %s", got)
+	}
+	if got := run(6); got != "0" {
+		t.Errorf("a newer cause is not a violation, got %s", got)
+	}
+}
+
+func TestCausalDependenciesAreOnlyKeptForClientsThatAskForThem(t *testing.T) {
+	s, client, kv := sessionSimulation("eventual", nil)
+	s.countSession(&logical{client: client, counted: true, key: 1}, Result{OK: true, Ver: 5})
+	s.commit(kv, &call{lg: &logical{id: 7, client: client, write: true, counted: true, key: 2}, key: 2})
+	if s.causalDeps != nil {
+		t.Error("a client that did not ask for causal order should leave no dependency records")
 	}
 }

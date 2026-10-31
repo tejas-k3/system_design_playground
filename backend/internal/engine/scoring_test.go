@@ -43,3 +43,16 @@ func TestStarTargetsAreDerivedFromTheGoals(t *testing.T) {
 		t.Errorf("no cost or p95 goal, so no star targets: %+v", g)
 	}
 }
+
+func TestTheCacheMessageGoalComparesWithTheMessagesSent(t *testing.T) {
+	limit := 1000
+	g := Goals{MaxCacheMessages: &limit}
+	pass := Evaluate(g, Diagram{}, RunStats{CacheMsgs: 1000}, 0)
+	fail := Evaluate(g, Diagram{}, RunStats{CacheMsgs: 1001}, 0)
+	if !pass.Pass || fail.Pass {
+		t.Fatalf("1000 should meet a limit of 1000 and 1001 should not: %v, %v", pass.Pass, fail.Pass)
+	}
+	if c := fail.Checks[len(fail.Checks)-1]; c.Label != "Messages to caches" || c.Actual != "1001" {
+		t.Errorf("the check should name what it counts: %+v", c)
+	}
+}

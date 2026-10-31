@@ -75,6 +75,12 @@ func (s *Store) Get(now float64, key int) (int, bool, bool) {
 	return e.ver, true, false
 }
 
+// Live reports whether a key is held and not expired, without touching recency or removing anything.
+func (s *Store) Live(now float64, key int) bool {
+	e, ok := s.m[key]
+	return ok && (e.exp == 0 || now < e.exp)
+}
+
 // Set inserts or refreshes a key and returns how many entries were evicted.
 func (s *Store) Set(now float64, key, ver int) int {
 	if s.cap == 0 {

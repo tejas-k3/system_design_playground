@@ -36,6 +36,7 @@ type Goals struct {
 	MaxResultDelaySec       *float64 `json:"maxResultDelaySec,omitempty"`       // how long after a window ends a stream job first emits it
 	MaxLostEvents           *int     `json:"maxLostEvents,omitempty"`           // saved writes whose event never reached the queue
 	MaxSessionViolations    *int     `json:"maxSessionViolations,omitempty"`    // violations of the client's selected session guarantee
+	MaxCacheMessages        *int     `json:"maxCacheMessages,omitempty"`        // messages the origin sent to caches about writes
 	StarCostPerHour         *float64 `json:"starCostPerHour,omitempty"`
 	StarP95Ms               *float64 `json:"starP95Ms,omitempty"`
 }
@@ -265,8 +266,11 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	if g.MaxRtoSec != nil {
 		checks = append(checks, Check{"Time to restore (RTO)", fmt.Sprintf("≤ %.0f s", *g.MaxRtoSec), fmt.Sprintf("%.1f s", run.RtoSec), run.RtoSec <= *g.MaxRtoSec+eps})
 	}
+	if g.MaxCacheMessages != nil {
+		checks = append(checks, Check{"Messages to caches", fmt.Sprintf("≤ %d", *g.MaxCacheMessages), fmt.Sprint(run.CacheMsgs), run.CacheMsgs <= *g.MaxCacheMessages})
+	}
 	if g.MaxSessionViolations != nil {
-		broken := run.ReadYourWritesBroken + run.MonotonicBroken + run.MonoWritesBroken + run.FollowReadBroken
+		broken := run.ReadYourWritesBroken + run.MonotonicBroken + run.MonoWritesBroken + run.FollowReadBroken + run.CausalBroken
 		checks = append(checks, Check{"Per-client guarantees broken", fmt.Sprintf("≤ %d", *g.MaxSessionViolations), fmt.Sprint(broken), broken <= *g.MaxSessionViolations})
 	}
 	if g.MinJobsCompleted != nil {

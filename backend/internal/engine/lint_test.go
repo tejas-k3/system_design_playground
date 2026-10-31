@@ -179,3 +179,41 @@ func withReplica(db Params, mode string) Diagram {
 	d.Edges = append(d.Edges, Edge{ID: "app1>r", From: "app1", To: "r"})
 	return d
 }
+
+func TestLintWarnsWhenAGuaranteeCannotBeJudgedOnTheConnectedStore(t *testing.T) {
+	const rule = "guarantee-not-judged"
+	diagram := func(model string, store string) Diagram {
+		return Diagram{
+			Nodes: []Node{
+				{ID: "users", Kind: KClient, Params: Params{"consistency": model}},
+				{ID: "app", Kind: KAppServer},
+				{ID: "store", Kind: store},
+			},
+			Edges: []Edge{{ID: "a", From: "users", To: "app"}, {ID: "b", From: "app", To: "store"}},
+		}
+	}
+	cases := []struct {
+		name  string
+		model string
+		store string
+		want  bool
+	}{
+		{"writes follow reads against a plain database", "writesFollowReads", KDatabase, true},
+		{"writes follow reads against a key-value store", "writesFollowReads", KKVStore, false},
+		{"monotonic writes against a plain database", "monotonicWrites", KDatabase, false},
+		{"read your writes against a plain database", "readYourWrites", KDatabase, false},
+		{"nothing asked for", "eventual", KDatabase, false},
+	}
+	for _, c := range cases {
+		f, ok := rules(Lint(diagram(c.model, c.store)))[rule]
+		if ok != c.want {
+			t.Errorf("%s: fired=%v, want %v", c.name, ok, c.want)
+		}
+		if ok && (f.Severity != "warn" || !strings.Contains(f.Message, "key-value store") || !strings.Contains(f.Message, "0")) {
+			t.Errorf("%s: the message must say what is missing and that a zero is not a pass: %+v", c.name, f)
+		}
+	}
+	if _, ok := rules(Lint(Diagram{Nodes: []Node{{ID: "users", Kind: KClient, Params: Params{"consistency": "writesFollowReads"}}}}))[rule]; ok {
+		t.Error("with no store at all there is nothing to say about the guarantee")
+	}
+}

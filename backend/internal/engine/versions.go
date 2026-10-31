@@ -69,6 +69,16 @@ func (s *Sim) countFreshness(lg *logical, res Result) {
 	if lg.write || res.Ver < 0 {
 		return
 	}
+	if lg.client.s("consistency") == "boundedWrites" { // a numerical bound: how many committed writes the read may have missed
+		s.runFresh++
+		if s.verAt(lg.key, lg.createdAt)-res.Ver > int(lg.client.f("maxMissedWrites")) {
+			s.runStale++
+			if res.Src != nil {
+				res.Src.c.stale++
+			}
+		}
+		return
+	}
 	ms := maxStale(lg.client)
 	if ms < 0 {
 		return
@@ -80,6 +90,79 @@ func (s *Sim) countFreshness(lg *logical, res Result) {
 			res.Src.c.stale++
 		}
 	}
+}
+
+// causalState is what a client that asks for causal order has seen: the last version it read, and for each item the
+// oldest version it may still be shown, because an effect it saw was built on that.
+type causalState struct {
+	lastKey, lastVer int
+	min              map[int]int
+}
+
+// countCausalRead counts a read of a cause that is older than an effect this client has already seen, then notes what
+// the read implies: the item itself may not go backwards, and what a write it shows was built on may not either.
+func (s *Sim) countCausalRead(lg *logical, res Result) {
+	if lg.write {
+		return
+	}
+	cl := lg.client
+	if cl.causal == nil {
+		cl.causal = &causalState{min: map[int]int{}}
+	}
+	cz := cl.causal
+	if lg.counted && res.Ver < cz.min[lg.key] {
+		s.runCausalBroken++
+	}
+	if res.Ver > cz.min[lg.key] {
+		cz.min[lg.key] = res.Ver
+	}
+	if dep, ok := s.causalDeps[[2]int{lg.key, res.Ver}]; ok && dep[1] > cz.min[dep[0]] {
+		cz.min[dep[0]] = dep[1]
+	}
+	cz.lastKey, cz.lastVer = lg.key, res.Ver
+}
+
+// stampSeen notes on a request what its client knew when it was issued: the newest version it had of this item, and, for
+// a write by a client asking for causal order, the last thing it read, which the write is built on (so a read made
+// while the write is in flight does not become its cause).
+func (c *node) stampSeen(lg *logical) {
+	lg.sawWrite, lg.sawRead = c.sessWrite[lg.key], c.sessRead[lg.key] // nil maps read as 0
+	if lg.write && c.causal != nil {
+		lg.sawWrite, lg.sawRead = c.causal.lastKey, c.causal.lastVer // here: the item and version it read last
+	}
+}
+
+// recordCause remembers, for a write by a client that asks for causal order, the read it was built on. Version 0 is an
+// item never written, which no read can be older than, so it is not a cause worth keeping.
+func (s *Sim) recordCause(c *call, ver int) {
+	if c.lg == nil || !c.lg.write || c.lg.client.s("consistency") != "causalOrder" || c.lg.sawRead <= 0 {
+		return
+	}
+	if s.causalDeps == nil {
+		s.causalDeps = map[[2]int][2]int{}
+	}
+	s.causalDeps[[2]int{c.key, ver}] = [2]int{c.lg.sawWrite, c.lg.sawRead}
+	if len(s.causalDeps) >= max(causalKeepMax, s.causalPruneAt) {
+		s.pruneCauses()
+	}
+}
+
+// causalKeepMax is how many dependency records are kept before the old ones are looked for, and causalWindow how many
+// versions back from an item's newest a read can still return (copies lag by a few versions, not by hundreds).
+const (
+	causalKeepMax = 4096
+	causalWindow  = 64
+)
+
+// pruneCauses drops the dependencies of versions too old for any read to return. The next look comes when the records
+// have doubled, so a design with many live items is not scanned on every write.
+func (s *Sim) pruneCauses() {
+	for k := range s.causalDeps {
+		if k[1] < s.itemVer(k[0])-causalWindow {
+			delete(s.causalDeps, k)
+		}
+	}
+	s.causalPruneAt = 2 * len(s.causalDeps)
 }
 
 // ensureSessionMaps lazily creates the maps used only by clients with per-client consistency guarantees.
@@ -96,6 +179,10 @@ func (s *Sim) countSession(lg *logical, res Result) {
 	}
 	cl := lg.client
 	model := cl.s("consistency")
+	if model == "causalOrder" {
+		s.countCausalRead(lg, res)
+		return
+	}
 	if model != "readYourWrites" && model != "monotonic" && model != "causal" && model != "monotonicWrites" && model != "writesFollowReads" {
 		return
 	}
@@ -180,7 +267,9 @@ func (s *Sim) commit(n *node, c *call) int {
 		n.writeLog = append(n.writeLog, s.now)
 	}
 	s.countMonotonicWrite(c)
-	return s.bumpVer(c.key)
+	v := s.bumpVer(c.key)
+	s.recordCause(c, v)
+	return v
 }
 
 func (s *Sim) pruneCommitted() {

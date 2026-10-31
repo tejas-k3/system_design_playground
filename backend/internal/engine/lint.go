@@ -191,6 +191,21 @@ func Lint(d Diagram) []Finding {
 		add("write-quorum-no-overlap", "warn", msg, "Raise the write quorum above half the copies.", n.ID)
 	}
 
+	// a per-client guarantee that the store behind the users cannot judge reads zero, which looks like a pass
+	for _, id := range clients {
+		if ps(res[id], "consistency") != "writesFollowReads" {
+			continue
+		}
+		hasKV, hasStore := false, false
+		for _, k := range reachableKinds(d, id) {
+			hasKV = hasKV || k == KKVStore
+			hasStore = hasStore || k == KDatabase || k == KReplica
+		}
+		if hasStore && !hasKV {
+			add("guarantee-not-judged", "warn", "Writes follow reads is only judged against a key-value store's copies. Here the users reach only a plain database, so the count stays at 0, and a 0 is not a pass.", "Use a key-value store, or ask for monotonic writes or read your writes, which every store can judge.", id)
+		}
+	}
+
 	// a payload the queue cannot carry: the users' request size against each queue's message limit
 	biggest := 0.0
 	for _, id := range clients {
@@ -272,4 +287,27 @@ func claimChecked(d Diagram, kind map[string]string, queue string) bool {
 		}
 	}
 	return feeders > 0
+}
+
+// reachableKinds lists the kinds of every component reachable from a node by following connections.
+func reachableKinds(d Diagram, from string) []string {
+	kind := map[string]string{}
+	for _, n := range d.Nodes {
+		kind[n.ID] = n.Kind
+	}
+	seen := map[string]bool{from: true}
+	queue := []string{from}
+	var kinds []string
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		for _, e := range d.Edges {
+			if e.From == id && !seen[e.To] {
+				seen[e.To] = true
+				queue = append(queue, e.To)
+				kinds = append(kinds, kind[e.To])
+			}
+		}
+	}
+	return kinds
 }
