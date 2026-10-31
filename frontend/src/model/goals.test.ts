@@ -260,3 +260,11 @@ describe('commit and recovery goals', () => {
     expect(row(good, 'Time to catch up after a crash').state).toBe('pass')
   })
 })
+
+describe('requests let through unchecked goal', () => {
+  it('counts the requests an auth service that failed let through', () => {
+    const g = { minSuccessRate: 0.5, maxUnchecked: 0 }
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10, unchecked: 7 }), 1, true), 'Requests let through unchecked')).toMatchObject({ actual: '7', state: 'fail' })
+    expect(row(goalRows(g, stats({ resolved: 10, ok: 10 }), 1, true), 'Requests let through unchecked').state).toBe('pass')
+  })
+})

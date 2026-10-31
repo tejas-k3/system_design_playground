@@ -160,6 +160,7 @@ export interface Goals {
   maxLostEvents?: number
   maxInconsistent?: number
   maxInDoubt?: number
+  maxUnchecked?: number
   maxBlockedSec?: number
   maxRepeatedOutputs?: number
   maxRecoverySec?: number
@@ -370,6 +371,9 @@ export interface RunStats {
   compensated?: number // multi-step writes rolled back
   crawl?: CrawlStats // only when the users run the crawl workload
   eventDups?: number // events a queue accepted a second time (a producer retried after a lost answer)
+  authCalls?: number // requests that asked the auth service
+  authCached?: number // requests whose token was already remembered
+  unchecked?: number // requests let through unchecked because the auth service failed (fail open)
   inDoubt?: number // two-phase commits left waiting for a crashed coordinator
   lateDropped?: number // events a stream job dropped for arriving too late
   recall?: number // share of the true nearest neighbours the vector search finds

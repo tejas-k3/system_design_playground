@@ -145,6 +145,7 @@ type node struct {
 	reshards        int
 	sessConns       int // long-lived connections held open (sessions arrival)
 	sessions        map[*session]bool
+	authTokens      map[int]float64 // app server: when each user's remembered token answer runs out
 	id, kind, label string
 	x, y            float64
 	p               Params
@@ -328,6 +329,7 @@ type Sim struct {
 
 	runResolved, runOK, runFailed, runPending int
 	runDNSLookups                             int
+	runAuthCalls, runAuthCached, runUnchecked int // requests that asked the auth service, were answered from memory, or were let through unchecked
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int

@@ -118,6 +118,10 @@ func (s *Sim) atomicCommit(n *node, c *call, steps []*edge, three bool, done fun
 				phase(i+1, round)
 				return
 			}
+			if round > 0 && !last { // every service has voted yes by now: abort all of them
+				s.compensate(n, c, steps, len(steps)-1, false, func() { done(res) })
+				return
+			}
 			if i == 0 || last {
 				done(res)
 				return

@@ -297,6 +297,11 @@ func registerScaleOut() {
 	// Nobody to wait for: the same checkout, but the stock must stay all-or-nothing and the services must not wait for a dead server
 	nobodyToWait := func(fixed bool) engine.Diagram {
 		d := frozenCheckout(false)
+		for k := range d.Nodes {
+			if d.Nodes[k].ID == "card" {
+				d.Nodes[k].Params["errorPct"] = 0.0 // an undo that fails would leave an order stuck whichever protocol runs
+			}
+		}
 		if fixed {
 			for k := range d.Nodes {
 				if d.Nodes[k].ID == "app" {
@@ -313,7 +318,7 @@ func registerScaleOut() {
 		Story:   "Checkout is a two-phase commit across the stock database, the card processor and shipping, and when the server dies between the votes and the decision the services sit locked until it returns. Operations prefers not to use a saga, because other customers can then see stock reserved for an order that later vanishes. The services should instead settle on their own when the server stays silent, and the total time rows stay locked must stay small. Operations still wants every order to stay {{consistency-levels|consistent}}.",
 		Diagram: nobodyToWait(false), Solution: nobodyToWait(true),
 		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app", AtSec: 15, DownSec: 8}},
-		Goals:       engine.Goals{MinSuccessRate: 0.6, MaxInDoubt: i(0), MaxInconsistent: i(0), MaxBlockedSec: f(15), MaxP95Ms: f(900), MaxCostPerHour: f(1.6), StarP95Ms: f(800), StarCostPerHour: f(1.4)},
+		Goals:       engine.Goals{MinSuccessRate: 0.6, MaxInDoubt: i(0), MaxInconsistent: i(0), MaxBlockedSec: f(15), MaxP95Ms: f(900), MaxCostPerHour: f(1.6), StarP95Ms: f(860), StarCostPerHour: f(1.4)},
 		DurationSec: 40, WarmupSec: 5, Speed: 1,
 		Hints: [3]string{
 			"Look at the goals panel after the crash: how many transactions wait, and for how many lock-seconds?",
@@ -356,5 +361,37 @@ func registerScaleOut() {
 		Predictions: []Prediction{{ID: "p1", Question: "What does logging every event buy over saving more often?", Options: []string{"A replay of what happened since the last save, with no repeated outputs", "Nothing: a log is the same as a save, only slower", "A free recovery, since the log is written later"}, Answer: 0,
 			Explain: "A save captures state at one moment; a log records everything after it, so the job can be brought back to just before the crash. The price is a log write on every event."}},
 		Debrief: "Checkpointing alone restarts from the last saved state and repeats the work since, so a long gap between saves means a long recovery and repeated outputs. Message logging (a {{write-ahead-log|log}} of the input) records each event before it is handled, so recovery replays deterministically from the last save and receivers can discard what they already saw. You pay one log write per event; the alternative is saving more often, which also costs.",
+	})
+
+	// Everyone asks auth: every request waits for the auth service, which is slow under load and then goes down
+	everyoneAsksAuth := func(fixed bool) engine.Diagram {
+		app := P{"threads": 32.0, "queueCap": 400.0, "authMode": "service", "tokenUsers": 500.0}
+		if fixed {
+			app["tokenCacheSec"] = 60.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 300.0, "readPct": 100.0, "keySpace": 5000.0, "keyDist": "uniform", "timeoutMs": 1500.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, app).
+			n("auth", engine.KAuth, cols[2], 60, P{"checkMs": 20.0, "connections": 4.0, "queueCap": 50.0}).label("auth", "Auth service").
+			n("db", engine.KDatabase, cols[2], 200, P{"connections": 16.0, "readMs": 3.0}).
+			e("users", "app").e("app", "auth").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "everyone-asks-auth", Title: "Everyone asks auth", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Every request waits for the auth service, and it cannot keep up.",
+		Story:   "Each request carries a token, and the app server asks the auth service whether it is valid before it does anything else. The auth service handles about 200 checks a second and 300 requests arrive, so it is the bottleneck. When it restarts for eight seconds the whole site is down with it. You may not let requests through unchecked, but 500 signed-in users make most of those checks repeats.",
+		Diagram: everyoneAsksAuth(false), Solution: everyoneAsksAuth(true),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "auth", AtSec: 20, DownSec: 8}},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxUnchecked: i(0), MaxP95Ms: f(300), MaxCostPerHour: f(1.5), StarP95Ms: f(200), StarCostPerHour: f(1.2)},
+		DurationSec: 50, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the auth service in the diagram: how busy is it, and what happens to requests while it is down?",
+			"There are only 500 different users. How many of the checks are about a user who was already checked a moment ago?",
+			"The app server can remember a valid token for a while. How long can it be remembered without being unsafe, given that a revoked token is accepted until then?",
+		},
+		Answer: "The answer: have the app server remember a valid token for a minute. Each of the 500 users is checked once a minute instead of on every request, so the auth service is no longer the bottleneck and its outage only affects users whose token has expired.",
+		Predictions: []Prediction{{ID: "p1", Question: "What is the risk of remembering a valid token for a minute?", Options: []string{"A token revoked in that minute is still accepted", "The auth service gets even more load", "Users are logged out more often"}, Answer: 0,
+			Explain: "A remembered yes is not checked again until it expires, so a revocation takes up to a minute to take effect. A shorter time lowers the risk and raises the load."}},
+		Debrief: "A service every request depends on is both a bottleneck and a single point of failure. Remembering its answers for a short time removes most of the load and rides out a short outage; verifying a signed token on each server removes the call altogether, at the price of noticing a revocation only when the token expires. Failing open keeps the site up by letting everyone in, which is rarely acceptable.",
 	})
 }
