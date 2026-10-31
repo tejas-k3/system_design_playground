@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Stats } from '../api/types'
 import { emptyStats } from '../state/store'
-import { failedAfter, fmtCost, goalCost, goalRows, starTargets, successRate } from './goals'
+import { failedAfter, fmtCost, goalCost, goalRows, pct, starTargets, successRate } from './goals'
 
 const stats = (run: Partial<Stats['global']['run']>): Stats => ({ ...emptyStats(), global: { now: 5, inFlight: 0, cost: 0, avgCost: 0, run: { ...emptyStats().global.run, ...run } } })
 const row = (rows: ReturnType<typeof goalRows>, label: string) => rows.find((r) => r.label === label)!
@@ -224,5 +224,27 @@ describe('messages to caches goal', () => {
   })
   it('is pending before the run starts', () => {
     expect(row(goalRows(goals, stats({}), 1, false), 'Messages to caches').state).toBe('pending')
+  })
+})
+
+describe('pct', () => {
+  it('does not show a limit below a tenth of a percent as zero', () => {
+    expect(pct(0.0005)).toBe('0.05%')
+    expect(pct(0.0002)).toBe('0.02%')
+    expect(pct(0.0009)).toBe('0.09%')
+  })
+  it('does not show a limit under a hundredth of a percent as zero either', () => {
+    expect(pct(0.00005)).toBe('<0.01%')
+  })
+  it('rounds down the same way the server does, whatever the floating point does', () => {
+    expect(pct(0.057)).toBe('5.7%') // 0.057 * 1000 is 56.99999999999999
+    expect(pct(0.003)).toBe('0.3%')
+  })
+  it('keeps one decimal everywhere else, rounding down', () => {
+    expect(pct(0)).toBe('0.0%')
+    expect(pct(0.001)).toBe('0.1%')
+    expect(pct(0.02)).toBe('2.0%')
+    expect(pct(0.995)).toBe('99.5%')
+    expect(pct(1)).toBe('100.0%')
   })
 })

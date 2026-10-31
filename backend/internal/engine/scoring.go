@@ -74,7 +74,15 @@ func (g Goals) WithStarTargets() Goals {
 	return g
 }
 
-func pct(f float64) string { return fmt.Sprintf("%.1f%%", math.Floor(f*1000+eps)/10) }
+func pct(f float64) string {
+	if f > 0 && f < 0.0001 { // a limit this small must not read as zero either
+		return "<0.01%"
+	}
+	if f > 0 && f < 0.001 { // under a tenth of a percent: two decimals
+		return fmt.Sprintf("%.2f%%", math.Floor(f*10000+eps)/100)
+	}
+	return fmt.Sprintf("%.1f%%", math.Floor(f*1000+eps)/10)
+}
 
 func msStr(v float64) string {
 	if v >= 10000 {

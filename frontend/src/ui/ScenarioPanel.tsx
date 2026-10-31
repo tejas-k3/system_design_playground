@@ -8,12 +8,14 @@ import { loadAnswer } from '../state/learning'
 import { useStore } from '../state/store'
 import { CONFIG_ONLY_HELP } from './copy'
 import { plain } from '../model/glossary'
+import { guaranteeNote } from '../model/guaranteeNote'
 import { StarterChecklist } from './StarterChecklist'
 import { Rich } from './Term'
 
 export function ScenarioPanel() {
   const sc = useStore((s) => s.scenario)
   const stats = useStore((s) => s.stats)
+  const findings = useStore((s) => s.findings)
   const cost = useStore((s) => s.cost)
   const status = useStore((s) => s.sim.status)
   const ui = useStore((s) => s.ui)
@@ -29,6 +31,7 @@ export function ScenarioPanel() {
   useEffect(() => setOpen(!isNarrow()), [sc?.def.id])
   if (!sc) return null
   const { def } = sc
+  const note = guaranteeNote(findings, def.goals.maxSessionViolations)
   const rows = goalRows(def.goals, stats, goalCost(cost, stats, status !== 'stopped'), status !== 'stopped')
   const stars = starTargets(def.goals)
   const pred = def.predictions?.[0]
@@ -59,6 +62,7 @@ export function ScenarioPanel() {
               </li>
             ))}
           </ul>
+          {note && <p className="muted small" role="note">{note}</p>}
           {stars && <p className="muted small">{stars}</p>}
           {sc.dailySeed !== undefined && <p className="muted small">Today's run: seed {sc.dailySeed}</p>}
           {sc.result && !ui.result && (

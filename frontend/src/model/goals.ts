@@ -7,7 +7,12 @@ export interface GoalRow {
   state: 'pass' | 'fail' | 'pending'
 }
 
-export const pct = (f: number) => `${(Math.floor(f * 1000) / 10).toFixed(1)}%`
+/** A percentage rounded down to a tenth, to a hundredth below a tenth of a percent, and shown as under 0.01% below that, so a small limit never reads as zero. */
+export const pct = (f: number) => {
+  if (f > 0 && f < 0.0001) return '<0.01%'
+  if (f > 0 && f < 0.001) return `${(Math.floor(f * 10000 + 1e-9) / 100).toFixed(2)}%`
+  return `${(Math.floor(f * 1000 + 1e-9) / 10).toFixed(1)}%`
+}
 const ms = (v: number) => (v >= 10000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`)
 
 /** Hourly cost as shown on screen; a dash until the server has priced the design. */
