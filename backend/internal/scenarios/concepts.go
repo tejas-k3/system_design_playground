@@ -71,6 +71,7 @@ var conceptTags = map[string][]string{
 	"older-write-wins":       {"consistency", "replication"},
 	"liar-in-the-group":      {"replication", "failure-handling"},
 	"old-leaders-writes":     {"replication", "failure-handling"},
+	"slow-news":              {"failure-handling", "replication"},
 	"who-is-the-leader":      {"replication", "failure-handling"},
 	"launch-day":             {"sharding", "capacity"},
 	"count-the-clicks":       {"queues", "consistency"},

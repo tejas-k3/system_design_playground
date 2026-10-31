@@ -1,6 +1,9 @@
 package engine
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
 // The quorum key-value store: one component standing for a cluster of nodes that keep N copies of every key. A
 // write goes to all N copies and is acknowledged once W of them have it; a read asks all N and answers with the
@@ -20,6 +23,9 @@ func (n *node) kvEnsure(nodes, slots int) {
 			}
 		}
 		n.kvFree, n.kvVer, n.kvDownUntil = free, ver, down
+		at := make([]float64, nodes)
+		copy(at, n.kvDownAt)
+		n.kvDownAt = at
 	}
 	for i := range n.kvFree {
 		if len(n.kvFree[i]) != slots {
@@ -95,11 +101,22 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 	}
 	next := copies // where stand-ins are looked for: the nodes after the preference list
 	counting := 0
+	coord, stale := kvCoordinator(c, nodes), 0
+	if m := n.s("failureDetection"); m == "gossip" || m == "broadcast" {
+		for tries := 0; tries < nodes && n.kvDownUntil[coord] > s.now; tries++ {
+			coord = (coord + 1) % nodes // a dead node receives nothing: the request lands on the next one
+		}
+	}
 	for j := 0; j < copies; j++ {
 		i := at(j)
 		if n.kvDownUntil[i] <= s.now {
 			replies = append(replies, reply{i, -1, slot(i, ms), true})
 			counting++
+			continue
+		}
+		if !s.kvKnowsDown(n, coord, i) { // the request goes to a node that is dead; nobody has told this coordinator
+			stale++
+			n.kvStaleView++
 			continue
 		}
 		if !write || (!hinted && !sloppy) {
@@ -117,6 +134,10 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 		}
 	}
 	if counting < need {
+		if stale > 0 { // it waited for a reply that never came
+			s.after(n.f("probeTimeoutMs"), func() { s.failAt(n, RQuorum, cb) })
+			return
+		}
 		s.failAt(n, RQuorum, cb)
 		return
 	}
@@ -224,12 +245,20 @@ func (s *Sim) kvNodesDown(n *node, count int, dur float64) {
 	if dur > 0 {
 		until = s.now + dur
 	}
+	fresh := false
 	for i := 0; i < count && i < nodes; i++ {
-		n.kvDownUntil[i] = until
+		if n.kvDownUntil[i] > s.now { // already down: nothing new to tell
+			continue
+		}
+		n.kvDownUntil[i], n.kvDownAt[i] = until, s.now
+		fresh = true
 		if dur > 0 {
 			i := i
 			s.at(until, func() { s.kvReplayHints(n, i) })
 		}
+	}
+	if fresh {
+		s.kvSpreadNews(n, nodes)
 	}
 }
 
@@ -302,4 +331,75 @@ func (s *Sim) kvAntiEntropy(n *node) {
 		s.after(every, round)
 	}
 	s.after(every, round)
+}
+
+// How the cluster finds out that a node is dead. Instantly (the default); by gossip, where every round each node that
+// knows tells `fanout` others, so the number that know grows by a factor of about 1+fanout per round until everyone
+// does; or by telling every node at once. The request's coordinator is a hash of the request, so no random number is
+// drawn: it learns when the news has reached its place in the order in which nodes hear.
+
+func kvCoordinator(c *call, nodes int) int {
+	return int(Hash32(uint32(c.rid)*2246822519+101) % uint32(nodes))
+}
+
+// gossipInformed is how many of n nodes know after r rounds when one node starts and each tells fanout others.
+func gossipInformed(n int, fanout float64, r int) float64 {
+	know := 1.0
+	for ; r > 0 && know < float64(n); r-- {
+		know = math.Min(float64(n), math.Ceil(know+fanout*know*(1-know/float64(n)))) // whole nodes
+	}
+	return know
+}
+
+// gossipRounds is the first round after which at least `need` of n nodes know.
+func gossipRounds(n int, fanout float64, need int) int {
+	r := 0
+	for gossipInformed(n, fanout, r) < float64(need) && r < 500 {
+		r++
+	}
+	return r
+}
+
+// kvSpreadNews records the cost of telling the cluster about a failure: the time until everyone knows and the messages.
+func (s *Sim) kvSpreadNews(n *node, nodes int) {
+	mode := n.s("failureDetection")
+	if mode != "gossip" && mode != "broadcast" {
+		return
+	}
+	detect := n.f("detectMs")
+	n.kvHear = nil // recomputed from the settings the first time a request needs it
+	if mode == "broadcast" {
+		n.kvTimeToAll = detect + n.f("broadcastMs")
+		n.kvMemberMsgs += float64(nodes - 1)
+		return
+	}
+	f := n.f("gossipFanout")
+	rounds := gossipRounds(nodes, f, nodes)
+	n.kvTimeToAll = detect + float64(rounds)*n.f("gossipIntervalMs")
+	for r := 0; r < rounds; r++ {
+		n.kvMemberMsgs += gossipInformed(nodes, f, r) * f
+	}
+}
+
+// kvKnowsDown is whether the coordinator has heard by now that node `dead` is down.
+func (s *Sim) kvKnowsDown(n *node, coord, dead int) bool {
+	mode := n.s("failureDetection")
+	if (mode != "gossip" && mode != "broadcast") || coord == dead {
+		return true
+	}
+	nodes := len(n.kvDownUntil)
+	delay := n.f("detectMs")
+	if mode == "broadcast" {
+		delay += n.f("broadcastMs")
+	} else {
+		if len(n.kvHear) != nodes-1 { // rounds after which the 1st, 2nd, ... node to hear has heard
+			n.kvHear = make([]int, nodes-1)
+			for r := range n.kvHear {
+				n.kvHear[r] = gossipRounds(nodes, n.f("gossipFanout"), r+2)
+			}
+		}
+		rank := (coord-dead+nodes)%nodes - 1 // 0..nodes-2: the order in which the others hear
+		delay += float64(n.kvHear[rank]) * n.f("gossipIntervalMs")
+	}
+	return s.now >= n.kvDownAt[dead]+delay
 }

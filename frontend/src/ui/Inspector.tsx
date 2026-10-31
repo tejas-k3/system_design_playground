@@ -387,6 +387,7 @@ function LiveStats({ s, kind }: { s: NodeStats; kind: string }) {
         {s.extra?.rebalances !== undefined && (<><dt>Group rebalances</dt><dd>{Math.round(s.extra.rebalances)}</dd></>)}
         {s.extra?.outboxBacklog !== undefined && (<><dt>Events waiting in the outbox</dt><dd>{Math.round(s.extra.outboxBacklog).toLocaleString()}</dd></>)}
         {s.extra?.term !== undefined && (<><dt>Leader</dt><dd>{s.extra.leader !== undefined && s.extra.leader >= 0 ? `node ${Math.round(s.extra.leader) + 1}` : 'none (electing or no majority)'}, term {Math.round(s.extra.term)}, {Math.round(s.extra.nodesUp ?? 0)} nodes up</dd></>)}
+        {s.extra?.timeToAllSec !== undefined && (<><dt>News of the last failure</dt><dd>reached every node after {s.extra.timeToAllSec.toFixed(1)} s with {Math.round(s.extra.membershipMsgs ?? 0)} messages; {Math.round(s.extra.staleViewRequests ?? 0).toLocaleString()} copies were asked that were already dead</dd></>)}
         {s.extra?.elections !== undefined && s.extra.elections > 0 && (<><dt>Leader elections</dt><dd>{Math.round(s.extra.elections)}{(s.extra.staleLeaderWrites ?? 0) > 0 ? `, ${Math.round(s.extra.staleLeaderWrites!).toLocaleString()} writes acknowledged by a replaced leader` : ''}</dd></>)}
         {s.extra?.writeConflicts !== undefined && (<><dt>Write conflicts</dt><dd>{Math.round(s.extra.writeConflicts).toLocaleString()}</dd></>)}
         {s.extra?.slowedByMove !== undefined && (<><dt>Requests slowed by the move</dt><dd>{Math.round(s.extra.slowedByMove).toLocaleString()}</dd></>)}

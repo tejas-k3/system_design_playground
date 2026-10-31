@@ -34,6 +34,7 @@ poison-pill c286e481612ef7a837c641554f1bd80f4605d537d5d738683bacc4d0d56fa563 sta
 consumer-lag f93067131ffceaadd0d58c81f8080933fc09af93cd0e47b4f5311023fa518550 start=false/0/1.0000/129.2 solution=true/3/1.0000/131.8
 hot-cell b689e00f17e03896ac5998839e83ecccb9827102a08c23f4a08906e7473fb8bf start=false/0/0.0000/0.0 solution=true/3/1.0000/148.4
 restore-drill d1e3a886183ffd3b61cf53b7a7e1c8765d485c9a1edaddd44b5f2a499d12629b start=false/0/0.3572/163.9 solution=true/2/0.7792/167.2
+slow-news d55f4a5d9cd6c6759cb3bfaeb42039cbb980a3f729c9cf93da7415f8340a2947 start=false/0/0.9285/137.1 solution=true/3/0.9977/137.1
 count-the-clicks 5b50ff595555b6c5474b5cfcde9fb1267a47f0512dc1ae65a31cbb40b1cce33a start=false/0/1.0000/131.8 solution=true/3/1.0000/131.8
 unique-visitors 4b5351d838f5f74da22cc8eca4d49e22c145c9175bb0a73bea96b36842914296 start=false/0/1.0000/131.8 solution=true/3/1.0000/131.8
 polite-crawler 838581b35e8d2647cdfa56b9f344b57fb37059e6a4ccea42f9fe46dc864d9c68 start=false/0/0.7244/361.9 solution=true/2/1.0000/5454.7

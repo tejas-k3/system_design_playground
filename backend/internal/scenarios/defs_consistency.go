@@ -165,6 +165,38 @@ func registerConsistencyAndStreams() {
 		Deeper:  "Consensus protocols such as Raft number every leadership with a term and let a write count as committed only when a majority has stored it, so two leaders can never both commit. A leader cut off from the majority can still receive client requests, but it cannot commit them, and a correct implementation does not acknowledge before commit. The danger in this scenario is a leader that acknowledges early, or a read served locally from a leader that has been replaced. The usual defences are a step-down rule (leave leadership when no majority has answered for an election timeout), leader leases whose length is shorter than the election timeout so a replaced leader stops serving before a new one starts, and terms or fencing tokens checked by whoever receives the writes. The cost of stepping down quickly is false step-downs during a slow network, which this simulation does not model. An interviewer will ask what happens to a write that reached only some followers, and why a read from the leader may still be stale.",
 	})
 
+	// Who knows it is dead: a thirty-two node store where the news of a failure spreads too slowly
+	slowNews := func(fixed bool) engine.Diagram {
+		g := P{"nodes": 32.0, "replicas": 3.0, "readQuorum": 1.0, "writeQuorum": 3.0, "writeMs": 5.0, "sloppyQuorum": true, "hintedHandoff": true, "failureDetection": "gossip", "detectMs": 500.0, "gossipIntervalMs": 10000.0, "gossipFanout": 1.0, "probeTimeoutMs": 1000.0}
+		if fixed {
+			g["gossipIntervalMs"], g["gossipFanout"] = 500.0, 3.0
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 200.0, "readPct": 0.0, "keySpace": 3000.0, "keyDist": "uniform", "timeoutMs": 3000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 64.0, "queueCap": 1000.0, "dbPool": 200.0}).
+			n("kv", engine.KKVStore, cols[2], rowMid, g).label("kv", "Key-value store").
+			e("users", "app").e("app", "kv").done()
+	}
+	register(&Scenario{
+		ID: "slow-news", Title: "Slow news", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "A node dies and the cluster takes more than a minute to find out.",
+		Story:   "A thirty-two node store keeps three copies of every key and needs all three to acknowledge a write, with stand-ins for a copy that is down. The nodes learn about a failure by {{gossip|gossip}}: every ten seconds a node that knows tells one other. At ten seconds one node dies. Until a node has heard, the requests it receives are sent to the dead node and wait a second for a reply that never comes. Keep at least 98.5% of the writes succeeding.",
+		Diagram: slowNews(false), Solution: slowNews(true),
+		Chaos:       []engine.ChaosEvent{{Type: "kvNodeDown", NodeID: "kv", AtSec: 10, Factor: 1}},
+		Goals:       engine.Goals{MinSuccessRate: 0.985, MaxP95Ms: f(400), MaxCostPerHour: f(6.0), StarCostPerHour: f(5.6)},
+		DurationSec: 60, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the key-value store when the node dies: how many nodes know about it, and what do the others do with requests for it?",
+			"With one peer told every ten seconds, the number of nodes that know roughly doubles every ten seconds. How long until all 32 know, and what do the requests do meanwhile?",
+			"The store's settings say how often a node tells others and how many it tells. Which change makes the news reach everyone in a couple of seconds without telling every node yourself?",
+		},
+		Answer: "The answer: gossip faster and to more peers: every half second to three peers reaches all 32 nodes in about two seconds, because the number of nodes that know grows by a factor of four each round. Telling every node directly is as quick, but one node sends them all.",
+		Predictions: []Prediction{{ID: "p1", Question: "A cluster doubles from 32 to 64 nodes. How does the time for gossip to reach every node change?", Options: []string{"It grows by about one extra round", "It doubles, as the cluster does", "It stays exactly the same"}, Answer: 0,
+			Explain: "Each round multiplies the number of nodes that know, so doubling the cluster adds only about one more round. Telling every node yourself would double the messages one node must send."}},
+		Debrief: "{{gossip|Gossip}} spreads news the way a rumour spreads: each node that knows tells a few others every round, so the time to reach everyone grows with the logarithm of the cluster and no node sends more than its fanout per round. It is slower than telling everyone directly but scales, and it needs no central list. The interval and the fanout set the time, and until the news arrives, a node acts on an out-of-date view.",
+		Deeper:  "Epidemic dissemination reaches all N nodes in about log base (1+fanout) of N rounds with high probability, and the work per node per round is constant, so it scales to thousands of nodes and tolerates the loss of any node or message, since the news arrives by many paths. The costs are delay, which sets how long a node acts on an old view; duplicate messages, because nodes keep telling nodes that already know; and probabilistic guarantees instead of certain ones. Direct broadcast is fastest and simplest but puts N messages on one node, and fails if that node dies mid-send. Systems that gossip membership and failure suspicion, such as Cassandra and Consul, add suspicion levels and indirect probes so one lost message does not mark a healthy node dead. An interviewer will ask how long a rumour takes to reach everyone, why the number of rounds is logarithmic, and how a partition changes that: the two sides each learn their own news and merge it when they reconnect.",
+	})
+
 	// Quorum overlap: a key-value store that answers quickly but sometimes shows a client its own old data
 	quorumOverlap := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0

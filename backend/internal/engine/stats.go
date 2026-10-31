@@ -304,6 +304,11 @@ func (s *Sim) Snapshot() Stats {
 				ex["staleLeaderWrites"] = float64(n.coordStaleAcks)
 			}
 		}
+		if n.kvMemberMsgs > 0 || n.kvStaleView > 0 {
+			ex["membershipMsgs"] = n.kvMemberMsgs
+			ex["timeToAllSec"] = n.kvTimeToAll / 1000
+			ex["staleViewRequests"] = float64(n.kvStaleView)
+		}
 		if n.kvRepairs > 0 {
 			ex["repairs"] = float64(n.kvRepairs)
 		}
