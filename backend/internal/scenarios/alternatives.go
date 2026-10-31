@@ -191,6 +191,12 @@ var alternatives = map[string][]Alternative{
 		alt("Use a single partition", false, 100.0, 132, 0.54, "Everything is in order, since one worker reads one partition, but one worker cannot keep up: only 28% of the messages are delivered.", Change{"log", "partitions", 1.0}),
 		alt("Use eight partitions, still spread evenly", false, 100.0, 132, 0.59, "More partitions and more places for one conversation's messages to land: 915 messages are handled out of order instead of 298.", Change{"log", "partitions", 8.0}),
 	},
+	"failing-refund": {
+		alt("Try a failed refund once more", false, 60.1, 321, 1.00, "Down from 59 stuck orders to 9, but a refund that fails twice in a row (one time in sixteen) still strands an order: 9 against a limit of 3.", Change{"app", "compensationRetries", 1.0}),
+		alt("Try a failed refund twice more", true, 59.1, 321, 1.00, "It passes on this seed with 2 stuck orders, but the margin is thin: three tries all failing still happens once in 64 refunds, and other seeds show 4 stuck. The reference tries five times.", Change{"app", "compensationRetries", 2.0}),
+		alt("Skip the undo and run the steps naively", false, 62.1, 328, 1.00, "No undo can fail because none is tried, but 661 orders are left half done: a charge with nothing to show for it.", Change{"app", "workflow", "naive"}),
+		alt("Use two-phase commit", false, 36.3, 517, 1.00, "Nothing is undone by hand, but a failed vote still has to release what the others held, and those calls fail too: 68 stuck, a p95 over budget and a success rate of 36%.", Change{"app", "workflow", "twoPhase"}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),
