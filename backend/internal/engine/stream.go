@@ -51,7 +51,8 @@ func (s *Sim) streamCrashed(n *node) {
 	if logged {
 		perEvent = n.f("replayMs")
 	}
-	n.winRecSec = max(n.winRecSec, 1+float64(n.winEvCP)*perEvent/1000)
+	n.winRecSec = max(n.winRecSec, 1+float64(n.winEvCP)*perEvent/1000) // reported, not played out: the job is down only for the chaos event's downtime
+	n.winEvCP, n.winCPAt = 0, s.now
 	if logged || n.s("delivery") == "exactlyOnce" {
 		return
 	}

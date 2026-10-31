@@ -134,7 +134,7 @@ var alternatives = map[string][]Alternative{
 	},
 	"nobody-to-wait-for": {
 		alt("Use a saga instead", true, 72.8, 321, 1.00, "It passes: nothing is locked across steps, so a dead server blocks nobody, and it is faster. The price is not in the goals: other customers can see stock reserved for an order that is later undone, which two- and three-phase commit never show.", Change{"app", "workflow", "saga"}),
-		alt("Use three-phase commit and keep the one-second wait", false, 65.0, 696, 1.00, "No transaction is in doubt, but each of the services that were mid-transaction waits a full second before deciding: 24 lock-seconds against a limit of 12. The timeout is the price of guessing that a silent server is dead.", Change{"app", "workflow", "threePhase"}),
+		alt("Use three-phase commit and keep the one-second wait", false, 64.4, 710, 1.00, "No transaction is in doubt, but every service that held a row waits a full second before deciding alone: 65 lock-seconds against a limit of 15. The timeout is the price of guessing that a silent server is dead.", Change{"app", "workflow", "threePhase"}),
 	},
 	"restart-the-counter": {
 		alt("Deliver exactly once", false, 96.4, 132, 0.90, "Nothing is repeated, but the job still reloads its save and handles the last twenty seconds again at full cost: 2.21 s to catch up against a limit of 1.5.", Change{"counter", "delivery", "exactlyOnce"}),

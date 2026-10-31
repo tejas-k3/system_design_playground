@@ -35,7 +35,7 @@ func (s *Sim) workflowWrite(n *node, c *call, mode string, done func(Result)) bo
 		return false
 	}
 	if mode == "twoPhase" || mode == "threePhase" {
-		s.twoPhase(n, c, steps, mode == "threePhase", done)
+		s.atomicCommit(n, c, steps, mode == "threePhase", done)
 		return true
 	}
 	var run func(i int)
@@ -67,24 +67,24 @@ func (s *Sim) workflowWrite(n *node, c *call, mode string, done func(Result)) bo
 	return true
 }
 
-// twoPhase asks every service to prepare (vote and hold its row), then tells every one to commit. A failed vote
-// aborts the ones that already voted yes. If the coordinator dies after a yes vote and before the decision is
+// atomicCommit runs two-phase commit, or three-phase with three set. Two-phase asks every service to prepare (vote and
+// hold its row), then tells every one to commit. A failed vote aborts the ones that already voted yes. If the coordinator dies after a yes vote and before the decision is
 // delivered, the services that voted cannot decide on their own: they stay locked until the coordinator restarts.
 // With three phases a pre-commit round sits between the votes and the commit, so no service is ever unsure while
 // locked: when the coordinator dies they wait out a timeout, then abort (before pre-commit) or commit (after it).
-func (s *Sim) twoPhase(n *node, c *call, steps []*edge, three bool, done func(Result)) {
+func (s *Sim) atomicCommit(n *node, c *call, steps []*edge, three bool, done func(Result)) {
 	ep := n.epoch
 	rounds := 2
 	if three {
 		rounds = 3
 	}
-	lost := func() bool {
+	lost := func(voted int) bool {
 		if n.epoch == ep {
 			return false
 		}
 		if three {
-			if c.counted {
-				s.runBlockedSec += n.f("termTimeoutMs") / 1000
+			if c.counted { // each service that holds its row waits one timeout before it decides alone
+				s.runBlockedSec += float64(voted) * n.f("termTimeoutMs") / 1000
 			}
 		} else {
 			if c.counted {
@@ -97,6 +97,7 @@ func (s *Sim) twoPhase(n *node, c *call, steps []*edge, three bool, done func(Re
 	}
 	var phase func(i, round int)
 	phase = func(i, round int) {
+		last := round == rounds-1 // the commit itself: no abort is possible any more
 		if i == len(steps) {
 			if round+1 < rounds {
 				phase(0, round+1)
@@ -106,14 +107,18 @@ func (s *Sim) twoPhase(n *node, c *call, steps []*edge, three bool, done func(Re
 			return
 		}
 		s.callCmd(n, steps[i], c, stepCmd(steps[i]), 0, func(res Result) {
-			if lost() {
+			voted := i // the services that have answered yes and now hold their rows
+			if round > 0 {
+				voted = len(steps)
+			}
+			if lost(voted) {
 				return
 			}
 			if res.OK {
 				phase(i+1, round)
 				return
 			}
-			if i == 0 || round > 0 {
+			if i == 0 || last {
 				done(res)
 				return
 			}
@@ -155,9 +160,13 @@ func (s *Sim) compensate(n *node, c *call, steps []*edge, i int, stuck bool, the
 	})
 }
 
+func isWorkflowMode(m string) bool {
+	return m == "naive" || m == "saga" || m == "twoPhase" || m == "threePhase"
+}
+
 // runsWorkflow is whether this server's writes are multi-step workflows, in which case the external services are
 // steps of the workflow and not an extra call made before it.
 func (s *Sim) runsWorkflow(n *node) bool {
 	m := n.s("workflow")
-	return (m == "naive" || m == "saga" || m == "twoPhase" || m == "threePhase") && len(s.workflowSteps(n)) >= 2
+	return isWorkflowMode(m) && len(s.workflowSteps(n)) >= 2
 }

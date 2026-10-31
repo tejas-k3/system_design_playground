@@ -301,7 +301,7 @@ func registerScaleOut() {
 			for k := range d.Nodes {
 				if d.Nodes[k].ID == "app" {
 					d.Nodes[k].Params["workflow"] = "threePhase"
-					d.Nodes[k].Params["termTimeoutMs"] = 300.0
+					d.Nodes[k].Params["termTimeoutMs"] = 100.0
 				}
 			}
 		}

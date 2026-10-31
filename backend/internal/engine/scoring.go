@@ -266,7 +266,7 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 		checks = append(checks, Check{"Wait for a window's first result", fmt.Sprintf("≤ %.0f s", *g.MaxResultDelaySec), fmt.Sprintf("%.0f s", run.ResultDelaySec), run.ResultDelaySec <= *g.MaxResultDelaySec+eps})
 	}
 	if g.MaxBlockedSec != nil {
-		checks = append(checks, Check{"Lock-seconds held for a dead coordinator", fmt.Sprintf("≤ %.0f s", *g.MaxBlockedSec), fmt.Sprintf("%.1f s", run.BlockedSec), run.BlockedSec <= *g.MaxBlockedSec+eps})
+		checks = append(checks, Check{"Lock-seconds held for a dead coordinator", fmt.Sprintf("≤ %.1f s", *g.MaxBlockedSec), fmt.Sprintf("%.1f s", run.BlockedSec), run.BlockedSec <= *g.MaxBlockedSec+eps})
 	}
 	if g.MaxRepeatedOutputs != nil {
 		checks = append(checks, Check{"Outputs repeated after a crash", fmt.Sprintf("≤ %d", *g.MaxRepeatedOutputs), fmt.Sprint(run.RepeatedOutputs), run.RepeatedOutputs <= *g.MaxRepeatedOutputs})
