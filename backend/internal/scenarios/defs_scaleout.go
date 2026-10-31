@@ -623,4 +623,34 @@ func registerScaleOut() {
 		Debrief: "A saga moves the problem from the transaction to the undo, which can fail like any step. Make each compensation {{idempotency|idempotent}} so it can be retried safely, retry it with a limit, and send what still fails to a queue a person works through. Count the orders that end up stuck, because that is the real size of the problem.",
 		Deeper:  "In a saga every step has a compensation, and a compensation is a call to another service, so it can fail, time out or succeed without the caller knowing. The ways to make that safe are to make compensations idempotent (an idempotency key per order) so a retry never refunds twice, to retry with a limit and backoff, to persist the saga's state so a crash does not forget which undos remain, and to route the ones that still fail to a dead-letter queue or a manual queue with an alert. Compensations that cannot be undone, such as an email sent, belong at the end of the saga. The cost of retrying is a longer failed order and more load on a processor that is already struggling, so a circuit breaker belongs here too. An interviewer will ask what happens when the compensation itself fails and how you know an order is stuck.",
 	})
+
+	// Presence: a heartbeat from every user is a write, and it does not need to survive a restart
+	presence := func(fixed bool) engine.Diagram {
+		b := (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 1500.0, "readPct": 10.0, "keySpace": 20000.0, "keyDist": "uniform", "timeoutMs": 1000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 64.0, "cpuMs": 1.0, "queueCap": 400.0})
+		if fixed {
+			return b.n("presence", engine.KKVStore, cols[2], rowMid, P{"nodes": 5.0, "writeQuorum": 1.0, "readQuorum": 1.0}).label("presence", "Presence").
+				e("users", "app").e("app", "presence").done()
+		}
+		return b.n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "readMs": 2.0, "writeMs": 15.0}).label("db", "Presence").
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "who-is-online", Title: "Who is online", Difficulty: "Medium",
+		Summary: "Every user's heartbeat is a database write, and the database cannot keep up.",
+		Story:   "A chat app shows a green dot next to friends who are online. Each connected user sends a heartbeat every few seconds, 1,500 a second in all, and the app writes each one to the database. Most of the traffic is writes of a value that is useless a minute later; the occasional read asks who is online. The database does a write in 15 ms and has 16 connections. Serve at least 97% of requests with a {{p95|95th percentile}} under 300 ms.",
+		Diagram: presence(false), Solution: presence(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(300), MaxCostPerHour: f(3.5), StarCostPerHour: f(3.0)},
+		DurationSec: 30, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at what is full. Is the app server short of threads, or the place the heartbeats are written?",
+			"Does a heartbeat need to survive a restart? It is replaced by the next one a few seconds later.",
+			"A key-value store spreads writes over several nodes and can acknowledge after one copy. Would that be enough for a value that is replaced every few seconds?",
+		},
+		Answer: "The answer: keep presence in a key-value store that acknowledges after one copy, instead of the database. A heartbeat is a short-lived, constantly replaced value, so a lost copy costs a few seconds of wrong green dots, while a durable write per heartbeat costs more than one database can do.",
+		Predictions: []Prediction{{ID: "p1", Question: "Heartbeats are sent every 10 seconds instead of every 5. What happens to the writes?", Options: []string{"They halve, and a departure is noticed later", "They halve, and a departure is noticed sooner", "They stay the same, since the same users are connected"}, Answer: 0,
+			Explain: "Each user sends half as many heartbeats, so there are half as many writes. The last heartbeat of a user who left is older for longer before it counts as missing, so the dot stays green longer."}},
+		Debrief: "Presence is soft state: it is rewritten every few seconds, it is wrong the moment it is read, and losing it costs nothing lasting. Paying for durable writes on it wastes the database. A store that spreads writes over several nodes and acknowledges after one fits, ideally with an expiry per entry: a user whose heartbeats stop disappears after the expiry, which sets how long a green dot stays wrong. The interval is a trade-off in its own right: a shorter heartbeat finds departures sooner and multiplies the writes, and telling every friend on each change multiplies them again, so large systems send changes only to friends who are looking.",
+	})
 }
