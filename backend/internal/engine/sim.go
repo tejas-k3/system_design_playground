@@ -129,6 +129,9 @@ type node struct {
 	kx              *kvExtra
 	kvRepairs       int
 	coordDown       []float64    // coordinator: when each cluster node comes back (0 = up)
+	coordStaleUntil float64      // coordinator: a leader that was cut off goes on answering writes until then
+	coordElections  int          // coordinator: leaders elected since the start
+	coordStaleAcks  int          // coordinator: writes acknowledged by a leader that had been replaced
 	coordFaults     *coordFaults // coordinator: members that drop messages or give wrong answers, once a chaos event makes one
 	coordLeader     int          // coordinator: the leader, -1 while there is none
 	coordTerm       int

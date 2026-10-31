@@ -31,7 +31,7 @@ describe('eventLabel', () => {
 
 describe('eventGlyph', () => {
   it('gives every known event a distinct one-character cue so markers do not rely on colour', () => {
-    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'scaleUp', 'serverUp', 'scaleDown', 'gc', 'compaction', 'configPush']
+    const types = ['crash', 'restart', 'slow', 'slowEnd', 'partition', 'heal', 'failoverDetected', 'promotion', 'splitbrain', 'elected', 'noLeader', 'scaleUp', 'serverUp', 'scaleDown', 'gc', 'compaction', 'configPush']
     const glyphs = types.map(eventGlyph)
     expect(new Set(glyphs).size).toBe(types.length)
     expect(glyphs.every((g) => g.length === 1)).toBe(true)
@@ -61,5 +61,13 @@ describe('eventMarks', () => {
   })
   it('is empty with a degenerate window', () => {
     expect(eventMarks([ev(5, 'crash')], { t0: 5, t1: 5, left: 0, width: 100 })).toEqual([])
+  })
+})
+
+describe('leader election events', () => {
+  it('names the term of a new leader and the loss of a leader', () => {
+    expect(eventLabel(ev(16, 'elected', 'Database', { lost: 3 }))).toBe('Database: a new leader was elected for term 3')
+    expect(eventLabel(ev(15, 'noLeader'))).toBe('Database has no leader')
+    expect(eventGlyph('elected')).toBe('L')
   })
 })

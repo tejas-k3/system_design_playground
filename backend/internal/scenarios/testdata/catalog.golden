@@ -76,6 +76,7 @@ nobody-on-call 0455f362e184abdf90d939cbc1d837fabc2f33f63bc59504b14cf32e788e4ba9 
 lost-cart 01c8b963e59d5c1f6094c139d6e06e3de552ff07d47d96f71dec89dd71ad4bd5 start=false/0/1.0000/177.4 solution=true/3/1.0000/177.4
 older-write-wins a17441843a702da947cfc76b8a7bc59883f45f6e06d3b5189c4854a2d4e27055 start=false/0/1.0000/177.4 solution=true/3/1.0000/177.4
 liar-in-the-group ba8e3497236e2d7572c1af87b2461391644423c2bad02ff7019286dcc148d79e start=false/0/1.0000/134.4 solution=true/2/1.0000/137.1
+old-leaders-writes b314421853c0ed2bc1b41fb7f72c10388d53a9b23f951ab0b8ff7da0fc9cf8a6 start=false/0/1.0000/134.4 solution=true/2/0.9779/134.4
 quorum-overlap 4e03d43d292a37dba955b10519e25eea5e05856373e96c0e6f9d07ca06413031 start=false/0/1.0000/160.7 solution=true/3/1.0000/216.2
 lease-expired f9db534e439db6226bbe40f456336db2ebcd4be8410fda299d97ec3f05116d41 start=false/0/0.9790/2327.9 solution=true/2/0.9790/2327.9
 who-is-the-leader 838c0e580fb2ed7f92b2eac175a9a6e8be994e0029cd94ce6cf988804e15f404 start=false/0/0.6771/173.9 solution=true/3/0.9292/177.4

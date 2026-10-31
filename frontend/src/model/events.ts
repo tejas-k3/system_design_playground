@@ -2,7 +2,7 @@ import type { SimEvent } from '../api/types'
 
 const GLYPHS: Record<string, string> = {
   crash: 'X', restart: 'R', slow: 'S', slowEnd: 'N', partition: 'P', heal: 'H',
-  failoverDetected: 'D', promotion: 'F', splitbrain: 'B', scaleUp: '+', serverUp: 'U', scaleDown: '-', gc: 'G', compaction: 'C', oom: 'M', badDeploy: 'R', configPush: 'K', rollback: 'r', purge: 'X', corrupt: '!', restore: 'Y', addShard: 'A',
+  failoverDetected: 'D', elected: 'L', noLeader: 'Q', promotion: 'F', splitbrain: 'B', scaleUp: '+', serverUp: 'U', scaleDown: '-', gc: 'G', compaction: 'C', oom: 'M', badDeploy: 'R', configPush: 'K', rollback: 'r', purge: 'X', corrupt: '!', restore: 'Y', addShard: 'A',
 }
 
 /** One-character cue drawn on a chart marker, so events never depend on colour alone. */
@@ -29,6 +29,8 @@ export function eventLabel(e: SimEvent): string {
     case 'oom': return `${e.label} ran out of memory and was killed`
     case 'compaction': return `${e.label} is compacting: writes wait`
     case 'gc': return `${e.label} paused for garbage collection`
+    case 'elected': return `${e.label}: a new leader was elected for term ${e.lost ?? '?'}`
+    case 'noLeader': return `${e.label} has no leader`
     case 'failoverDetected': return `Failure of ${e.label} noticed`
     case 'promotion': return `${e.label} promoted to primary (${e.lost ? writes(e.lost) : 'no writes lost'})`
     case 'splitbrain': return `${e.label} rejoined as primary: ${writes(e.lost ?? 0)}`

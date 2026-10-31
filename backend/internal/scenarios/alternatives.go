@@ -163,6 +163,11 @@ var alternatives = map[string][]Alternative{
 		alt("Add checksums to the answers", false, 100.0, 134, 0.52, "A checksum would show data damaged on the way or on the disk, and the damaged answer would be dropped. This member lies with a matching checksum, so nothing changes: 1,240 wrong answers.", Change{"config", "answerChecksums", true}),
 		alt("Four members, built for two liars", false, 0.0, 0, 0.60, "To tolerate two liars the group needs seven members, waits for all but two replies and needs three matching. Four members can never find three, so every request is refused, faulty member or not.", Change{"config", "nodes", 4.0}, Change{"config", "faultModel", "arbitrary"}, Change{"config", "faultsTolerated", 2.0}),
 	},
+	"old-leaders-writes": {
+		alt("Run five members", false, 100.0, 134, 0.68, "More members do not shorten the time the old leader keeps answering: the same 362 acknowledged writes are lost, and the bill goes up.", Change{"config", "nodes", 5.0}),
+		alt("Shorten the election timeout to 100 ms", false, 100.0, 134, 0.52, "The new leader is elected sooner, but the old one still acknowledges for eight seconds: 362 writes lost.", Change{"config", "electionTimeoutMs", 100.0}),
+		alt("Let the cut-off leader step down after half a second", false, 98.9, 134, 0.52, "Much better, but half a second of acknowledged writes is still 32 lost writes against a limit of 20: the step-down time is the loss.", Change{"config", "stepDownSec", 0.5}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),

@@ -102,6 +102,11 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 			s.kvNodesDown(t, int(ev.Factor), ev.DurationSec*1000)
 		}
 		return
+	case "leaderCut":
+		if t.kind == KCoordinator {
+			s.coordLeaderCut(t, ev.DurationSec*1000)
+		}
+		return
 	case "leaderDown":
 		if t.kind == KCoordinator {
 			s.coordLeaderDown(t, ev.DurationSec*1000)
