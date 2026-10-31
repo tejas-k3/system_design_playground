@@ -91,6 +91,12 @@ var alternatives = map[string][]Alternative{
 		alt("Wait for two copies on reads only (R=2, W=1)", false, 100.0, 161, 1.30, "Closer, but 2 + 1 is still not more than 3: one read in the run still missed a write.", Change{"kv", "readQuorum", 2.0}),
 		alt("Write to all three copies (R=1, W=3)", true, 100.0, 321, 1.30, "1 + 3 is more than 3, so it works, but every write waits for the slowest copy (p95 321 ms against 216) and would fail if any copy were down.", Change{"kv", "writeQuorum", 3.0}),
 	},
+	"effect-before-cause": {
+		alt("Wait for two copies on reads only (R=2, W=1)", false, 100.0, 161, 1.30, "A read of two copies finds the newest of them, so most violations go (7 left in the run, from 63), but a write on a single copy can still sit where neither read looked: 2 + 1 is not more than 3.", Change{"kv", "readQuorum", 2.0}),
+		alt("Wait for two copies on writes only (R=1, W=2)", false, 100.0, 212, 1.30, "A read still asks a single copy, and it can be the one copy a write has not reached, so 42 violations remain and every write got slower.", Change{"kv", "writeQuorum", 2.0}),
+		alt("Write to all three copies (R=1, W=3)", false, 100.0, 315, 1.30, "No violations at all, because every read meets every write, but each write waits for the slowest copy: p95 is 315 ms against a limit of 260, and a write would fail while any copy is down.", Change{"kv", "writeQuorum", 3.0}),
+		alt("Turn on read repair", false, 100.0, 161, 1.30, "A read that finds a stale copy brings it up to date, so most violations go (5 left) without any extra wait. It cannot help the first read after a write, so it does not reach zero.", Change{"kv", "readRepair", true}),
+	},
 	"lease-expired": {
 		alt("Make the lock lease 1 second", true, 97.5, 2238, 2.71, "Passes this run, because every pause (600 ms) is shorter than the lease. It is a bet on how long a pause can be: with 3-second pauses it double books again (6 on this seed), where the conditional write still has none.", Change{"app1", "lockTtlMs", 1000.0}, Change{"app2", "lockTtlMs", 1000.0}, Change{"app3", "lockTtlMs", 1000.0}),
 	},

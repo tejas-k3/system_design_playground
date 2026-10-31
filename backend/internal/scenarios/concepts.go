@@ -53,6 +53,7 @@ var conceptTags = map[string][]string{
 	"restore-drill":          {"failure-handling", "replication"},
 	"lost-cart":              {"consistency", "replication"},
 	"quorum-overlap":         {"consistency", "replication"},
+	"effect-before-cause":    {"consistency", "replication"},
 	"lease-expired":          {"consistency", "failure-handling"},
 	"add-a-shard":            {"sharding", "capacity"},
 	"heavy-tail":             {"capacity", "overload-control"},
