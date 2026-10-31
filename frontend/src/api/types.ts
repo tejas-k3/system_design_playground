@@ -383,6 +383,7 @@ export interface RunStats {
   monotonicBroken?: number // reads older than one the same client already had
   monotonicWritesBroken?: number // writes applied out of the client's issue order
   writesFollowReadsBroken?: number // writes applied to a copy older than a value the client read
+  causalBroken?: number // reads of a cause older than an effect the same client had already seen
   lostUpdates?: number // transfers that silently overwrote a concurrent commit (read committed)
   txAborts?: number // transactions aborted by a write conflict or as a deadlock victim
   deadlocks?: number

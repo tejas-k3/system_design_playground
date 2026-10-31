@@ -13,6 +13,11 @@ describe('per-client guarantees goal', () => {
     expect(r.actual).toBe('5')
     expect(r.state).toBe('fail')
   })
+  it('also counts writes out of order, writes that skipped a read value and effects seen before their cause, as the server does', () => {
+    const r = row(goalRows(goals, stats({ resolved: 100, ok: 100, readYourWritesBroken: 3, monotonicBroken: 2, monotonicWritesBroken: 4, writesFollowReadsBroken: 1, causalBroken: 6 }), 1, true), 'Per-client guarantees broken')
+    expect(r.actual).toBe('16')
+    expect(r.state).toBe('fail')
+  })
   it('passes with none', () => {
     expect(row(goalRows(goals, stats({ resolved: 100, ok: 100 }), 1, true), 'Per-client guarantees broken').state).toBe('pass')
   })
