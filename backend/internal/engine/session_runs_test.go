@@ -5,6 +5,46 @@ import (
 	"testing"
 )
 
+func dnsRun(ttl float64) (RunStats, float64) {
+	d, _ := Sanitize(Diagram{Nodes: []Node{
+		{ID: "users", Kind: KClient, Params: Params{"rps": 60.0, "readPct": 100.0, "keySpace": 200.0, "timeoutMs": 1000.0, "dnsTtlSec": ttl}},
+		{ID: "a", Kind: KAppServer, Params: Params{"threads": 64.0}},
+		{ID: "b", Kind: KAppServer, Params: Params{"threads": 64.0}},
+		{ID: "db", Kind: KDatabase, Params: Params{"connections": 64.0}},
+	}, Edges: []Edge{{ID: "users>a", From: "users", To: "a"}, {ID: "users>b", From: "users", To: "b"}, {ID: "a>db", From: "a", To: "db"}, {ID: "b>db", From: "b", To: "db"}}})
+	s := New(d, Options{Seed: 42, StopTrafficAtMs: 40000, Chaos: []ChaosEvent{{Type: "crash", NodeID: "a", AtSec: 5, DownSec: 60}}})
+	for !s.Finished() && s.Now() < 45000 {
+		s.Advance(100)
+	}
+	return s.RunSnapshot(), s.CostPerHour()
+}
+
+func TestDNSStaleAddressesExpireAndShorterTTLResolvesMoreOften(t *testing.T) {
+	long, _ := dnsRun(30)
+	short, _ := dnsRun(2)
+	plain, _ := dnsRun(0)
+	if long.Errors["staleDNS"] <= short.Errors["staleDNS"] || short.Errors["staleDNS"] == 0 {
+		t.Fatalf("stale address failures long=%d short=%d", long.Errors["staleDNS"], short.Errors["staleDNS"])
+	}
+	if short.DNSLookups <= long.DNSLookups {
+		t.Fatalf("lookups short=%d long=%d", short.DNSLookups, long.DNSLookups)
+	}
+	if plain.DNSLookups != 0 || plain.Errors["staleDNS"] != 0 || plain.Errors["nodeDown"] == 0 {
+		t.Fatalf("TTL 0 changed today's routing: %+v", plain)
+	}
+}
+
+func TestDNSLookupCostIsIncludedInHourlyCost(t *testing.T) {
+	short, shortCost := dnsRun(2)
+	long, longCost := dnsRun(30)
+	if short.DNSLookups <= long.DNSLookups {
+		t.Fatal("short TTL should resolve more often")
+	}
+	if short.DNSLookups == 0 || long.DNSLookups == 0 || shortCost <= longCost {
+		t.Fatalf("lookups/cost: short=%d/$%.5f, long=%d/$%.5f", short.DNSLookups, shortCost, long.DNSLookups, longCost)
+	}
+}
+
 // sessionRun drives a real run: 200 requests a second, half of them writes, over 20 keys, through an app server
 // to a key-value store with the given quorums (or to a plain database when kvQuorums is nil).
 func sessionRun(model string, kvQuorums []float64) RunStats {

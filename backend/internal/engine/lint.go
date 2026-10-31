@@ -78,6 +78,9 @@ func Lint(d Diagram) []Finding {
 	retrying, patience := false, 0.0
 	for _, id := range clients {
 		c := res[id]
+		if pf(c, "dnsTtlSec", 0) > 60 && out[id] > 1 {
+			add("long-dns-ttl", "warn", "A long DNS TTL keeps a failed target in rotation longer and delays failover.", "Lower the DNS record TTL if callers must move to a healthy target sooner; the trade-off is more lookups.", id)
+		}
 		if pf(c, "retries", 0) > 0 {
 			if ps(c, "backoff") == "none" {
 				noBackoff = append(noBackoff, id)

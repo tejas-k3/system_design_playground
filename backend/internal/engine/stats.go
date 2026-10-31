@@ -68,6 +68,7 @@ type RunStats struct {
 	FailP50              float64         `json:"failP50"`        // median time to failure; the latencies above count successes only
 	Mean                 float64         `json:"mean"`
 	Errors               map[string]int  `json:"errors"`
+	DNSLookups           int             `json:"dnsLookups,omitempty"`
 	Conflicts            int             `json:"conflicts"`
 	Fresh                int             `json:"freshReads"`
 	Stale                int             `json:"staleReads"`
@@ -381,7 +382,7 @@ func (s *Sim) Snapshot() Stats {
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
 		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.Quantile(0.95), ITLMs: s.itlHist.Quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		Errors: map[string]int{}, DNSLookups: s.runDNSLookups, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.Quantile(0.95), ITLMs: s.itlHist.Quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {
@@ -400,6 +401,9 @@ func (s *Sim) Snapshot() Stats {
 		if !n.removed {
 			cost += Spec(n.kind).cost(n.p) * float64(s.instancesOf(n))
 		}
+	}
+	if s.now > 0 {
+		cost += float64(s.runDNSLookups) / (s.now / 1000) * 3600 * dnsLookupCost
 	}
 	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: cost, AvgCost: s.CostPerHour(), Run: run}
 	st.Series = append(make([]SeriesPoint, 0, len(s.series)), s.series...) // never nil: JSON must be [] not null

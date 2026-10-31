@@ -158,6 +158,7 @@ type node struct {
 	global          *bucket         // the single allowance of a window-based limiter that is not per user
 	buckets         map[int]*bucket // a per-user rate limiter's allowance for each account seen so far
 	badUntil        float64         // a bad release answers every request with an error until then (0 = none)
+	dnsNextLookup   float64         // client: when its cached DNS answer expires
 	region          string          // where in the world it runs, kept in step with the 'region' setting
 	zone            string          // availability zone, kept in step with the 'zone' setting
 	down            bool
@@ -323,6 +324,7 @@ type Sim struct {
 	failHist                                  Hist
 
 	runResolved, runOK, runFailed, runPending int
+	runDNSLookups                             int
 	runErrors                                 [NumReasons]int
 	runConflicts, runFresh, runStale, runDup  int
 	runSessReads, runRYW, runMono             int

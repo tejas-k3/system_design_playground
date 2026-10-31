@@ -109,6 +109,7 @@ func init() {
 			CanConnect: []string{KLoadBalancer, KAppServer, KCDN, KRateLimiter},
 			Params: []ParamSpec{
 				flag("geoRouting", "Send users to the nearest region", "Traffic", false, "With a stack in more than one region connected to these users, send each request to the one in the region closest to them (geo-DNS routing), and to the next nearest if that one is down. Off: take turns among all of them.").adv(),
+				num("dnsTtlSec", "DNS record TTL", "Traffic", 0, 0, 3600, 1, "s", "How long Users keeps sending to a failed target before resolving its name again. 0 keeps today's routing behaviour. Each lookup costs $0.00001; a shorter TTL can restore traffic sooner but increases lookups.").adv(),
 				sel("arrival", "User behaviour", "Traffic", "open", "Independent users keep arriving whatever happens (a crowd of strangers). Bursty users arrive in short rushes with the same average. A fixed crowd waits for each answer, thinks, then asks again, so it slows down when the system does.",
 					opt("open", "Independent users (steady arrivals)"), opt("bursty", "Bursty: short rushes"), opt("closed", "A fixed crowd that waits and thinks"), opt("sessions", "Connected users (long-lived connections)")),
 				num("users", "Users", "Traffic", 50, 1, 5000, 10, "", "How many users there are; each has at most one request in flight.").showIf("arrival", "closed"),

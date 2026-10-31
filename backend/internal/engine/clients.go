@@ -253,12 +253,32 @@ func (s *Sim) startAttempt(lg *logical) {
 		return
 	}
 	c := lg.client
-	e := s.pickCyclic(c, "out", c.out, nil)
+	ttl := c.f("dnsTtlSec")
+	var e *edge
+	if ttl > 0 {
+		if c.dnsNextLookup <= s.now {
+			s.runDNSLookups++
+			c.dnsNextLookup = s.now + ttl*1000
+		}
+		e = s.pickCyclic(c, "out", c.out, func(edge *edge) bool {
+			return !edge.to.down || s.now-edge.to.downAt < ttl*1000
+		})
+	} else {
+		e = s.pickCyclic(c, "out", c.out, nil)
+	}
 	if c.b("geoRouting") {
-		e = s.nearestEdge(c)
+		if ttl > 0 {
+			e = s.nearestEdgeDNS(c, ttl)
+		} else {
+			e = s.nearestEdge(c)
+		}
 	}
 	if e == nil {
 		s.resolve(lg, Result{Reason: RNoRoute})
+		return
+	}
+	if ttl > 0 && e.to.down && s.now-e.to.downAt < ttl*1000 {
+		s.resolve(lg, Result{Reason: RStaleDNS})
 		return
 	}
 	lg.attempts++
@@ -400,9 +420,14 @@ func (s *Sim) resolve(lg *logical, res Result) {
 // nearestEdge is geo routing: of the places a client can send to, those in the region closest to the user, taking
 // turns among them. If every nearby one is down the next nearest is used (a failover across regions).
 func (s *Sim) nearestEdge(c *node) *edge {
+	return s.nearestEdgeDNS(c, 0)
+}
+
+func (s *Sim) nearestEdgeDNS(c *node, ttl float64) *edge {
+	usable := func(e *edge) bool { return !e.removed && (!e.to.down || s.now-e.to.downAt < ttl*1000) }
 	best := -1.0
 	for _, e := range c.out {
-		if e.removed || e.to.down {
+		if !usable(e) {
 			continue
 		}
 		if d := regionMs(c.region, e.to.region); best < 0 || d < best {
@@ -410,7 +435,10 @@ func (s *Sim) nearestEdge(c *node) *edge {
 		}
 	}
 	if best < 0 {
+		if ttl > 0 {
+			return nil
+		}
 		return s.pickCyclic(c, "out", c.out, nil)
 	}
-	return s.pickCyclic(c, "geo", c.out, func(e *edge) bool { return !e.to.down && regionMs(c.region, e.to.region) == best })
+	return s.pickCyclic(c, "geo", c.out, func(e *edge) bool { return usable(e) && regionMs(c.region, e.to.region) == best })
 }

@@ -131,6 +131,24 @@ func TestLintDanglingAndSynchronisedExpiry(t *testing.T) {
 	}
 }
 
+func TestLintWarnsOnLongDNSCacheWithSeveralTargets(t *testing.T) {
+	d := lintDiagram(2, Params{"dnsTtlSec": 120.0}, nil, nil)
+	d.Edges = append(d.Edges, Edge{ID: "users>app2", From: "users", To: "app2"})
+	f, ok := rules(Lint(d))["long-dns-ttl"]
+	if !ok || f.Severity != "warn" || !strings.Contains(f.Message, "delays failover") || !strings.Contains(f.Fix, "more lookups") {
+		t.Fatalf("long DNS TTL finding = %+v, found=%v", f, ok)
+	}
+	d.Nodes[0].Params["dnsTtlSec"] = 60.0
+	if _, ok := rules(Lint(d))["long-dns-ttl"]; ok {
+		t.Fatal("60 seconds should not trigger the greater-than-60 warning")
+	}
+	d.Nodes[0].Params["dnsTtlSec"] = 120.0
+	d.Edges = d.Edges[:1]
+	if _, ok := rules(Lint(d))["long-dns-ttl"]; ok {
+		t.Fatal("a single target has no alternate to fail over to")
+	}
+}
+
 func TestLintIsPureAndDeterministic(t *testing.T) {
 	d := lintDiagram(1, Params{"retries": 3.0, "backoff": "none"}, nil, nil)
 	a, b := Lint(d), Lint(d)

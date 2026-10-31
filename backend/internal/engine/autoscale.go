@@ -52,8 +52,13 @@ func (s *Sim) CostPerHour() float64 {
 			c += s.storeUsageCost(n)
 		}
 	}
+	if s.now > 0 {
+		c += float64(s.runDNSLookups) / (s.now / 1000) * 3600 * dnsLookupCost
+	}
 	return c
 }
+
+const dnsLookupCost = 0.00001
 
 func (s *Sim) averageInstances(n *node) float64 {
 	if s.autoscaled(n) && n.as.instArea > 0 && s.now > 0 {
