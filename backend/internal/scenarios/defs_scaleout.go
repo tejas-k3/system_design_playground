@@ -394,4 +394,39 @@ func registerScaleOut() {
 			Explain: "A remembered yes is not checked again until it expires, so a revocation takes up to a minute to take effect. A shorter time lowers the risk and raises the load."}},
 		Debrief: "A service every request depends on is both a bottleneck and a single point of failure. Remembering its answers for a short time removes most of the load and rides out a short outage; verifying a signed token on each server removes the call altogether, at the price of noticing a revocation only when the token expires. Failing open keeps the site up by letting everyone in, which is rarely acceptable.",
 	})
+
+	// Where login sessions live: two app servers keep sessions in memory; one restarts
+	loginSessions := func(fixed bool) engine.Diagram {
+		state := "local"
+		if fixed {
+			state = "shared"
+		}
+		app := P{"threads": 16.0, "queueCap": 200.0, "sessionState": state}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 100.0, "keySpace": 5000.0, "keyDist": "uniform", "timeoutMs": 1500.0, "retries": 0.0, "identities": 300.0}).
+			n("lb", engine.KLoadBalancer, cols[1], rowMid, P{"healthCheckSec": 1.0}).
+			n("app1", engine.KAppServer, cols[2], 40, app).
+			n("app2", engine.KAppServer, cols[2], 200, app).
+			n("db", engine.KDatabase, cols[3], 40, P{"connections": 16.0, "readMs": 3.0}).
+			n("sessions", engine.KRedis, cols[3], 200, P{}).label("sessions", "Session store").
+			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").e("app1", "sessions").e("app2", "sessions").done()
+	}
+	register(&Scenario{
+		ID: "where-do-sessions-live", Title: "Where do sessions live?", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Users are signed out whenever their requests land on another server, or the server restarts.",
+		Story:   "Each logged-in user's session is kept in the memory of the app server that signed them in. The load balancer sends the next request to either server, so a user keeps finding themselves signed out, and when one server restarts, everyone it held is signed out again. A Redis instance is already in the diagram. Keep the sign-outs at zero and the p95 under 250 ms, without adding servers.",
+		Diagram: loginSessions(false), Solution: loginSessions(true),
+		Chaos:       []engine.ChaosEvent{{Type: "crash", NodeID: "app1", AtSec: 20, DownSec: 4}},
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxReauth: i(0), MaxP95Ms: f(250), MaxCostPerHour: f(1.2), StarP95Ms: f(200), StarCostPerHour: f(1.0)},
+		DurationSec: 45, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at which requests fail: are they the ones after the restart, or also before it?",
+			"Making the balancer keep a user on one server fixes the cross-server misses. Where does that user's session go when the server restarts?",
+			"Which component could every app server consult, so that a user's session does not depend on the server that signed them in?",
+		},
+		Answer: "The answer: keep the sessions in the shared store (the app servers' session setting). Either server finds the session, and a restarted server loses nothing, at the cost of one call to the store per request.",
+		Predictions: []Prediction{{ID: "p1", Question: "The balancer is made sticky, then the server holding a user's session restarts. What happens to that session?", Options: []string{"Another server recovers it automatically", "It is lost unless another component kept a copy", "Stickiness copies it, so it survives"}, Answer: 1,
+			Explain: "Stickiness only keeps a user's requests on the same server. It does not copy anything, so the memory of a restarted server is gone."}},
+		Debrief: "A {{stateless-service|stateless}} server keeps nothing between requests, so any healthy server can take the next one. Keeping a session in one server's memory makes the user depend on that server. Sticky routing keeps the requests together but not the state: it loads servers unevenly and does not survive a restart. A shared store lets any server find the session, adding a call to every request and a dependency that must itself stay up; a session that expires when idle is soft state, which the user notices only when it is gone.",
+	})
 }

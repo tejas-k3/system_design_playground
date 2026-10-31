@@ -33,9 +33,10 @@ const (
 	cmdScore
 	cmdEnqueue
 	cmdExternal
-	cmdPut  // upload a body to an object store
-	cmdGet  // download a body from an object store
-	cmdAuth // ask an auth service whether a token is valid
+	cmdPut     // upload a body to an object store
+	cmdGet     // download a body from an object store
+	cmdAuth    // ask an auth service whether a token is valid
+	cmdSession // look up or refresh a login session in a shared store
 )
 
 type call struct {
@@ -1153,7 +1154,12 @@ func (s *Sim) pickBackend(n *node) *edge {
 func (s *Sim) procRoute(n *node, c *call, cb func(Result), release func()) {
 	s.hold(n, 0.2*n.slow, release, cb, func() {
 		release()
-		e := s.pickBackend(n)
+		var e *edge
+		if n.b("sticky") && c.user != 0 {
+			e = s.stickyBackend(n, c.user)
+		} else {
+			e = s.pickBackend(n)
+		}
 		if e == nil {
 			s.failAt(n, RNoBackend, cb)
 			return

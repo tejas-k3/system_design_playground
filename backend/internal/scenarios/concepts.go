@@ -67,6 +67,7 @@ var conceptTags = map[string][]string{
 	"nobody-to-wait-for":     {"consistency", "failure-handling"},
 	"restart-the-counter":    {"queues", "failure-handling"},
 	"everyone-asks-auth":     {"overload-control", "failure-handling"},
+	"where-do-sessions-live": {"failure-handling", "replication"},
 	"who-is-the-leader":      {"replication", "failure-handling"},
 	"launch-day":             {"sharding", "capacity"},
 	"count-the-clicks":       {"queues", "consistency"},

@@ -140,17 +140,38 @@ func (s *Sim) procApp(n *node, c *call, cb func(Result), release func()) {
 				s.appRead(n, &cc, done)
 			}
 		}
-		if ae := s.first(n, KAuth); ae != nil && n.s("authMode") == "service" {
-			s.authenticate(n, ae, &cc, func(res Result) {
-				if !res.OK {
-					done(res)
-					return
-				}
-				s.proceed(n, &cc, run, done)
-			})
+		ae := s.first(n, KAuth)
+		asks := ae != nil && n.s("authMode") == "service"
+		signedIn := cc.user != 0 && (n.s("sessionState") == "local" || n.s("sessionState") == "shared")
+		if !asks && !signedIn { // the common case: nothing to check, and no closure to allocate
+			s.proceed(n, &cc, run, done)
 			return
 		}
-		s.proceed(n, &cc, run, done)
+		s.checkCaller(n, ae, asks, &cc, done, func() { s.proceed(n, &cc, run, done) })
+	})
+}
+
+// checkCaller runs the token check, then the session lookup, and continues with next if both let the request through.
+func (s *Sim) checkCaller(n *node, ae *edge, asks bool, c *call, done func(Result), next func()) {
+	session := func() {
+		s.sessionGate(n, c, func(res Result) {
+			if !res.OK {
+				done(res)
+				return
+			}
+			next()
+		})
+	}
+	if !asks {
+		session()
+		return
+	}
+	s.authenticate(n, ae, c, func(res Result) {
+		if !res.OK {
+			done(res)
+			return
+		}
+		session()
 	})
 }
 
@@ -882,7 +903,7 @@ func (s *Sim) procRedis(n *node, c *call, cb func(Result), release func()) {
 		ms = n.f("geoSearchMs")
 	case cmdScore:
 		ms = n.f("scoreMs")
-	case cmdRank:
+	case cmdRank, cmdSession:
 		ms = 0.1
 	default:
 		ms = 0.05

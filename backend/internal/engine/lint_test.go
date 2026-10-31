@@ -266,3 +266,32 @@ func TestAuthLintFindsTheServiceOnEveryRequestAndAFailOpenPolicy(t *testing.T) {
 		t.Errorf("no check, no finding")
 	}
 }
+
+func TestSessionLintFindsMissingIdentitiesAndStore(t *testing.T) {
+	d := func(app Params, identities float64, withRedis bool) Diagram {
+		b := &builder{}
+		b.node("u", KClient, Params{"identities": identities})
+		b.node("a", KAppServer, app)
+		b.node("db", KDatabase, Params{})
+		b.edge("u", "a").edge("a", "db")
+		if withRedis {
+			b.node("r", KRedis, Params{})
+			b.edge("a", "r")
+		}
+		out, _ := Sanitize(b.d)
+		return out
+	}
+	if _, ok := rules(Lint(d(Params{"sessionState": "local"}, 0, false)))["sessions-need-identities"]; !ok {
+		t.Errorf("sessions with nobody to sign in are flagged")
+	}
+	if _, ok := rules(Lint(d(Params{"sessionState": "shared"}, 100, false)))["session-store-missing"]; !ok {
+		t.Errorf("a shared store that is not connected is flagged")
+	}
+	f := rules(Lint(d(Params{"sessionState": "shared"}, 100, true)))
+	if _, a := f["session-store-missing"]; a {
+		t.Errorf("a connected store is fine")
+	}
+	if _, a := f["sessions-need-identities"]; a {
+		t.Errorf("users with identities are fine")
+	}
+}

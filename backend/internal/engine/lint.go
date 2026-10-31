@@ -55,6 +55,33 @@ func Lint(d Diagram) []Finding {
 			add("spof-database", "warn", "The only copy of the data lives on one database: if it crashes, every request that needs it fails.", "Add a read replica and set the database to promote it on failure.", id)
 		}
 	}
+	var noStore, noIdentity []string
+	anyIdentity := false
+	for _, id := range clients {
+		anyIdentity = anyIdentity || pf(res[id], "identities", 0) > 0
+	}
+	for _, id := range apps {
+		mode := ps(res[id], "sessionState")
+		if mode != "local" && mode != "shared" {
+			continue
+		}
+		if !anyIdentity {
+			noIdentity = append(noIdentity, id)
+		}
+		hasStore := false
+		for _, e := range d.Edges {
+			hasStore = hasStore || (e.From == id && kind[e.To] == KRedis)
+		}
+		if mode == "shared" && !hasStore {
+			noStore = append(noStore, id)
+		}
+	}
+	if len(noIdentity) > 0 {
+		add("sessions-need-identities", "warn", "These servers keep login sessions, but no user has an identity, so no session is ever looked up.", "Set Distinct users on the Users component.", noIdentity...)
+	}
+	if len(noStore) > 0 {
+		add("session-store-missing", "warn", "These servers keep sessions in a shared store, but no Redis is connected to them, so nothing is checked.", "Connect a Redis, or keep the sessions in the server's memory.", noStore...)
+	}
 	var noAuth, askEvery, failOpen []string
 	for _, id := range apps {
 		if ps(res[id], "authMode") != "service" {

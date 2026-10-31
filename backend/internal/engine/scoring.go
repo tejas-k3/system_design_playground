@@ -29,6 +29,7 @@ type Goals struct {
 	MaxBlockedSec           *float64 `json:"maxBlockedSec,omitempty"`           // lock-seconds held waiting for a crashed coordinator
 	MaxRepeatedOutputs      *int     `json:"maxRepeatedOutputs,omitempty"`      // stream outputs produced a second time after a crash
 	MaxRecoverySec          *float64 `json:"maxRecoverySec,omitempty"`          // longest time a stream job took to catch up after a crash
+	MaxReauth               *int     `json:"maxReauth,omitempty"`               // requests that found their user signed out
 	MaxUnchecked            *int     `json:"maxUnchecked,omitempty"`            // requests let through without a token check
 	MaxInDoubt              *int     `json:"maxInDoubt,omitempty"`              // two-phase commits left waiting for a crashed coordinator
 	MaxTTFTMs               *float64 `json:"maxTTFTMs,omitempty"`               // time to first token (p95) of LLM answers
@@ -274,6 +275,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxRecoverySec != nil {
 		checks = append(checks, Check{"Time to catch up after a crash", fmt.Sprintf("≤ %.1f s", *g.MaxRecoverySec), fmt.Sprintf("%.2f s", run.RecoverySec), run.RecoverySec <= *g.MaxRecoverySec+eps})
+	}
+	if g.MaxReauth != nil {
+		checks = append(checks, Check{"Users signed out by a lost session", fmt.Sprintf("≤ %d", *g.MaxReauth), fmt.Sprint(run.Reauth), run.Reauth <= *g.MaxReauth})
 	}
 	if g.MaxUnchecked != nil {
 		checks = append(checks, Check{"Requests let through unchecked", fmt.Sprintf("≤ %d", *g.MaxUnchecked), fmt.Sprint(run.Unchecked), run.Unchecked <= *g.MaxUnchecked})
