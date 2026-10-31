@@ -55,7 +55,7 @@ func TestEveryHardChallengeHasADeeperDebrief(t *testing.T) {
 			t.Errorf("%s: deeper debrief repeats the debrief", sc.ID)
 		}
 	}
-	if hard != 29 {
-		t.Errorf("expected 29 Hard challenges, found %d", hard)
+	if hard != 30 {
+		t.Errorf("expected 30 Hard challenges, found %d", hard)
 	}
 }

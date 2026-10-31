@@ -557,4 +557,37 @@ func registerScaleOut() {
 			Explain: "A partition is ordered on its own. Messages of one conversation in different partitions are handled by different workers, in no particular order."}},
 		Debrief: "A log orders messages within a partition, not across partitions. To keep a conversation in order, send all its messages to the same partition by key. That caps how fast one key can be handled, because one worker reads its partition. A sequence number on each message lets the receiver detect and reorder what still arrives late.",
 	})
+
+	// The refund that fails: a saga whose undo calls can also be declined
+	failingRefund := func(fixed bool) engine.Diagram {
+		retries := 0.0
+		if fixed {
+			retries = 5
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 50.0, "readPct": 0.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 1000.0, "dbPool": 50.0, "workflow": "saga", "compensationRetries": retries}).
+			n("stock", engine.KDatabase, cols[2], 40, P{"connections": 16.0, "writeMs": 10.0}).label("stock", "Stock database").
+			n("card", engine.KExternalAPI, cols[2], 160, P{"latencyMs": 40.0, "errorPct": 25.0}).label("card", "Card processor").
+			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 20.0}).label("ship", "Shipping service").
+			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
+	}
+	register(&Scenario{
+		ID: "failing-refund", Title: "The refund that fails", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "The saga undoes a charge, and the undo is declined too.",
+		Story:   "Checkout is already a saga: reserve the item, charge the card, book shipping, and undo in reverse when a step fails. Today shipping fails one time in five. The undo of the charge is a refund to the same card processor, which declines one call in four, and when the refund fails the order is stuck: the customer is charged and has nothing. Support is drowning. At most three orders may end up stuck, and a failed order should still fail within the half-second budget.",
+		Diagram: failingRefund(false), Solution: failingRefund(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.55, MaxInconsistent: i(3), MaxP95Ms: f(500), MaxCostPerHour: f(1.6), StarCostPerHour: f(1.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the orders left half done on the goals panel: the saga is on, so why are some still stuck?",
+			"A saga only helps if its undo calls succeed. The undo of the charge goes through the same flaky processor. What would you do when a refund fails?",
+			"A failed refund can be tried again, since it can be made safe to repeat. The saga has a setting for how many times it tries an undo again.",
+		},
+		Answer: "The answer: have the saga try a failed undo again a few times (the retries for compensation). Each retry has the same chance of success, so a few retries make a stuck order rare; the undo must be safe to repeat, or a retry could refund twice.",
+		Predictions: []Prediction{{ID: "p1", Question: "A refund is declined one time in four. With three retries, about how many refunds still fail?", Options: []string{"About one in two hundred and fifty", "About one in eight, give or take", "About one in four, same as before"}, Answer: 0,
+			Explain: "All four tries must fail: a quarter to the fourth power is about 1 in 256, if failures are independent."}},
+		Debrief: "A saga moves the problem from the transaction to the undo, which can fail like any step. Make each compensation {{idempotency|idempotent}} so it can be retried safely, retry it with a limit, and send what still fails to a queue a person works through. Count the orders that end up stuck, because that is the real size of the problem.",
+		Deeper:  "In a saga every step has a compensation, and a compensation is a call to another service, so it can fail, time out or succeed without the caller knowing. The ways to make that safe are to make compensations idempotent (an idempotency key per order) so a retry never refunds twice, to retry with a limit and backoff, to persist the saga's state so a crash does not forget which undos remain, and to route the ones that still fail to a dead-letter queue or a manual queue with an alert. Compensations that cannot be undone, such as an email sent, belong at the end of the saga. The cost of retrying is a longer failed order and more load on a processor that is already struggling, so a circuit breaker belongs here too. An interviewer will ask what happens when the compensation itself fails and how you know an order is stuck.",
+	})
 }

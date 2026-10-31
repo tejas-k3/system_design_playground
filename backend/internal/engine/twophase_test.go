@@ -68,3 +68,26 @@ func TestThreePhaseCommitCostsAnExtraRound(t *testing.T) {
 		t.Errorf("still atomic, but the extra round is slower: %.0f against %.0f ms, %d half done", three.P50, two.P50, three.Inconsistent)
 	}
 }
+
+// A saga whose undo calls can fail: a refund the card processor declines leaves the order stuck. Retrying the undo a
+// few times gets most of them through.
+func TestRetryingAFailedCompensationLeavesFewerOrdersStuck(t *testing.T) {
+	run := func(retries float64) RunStats {
+		b := &builder{}
+		b.node("u", KClient, Params{"rps": 50.0, "readPct": 0.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0})
+		b.node("a", KAppServer, Params{"threads": 64.0, "queueCap": 2000.0, "dbPool": 100.0, "workflow": "saga", "compensationRetries": retries})
+		b.node("stock", KDatabase, Params{"connections": 32.0, "writeMs": 10.0})
+		b.node("pay", KExternalAPI, Params{"latencyMs": 40.0, "errorPct": 30.0})
+		b.node("ship", KExternalAPI, Params{"latencyMs": 30.0, "errorPct": 20.0})
+		b.edge("u", "a").edge("a", "stock").edge("a", "pay").edge("a", "ship")
+		d, _ := Sanitize(b.d)
+		s := New(d, Options{Seed: 22})
+		s.Advance(30000)
+		return s.RunSnapshot()
+	}
+	none, three := run(0), run(3)
+	t.Logf("stuck orders: no retries %d, 3 retries %d (rolled back cleanly: %d and %d)", none.Stuck, three.Stuck, none.Compensated, three.Compensated)
+	if none.Stuck < 20 || three.Stuck > none.Stuck/5 {
+		t.Errorf("a refund declined 30%% of the time strands orders unless it is tried again: %d against %d", none.Stuck, three.Stuck)
+	}
+}

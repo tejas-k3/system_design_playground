@@ -63,6 +63,7 @@ var conceptTags = map[string][]string{
 	"notification-fan-out":   {"queues"},
 	"go-global":              {"capacity"},
 	"payment-saga":           {"consistency", "failure-handling"},
+	"failing-refund":         {"consistency", "failure-handling"},
 	"frozen-checkout":        {"consistency", "failure-handling"},
 	"nobody-to-wait-for":     {"consistency", "failure-handling"},
 	"restart-the-counter":    {"queues", "failure-handling"},

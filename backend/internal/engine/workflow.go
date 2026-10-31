@@ -159,8 +159,19 @@ func (s *Sim) compensate(n *node, c *call, steps []*edge, i int, stuck bool, the
 		then()
 		return
 	}
+	s.undoStep(n, c, steps, i, 0, func(ok bool) {
+		s.compensate(n, c, steps, i-1, stuck || !ok, then)
+	})
+}
+
+// undoStep calls the undo of step i, and when it fails tries again after a short pause, up to compensationRetries times.
+func (s *Sim) undoStep(n *node, c *call, steps []*edge, i, tries int, then func(ok bool)) {
 	s.callCmd(n, steps[i], c, stepCmd(steps[i]), 0, func(res Result) {
-		s.compensate(n, c, steps, i-1, stuck || !res.OK, then)
+		if res.OK || tries >= int(n.f("compensationRetries")) {
+			then(res.OK)
+			return
+		}
+		s.after(50, func() { s.undoStep(n, c, steps, i, tries+1, then) })
 	})
 }
 
