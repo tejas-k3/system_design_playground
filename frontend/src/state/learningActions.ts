@@ -46,6 +46,6 @@ export const learningActions = (set: Set) => ({
       if (!s.scenario) return {}
       const id = s.scenario.def.id
       const better = score.stars > (s.progress[id] ?? 0)
-      return { scenario: { ...s.scenario, result: score }, ui: { ...s.ui, result: true }, progress: better ? { ...s.progress, [id]: score.stars } : s.progress, records: { ...s.records, [id]: noteRun(s.records[id], score.pass) } }
+      return { scenario: { ...s.scenario, result: score, resultFindings: s.findings }, ui: { ...s.ui, result: true }, progress: better ? { ...s.progress, [id]: score.stars } : s.progress, records: { ...s.records, [id]: noteRun(s.records[id], score.pass) } }
     }),
 })

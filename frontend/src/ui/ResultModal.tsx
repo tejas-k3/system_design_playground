@@ -9,6 +9,7 @@ import { starTargets } from '../model/goals'
 import { Stars } from './Stars'
 import { Alternatives } from './Alternatives'
 import { DefendDesign } from './DefendDesign'
+import { TradeOffMemo } from './TradeOffMemo'
 import { WeakPointChecklist } from './WeakPointChecklist'
 import { Rich } from './Term'
 import { useEscapeKey } from './useEscapeKey'
@@ -58,6 +59,7 @@ export function ResultModal() {
         {r.pass && sc.debrief && sc.deeper && <Deeper key={sc.def.id} text={sc.deeper} />}
         {r.pass && <Alternatives id={sc.def.id} />}
         {r.pass && <DefendDesign id={sc.def.id} diagram={diagram} seed={sc.dailySeed} />}
+        {r.pass && <TradeOffMemo key={sc.def.id} id={sc.def.id} title={sc.def.title} score={r} findings={sc.resultFindings ?? []} seconds={Math.max(1, sc.def.durationSec - sc.def.warmupSec)} minSuccessRate={sc.def.goals.minSuccessRate} />}
         <div className="row-btns end">
           <button autoFocus onClick={close}>Keep tweaking</button>
           <button onClick={() => { close(); reset() }}>Try again</button>
