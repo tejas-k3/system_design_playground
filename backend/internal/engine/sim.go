@@ -121,6 +121,10 @@ type node struct {
 	causal          *causalState     // client asking for causal order: what it has seen and what it may no longer be shown
 	kvFree          [][]float64      // quorum store: when each slot of each cluster node is next free
 	kvVer           []map[int]int    // quorum store: the version of each key each cluster node holds
+	kvDownAt        []float64        // quorum store: when each cluster node last went down
+	kvMemberMsgs    float64          // quorum store: messages spent telling the cluster about failures
+	kvTimeToAll     float64          // quorum store: ms until every node knew of the latest failure
+	kvStaleView     int              // quorum store: copies a request was sent to that its coordinator did not yet know were down
 	kvDownUntil     []float64        // quorum store: when each cluster node comes back (0 = up)
 	kvHints         map[int][][2]int // quorum store: writes held for a node that is down (key, version), by that node
 	kvHintsReplayed int
