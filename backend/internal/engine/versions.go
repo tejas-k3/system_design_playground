@@ -69,6 +69,16 @@ func (s *Sim) countFreshness(lg *logical, res Result) {
 	if lg.write || res.Ver < 0 {
 		return
 	}
+	if lg.client.s("consistency") == "boundedWrites" { // a numerical bound: how many committed writes the read may have missed
+		s.runFresh++
+		if s.verAt(lg.key, lg.createdAt)-res.Ver > int(lg.client.f("maxMissedWrites")) {
+			s.runStale++
+			if res.Src != nil {
+				res.Src.c.stale++
+			}
+		}
+		return
+	}
 	ms := maxStale(lg.client)
 	if ms < 0 {
 		return

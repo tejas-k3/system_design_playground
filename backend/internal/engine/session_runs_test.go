@@ -81,3 +81,45 @@ func TestTheConsistencyHelpStatesWhatTheNewOptionsCanAndCannotDo(t *testing.T) {
 		}
 	}
 }
+
+// numericRun is sessionRun with any extra settings on the users.
+func numericRun(extra Params, quorums []float64) RunStats {
+	d := Diagram{Nodes: []Node{
+		{ID: "users", Kind: KClient, Params: Params{"rps": 200.0, "readPct": 50.0, "keySpace": 20.0, "keyDist": "uniform", "timeoutMs": 3000.0}},
+		{ID: "app", Kind: KAppServer, Params: Params{"threads": 32.0, "dbPool": 200.0}},
+		{ID: "kv", Kind: KKVStore, Params: Params{"nodes": 5.0, "replicas": 3.0, "readQuorum": quorums[0], "writeQuorum": quorums[1], "readMs": 4.0, "writeMs": 60.0, "variability": "exponential", "concurrency": 32.0}},
+	}, Edges: []Edge{{ID: "a", From: "users", To: "app", LatencyMs: 40}, {ID: "b", From: "app", To: "kv", LatencyMs: 2}}}
+	for k, v := range extra {
+		d.Nodes[0].Params[k] = v
+	}
+	d, _ = Sanitize(d)
+	s := New(d, Options{Seed: 1, StopTrafficAtMs: 40000})
+	for !s.Finished() && s.Now() < 100000 {
+		s.Advance(100)
+	}
+	return s.RunSnapshot()
+}
+
+// A numerical bound counts a read as too stale when it misses more committed writes of the item than allowed.
+func TestBoundedByMissedWritesCountsReadsThatMissTooMany(t *testing.T) {
+	bound := func(max float64, q []float64) RunStats {
+		return numericRun(Params{"consistency": "boundedWrites", "maxMissedWrites": max}, q)
+	}
+	strict, lax, quorum := bound(0, []float64{1, 1}), bound(3, []float64{1, 1}), bound(0, []float64{2, 2})
+	if strict.Fresh == 0 || strict.Stale == 0 {
+		t.Fatalf("at R=W=1 and a bound of 0 some reads must miss a write: %d of %d", strict.Stale, strict.Fresh)
+	}
+	if lax.Stale >= strict.Stale {
+		t.Errorf("allowing 3 missed writes should count fewer reads than allowing none: %d against %d", lax.Stale, strict.Stale)
+	}
+	if quorum.Stale != 0 {
+		t.Errorf("R=W=2 over three copies reads every acknowledged write, so none can be too stale: %d", quorum.Stale)
+	}
+}
+
+// With no bound chosen the old behaviour is untouched: an eventual client counts nothing.
+func TestEventualClientsAreStillNotJudgedForFreshness(t *testing.T) {
+	if r := numericRun(nil, []float64{1, 1}); r.Fresh != 0 || r.Stale != 0 {
+		t.Errorf("an eventual client was judged: %d of %d", r.Stale, r.Fresh)
+	}
+}
