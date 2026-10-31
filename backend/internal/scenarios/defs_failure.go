@@ -92,7 +92,7 @@ func registerFailureAndElasticity() {
 		Answer: "The answer: give calls to the database a timeout of a few hundred milliseconds so threads come back, and turn on the {{circuit-breaker|circuit breaker}} so servers stop trying while the database is unreachable.",
 		Predictions: []Prediction{{ID: "p1", Question: "A server calls a database that is cut off, and 'Call timeout' is 0 (wait forever). What happens to the server?", Options: []string{"Calls to the database fail, but every other request is answered normally", "All its threads get stuck waiting, so even cache hits go unanswered", "The load balancer sees the stuck calls and stops sending to it"}, Answer: 1,
 			Explain: "Each waiting request holds a thread for good. Within a second or two none are left, and cache hits queue behind them."}},
-		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up {{thread-pool|threads}} until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a {{circuit-breaker|circuit breaker}} stops you spending a thread on every attempt.",
+		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up {{thread-pool|threads}} until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a {{circuit-breaker|circuit breaker}} stops you spending a thread on every attempt. A distributed design must not assume {{distributed-system-pitfalls|the network is reliable}}.",
 	})
 
 	// 14e ─ Medium, config only: one server keeps stalling (a gray failure that pulses) ────

@@ -110,7 +110,7 @@ func registerResilienceAndCapstones() {
 		Answer: "The answer: set each component's availability zone (advanced settings): keep the balancer and the database out of zone A and spread the servers over different zones.",
 		Predictions: []Prediction{{ID: "p1", Question: "Why does the design survive when the balancer is moved to another zone but the servers stay put?", Options: []string{"It does not: all three servers are still in the failed zone", "The balancer caches responses from the servers", "The database takes over when the zone fails"}, Answer: 0,
 			Explain: "A balancer in a healthy zone has nothing to send traffic to if every server it knows is in the failed zone. All the pieces a request needs must survive."}},
-		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance.",
+		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance. A design must account for {{distributed-system-pitfalls|topology changes}}.",
 	})
 
 	// Retry storm: a five-second slowdown that never ends, because the clients' retries keep the database saturated

@@ -6,6 +6,7 @@ func init() {
 	registerFundamentals()
 	registerLoadAndLiveData()
 	registerFailureAndElasticity()
+	registerDNS()
 	registerResourceLimits()
 	registerConsistencyAndStreams()
 	registerServicePatterns()

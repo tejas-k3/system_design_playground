@@ -5,6 +5,53 @@ import (
 	"testing"
 )
 
+func dnsRun(ttl float64) (RunStats, float64) { return dnsRunWith(ttl, Params{}, 0) }
+
+// dnsRunWith: two app servers behind the users, one of which crashes at 5 s for 60 s; extra settings go on the users.
+func dnsRunWith(ttl float64, users Params, warmupMs float64) (RunStats, float64) {
+	u := Params{"rps": 60.0, "readPct": 100.0, "keySpace": 200.0, "timeoutMs": 1000.0, "dnsTtlSec": ttl}
+	for k, v := range users {
+		u[k] = v
+	}
+	d, _ := Sanitize(Diagram{Nodes: []Node{
+		{ID: "users", Kind: KClient, Params: u},
+		{ID: "a", Kind: KAppServer, Params: Params{"threads": 64.0}},
+		{ID: "b", Kind: KAppServer, Params: Params{"threads": 64.0}},
+		{ID: "db", Kind: KDatabase, Params: Params{"connections": 64.0}},
+	}, Edges: []Edge{{ID: "users>a", From: "users", To: "a"}, {ID: "users>b", From: "users", To: "b"}, {ID: "a>db", From: "a", To: "db"}, {ID: "b>db", From: "b", To: "db"}}})
+	s := New(d, Options{Seed: 42, StopTrafficAtMs: 40000, WarmupMs: warmupMs, Chaos: []ChaosEvent{{Type: "crash", NodeID: "a", AtSec: 5, DownSec: 60}}})
+	for !s.Finished() && s.Now() < 45000 {
+		s.Advance(100)
+	}
+	return s.RunSnapshot(), s.CostPerHour()
+}
+
+func TestDNSStaleAddressesExpireAndShorterTTLResolvesMoreOften(t *testing.T) {
+	long, _ := dnsRun(30)
+	short, _ := dnsRun(2)
+	plain, _ := dnsRun(0)
+	if long.Errors["staleDNS"] <= short.Errors["staleDNS"] || short.Errors["staleDNS"] == 0 {
+		t.Fatalf("stale address failures long=%d short=%d", long.Errors["staleDNS"], short.Errors["staleDNS"])
+	}
+	if short.DNSLookups <= long.DNSLookups {
+		t.Fatalf("lookups short=%d long=%d", short.DNSLookups, long.DNSLookups)
+	}
+	if plain.DNSLookups != 0 || plain.Errors["staleDNS"] != 0 || plain.Errors["nodeDown"] == 0 {
+		t.Fatalf("TTL 0 changed today's routing: %+v", plain)
+	}
+}
+
+func TestDNSLookupCostIsIncludedInHourlyCost(t *testing.T) {
+	short, shortCost := dnsRun(2)
+	long, longCost := dnsRun(30)
+	if short.DNSLookups <= long.DNSLookups {
+		t.Fatal("short TTL should resolve more often")
+	}
+	if short.DNSLookups == 0 || long.DNSLookups == 0 || shortCost <= longCost {
+		t.Fatalf("lookups/cost: short=%d/$%.5f, long=%d/$%.5f", short.DNSLookups, shortCost, long.DNSLookups, longCost)
+	}
+}
+
 // sessionRun drives a real run: 200 requests a second, half of them writes, over 20 keys, through an app server
 // to a key-value store with the given quorums (or to a plain database when kvQuorums is nil).
 func sessionRun(model string, kvQuorums []float64) RunStats {
@@ -135,5 +182,55 @@ func TestCausalOrderBreaksOnLaggingCopiesAndQuorumsReduceIt(t *testing.T) {
 	}
 	if strict >= loose {
 		t.Errorf("overlapping quorums should reduce it: %d at R=W=2 against %d at R=W=1", strict, loose)
+	}
+}
+
+// A request that goes to a stale address is a real attempt: it takes the time a call to a dead server takes, and a
+// client that retries sends the retry to a healthy target.
+func TestAStaleAddressIsARealAttemptThatCanBeRetried(t *testing.T) {
+	once, _ := dnsRunWith(30, Params{"retries": 0.0}, 0)
+	retried, _ := dnsRunWith(30, Params{"retries": 2.0, "backoff": "none"}, 0)
+	if once.Errors["staleDNS"] == 0 {
+		t.Fatal("a stale address should fail some requests")
+	}
+	if once.FailP50 <= 0 {
+		t.Errorf("a failed attempt at a dead server takes time, but the median failure took %.1f ms", once.FailP50)
+	}
+	if retried.OK <= once.OK {
+		t.Errorf("a retry should reach the healthy server and rescue requests: %d ok with retries against %d without", retried.OK, once.OK)
+	}
+}
+
+// Lookups made while the run is warming up are not counted, as with every other counter of the run.
+func TestDNSLookupsAreCountedAfterTheWarmUpOnly(t *testing.T) {
+	all, _ := dnsRunWith(2, nil, 0)
+	late, _ := dnsRunWith(2, nil, 20000)
+	if late.DNSLookups*3 > all.DNSLookups*2 {
+		t.Errorf("counting from 20 s of a 40 s run should leave about half the lookups: %d against %d", late.DNSLookups, all.DNSLookups)
+	}
+}
+
+// With geo routing, when every nearby target is down the request still goes to one (and fails as a dead server does),
+// exactly as without a TTL, instead of being turned away for want of a route.
+func TestGeoRoutingWithATTLFallsBackLikeWithout(t *testing.T) {
+	run := func(ttl float64) RunStats {
+		d, _ := Sanitize(Diagram{Nodes: []Node{
+			{ID: "users", Kind: KClient, Params: Params{"rps": 30.0, "readPct": 100.0, "keySpace": 50.0, "timeoutMs": 1000.0, "geoRouting": true, "dnsTtlSec": ttl}},
+			{ID: "a", Kind: KAppServer, Params: Params{"threads": 32.0}},
+			{ID: "b", Kind: KAppServer, Params: Params{"threads": 32.0}},
+			{ID: "db", Kind: KDatabase},
+		}, Edges: []Edge{{ID: "ua", From: "users", To: "a"}, {ID: "ub", From: "users", To: "b"}, {ID: "ad", From: "a", To: "db"}, {ID: "bd", From: "b", To: "db"}}})
+		s := New(d, Options{Seed: 42, StopTrafficAtMs: 30000, Chaos: []ChaosEvent{{Type: "crash", NodeID: "a", AtSec: 1, DownSec: 60}, {Type: "crash", NodeID: "b", AtSec: 1, DownSec: 60}}})
+		for !s.Finished() && s.Now() < 40000 {
+			s.Advance(100)
+		}
+		return s.RunSnapshot()
+	}
+	plain, withTTL := run(0), run(2)
+	if withTTL.Failed != plain.Failed || withTTL.Errors["noRoute"] != 0 {
+		t.Errorf("a TTL should not change how many requests an all-down fan-out fails, nor turn them into 'no route': %d against %d failed, %d no route", withTTL.Failed, plain.Failed, withTTL.Errors["noRoute"])
+	}
+	if withTTL.Errors["staleDNS"] == 0 || withTTL.Errors["nodeDown"] == 0 {
+		t.Errorf("the first TTL's worth are stale records and the rest are plain dead servers: %v", withTTL.Errors)
 	}
 }

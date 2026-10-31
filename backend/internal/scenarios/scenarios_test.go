@@ -3,6 +3,7 @@ package scenarios
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 
 	"sysdesign/internal/engine"
@@ -31,6 +32,32 @@ func TestScenarioStartFailsAndSolutionPasses(t *testing.T) {
 				t.Errorf("reference solution fails: %+v", sol.Checks)
 			}
 		})
+	}
+}
+
+func TestStaleDNSAndZeroTTLDefaults(t *testing.T) {
+	sc := Get("stale-dns")
+	var stars int = -1
+	for seed := uint32(1); seed <= 3; seed++ {
+		start := engine.RunToEnd(sc.Diagram, sc.Options(seed), sc.Goals)
+		solved := engine.RunToEnd(sc.Solution, sc.Options(seed), sc.Goals)
+		if start.Pass || !solved.Pass {
+			t.Fatalf("seed %d: start pass=%v solution pass=%v", seed, start.Pass, solved.Pass)
+		}
+		if stars < 0 {
+			stars = solved.Stars
+		} else if solved.Stars != stars {
+			t.Fatalf("seed %d got %d stars, want %d", seed, solved.Stars, stars)
+		}
+	}
+	base := Get("server-down")
+	for seed := uint32(1); seed <= 3; seed++ {
+		d := withParam(base.Diagram, "users", "dnsTtlSec", 0.0)
+		a := engine.RunToEnd(base.Diagram, base.Options(seed), base.Goals)
+		b := engine.RunToEnd(d, base.Options(seed), base.Goals)
+		if !reflect.DeepEqual(a, b) {
+			t.Fatalf("seed %d explicit dnsTtlSec=0 changed the existing result", seed)
+		}
 	}
 }
 

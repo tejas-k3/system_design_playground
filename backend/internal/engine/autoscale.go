@@ -52,7 +52,18 @@ func (s *Sim) CostPerHour() float64 {
 			c += s.storeUsageCost(n)
 		}
 	}
-	return c
+	return c + s.dnsCostPerHour()
+}
+
+const dnsLookupCost = 0.00001
+
+// dnsCostPerHour is what the name lookups counted since the warm-up ended cost, as an hourly rate over that time.
+func (s *Sim) dnsCostPerHour() float64 {
+	span := (s.now - s.opts.WarmupMs) / 1000
+	if s.runDNSLookups == 0 || span <= 0 {
+		return 0
+	}
+	return float64(s.runDNSLookups) / span * 3600 * dnsLookupCost
 }
 
 func (s *Sim) averageInstances(n *node) float64 {
