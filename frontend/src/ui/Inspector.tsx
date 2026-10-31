@@ -84,6 +84,7 @@ function Overview({ count }: { count: number }) {
             {(run.hottestKeyShare ?? 0) >= 0.05 && (<><dt>Busiest item's share</dt><dd>{(run.hottestKeyShare! * 100).toFixed(0)}% of requests</dd></>)}
             {(run.hedged ?? 0) > 0 && (<><dt>Hedged queries</dt><dd>{run.hedged!.toLocaleString()}</dd></>)}
             {(run.dnsLookups ?? 0) > 0 && (<><dt>DNS lookups</dt><dd>{run.dnsLookups!.toLocaleString()}</dd></>)}
+            {(run.revalidated ?? 0) > 0 && (<><dt>Revalidated</dt><dd>{run.revalidated!.toLocaleString()}</dd></>)}
             {run.jobs && run.jobs.retried > 0 && (<><dt>Jobs retried</dt><dd>{run.jobs.retried.toLocaleString()}</dd></>)}
             {run.jobs && (run.jobs.orderViolations ?? 0) > 0 && (<><dt>Out-of-order messages</dt><dd className="bad">{run.jobs.orderViolations!.toLocaleString()}</dd></>)}
             {run.jobs && (run.jobs.highP95 ?? 0) > 0 && (<><dt>Urgent jobs p95</dt><dd>{Math.round(run.jobs.highP95!).toLocaleString()} ms</dd></>)}

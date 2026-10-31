@@ -288,11 +288,21 @@ func init() {
 				num("ttlSec", "Time to live", "Freshness", 0, 0, 3600, 1, "s", "Entries expire after this long, their {{ttl|time to live}} (0 = never)."),
 				clockSkew(),
 				ttlJitter(),
+				num("shortTtlPct", "Items with a shorter TTL", "Freshness", 0, 0, 100, 5, "%", "A share of the items (chosen by key) expire after the shorter time below instead of the time to live: for data that changes at different rates. Server-side invalidation (the write policy) works alongside it.").adv(),
+				num("shortTtlSec", "Shorter time to live", "Freshness", 5, 1, 3600, 1, "s", "The time to live of the items in the share above.").adv(),
+				flag("revalidate", "Revalidate on expiry", "Freshness", false, "An expired entry asks the origin whether it is still current, which costs about a tenth of a full read, and is renewed if it is; only an item that changed is fetched again.").adv(),
+				num("revalidateMs", "Revalidation time", "Freshness", 1, 0.1, 100, 0.1, "ms", "How long that version check takes.").adv(),
 				flag("coalesce", "Share concurrent misses", "Freshness", false, "When several requests miss on the same key at once (a {{stampede}}), only one goes to the data store and the rest wait for its answer.").adv(),
 				flag("startWarm", "Start warm", "Memory", true, "Begin the run with popular items already cached."),
 				num("latencyMs", "Latency", "Speed", 1, 0.1, 50, 0.1, "ms", "Time per lookup.").adv(),
 			},
-			cost: func(p Params) float64 { return 0.03 + 0.05*pf(p, "capacityItems", 2000)/2000 },
+			cost: func(p Params) float64 {
+				memory := 0.05 * pf(p, "capacityItems", 2000) / 2000
+				if ps(p, "writePolicy") == "lease" {
+					memory *= 1.5 // the origin has to remember who holds what: half as much again as the memory itself
+				}
+				return 0.03 + memory
+			},
 		},
 		{
 			// TODO(#17): database scenarios still to handle later: joins (a join penalty for document stores) and cheap

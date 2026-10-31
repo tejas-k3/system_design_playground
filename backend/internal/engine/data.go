@@ -474,6 +474,13 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 	if c.cmd == cmdCacheInv || c.cmd == cmdCacheSet {
 		ms = 0.1
 	}
+	checks := false
+	if c.cmd == cmdCacheGet && n.b("revalidate") {
+		if _, stale := s.revalidatable(n, c.key); stale {
+			checks = true
+			ms += n.f("revalidateMs") // the version check goes to the origin before the entry is answered or dropped
+		}
+	}
 	s.hold(n, ms*n.slow, release, cb, func() {
 		release()
 		switch c.cmd {
@@ -526,6 +533,17 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 				s.okAt(n, Result{Ver: -1}, cb)
 				return
 			}
+			if checks {
+				if sv, stale := s.revalidatable(n, c.key); stale && s.itemVer(c.key) == sv {
+					n.store.Set(s.now, c.key, sv) // still current: renewed without fetching it again
+					n.c.hit++
+					if c.counted {
+						s.runRevalidated++
+					}
+					s.okAt(n, Result{Ver: sv, Hit: true, Done: true, Src: n}, cb)
+					return
+				}
+			}
 			ver, hit, expired := n.store.Get(s.now, c.key)
 			if expired {
 				n.c.expired++
@@ -571,6 +589,15 @@ func (s *Sim) procCache(n *node, c *call, cb func(Result), release func()) {
 }
 
 // readThroughEdge is where a cache fetches misses from, preferring a replica.
+// revalidatable returns the version of a held but expired entry that a revalidating cache may check. The check is a cost
+// model (the origin is not sent a request), so it needs a read-through origin that is up, and it is not used with Range size.
+func (s *Sim) revalidatable(n *node, key int) (int, bool) {
+	if e := s.readThroughEdge(n); e == nil || e.to.down || s.rangePiecesOf(n) > 0 {
+		return 0, false
+	}
+	return n.store.Expired(s.now, key)
+}
+
 func (s *Sim) readThroughEdge(n *node) *edge {
 	if e := s.first(n, KReplica); e != nil {
 		return e

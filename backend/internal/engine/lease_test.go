@@ -77,3 +77,76 @@ func TestALeaseStillReachesACacheThatKeepsPieces(t *testing.T) {
 		t.Errorf("a cache that keeps pieces cannot be skipped: %d messages against %d for push", lease.CacheMsgs, push.CacheMsgs)
 	}
 }
+
+// Per-item TTL: a share of the items live for a shorter time than the rest.
+func TestAShareOfItemsCanHaveAShorterTTL(t *testing.T) {
+	live := func(shortPct float64) int {
+		s := NewStore("lru", 1000, 100000, NewRNG(1))
+		s.SetShortTTL(shortPct, 1000)
+		for k := 0; k < 400; k++ {
+			s.Set(0, k, 1)
+		}
+		n := 0
+		for k := 0; k < 400; k++ {
+			if s.Live(5000, k) {
+				n++
+			}
+		}
+		return n
+	}
+	if got := live(0); got != 400 {
+		t.Errorf("with no short share every item is still live after 5 s, got %d of 400", got)
+	}
+	if got := live(50); got < 140 || got > 260 {
+		t.Errorf("with half the items on a 1 s TTL about half should be gone after 5 s, got %d of 400 live", got)
+	}
+	if got := live(100); got != 0 {
+		t.Errorf("with every item on the short TTL none is live after 5 s, got %d", got)
+	}
+}
+
+// revalRun: one cache in front of a database, 5% writes, entries that expire every 3 s.
+func revalRun(revalidate bool) (RunStats, float64) {
+	d := Diagram{Nodes: []Node{
+		{ID: "users", Kind: KClient, Params: Params{"rps": 200.0, "readPct": 95.0, "keySpace": 200.0, "keyDist": "uniform", "consistency": "bounded", "maxStaleMs": 200.0, "timeoutMs": 3000.0}},
+		{ID: "app", Kind: KAppServer, Params: Params{"threads": 64.0, "dbPool": 64.0}},
+		{ID: "db", Kind: KDatabase},
+		{ID: "c", Kind: KCache, Params: Params{"capacityItems": 1000.0, "ttlSec": 3.0, "writePolicy": "none", "revalidate": revalidate}},
+	}, Edges: []Edge{{ID: "u", From: "users", To: "app", LatencyMs: 20}, {ID: "d", From: "app", To: "db", LatencyMs: 2}, {ID: "ac", From: "app", To: "c", LatencyMs: 2}, {ID: "cd", From: "c", To: "db", LatencyMs: 2}}}
+	d, _ = Sanitize(d)
+	s := New(d, Options{Seed: 1, StopTrafficAtMs: 40000})
+	for !s.Finished() && s.Now() < 100000 {
+		s.Advance(100)
+	}
+	return s.RunSnapshot(), s.Snapshot().Nodes["db"].Arr
+}
+
+// A revalidating cache asks the origin whether an expired entry is still current and renews it if so, so the database
+// is read far less often than when every expiry is a miss, and reads are no staler.
+func TestARevalidatingCacheRenewsUnchangedEntriesInsteadOfRefetching(t *testing.T) {
+	plain, plainDB := revalRun(false)
+	reval, revalDB := revalRun(true)
+	if plain.Revalidated != 0 || reval.Revalidated == 0 {
+		t.Fatalf("only the revalidating cache should renew entries: %d against %d", plain.Revalidated, reval.Revalidated)
+	}
+	if revalDB >= plainDB*0.8 {
+		t.Errorf("renewing unchanged entries should cut the database's reads clearly: %.0f against %.0f", revalDB, plainDB)
+	}
+	if reval.Stale > plain.Stale+plain.Stale/5+2 {
+		t.Errorf("a version check must not make reads staler: %d against %d", reval.Stale, plain.Stale)
+	}
+}
+
+// A lease needs the origin to remember who holds what; that bookkeeping adds half of the cache's memory cost.
+func TestLeaseBookkeepingIsChargedAsHalfTheMemoryCost(t *testing.T) {
+	cost := func(policy string) float64 {
+		return Spec(KCache).cost(Params{"capacityItems": 2000.0, "writePolicy": policy})
+	}
+	none, lease, push := cost("none"), cost("lease"), cost("invalidate")
+	if push != none {
+		t.Errorf("pushing keeps no record of holders, so it costs the same as doing nothing: %.4f against %.4f", push, none)
+	}
+	if got, want := lease-none, 0.025; got < want-1e-9 || got > want+1e-9 {
+		t.Errorf("a 2,000-item cache should pay %.3f a hour for lease bookkeeping, paid %.4f", want, got)
+	}
+}

@@ -13,16 +13,17 @@ type entry struct {
 
 // Store is a bounded key->version cache with LRU, LFU, FIFO or random eviction and optional TTL.
 type Store struct {
-	policy string
-	cap    int
-	ttlMs  float64
-	jitter float64 // 0..0.9: each entry lives ttl*(1 +/- jitter), spread deterministically by key and time
-	rng    *RNG
-	m      map[int]*entry
-	ll     *list.List         // lru / fifo: front = newest
-	freq   map[int]*list.List // lfu buckets
-	minF   int
-	keys   []int // random policy
+	policy            string
+	cap               int
+	ttlMs             float64
+	jitter            float64 // 0..0.9: each entry lives ttl*(1 +/- jitter), spread deterministically by key and time
+	shortPct, shortMs float64 // a share of the items (by key) live shortMs instead of ttlMs
+	rng               *RNG
+	m                 map[int]*entry
+	ll                *list.List         // lru / fifo: front = newest
+	freq              map[int]*list.List // lfu buckets
+	minF              int
+	keys              []int // random policy
 }
 
 func NewStore(policy string, capacity int, ttlMs float64, rng *RNG) *Store {
@@ -41,6 +42,18 @@ func (s *Store) Size() int           { return len(s.m) }
 func (s *Store) Capacity() int       { return s.cap }
 func (s *Store) SetTTL(ms float64)   { s.ttlMs = ms }
 func (s *Store) SetJitter(f float64) { s.jitter = f }
+
+// SetShortTTL gives a share of the items (chosen by key, so the same items every time) a shorter time to live.
+func (s *Store) SetShortTTL(pct, ms float64) { s.shortPct, s.shortMs = pct, ms }
+
+// Expired returns the version of an entry that is held but past its time to live, without removing it.
+func (s *Store) Expired(now float64, key int) (int, bool) {
+	e, ok := s.m[key]
+	if !ok || e.exp == 0 || now < e.exp {
+		return 0, false
+	}
+	return e.ver, true
+}
 
 // SetCapacity resizes the store, evicting if it shrank. Returns evictions.
 func (s *Store) SetCapacity(c int) int {
@@ -89,6 +102,9 @@ func (s *Store) Set(now float64, key, ver int) int {
 	exp := 0.0
 	if s.ttlMs > 0 {
 		life := s.ttlMs
+		if s.shortPct > 0 && s.shortMs > 0 && float64(Hash32(uint32(key)*2246822519+17)%100) < s.shortPct {
+			life = min(life, s.shortMs)
+		}
 		if s.jitter > 0 {
 			u := float64(Hash32(uint32(key)*0x9e3779b1^uint32(now))) / 4294967296
 			life *= 1 + s.jitter*(2*u-1)

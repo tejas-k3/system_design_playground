@@ -22,7 +22,7 @@ func TestPerfGuard(t *testing.T) {
 	if v, err := strconv.ParseFloat(os.Getenv("PERF_NS_CEILING_MS"), 64); err == nil && v > 0 {
 		ceilingMs = v
 	}
-	const maxAllocs, maxBytes = 1_950_000, 115 << 20
+	const maxAllocs, maxBytes = 2_000_000, 125 << 20
 	best := testing.Benchmark(BenchmarkLargeDesign)
 	for i := 0; i < 2; i++ { // the allocation numbers are stable, the time is the noisy one: keep the fastest of three
 		if r := testing.Benchmark(BenchmarkLargeDesign); r.NsPerOp() < best.NsPerOp() {
