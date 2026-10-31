@@ -686,4 +686,35 @@ func registerScaleOut() {
 			Explain: "Each user sends half as many heartbeats, so there are half as many writes. The last heartbeat of a user who left is older for longer before it counts as missing, so the dot stays green longer."}},
 		Debrief: "Presence is soft state: it is rewritten every few seconds, it is wrong the moment it is read, and losing it costs nothing lasting. Paying for durable writes on it wastes the database. A store that spreads writes over several nodes and acknowledges after one fits. In a real store an expiry per entry (not modelled here) removes a user whose heartbeats stop, and its length sets how long a green dot stays wrong. The interval is a trade-off in its own right: a shorter heartbeat finds departures sooner and multiplies the writes, and telling every friend on each change multiplies them again, so large systems send changes only to friends who are looking.",
 	})
+
+	// Friends of friends: every hop multiplies the rows a read touches
+	friendsOfFriends := func(fixed bool) engine.Diagram {
+		db := P{"connections": 16.0, "readMs": 2.0}
+		if fixed {
+			db["model"] = "graph"
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 120.0, "readPct": 100.0, "keySpace": 1000000.0, "keyDist": "uniform", "timeoutMs": 1500.0, "retries": 0.0, "friendHops": 2.0, "friendsEach": 200.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 64.0, "cpuMs": 1.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, db).label("db", "Social graph").
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "friends-of-friends", Title: "Friends of friends", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "\"People you may know\" reads 40,000 rows for every user.",
+		Story:   "The suggestions page lists the friends of a user's friends. A user has about 200 friends, so one hop touches 200 rows and two hops touch 40,000. The social graph lives in a relational database that joins them, and 120 users a second ask. Answer at least 97% of requests with a p95 under 400 ms.",
+		Diagram: friendsOfFriends(false), Solution: friendsOfFriends(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(400), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.6)},
+		DurationSec: 30, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Look at the database: how busy is it, and what does each read cost compared with a plain read?",
+			"The work grows with the number of friends to the power of the hops. Which of the two can the design change?",
+			"Is a database that joins tables the best place for data whose main query is \"follow the links\"? The data model setting says how a store handles that, and a cap on the neighbours followed bounds the work.",
+		},
+		Answer: "The answer: store the graph in a graph database (the data model setting). Following a link there is a pointer, a tenth of the cost of a join row, so two hops cost a tenth as much. Capping the neighbours followed per hop also works, by returning a sample instead of every friend of a friend.",
+		Predictions: []Prediction{{ID: "p1", Question: "Users have 200 friends each. How many more rows does a read touch at three hops than at two?", Options: []string{"About 200 times as many", "About 1.5 times as many", "The same, since the friends overlap"}, Answer: 0,
+			Explain: "Each hop multiplies the rows by the number of friends, so a third hop reaches about 200 times as many rows as the second."}},
+		Debrief: "Following links makes the work grow with the number of friends to the power of the hops, so a few popular users and one more hop dominate everything else. A relational database pays a join for every row on the way. A graph database stores each user's neighbours next to the user and follows them as pointers, which is much cheaper per row but still grows the same way with every hop. The lasting fixes bound the work: cap the neighbours per hop and return a sample, limit the depth, or precompute the result for the users who ask most and keep it fresh with a cache.",
+		Deeper:  "Graph queries are a different shape from key lookups: the cost depends on the neighbourhood that is reached, not on the size of the data. Real systems cap the fan-out per hop, rank the neighbours so that the sample is the useful part, and keep suggestions as a precomputed list refreshed in the background, because computing a two-hop answer per request would not survive one user with a hundred thousand followers. A graph store makes the traversal cheap; it does not make a celebrity cheap.",
+	})
 }

@@ -189,6 +189,10 @@ var alternatives = map[string][]Alternative{
 		alt("Give the database 64 connections", false, 56.4, 643, 3.32, "It barely helps: success only reaches 56% and p95 stays at 643 ms, at a higher bill. Paying for more of a durable store does not fix writes that never needed to be durable.", Change{"db", "connections", 64.0}),
 		alt("Heartbeat every 10 seconds instead of 5", true, 100.0, 124, 2.46, "It passes, and it is the cheapest: half the writes fit the database. The price is not in the bill: a user who leaves stays green for twice as long.", Change{"users", "rps", 750.0}),
 	},
+	"friends-of-friends": {
+		alt("Follow at most 50 friends per hop", true, 100.0, 122, 2.46, "It passes at the same bill: two hops touch 2,550 rows instead of 40,200, so the join is cheap enough. The answer is a sample of the friends of friends, not all of them.", Change{"db", "graphCap", 50.0}),
+		alt("Give the database 64 connections", false, 70.0, 1447, 3.32, "Four times the connections lift success to 70% and nothing more: each read still costs 40,000 rows of work, and the bill goes up by a third.", Change{"db", "connections", 64.0}),
+	},
 	"cold-start": {
 		alt("Keep one instance warm", false, 100.0, 129, 0.24, "There is no cold start any more, but the instance that never stops costs more than the whole budget of $0.20 an hour.", Change{"fn", "keepWarm", true}),
 		alt("Make the function start in 300 ms", false, 100.0, 424, 0.19, "Requests that find it cold wait a quarter as long, but there are still enough of them for the p95 of 424 ms to be just over the 400 ms goal.", Change{"fn", "coldStartMs", 300.0}),
