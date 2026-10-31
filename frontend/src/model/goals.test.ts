@@ -248,3 +248,15 @@ describe('pct', () => {
     expect(pct(1)).toBe('100.0%')
   })
 })
+
+describe('commit and recovery goals', () => {
+  it('judges lock-seconds, repeated outputs and catch-up time', () => {
+    const g = { minSuccessRate: 0.5, maxBlockedSec: 5, maxRepeatedOutputs: 0, maxRecoverySec: 1.5 }
+    const bad = goalRows(g, stats({ resolved: 10, ok: 10, blockedSec: 22, repeatedOutputs: 6, recoverySec: 2.37 }), 1, true)
+    expect(row(bad, 'Lock-seconds held for a dead coordinator')).toMatchObject({ actual: '22.0 s', state: 'fail' })
+    expect(row(bad, 'Outputs repeated after a crash')).toMatchObject({ actual: '6', state: 'fail' })
+    expect(row(bad, 'Time to catch up after a crash')).toMatchObject({ actual: '2.37 s', state: 'fail' })
+    const good = goalRows(g, stats({ resolved: 10, ok: 10, recoverySec: 1.27 }), 1, true)
+    expect(row(good, 'Time to catch up after a crash').state).toBe('pass')
+  })
+})
