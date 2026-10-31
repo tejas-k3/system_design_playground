@@ -67,6 +67,8 @@ var conceptTags = map[string][]string{
 	"unique-visitors":        {"storage-and-payload", "capacity"},
 	"top-ten":                {"storage-and-payload", "caching"},
 	"polite-crawler":         {"overload-control", "failure-handling"},
+	"typeahead-index":        {"storage-and-payload", "capacity"},
+	"crawl-dedup":            {"storage-and-payload", "overload-control"},
 	"slow-first-token":       {"capacity", "queues"},
 	"rag-under-load":         {"capacity", "storage-and-payload"},
 	"the-gpu-budget":         {"overload-control", "capacity"},

@@ -145,6 +145,14 @@ var alternatives = map[string][]Alternative{
 		alt("Limit the crawler to 3 fetches a second per site", false, 30.4, 7791, 0.37, "Politer than needed: 3 a second is below the 4 a second the crawler averages, so the queue grows for the whole run and most fetches time out.", Change{"crawler", "perHostRps", 3.0}),
 		alt("Limit the crawler to 5 fetches a second per site", false, 57.1, 7638, 0.37, "Above the average but only just: the waiting never fully clears between rushes, and on this seed over a third of the fetches time out. A limit is only safe with room over the average load.", Change{"crawler", "perHostRps", 5.0}),
 	},
+	"typeahead-index": {
+		alt("Keep one secondary index", true, 100.0, 225, 0.72, "An index speeds lookups by the suggestion field but adds work to each write.", Change{"db", "indexes", 1.0}),
+		alt("Keep two secondary indexes", false, 48.7, 1391, 0.72, "The second index has no query to serve here and adds another update to every write, exhausting the disk budget.", Change{"db", "indexes", 2.0}),
+	},
+	"crawl-dedup": {
+		alt("Use an exact seen-URL set", true, 100.0, 143, 1.00, "The exact set prevents refetching known pages without Bloom-filter false positives, but its memory grows with distinct URLs.", Change{"users", "crawlDedup", "exact"}),
+		alt("Size a Bloom filter for 1,000 URLs", false, 100.0, 143, 1.00, "This small filter quickly fills at the crawl's size: false positives hide new pages and recall falls below the target.", Change{"users", "crawlDedup", "bloom"}, Change{"users", "crawlUrls", 1000.0}, Change{"users", "crawlBitsPerUrl", 1.0}),
+	},
 	"slow-first-token": {
 		alt("Write 16 answers at once", false, 100.0, 22698, 4.76, "Four times the batch, but one GPU still finishes only about 2.6 requests a second against the 3 that arrive, so the queue keeps growing and the first token waits 17 seconds.", Change{"model", "batchSize", 16.0}),
 		alt("Buy a second GPU and keep the batch at 4", false, 55.5, 29362, 7.26, "Two GPUs at a batch of 4 finish about 2.1 requests a second: still below the 3 that arrive, and over the budget.", Change{"model", "gpus", 2.0}),

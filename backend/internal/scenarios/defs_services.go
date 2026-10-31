@@ -234,4 +234,54 @@ func registerServicePatterns() {
 			Explain: "Each window has its own count: the last moments of one window and the first moments of the next can each admit the whole allowance."}},
 		Debrief: "Every rate-limiting algorithm makes a different promise at the boundary. A fixed window is cheap but allows up to twice the limit across its edge; a sliding log is exact and costs memory per request; a sliding counter is cheap and close; a token bucket allows a burst up to its size and then a steady rate. Pick the one whose worst case your backend can survive.",
 	})
+
+	typeahead := func(indexes float64) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 70.0, "secondaryPct": 80.0, "timeoutMs": 1500.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 24.0, "queueCap": 300.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "indexes": indexes, "diskIops": 130.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "typeahead-index", Title: "Typeahead under load", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "Keep prefix lookups fast while the index is maintained on writes.",
+		Story:   "A catalogue serves suggestions as people type. Most reads search by a name prefix, while new and changed names must still be written. Keep p95 below 300 ms and the hourly cost under $1.20. This exercise models a prefix lookup as a lookup by another indexed field; it does not simulate a trie or matching each prefix length.",
+		Diagram: typeahead(0), Solution: typeahead(1),
+		Traffic: map[string][]engine.TrafficPoint{"users": {{0, 100}, {10, 100}, {20, 180}, {40, 180}, {50, 100}, {60, 100}}},
+		Goals:   engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarP95Ms: f(300), StarCostPerHour: f(1.05)}, DurationSec: 60, WarmupSec: 5,
+		Hints: [3]string{
+			"Which field does each suggestion query search, and how much work does an unindexed lookup ask the database to do?",
+			"An index makes alternate-field reads cheaper, but the database must update each index when a row changes.",
+			"How many of these reads need the alternate field, and is the reduction in read work worth the added write work?",
+		},
+		Answer: "The answer: keep one secondary index for the prefix field. It avoids a table scan on most reads while adding one index update to each write; more indexes add write work without helping this query.",
+		Predictions: []Prediction{{ID: "p1", Question: "Adding one index for the suggestion field makes writes…", Options: []string{"Faster, because the database can find the row sooner", "Slower, because each write also updates the index", "Unchanged, because indexes only affect reads"}, Answer: 1,
+			Explain: "An index saves read work for lookups by that field, and adds work whenever the field is written."}},
+		Debrief: "A {{secondary-index|secondary index}} trades extra work on writes for faster lookups by another field. Keep only indexes that serve a real access path. This model treats a prefix query as one alternate-field lookup; it does not measure autocomplete ranking or results for each prefix length.",
+	})
+
+	crawler := func(dedup string, bits float64) engine.Diagram {
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 25.0, "readPct": 100.0, "workload": "crawl", "crawlHosts": 40.0, "crawlHostSkew": 1.2, "crawlLinks": 6.0, "crawlDupPct": 80.0, "crawlDedup": dedup, "crawlUrls": 30000.0, "crawlBitsPerUrl": bits, "crawlHashes": 7.0, "timeoutMs": 2000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 500.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0}).
+			e("users", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "crawl-dedup", Title: "The repeating crawler", Difficulty: "Medium",
+		Summary: "Stop the frontier from fetching pages it has already found.",
+		Story:   "A crawler visits many sites and each page links to pages already seen as well as new ones. At least 98% of requests must succeed, p95 must stay below 300 ms, cost must stay under $1.20 an hour, at least 98% of new pages must be found, and no page may be fetched twice. Choose a seen-URL check and keep the frontier moving.",
+		Diagram: crawler("none", 10), Solution: crawler("exact", 10),
+		Goals:       engine.Goals{MinSuccessRate: 0.98, MaxP95Ms: f(300), MaxCostPerHour: f(1.2), StarCostPerHour: f(1.0), MinRecall: f(0.98), MaxDuplicates: i(0)},
+		DurationSec: 60, WarmupSec: 5,
+		Hints: [3]string{
+			"What happens when a page links back to a URL already in the frontier or fetched earlier?",
+			"An exact set grows with each distinct URL. A Bloom filter uses fixed memory but can sometimes say a new URL was already seen.",
+			"Which seen-URL check meets both the recall target and the rule against fetching a page twice?",
+		},
+		Answer: "The answer: use an exact seen-URL set. It avoids refetching known pages without false positives, at the cost of memory that grows with the number of distinct URLs.",
+		Predictions: []Prediction{{ID: "p1", Question: "A Bloom filter reports that a new URL was already seen. The crawler will…", Options: []string{"Fetch it anyway, because Bloom filters keep an exact set", "Skip it, so a false positive can hide a new page", "Add another URL to the frontier to compensate"}, Answer: 1,
+			Explain: "Bloom filters can report a false positive. The crawler saves memory but may skip a new URL, reducing recall."}},
+		Debrief: "A {{crawl-frontier|frontier}} holds discovered pages waiting to be fetched. A seen-URL check prevents repeats; an exact set preserves recall but grows with distinct URLs, while a Bloom filter trades some recall for bounded memory. This run does not charge for the exact set's memory.",
+	})
 }

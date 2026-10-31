@@ -40,6 +40,8 @@ rag-under-load 668d9a8f4bb8223b5e89ec1324e1a888ea901ff7e47d275d6f5a93c53c46dc2f 
 shed-the-cheap-traffic adfaee39dfd9d7f299f389a5e2708f9dd2c0f960fb1db58d813185ffe76e3d75 start=false/0/0.0000/0.0 solution=true/2/0.4987/334.3
 url-shortener 9ee10db61372004e6ebc3bfc12f7baf75d2f5610bfadac285be167c3627575bf start=false/0/0.0000/0.0 solution=true/2/1.0000/151.4
 rate-limiter-showdown 2d4373dc650a6418f321f5edd3e1aca85cd606b67218748a124e83a0dcc23483 start=false/0/0.3758/1391.1 solution=true/2/0.2411/630.0
+typeahead-index fdd04183e5872e329df359d21538693ead6538a2747ff57daaa18b653aa72084 start=false/0/0.3039/1363.8 solution=true/3/1.0000/225.0
+crawl-dedup 066f3dee0367d1fb008f271ac1045b918390528ae5ebdd754697fbeef9abd0de start=false/0/1.0000/142.7 solution=true/3/1.0000/142.7
 multi-region-reads 2a0c10f003fddcdabed12d7246fa37a1de98a9f7162972dd05ef27d488d7f72d start=false/0/1.0000/279.7 solution=true/2/1.0000/142.7
 add-a-shard fe26edd70bf303ba3ef7ebaa0094bcd3db99d7d46d1e0a118dc80e5226aca253 start=false/0/1.0000/2952.4 solution=true/3/1.0000/154.4
 noisy-tenant b3a0bc72d661e61040698af36c23df8042a351eab9b346d2af3c48d5081d89a3 start=false/0/0.3337/154.4 solution=true/3/0.5033/151.4
