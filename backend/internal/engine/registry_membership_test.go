@@ -50,3 +50,20 @@ func TestMembershipByHealthCheckIsTheDefault(t *testing.T) {
 		t.Errorf("naming the default must change nothing: %d/%d vs %d/%d", a.OK, a.Failed, b.OK, b.Failed)
 	}
 }
+
+// A server that comes back before its entry expired was never dropped, so it keeps its place.
+func TestAQuickRestartNeverLeftThePool(t *testing.T) {
+	quick := func(refresh float64) float64 {
+		b := &builder{}
+		b.node("u", KClient, Params{"rps": 80.0, "readPct": 100.0, "timeoutMs": 1000.0}).
+			node("lb", KLoadBalancer, Params{"membership": "registry", "registryTtlSec": 6.0, "registryRefreshSec": refresh}).
+			node("a1", KAppServer, Params{"threads": 32.0}).node("a2", KAppServer, Params{"threads": 32.0}).
+			node("db", KDatabase, Params{"connections": 64.0})
+		b.edge("u", "lb").edge("lb", "a1").edge("lb", "a2").edge("a1", "db").edge("a2", "db")
+		d, _ := Sanitize(b.d)
+		return run(d, Options{Seed: 3, Chaos: []ChaosEvent{{Type: "crash", NodeID: "a1", AtSec: 10, DownSec: 2}}}, 13).Snapshot().Nodes["a1"].Arr
+	}
+	if a := quick(8); a < 20 {
+		t.Errorf("a server back after 2 s was still listed, so it serves at once: %.0f/s", a)
+	}
+}

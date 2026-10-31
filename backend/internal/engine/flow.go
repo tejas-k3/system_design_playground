@@ -1097,7 +1097,9 @@ func (s *Sim) believedDown(lb, t *node) bool {
 		if t.down {
 			return s.now-t.downAt >= (lb.f("registryTtlSec")+lb.f("registryRefreshSec"))*1000
 		}
-		return t.upAt > 0 && s.now-t.upAt < lb.f("registryRefreshSec")*1000 && t.upAt > t.downAt && t.downAt > 0
+		// back up: kept out until the next read, but only if the entry had expired (it was dropped) before the restart
+		listed := (lb.f("registryTtlSec") + lb.f("registryRefreshSec")) * 1000
+		return t.upAt > 0 && t.upAt-t.downAt >= listed && s.now-t.upAt < lb.f("registryRefreshSec")*1000
 	}
 	if !t.down {
 		return false

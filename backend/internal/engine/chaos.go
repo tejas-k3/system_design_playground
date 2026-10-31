@@ -261,7 +261,7 @@ func (s *Sim) CrashNode(id string, downSec float64) {
 		ep := n.epoch
 		s.after(n.f("leaderElectionSec")*1000, func() { // a follower becomes the leader while the old one is still down
 			if n.down && n.epoch == ep {
-				n.down = false
+				n.down, n.upAt = false, s.now
 				s.logEvent("promotion", n, 0)
 				s.dispatch(n)
 			}
