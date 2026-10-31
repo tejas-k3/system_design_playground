@@ -173,6 +173,15 @@ var alternatives = map[string][]Alternative{
 		alt("Gossip every second to two peers", true, 99.4, 137, 5.46, "It passes: three or four one-second rounds reach all 32 nodes in a few seconds, with each node telling only two.", Change{"kv", "gossipIntervalMs", 1000.0}, Change{"kv", "gossipFanout", 2.0}),
 		alt("Tell every node directly", true, 99.9, 137, 5.46, "It passes and is the quickest, about half a second. The node that notices sends 31 messages, and that grows with the cluster; gossip keeps each node's share the same.", Change{"kv", "failureDetection", "broadcast"}),
 	},
+	"front-door": {
+		alt("Give both app servers 64 threads", false, 48.0, 309, 5.66, "The servers were never the limit: the balancer still passes 1,200 requests a second, so 48% get through and the bill doubles.", Change{"app1", "threads", 64.0}, Change{"app2", "threads", 64.0}),
+	},
+	"cold-start": {
+		alt("Keep one instance warm", false, 100.0, 129, 0.24, "There is no cold start any more, but the instance that never stops costs more than the whole budget of $0.20 an hour.", Change{"fn", "keepWarm", true}),
+		alt("Make the function start in 300 ms", false, 100.0, 424, 0.19, "Requests that find it cold wait a quarter as long, but there are still enough of them for the p95 of 424 ms to be just over the 400 ms goal.", Change{"fn", "coldStartMs", 300.0}),
+		alt("Let it idle for 1 second before it stops", false, 100.0, 1311, 0.19, "Requests come twice a second on average, but gaps of a second or more are not rare, and each one that follows finds the function stopped: enough requests wait 1.2 s to show in the 95th percentile.", Change{"fn", "idleSec", 1.0}),
+		alt("Let it idle for 2 seconds before it stops", true, 100.0, 148, 0.19, "It passes: a gap of two seconds between requests is rare at this rate, so the function almost never stops. A quieter service would need a longer time.", Change{"fn", "idleSec", 2.0}),
+	},
 	"who-is-the-leader": {
 		alt("Run 4 coordination machines instead of 3", false, 67.7, 174, 1.26, "Four machines need a majority of three, so losing two still leaves no quorum: the same outage, for more money. Even sizes add cost, not tolerance.", Change{"zk", "nodes", 4.0}),
 		alt("Let a timer promote the replica instead", true, 92.9, 177, 1.18, "It passes here because the primary really is dead. A timer promotes whatever the cause, so a primary that was only cut off would stay up beside its replacement: two primaries. This run cannot show that risk.", Change{"db", "electionBy", "timer"}),

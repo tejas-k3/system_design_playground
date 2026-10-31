@@ -53,6 +53,8 @@ go-global c1d439ce3196bf0a9cba8012a14bae78a23d6cbc35d9409cd31e1fe8c3efbd6d start
 restart-the-counter 1245e20a30c82877ed43be5b316f3eabb84cf73152b13867b443a24fa9beea73 start=false/0/0.9642/129.2 solution=true/3/0.9642/131.8
 everyone-asks-auth 2dca6bc1d62f632166d643553f8ed2f8778d3af17e634ba17b56f639b352299d start=false/0/0.0662/1391.1 solution=true/3/1.0000/134.4
 where-do-sessions-live 94df494f4cd79c0acc2ea27f23f4f3051124e16e0eb5dcca144329f0a1729d11 start=false/0/0.8678/145.5 solution=true/3/0.9851/154.4
+front-door d296d3d0a80592ef21ba2973925583626a21fdef13814c7f1de6e06df3ee6148 start=false/0/0.4807/308.9 solution=true/3/1.0000/110.3
+cold-start 9eb4f10588690f4d221a129d115ca70b2ece02cd6727e20c9e6ab9f2d721721b start=false/0/1.0000/1337.1 solution=true/3/1.0000/129.2
 reconnect-storm c99649e50b9da6de0c724feafdb24d55544c9fed8751fb4cfa954a6374cc3ad4 start=false/0/0.5112/537.7 solution=true/3/0.9764/121.8
 bad-deploy 6d3073a1a9fb177b767fcb7b3fa77f22cc45ae26e0c01302e177fbc15ddcae91 start=false/0/0.6946/151.4 solution=true/3/0.9698/151.4
 zone-outage 3ea11dcf282bae958e6e8827860e243e2cb7f6c7cf822a5d5bbc581a8a6c3c39 start=false/0/0.5684/151.4 solution=true/3/0.9923/157.5

@@ -122,7 +122,11 @@ func (s *Sim) autoscale(n *node) {
 		a.pending += add
 		for k := 0; k < add; k++ {
 			s.logEvent("scaleUp", n, 0)
-			s.after(n.f("scaleUpDelaySec")*1000, func() {
+			boot := n.f("scaleUpDelaySec")
+			if n.s("runtime") == "container" {
+				boot = n.f("containerBootSec")
+			}
+			s.after(boot*1000, func() {
 				a.pending--
 				if s.autoscaled(n) && !n.removed && a.instances < hi {
 					a.instances++
