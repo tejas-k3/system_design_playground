@@ -648,10 +648,21 @@ func (s *Sim) readThroughEdge(n *node) *edge {
 // diskReadMult is how much slower a page read from disk is than one found in memory.
 const diskReadMult = 10
 
+// lsmExtraLevels is how many levels beyond the first an LSM read must look in. Each level holds about ten times the one
+// above, so the count grows smoothly with the log of the data size: none up to 10 GB (and with no size set, 0), one at
+// 100 GB, two at 1 TB.
+func lsmExtraLevels(dataGB float64) float64 {
+	if dataGB <= 10 {
+		return 0
+	}
+	return math.Log10(dataGB) - 1
+}
+
 func (s *Sim) readMult(n *node, c *call) float64 {
 	m := s.readMultBase(n, c)
-	if n.s("engine") == "lsm" {
-		m *= 1.5 // a read may have to look in several levels
+	if n.s("engine") == "lsm" && n.kind == KDatabase {
+		// a read may have to look in several levels: 1.5x the read, and half a read more for each extra level (a scan is not charged per level)
+		m = m*1.5 + 0.5*lsmExtraLevels(n.f("dataGB"))
 	}
 	if data := n.f("dataGB"); data > n.f("bufferPoolGB") && n.kind == KDatabase {
 		miss := 1 - n.f("bufferPoolGB")/data // pages not in memory (uniform access)
