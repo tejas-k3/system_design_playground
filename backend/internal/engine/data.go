@@ -741,6 +741,7 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 	if c.fan > 0 {
 		ms += c.fan * feedUnitMs
 	}
+	ms += s.graphMs(n, c)
 	if c.heavy {
 		ms *= s.heavyMult(c)
 	}
