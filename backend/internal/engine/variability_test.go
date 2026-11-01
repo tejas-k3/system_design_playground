@@ -10,11 +10,11 @@ var wantSCV = map[string]float64{"steady": 0.25, "exponential": 1, "heavy": 4}
 
 func TestServiceVariabilityModes(t *testing.T) {
 	for mode, want := range wantSCV {
-		r := NewRNG(11)
+		r := newPRNG(11)
 		const n = 2000000
 		var sum, sumSq float64
 		for range n {
-			v := r.ServiceDist(10, mode)
+			v := r.serviceDist(10, mode)
 			sum += v
 			sumSq += v * v
 		}
@@ -30,9 +30,9 @@ func TestServiceVariabilityModes(t *testing.T) {
 }
 
 func TestDefaultVariabilityIsTheOriginalModel(t *testing.T) {
-	r1, r2 := NewRNG(5), NewRNG(5)
+	r1, r2 := newPRNG(5), newPRNG(5)
 	for i := range 1000 {
-		if a, b := r1.Service(7), r2.ServiceDist(7, ""); a != b {
+		if a, b := r1.Service(7), r2.serviceDist(7, ""); a != b {
 			t.Fatalf("draw %d: Service %v vs ServiceDist(\"\") %v", i, a, b)
 		}
 	}

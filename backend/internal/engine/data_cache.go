@@ -8,10 +8,10 @@ func (s *Sim) localStore(n *node) *Store {
 		return nil
 	}
 	if n.local == nil {
-		n.local = NewStore("lru", 0, 0, s.rng)
+		n.local = newStore("lru", 0, 0, s.rng)
 	}
-	n.local.SetCapacity(int(n.f("localCacheItems")))
-	n.local.SetTTL(n.f("localCacheTtlSec") * 1000)
+	n.local.setCapacity(int(n.f("localCacheItems")))
+	n.local.setTTL(n.f("localCacheTtlSec") * 1000)
 	return n.local
 }
 

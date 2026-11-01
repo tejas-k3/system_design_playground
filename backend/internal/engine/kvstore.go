@@ -339,7 +339,7 @@ func (s *Sim) kvAntiEntropy(n *node) {
 // drawn: it learns when the news has reached its place in the order in which nodes hear.
 
 func kvCoordinator(c *call, nodes int) int {
-	return int(Hash32(uint32(c.rid)*2246822519+101) % uint32(nodes))
+	return int(hash32(uint32(c.rid)*2246822519+101) % uint32(nodes))
 }
 
 // gossipInformed is how many of n nodes know after r rounds when one node starts and each tells fanout others.

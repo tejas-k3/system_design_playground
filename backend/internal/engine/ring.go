@@ -37,7 +37,7 @@ func (s *Sim) ringFor(t *node, cand []*edge) *ring {
 	r := &ring{sig: sig}
 	for _, e := range cand {
 		for i := range v {
-			r.points = append(r.points, ringPoint{Hash32(strHash(e.to.id) + uint32(i)*0x9e3779b1), e.to.id})
+			r.points = append(r.points, ringPoint{hash32(strHash(e.to.id) + uint32(i)*0x9e3779b1), e.to.id})
 		}
 	}
 	sort.Slice(r.points, func(i, j int) bool {
@@ -53,10 +53,10 @@ func (s *Sim) ringFor(t *node, cand []*edge) *ring {
 // pickShard chooses the child edge that serves a key hash.
 func (s *Sim) pickShard(t *node, cand []*edge, h uint32) *edge {
 	if t.s("hashing") != "ring" || len(cand) == 1 {
-		return cand[int(Hash32(h)%uint32(len(cand)))]
+		return cand[int(hash32(h)%uint32(len(cand)))]
 	}
 	r := s.ringFor(t, cand)
-	kh := Hash32(h)
+	kh := hash32(h)
 	i := sort.Search(len(r.points), func(i int) bool { return r.points[i].h >= kh })
 	if i == len(r.points) {
 		i = 0

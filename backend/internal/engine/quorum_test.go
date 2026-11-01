@@ -115,7 +115,7 @@ func TestHintedHandoffLeavesNoCopyBehind(t *testing.T) {
 	nodes, copies, _, _ := kvShape(n)
 	missing, checked := 0, 0
 	for k, have := range n.kvVer[0] { // node 0 is the one that went down
-		first := int(Hash32(uint32(k)*2654435761+11) % uint32(nodes))
+		first := int(hash32(uint32(k)*2654435761+11) % uint32(nodes))
 		newest := 0
 		for j := range copies {
 			newest = max(newest, n.kvVer[(first+j)%nodes][k])

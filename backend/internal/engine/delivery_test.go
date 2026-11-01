@@ -16,9 +16,9 @@ func deliveryEvents() []float64 {
 
 func TestAtLeastOnceRepeatsOutputsAfterACrash(t *testing.T) {
 	ev := deliveryEvents()
-	clean := RunStream(ev, 2, 0, 10, "atLeastOnce", -1)
-	alo := RunStream(ev, 2, 0, 10, "atLeastOnce", 3800)
-	eo := RunStream(ev, 2, 0, 10, "exactlyOnce", 3800)
+	clean := runStream(ev, 2, 0, 10, "atLeastOnce", -1)
+	alo := runStream(ev, 2, 0, 10, "atLeastOnce", 3800)
+	eo := runStream(ev, 2, 0, 10, "exactlyOnce", 3800)
 	t.Logf("windows delivered: clean %d, at-least-once after a crash %d (%d duplicates), exactly-once %d (%d duplicates)", len(clean.Delivered), len(alo.Delivered), alo.Duplicates, len(eo.Delivered), eo.Duplicates)
 	if clean.Duplicates != 0 {
 		t.Errorf("no crash, no repeats: %d", clean.Duplicates)

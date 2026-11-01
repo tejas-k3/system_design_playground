@@ -2,14 +2,14 @@ package engine
 
 import "math"
 
-// RNG is a small deterministic PRNG (mulberry32) so a run is reproducible from its seed.
-type RNG struct{ s uint32 }
+// prng is a small deterministic PRNG (mulberry32) so a run is reproducible from its seed.
+type prng struct{ s uint32 }
 
-// NewRNG returns a deterministic generator for the seed.
-func NewRNG(seed uint32) *RNG { return &RNG{s: seed} }
+// newPRNG returns a deterministic generator for the seed.
+func newPRNG(seed uint32) *prng { return &prng{s: seed} }
 
 // Next returns a uniform float in [0,1).
-func (r *RNG) Next() float64 {
+func (r *prng) Next() float64 {
 	r.s += 0x6D2B79F5
 	t := r.s
 	t = (t ^ (t >> 15)) * (t | 1)
@@ -17,14 +17,14 @@ func (r *RNG) Next() float64 {
 	return float64(t^(t>>14)) / 4294967296.0
 }
 
-// Exp returns an Exp(1) sample.
-func (r *RNG) Exp() float64 { return -math.Log(1 - r.Next()) }
+// exp returns an Exp(1) sample.
+func (r *prng) exp() float64 { return -math.Log(1 - r.Next()) }
 
 // Service turns a mean service time into a sample between 0.5*mean and ~mean*(0.5+k).
-func (r *RNG) Service(mean float64) float64 { return mean * (0.5 + 0.5*r.Exp()) }
+func (r *prng) Service(mean float64) float64 { return mean * (0.5 + 0.5*r.exp()) }
 
-// Hash32 is an integer finalizer used to derive sub-stream seeds and stable per-request hashes.
-func Hash32(x uint32) uint32 {
+// hash32 is an integer finalizer used to derive sub-stream seeds and stable per-request hashes.
+func hash32(x uint32) uint32 {
 	x ^= x >> 16
 	x *= 0x85ebca6b
 	x ^= x >> 13
@@ -33,17 +33,17 @@ func Hash32(x uint32) uint32 {
 	return x
 }
 
-// ServiceDist draws a service time with the given mean and the spread a node's "variability" setting asks for:
+// serviceDist draws a service time with the given mean and the spread a node's "variability" setting asks for:
 //
 //	steady (default, ""):  0.5*mean + Exp(0.5*mean), SCV 0.25, the original model
 //	exponential:           Exp(mean), SCV 1, what queueing textbooks assume
 //	heavy:                 lognormal with SCV 4, a long right tail like real services
 //
 // SCV is the squared coefficient of variation (variance / mean^2). The mean is the same in every mode.
-func (r *RNG) ServiceDist(mean float64, mode string) float64 {
+func (r *prng) serviceDist(mean float64, mode string) float64 {
 	switch mode {
 	case "exponential":
-		return mean * r.Exp()
+		return mean * r.exp()
 	case "heavy":
 		const sigma2 = 1.6094379124341003 // ln(1 + SCV) for SCV = 4
 		u1, u2 := 1-r.Next(), r.Next()

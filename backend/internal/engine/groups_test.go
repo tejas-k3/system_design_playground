@@ -27,10 +27,10 @@ func TestSanitizeGroupsRoundTrip(t *testing.T) {
 	if out.Groups[0] != in.Groups[0] {
 		t.Fatalf("valid group changed: %+v", out.Groups[0])
 	}
-	if out.Groups[1].W != MinGroupSize || out.Groups[1].H != MaxGroupSize {
+	if out.Groups[1].W != minGroupSize || out.Groups[1].H != maxGroupSize {
 		t.Fatalf("sizes not clamped: %+v", out.Groups[1])
 	}
-	if len([]rune(out.Groups[2].Label)) != MaxGroupLabel {
+	if len([]rune(out.Groups[2].Label)) != maxGroupLabel {
 		t.Fatalf("label not truncated")
 	}
 	again, adj2 := Sanitize(out)
@@ -46,11 +46,11 @@ func TestSanitizeGroupsRoundTrip(t *testing.T) {
 
 func TestSanitizeGroupsCapAndOldDesigns(t *testing.T) {
 	var gs []Group
-	for i := 0; i < MaxGroups+5; i++ {
+	for i := 0; i < maxGroups+5; i++ {
 		gs = append(gs, Group{ID: "g" + strings.Repeat("x", i+1), Kind: "az", W: 100, H: 100})
 	}
 	out, adj := Sanitize(Diagram{Groups: gs})
-	if !adj || len(out.Groups) != MaxGroups {
+	if !adj || len(out.Groups) != maxGroups {
 		t.Fatalf("cap: adj=%v n=%d", adj, len(out.Groups))
 	}
 	var old Diagram

@@ -85,8 +85,8 @@ func TestBandwidthIsSanitized(t *testing.T) {
 	}
 	d.Edges[0].BandwidthMbps = 1e9
 	out, _ = Sanitize(d)
-	if out.Edges[0].BandwidthMbps != MaxBandwidthMbps {
-		t.Fatalf("clamped to %v, got %v", MaxBandwidthMbps, out.Edges[0].BandwidthMbps)
+	if out.Edges[0].BandwidthMbps != maxBandwidthMbps {
+		t.Fatalf("clamped to %v, got %v", maxBandwidthMbps, out.Edges[0].BandwidthMbps)
 	}
 	d.Edges[0].BandwidthMbps = 80
 	if out, adj := Sanitize(d); out.Edges[0].BandwidthMbps != 80 || adj {

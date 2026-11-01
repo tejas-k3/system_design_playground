@@ -97,7 +97,7 @@ func TestMultiServerQueueMatchesAllenCunneen(t *testing.T) {
 // mean*(0.5 + 0.5*Exp(1)), which is always at least half the mean and has a squared coefficient of
 // variation of 0.25. Real services are usually far more variable (SCV of 1 or well above).
 func TestServiceTimesAreLowVariance(t *testing.T) {
-	r := NewRNG(3)
+	r := newPRNG(3)
 	const n = 400000
 	var sum, sumSq, lowest float64
 	lowest = math.MaxFloat64

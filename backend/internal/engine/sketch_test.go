@@ -9,18 +9,18 @@ import (
 // is (1 - e^(-kn/m))^k.
 func TestBloomFalsePositiveRateMatchesTheFormula(t *testing.T) {
 	for _, c := range []struct{ m, k, n int }{{100000, 7, 10000}, {50000, 4, 10000}, {20000, 3, 5000}} {
-		b := NewBloom(c.m, c.k)
+		b := newBloom(c.m, c.k)
 		for i := 0; i < c.n; i++ {
 			b.Add(uint32(i))
 		}
 		for i := 0; i < c.n; i++ {
-			if !b.Has(uint32(i)) {
+			if !b.has(uint32(i)) {
 				t.Fatalf("a Bloom filter never forgets what was added: %d", i)
 			}
 		}
 		fp, trials := 0, 200000
 		for i := range trials {
-			if b.Has(uint32(1000000 + i)) {
+			if b.has(uint32(1000000 + i)) {
 				fp++
 			}
 		}
@@ -40,8 +40,8 @@ func TestCountMinOvercountIsBoundedByEpsilonN(t *testing.T) {
 	eps, delta := math.E/float64(w), math.Exp(-float64(d))
 	over, total := 0, 0
 	for trial := range 1000 {
-		c := NewCountMin(w, d, uint32(trial))
-		rng := NewRNG(uint32(trial) + 1)
+		c := newCountMin(w, d, uint32(trial))
+		rng := newPRNG(uint32(trial) + 1)
 		counts := map[uint32]int{}
 		n := 0
 		for range 2000 {
@@ -72,11 +72,11 @@ func TestCountMinOvercountIsBoundedByEpsilonN(t *testing.T) {
 func TestHyperLogLogErrorIsWithinThreeStandardErrors(t *testing.T) {
 	const p = 12
 	se := 1.04 / math.Sqrt(float64(int(1)<<p))
-	rng := NewRNG(99)
+	rng := newPRNG(99)
 	var sumSq float64
 	for i := range 20 {
 		n := 100 + int(rng.Next()*200000)
-		h := NewHLL(p)
+		h := newHLL(p)
 		base := uint32(i) * 1000003
 		for j := range n {
 			h.Add(base + uint32(j))
@@ -99,7 +99,7 @@ func TestHyperLogLogErrorMatchesTheoryAtSmallPrecisions(t *testing.T) {
 		se := 1.04 / math.Sqrt(float64(int(1)<<p))
 		var sq, sum float64
 		for i := range trials {
-			h := NewHLL(p)
+			h := newHLL(p)
 			base := uint32(i) * 7919
 			for j := range n {
 				h.Add(base + uint32(j)*3)

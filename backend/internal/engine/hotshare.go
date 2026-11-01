@@ -8,7 +8,7 @@ func (s *Sim) countKey(key int) {
 	if s.keyCount == nil {
 		s.keyCount = make([]int32, hotBuckets)
 	}
-	s.keyCount[Hash32(uint32(key))%hotBuckets]++
+	s.keyCount[hash32(uint32(key))%hotBuckets]++
 	s.keyTotal++
 }
 

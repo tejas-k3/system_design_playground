@@ -28,16 +28,16 @@ func (h *eventHeap) Push(e event) {
 	}
 }
 
-// PeekTime returns the next event time or +Inf-like when empty.
-func (h *eventHeap) PeekTime() float64 {
+// peekTime returns the next event time or +Inf-like when empty.
+func (h *eventHeap) peekTime() float64 {
 	if len(h.a) == 0 {
 		return 1e308
 	}
 	return h.a[0].t
 }
 
-// Pop removes and returns the earliest event; ties go to the one queued first.
-func (h *eventHeap) Pop() event {
+// pop removes and returns the earliest event; ties go to the one queued first.
+func (h *eventHeap) pop() event {
 	top := h.a[0]
 	n := len(h.a) - 1
 	h.a[0] = h.a[n]

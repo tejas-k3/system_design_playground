@@ -78,7 +78,7 @@ func secondAccount(c *call, first int) int {
 			ks = v
 		}
 	}
-	k := int(Hash32(uint32(c.rid)*2246822519+13) % uint32(ks))
+	k := int(hash32(uint32(c.rid)*2246822519+13) % uint32(ks))
 	if k == first {
 		k = (k + 1) % ks
 	}

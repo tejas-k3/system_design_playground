@@ -263,7 +263,7 @@ type kvRing struct {
 	cache map[int][]int
 }
 
-func kvKeyHash(key int) uint32 { return Hash32(uint32(key)*2654435761 + 11) }
+func kvKeyHash(key int) uint32 { return hash32(uint32(key)*2654435761 + 11) }
 
 // kvModFirst is where hash mod n puts the first copy.
 func kvModFirst(key, n int) int { return int(kvKeyHash(key) % uint32(n)) }
@@ -271,9 +271,9 @@ func kvModFirst(key, n int) int { return int(kvKeyHash(key) % uint32(n)) }
 func newKVRing(nodes, vnodes int) *kvRing {
 	r := &kvRing{nodes: nodes, cache: map[int][]int{}}
 	for i := range nodes {
-		base := Hash32(uint32(i) + 0x5bd1e995)
+		base := hash32(uint32(i) + 0x5bd1e995)
 		for v := range vnodes {
-			r.pts = append(r.pts, kvPoint{Hash32(base + uint32(v)*0x9e3779b1), i})
+			r.pts = append(r.pts, kvPoint{hash32(base + uint32(v)*0x9e3779b1), i})
 		}
 	}
 	sort.Slice(r.pts, func(a, b int) bool {

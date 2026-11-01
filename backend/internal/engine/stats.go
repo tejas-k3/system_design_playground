@@ -431,19 +431,19 @@ func (s *Sim) nodeExtraCounters(n *node, ex map[string]float64, sum counters, sp
 
 // snapshotRun is the whole-run statistics so far.
 func (s *Sim) snapshotRun() RunStats {
-	buckets := s.hist.Buckets(LatencyBounds)
+	buckets := s.hist.buckets(latencyBounds)
 	lb := make([]LatencyBucket, len(buckets))
 	for i, c := range buckets {
 		le := 1e9
-		if i < len(LatencyBounds) {
-			le = LatencyBounds[i]
+		if i < len(latencyBounds) {
+			le = latencyBounds[i]
 		}
 		lb[i] = LatencyBucket{LeMs: le, Count: c}
 	}
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
-		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, DNSLookups: s.runDNSLookups, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, WrongAnswers: s.runWrongAnswers, ClockLost: s.runClockLost, SessionsLost: s.runLoginsLost, Reauth: s.runLoginRefused, AuthCalls: s.runAuthCalls, AuthCached: s.runAuthCached, Unchecked: s.runUnchecked, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.Quantile(0.95), ITLMs: s.itlHist.Quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, RepeatedOutputs: s.streamRepeated(), RecoverySec: s.streamRecovery(), Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Revalidated: s.runRevalidated, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		P50: s.hist.quantile(0.5), P95: s.hist.quantile(0.95), P99: s.hist.quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.quantile(0.5),
+		Errors: map[string]int{}, DNSLookups: s.runDNSLookups, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, WrongAnswers: s.runWrongAnswers, ClockLost: s.runClockLost, SessionsLost: s.runLoginsLost, Reauth: s.runLoginRefused, AuthCalls: s.runAuthCalls, AuthCached: s.runAuthCached, Unchecked: s.runUnchecked, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.quantile(0.95), ITLMs: s.itlHist.quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, RepeatedOutputs: s.streamRepeated(), RecoverySec: s.streamRecovery(), Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Revalidated: s.runRevalidated, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.quantile(0.95), HeavyP95: s.heavyHist.quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {
@@ -455,7 +455,7 @@ func (s *Sim) snapshotRun() RunStats {
 	if s.hasQueue {
 		run.Jobs = &JobStats{
 			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead, Redelivered: s.jobRedelivered,
-			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95), HighP95: s.jobHistHigh.Quantile(0.95), OrderViolations: s.jobOrderViolations,
+			Backlog: s.backlog(), P50: s.jobHist.quantile(0.5), P95: s.jobHist.quantile(0.95), HighP95: s.jobHistHigh.quantile(0.95), OrderViolations: s.jobOrderViolations,
 		}
 	}
 	return run

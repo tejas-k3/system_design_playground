@@ -163,7 +163,7 @@ type node struct {
 	retryRetries    float64 // decayed count of retries taken
 	retryAt         float64
 	idBase          int             // users of this client are numbered from here, so two clients never share an account
-	userKeys        KeySampler      // samples which account sends a request
+	userKeys        keySampler      // samples which account sends a request
 	global          *bucket         // the single allowance of a window-based limiter that is not per user
 	buckets         map[int]*bucket // a per-user rate limiter's allowance for each account seen so far
 	badUntil        float64         // a bad release answers every request with an error until then (0 = none)
@@ -202,7 +202,7 @@ type node struct {
 	arrivalGen int
 	burstOn    bool    // bursty client: inside a rush now
 	burstUntil float64 // bursty client: when the current phase ends
-	keys       KeySampler
+	keys       keySampler
 
 	// cache / cdn
 	store    *Store
@@ -250,7 +250,7 @@ type node struct {
 	laneIdx    map[[2]int]*lane
 	rrNext     int              // round-robin partition choice
 	lastSeq    map[[2]int]int   // per (group, key): the newest message a consumer has finished
-	win        *WindowAgg       // stream job: the windows it keeps
+	win        *windowAgg       // stream job: the windows it keeps
 	winCP      int              // stream job: how many outputs had been emitted at the last checkpoint
 	winCPAt    float64          // stream job: when that checkpoint was taken
 	winDup     int              // stream job: outputs sent a second time after a crash
@@ -258,13 +258,13 @@ type node struct {
 	winEvCP    int              // stream job: events taken in since the last checkpoint
 	winRecSec  float64          // stream job: how long the last crash took to recover from
 	uniqExact  map[int]struct{} // stream job: every visitor id seen, for the exact count and as the truth for the estimate
-	uniqHLL    *HLL             // stream job: the HyperLogLog sketch
+	uniqHLL    *hllSketch       // stream job: the HyperLogLog sketch
 	hostTokens float64          // external service: calls it will still accept this second
 	hostAt     float64          // external service: when the tokens were last topped up
 	llm        *llmState        // LLM server: its GPUs and queue
-	topTruth   *ExactTopK       // stream job: every item counted exactly, the truth the top ten is judged against
-	topExact   *ExactTopK       // stream job: the exact top-ten tracker when it is the chosen method
-	topSketch  *SketchTopK      // stream job: the count-min top-ten tracker
+	topTruth   *exactTopK       // stream job: every item counted exactly, the truth the top ten is judged against
+	topExact   *exactTopK       // stream job: the exact top-ten tracker when it is the chosen method
+	topSketch  *sketchTopK      // stream job: the count-min top-ten tracker
 	hjobs      []*job           // urgent jobs of a priority queue, served before jobs
 	hh         int
 	delayed    int // jobs held back by the queue's delivery delay
@@ -323,7 +323,7 @@ type Particle struct {
 type Sim struct {
 	now                   float64
 	opts                  Options
-	rng, keyRng, chaosRng *RNG
+	rng, keyRng, chaosRng *prng
 	heap                  eventHeap
 	seq                   uint64
 
@@ -336,9 +336,9 @@ type Sim struct {
 	tokenSeq   int
 	unresolved int
 
-	res, created, attempts, jobsW, conflictsW Window
-	hist                                      Hist
-	failHist                                  Hist
+	res, created, attempts, jobsW, conflictsW reqWindow
+	hist                                      latencyHist
+	failHist                                  latencyHist
 
 	runResolved, runOK, runFailed, runPending int
 	runDNSLookups                             int
@@ -382,9 +382,9 @@ type Sim struct {
 	sharedLimit                                    *node // the first limiter that shares its count: its bucket is everyone's
 	runCustOK, runCustTotal                        int   // requests of clients that are not bots (only counted when a bot exists)
 	hasAbuse                                       bool
-	lightHist, heavyHist                           Hist // latencies of light and heavy requests when the users mix both
-	ttftHist, itlHist                              Hist // time to first token and gap between tokens of the LLM answers
-	jobHist, jobHistHigh                           Hist
+	lightHist, heavyHist                           latencyHist // latencies of light and heavy requests when the users mix both
+	ttftHist, itlHist                              latencyHist // time to first token and gap between tokens of the LLM answers
+	jobHist, jobHistHigh                           latencyHist
 	hasQueue, hasBooking, hasFresh                 bool
 
 	vers      map[int]*verLog
@@ -425,9 +425,9 @@ func New(d Diagram, opts Options) *Sim {
 	seed := opts.Seed
 	s := &Sim{
 		opts:      opts,
-		rng:       NewRNG(seed),
-		keyRng:    NewRNG(Hash32(seed ^ 1540483477)),
-		chaosRng:  NewRNG(Hash32(seed ^ 739982445)),
+		rng:       newPRNG(seed),
+		keyRng:    newPRNG(hash32(seed ^ 1540483477)),
+		chaosRng:  newPRNG(hash32(seed ^ 739982445)),
 		nodes:     map[string]*node{},
 		edges:     map[string]*edge{},
 		vers:      map[int]*verLog{},
@@ -501,8 +501,8 @@ func (s *Sim) after(d float64, fn func()) { s.at(s.now+d, fn) }
 // Advance runs all events up to now+dt.
 func (s *Sim) Advance(dt float64) {
 	target := s.now + max(0, dt)
-	for s.heap.PeekTime() <= target {
-		e := s.heap.Pop()
+	for s.heap.peekTime() <= target {
+		e := s.heap.pop()
 		s.now = e.t
 		e.fn()
 	}
@@ -594,11 +594,11 @@ func (s *Sim) tick() {
 	}
 	s.retuneTraceRate()
 	cut := s.now - statsWindow
-	s.res.Prune(cut)
-	s.created.Prune(cut)
-	s.attempts.Prune(cut)
-	s.jobsW.Prune(cut)
-	s.conflictsW.Prune(cut)
+	s.res.prune(cut)
+	s.created.prune(cut)
+	s.attempts.prune(cut)
+	s.jobsW.prune(cut)
+	s.conflictsW.prune(cut)
 	if s.tickCount%5 == 0 {
 		w := s.res.Stats(s.now - 1000)
 		succ := 1.0
@@ -632,7 +632,7 @@ func (s *Sim) backlog() int { return s.jobEnqueued - s.jobCompleted - s.jobLost 
 // service draws a service time for one unit of work at node n, honouring its "variability" setting.
 func (s *Sim) service(n *node, mean float64) float64 {
 	mode, _ := n.p["variability"].(string)
-	return s.rng.ServiceDist(mean, mode)
+	return s.rng.serviceDist(mean, mode)
 }
 
 // logEvent records something that happened to node n at the current time (see Event).

@@ -12,8 +12,8 @@ func (s *Sim) securityMs(n *node, c *call) float64 {
 		ms += n.f("verifyMs")
 	}
 	if tls := n.f("tlsMs"); tls > 0 {
-		if float64(Hash32(uint32(c.rid)*2654435761+5)%100) < n.f("newConnPct") {
-			if float64(Hash32(uint32(c.rid)*40503+23)%100) < n.f("tlsResumePct") {
+		if float64(hash32(uint32(c.rid)*2654435761+5)%100) < n.f("newConnPct") {
+			if float64(hash32(uint32(c.rid)*40503+23)%100) < n.f("tlsResumePct") {
 				tls /= 3
 			}
 			ms += tls
@@ -24,7 +24,7 @@ func (s *Sim) securityMs(n *node, c *call) float64 {
 
 // authenticate asks the auth service about the request's token, unless a yes for that user is still remembered.
 func (s *Sim) authenticate(n *node, e *edge, c *call, then func(Result)) {
-	user := int(Hash32(uint32(c.rid)*40503+9) % uint32(max(1, int(n.f("tokenUsers")))))
+	user := int(hash32(uint32(c.rid)*40503+9) % uint32(max(1, int(n.f("tokenUsers")))))
 	ttl := n.f("tokenCacheSec") * 1000
 	if ttl > 0 {
 		if exp, ok := n.authTokens[user]; ok && exp > s.now {

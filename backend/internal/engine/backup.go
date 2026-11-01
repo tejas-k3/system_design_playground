@@ -64,7 +64,7 @@ func (s *Sim) restore(n *node) {
 // one of them, a merge keeps both.
 func (s *Sim) multiLeaderWrite(n *node, c *call) {
 	leaders := clampInt(int(n.f("leaders")), 2, 8)
-	leader := int(Hash32(c.hash*2246822519+3) % uint32(leaders))
+	leader := int(hash32(c.hash*2246822519+3) % uint32(leaders))
 	if n.mlLast == nil {
 		n.mlLast = map[int]mlWrite{}
 	}

@@ -478,7 +478,7 @@ func (l *lintRun) ruleDanglingNodes() {
 func (l *lintRun) ruleUnreachable() {
 	d := l.d
 	add := l.add
-	for _, n := range Unwired(d) {
+	for _, n := range unwired(d) {
 		add("unreachable-store", "error", "This component never reaches a data store, so it cannot serve a real request.", "Connect it to a database, cache or queue.", n.ID)
 	}
 }

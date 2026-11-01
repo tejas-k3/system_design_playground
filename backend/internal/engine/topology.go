@@ -67,16 +67,16 @@ func (s *Sim) configStore(n *node) {
 		capItems = min(capItems, int(mb*1000/kb))
 	}
 	if n.store == nil || n.storePol != pol {
-		n.store = NewStore(pol, capItems, ttlMs, s.rng)
-		n.store.SetJitter(n.f("ttlJitterPct") / 100)
-		n.store.SetShortTTL(n.f("shortTtlPct"), max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
+		n.store = newStore(pol, capItems, ttlMs, s.rng)
+		n.store.setJitter(n.f("ttlJitterPct") / 100)
+		n.store.setShortTTL(n.f("shortTtlPct"), max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
 		n.storePol = pol
 		return
 	}
-	n.c.evict += n.store.SetCapacity(capItems)
-	n.store.SetTTL(ttlMs)
-	n.store.SetJitter(n.f("ttlJitterPct") / 100)
-	n.store.SetShortTTL(n.f("shortTtlPct"), max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
+	n.c.evict += n.store.setCapacity(capItems)
+	n.store.setTTL(ttlMs)
+	n.store.setJitter(n.f("ttlJitterPct") / 100)
+	n.store.setShortTTL(n.f("shortTtlPct"), max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
 }
 
 func (s *Sim) addEdge(d Edge) {

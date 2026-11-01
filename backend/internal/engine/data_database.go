@@ -103,7 +103,7 @@ func (s *Sim) secondaryLookup(c *call) bool {
 		return false
 	}
 	pct := c.lg.client.f("secondaryPct")
-	return pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+97)%100) < pct
+	return pct > 0 && float64(hash32(uint32(c.rid)*2654435761+97)%100) < pct
 }
 
 // rangeRead says whether this read returns a range of rows rather than one (chosen from the request id, so no random draw).
@@ -112,7 +112,7 @@ func (s *Sim) rangeRead(c *call) bool {
 		return false
 	}
 	pct := c.lg.client.f("rangePct")
-	return pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+193)%100) < pct
+	return pct > 0 && float64(hash32(uint32(c.rid)*2654435761+193)%100) < pct
 }
 
 // wideScanMult is how many times worse than a plain scan it is to scan every partition of a wide-column store.

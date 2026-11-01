@@ -73,7 +73,7 @@ func TestARetrievalChainAddsTheSearchToTheAnswer(t *testing.T) {
 		d, _ := Sanitize(b.d)
 		s := New(d, Options{Seed: 4})
 		s.Advance(120000)
-		return s.RunSnapshot(), s.ttftHist.Quantile(0.5)
+		return s.RunSnapshot(), s.ttftHist.quantile(0.5)
 	}
 	plain, t0 := run(false)
 	rag, t1 := run(true)

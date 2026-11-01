@@ -30,16 +30,16 @@ func TestSanitizeShapesRoundTrip(t *testing.T) {
 	if out.Shapes[0] != in.Shapes[0] || out.Shapes[1] != in.Shapes[1] {
 		t.Fatalf("valid shapes changed: %+v", out.Shapes[:2])
 	}
-	if s := out.Shapes[2]; s.W != MinShapeSize || s.H != MaxShapeSize {
+	if s := out.Shapes[2]; s.W != minShapeSize || s.H != maxShapeSize {
 		t.Fatalf("ellipse size not clamped: %+v", s)
 	}
-	if s := out.Shapes[3]; s.W != -MaxShapeSize || s.H != MaxShapeSize {
+	if s := out.Shapes[3]; s.W != -maxShapeSize || s.H != maxShapeSize {
 		t.Fatalf("arrow extent not clamped: %+v", s)
 	}
 	if s := out.Shapes[4]; s.W == 0 && s.H == 0 {
 		t.Fatalf("a zero-length arrow must get a visible length: %+v", s)
 	}
-	if len([]rune(out.Shapes[5].Label)) != MaxShapeLabel {
+	if len([]rune(out.Shapes[5].Label)) != maxShapeLabel {
 		t.Fatal("label not truncated")
 	}
 	again, adj2 := Sanitize(out)
@@ -65,11 +65,11 @@ func TestSanitizeShapesShareIDSpaceWithGroups(t *testing.T) {
 
 func TestSanitizeShapesCapAndOldDesigns(t *testing.T) {
 	var ss []Shape
-	for i := 0; i < MaxShapes+5; i++ {
+	for i := 0; i < maxShapes+5; i++ {
 		ss = append(ss, Shape{ID: "s" + strings.Repeat("x", i+1), Kind: "ellipse", W: 100, H: 100})
 	}
 	out, adj := Sanitize(Diagram{Shapes: ss})
-	if !adj || len(out.Shapes) != MaxShapes {
+	if !adj || len(out.Shapes) != maxShapes {
 		t.Fatalf("cap: adj=%v n=%d", adj, len(out.Shapes))
 	}
 	var old Diagram

@@ -56,7 +56,7 @@ func (s *Sim) arriveLLM(n *node, c *call, cb func(Result)) {
 		pct := n.f("tokenSpreadPct")
 		f := 1.0
 		if pct > 0 {
-			f = 1 + (float64(Hash32(uint32(c.rid)*2654435761+salt)%2001)/1000-1)*pct/100
+			f = 1 + (float64(hash32(uint32(c.rid)*2654435761+salt)%2001)/1000-1)*pct/100
 		}
 		return max(1, int(base*f))
 	}

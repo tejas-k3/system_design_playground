@@ -161,8 +161,8 @@ func Specs() []NodeSpec { return specsOnce().list }
 // Spec returns the spec for a kind, or nil.
 func Spec(kind string) *NodeSpec { return specsOnce().byKind[kind] }
 
-// Defaults returns default parameter values for a kind.
-func Defaults(kind string) Params {
+// defaultParams returns default parameter values for a kind.
+func defaultParams(kind string) Params {
 	out := Params{}
 	if s := Spec(kind); s != nil {
 		for _, p := range s.Params {
@@ -174,7 +174,7 @@ func Defaults(kind string) Params {
 
 // Resolve merges explicit params over the defaults.
 func Resolve(kind string, p Params) Params {
-	out := Defaults(kind)
+	out := defaultParams(kind)
 	for k, v := range p {
 		out[k] = v
 	}
@@ -195,8 +195,8 @@ func CanConnect(from, to string) bool {
 	return false
 }
 
-// NodeCost is the hourly cost of one node in dollars.
-func NodeCost(n Node) float64 {
+// nodeCost is the hourly cost of one node in dollars.
+func nodeCost(n Node) float64 {
 	s := Spec(n.Kind)
 	if s == nil {
 		return 0
@@ -213,7 +213,7 @@ func NodeCost(n Node) float64 {
 func DiagramCost(d Diagram) float64 {
 	var c float64
 	for _, n := range d.Nodes {
-		c += NodeCost(n)
+		c += nodeCost(n)
 	}
 	return c
 }

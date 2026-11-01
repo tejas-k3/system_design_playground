@@ -101,8 +101,8 @@ func msStr(v float64) string {
 	return fmt.Sprintf("%d ms", int(math.Round(v)))
 }
 
-// Unwired lists app servers that answer without any data store, and workers that never write.
-func Unwired(d Diagram) []Node {
+// unwired lists app servers that answer without any data store, and workers that never write.
+func unwired(d Diagram) []Node {
 	kind := map[string]string{}
 	for _, n := range d.Nodes {
 		kind[n.ID] = n.Kind
@@ -406,7 +406,7 @@ func jobAndCostChecks(g Goals, d Diagram, run RunStats, cost float64) []Check {
 	if g.MaxCostPerHour != nil {
 		checks = append(checks, Check{"Cost", fmt.Sprintf("≤ $%.2f/hr", *g.MaxCostPerHour), fmt.Sprintf("$%.2f/hr", cost), cost <= *g.MaxCostPerHour+eps})
 	}
-	if un := Unwired(d); len(un) > 0 {
+	if un := unwired(d); len(un) > 0 {
 		who := un[0].Label
 		if len(un) > 1 {
 			who += fmt.Sprintf(" and %d more", len(un)-1)
