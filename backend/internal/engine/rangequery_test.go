@@ -56,3 +56,37 @@ func TestOnlyReadsAreRangeReads(t *testing.T) {
 		t.Errorf("a write is not a range read: %.3f vs %.3f", a, b)
 	}
 }
+
+func rangeLintDesign(db Params, rangePct float64) Diagram {
+	b := &builder{}
+	b.node("u", KClient, Params{"rps": 20.0, "readPct": 100.0, "rangePct": rangePct}).node("a", KAppServer, nil).node("db", KDatabase, db)
+	b.edge("u", "a").edge("a", "db")
+	d, _ := Sanitize(b.d)
+	return d
+}
+
+func TestLintFlagsRangeReadsWithoutAnIndexExceptOnATimeSeriesStore(t *testing.T) {
+	has := func(d Diagram) bool {
+		for _, f := range Lint(d) {
+			if f.Rule == "secondary-reads-without-index" {
+				return true
+			}
+		}
+		return false
+	}
+	if !has(rangeLintDesign(nil, 100)) {
+		t.Error("range reads with no index scan and should be flagged")
+	}
+	if has(rangeLintDesign(Params{"indexes": 1.0}, 100)) || has(rangeLintDesign(Params{"model": "timeSeries"}, 100)) || has(rangeLintDesign(nil, 0)) {
+		t.Error("an index, a time-series store or no range reads need no warning")
+	}
+}
+
+// With few rows an index is cheap, but with very many it can cost more than a scan would: a scan never costs less than
+// reading through the index.
+func TestAScanNeverBeatsTheIndexedRangeRead(t *testing.T) {
+	huge := Params{"rangePct": 100.0, "rangeRows": 100000.0}
+	if indexed, scan := rangeMean(huge, Params{"indexes": 1.0}), rangeMean(huge, nil); scan < indexed-1 {
+		t.Errorf("100,000 rows: scan %.0f ms is cheaper than the index %.0f ms", scan, indexed)
+	}
+}

@@ -689,6 +689,9 @@ func (s *Sim) rangeRead(c *call) bool {
 	return pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+193)%100) < pct
 }
 
+// wideScanMult is how many times worse than a plain scan it is to scan every partition of a wide-column store.
+const wideScanMult = 3
+
 // Per-row time of reading a range through an index, and of reading it from a layout kept in time order.
 const (
 	indexRangeRowMs  = 0.01
@@ -705,12 +708,16 @@ func (s *Sim) rangeMult(n *node, c *call) float64 {
 	case "timeSeries":
 		return 1 + rows*seriesRangeRowMs/readMs
 	case "wideColumn":
-		return n.f("scanMult") * 3
+		return n.f("scanMult") * wideScanMult
 	}
-	if n.f("indexes") < 1 {
-		return n.f("scanMult")
+	m := 1 + rows*indexRangeRowMs/readMs
+	if n.s("model") == "document" {
+		m *= 0.8 // single-document reads are cheaper in a document store
 	}
-	return 1 + rows*indexRangeRowMs/readMs
+	if n.f("indexes") < 1 { // a scan reads at least the rows an index would have found
+		return math.Max(n.f("scanMult"), m)
+	}
+	return m
 }
 
 func (s *Sim) readMultBase(n *node, c *call) float64 {
@@ -729,7 +736,7 @@ func (s *Sim) readMultBase(n *node, c *call) float64 {
 	if s.secondaryLookup(c) && (n.f("indexes") < 1 || n.s("model") == "wideColumn") {
 		m := n.f("scanMult")
 		if n.s("model") == "wideColumn" {
-			m *= 3 // no secondary access path at all: the scan is over every partition
+			m *= wideScanMult // no secondary access path at all: the scan is over every partition
 		}
 		return m
 	}
