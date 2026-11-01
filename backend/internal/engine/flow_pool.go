@@ -1,7 +1,5 @@
 package engine
 
-import ()
-
 func (s *Sim) breakerState(e *edge) int {
 	if e.brState == 1 && s.now >= e.brUntil {
 		e.brState, e.trial = 2, false

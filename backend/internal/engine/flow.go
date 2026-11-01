@@ -1,7 +1,5 @@
 package engine
 
-import ()
-
 // Result is the outcome of one call travelling back up the chain.
 type Result struct {
 	OK     bool
@@ -369,15 +367,3 @@ func (s *Sim) callDown(from *node, e *edge, c *call, cm cmd, cb func(Result)) {
 	}
 	send(nil)
 }
-
-// ---- circuit breaker ---------------------------------------------------------------
-
-// ---- connection pools --------------------------------------------------------------
-
-// ---- stations (capacity + queue) -----------------------------------------------------
-
-// ---- arrival -----------------------------------------------------------------------
-
-// ---- load balancer / rate limiter -----------------------------------------------------
-
-// ---- CDN -----------------------------------------------------------------------------

@@ -1,7 +1,5 @@
 package engine
 
-import ()
-
 func (s *Sim) procCDN(n *node, c *call, cb func(Result), release func()) {
 	ms := 0.2
 	if !c.write {

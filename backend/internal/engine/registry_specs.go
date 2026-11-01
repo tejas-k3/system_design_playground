@@ -4,7 +4,6 @@ import "math"
 
 // One function per component kind, in the order the registry lists them (buildSpecs).
 
-// specClient describes the Client component.
 func specClient() NodeSpec {
 	return NodeSpec{
 		Kind: KClient, Name: "Users", Description: "A crowd of users sending requests.",
@@ -88,7 +87,6 @@ func specClient() NodeSpec {
 	}
 }
 
-// specLoadBalancer describes the LoadBalancer component.
 func specLoadBalancer() NodeSpec {
 	return NodeSpec{
 		Kind: KLoadBalancer, Name: "Load Balancer", Description: "Spreads requests across app servers.",
@@ -126,7 +124,6 @@ func specLoadBalancer() NodeSpec {
 	}
 }
 
-// specAppServer describes the AppServer component.
 func specAppServer() NodeSpec {
 	return NodeSpec{
 		Kind: KAppServer, Name: "App Server", Description: "Runs your code. Each request holds a thread until it finishes.",
@@ -243,7 +240,6 @@ func specAppServer() NodeSpec {
 	}
 }
 
-// specCache describes the Cache component.
 func specCache() NodeSpec {
 	return NodeSpec{
 		Kind: KCache, Name: "Cache", Description: "In-memory cache. Misses go on to the data store.",
@@ -278,7 +274,6 @@ func specCache() NodeSpec {
 	}
 }
 
-// specDatabase describes the Database component.
 func specDatabase() NodeSpec {
 	return NodeSpec{
 		// TODO(#17): database scenarios still to handle later: joins (a join penalty for document stores) and cheap
@@ -345,7 +340,6 @@ func specDatabase() NodeSpec {
 	}
 }
 
-// specReplica describes the Replica component.
 func specReplica() NodeSpec {
 	return NodeSpec{
 		Kind: KReplica, Name: "Read Replica", Description: "A copy of the database that serves reads, slightly behind.",
@@ -369,7 +363,6 @@ func specReplica() NodeSpec {
 	}
 }
 
-// specQueue describes the Queue component.
 func specQueue() NodeSpec {
 	return NodeSpec{
 		Kind: KQueue, Name: "Message Queue", Description: "Buffers work so servers can answer fast and workers catch up later.",
@@ -389,7 +382,6 @@ func specQueue() NodeSpec {
 	}
 }
 
-// specTopic describes the Topic component.
 func specTopic() NodeSpec {
 	return NodeSpec{
 		Kind: KTopic, Name: "Topic", Description: "Publish once, every subscriber gets its own copy.",
@@ -404,7 +396,6 @@ func specTopic() NodeSpec {
 	}
 }
 
-// specLog describes the Log component.
 func specLog() NodeSpec {
 	return NodeSpec{
 		Kind: KLog, Name: "Log", Description: "A partitioned, ordered log. Consumer groups read it; a partition has one reader per group.",
@@ -428,7 +419,6 @@ func specLog() NodeSpec {
 	}
 }
 
-// specWorker describes the Worker component.
 func specWorker() NodeSpec {
 	return NodeSpec{
 		Kind: KWorker, Name: "Worker", Description: "Pulls jobs from a queue and does the slow work.",
@@ -446,7 +436,6 @@ func specWorker() NodeSpec {
 	}
 }
 
-// specCDN describes the CDN component.
 func specCDN() NodeSpec {
 	return NodeSpec{
 		Kind: KCDN, Name: "CDN", Description: "Serves popular reads from the edge, close to users.",
@@ -466,7 +455,6 @@ func specCDN() NodeSpec {
 	}
 }
 
-// specRateLimiter describes the RateLimiter component.
 func specRateLimiter() NodeSpec {
 	return NodeSpec{
 		Kind: KRateLimiter, Name: "Rate Limiter", Description: "Rejects traffic above a configured rate.",
@@ -489,7 +477,6 @@ func specRateLimiter() NodeSpec {
 	}
 }
 
-// specShardRouter describes the ShardRouter component.
 func specShardRouter() NodeSpec {
 	return NodeSpec{
 		Kind: KShardRouter, Name: "Shard Router", Description: "Splits data across several databases by key.",
@@ -508,7 +495,6 @@ func specShardRouter() NodeSpec {
 	}
 }
 
-// specExternalAPI describes the ExternalAPI component.
 func specExternalAPI() NodeSpec {
 	return NodeSpec{
 		Kind: KExternalAPI, Name: "External API", Description: "A third-party service you do not control.",
@@ -526,7 +512,6 @@ func specExternalAPI() NodeSpec {
 	}
 }
 
-// specObjectStore describes the ObjectStore component.
 func specObjectStore() NodeSpec {
 	return NodeSpec{
 		Kind: KObjectStore, Name: "Object Store", Description: "Cheap, huge, durable storage for big bodies: uploads, images, video.",
@@ -548,7 +533,6 @@ func specObjectStore() NodeSpec {
 	}
 }
 
-// specKVStore describes the KVStore component.
 func specKVStore() NodeSpec {
 	return NodeSpec{
 		Kind: KKVStore, Name: "Key-Value Store", Description: "A cluster of nodes that keeps several copies of every key and answers when enough of them agree.",
@@ -583,7 +567,6 @@ func specKVStore() NodeSpec {
 	}
 }
 
-// specCoordinator describes the Coordinator component.
 func specCoordinator() NodeSpec {
 	return NodeSpec{
 		Kind: KCoordinator, Name: "Coordinator", Description: "The simulator models a leader-based cluster, as Raft does: writes wait for a majority. Real ZooKeeper may serve reads from a follower, so they can be stale. It answers nothing without a leader.",
@@ -605,7 +588,6 @@ func specCoordinator() NodeSpec {
 	}
 }
 
-// specStream describes the Stream component.
 func specStream() NodeSpec {
 	return NodeSpec{
 		Kind: KStream, Name: "Stream Job", Description: "Counts events in windows of event time (when they happened, not when they arrived), with a watermark that decides when a window is final.",
@@ -638,7 +620,6 @@ func specStream() NodeSpec {
 	}
 }
 
-// specLLMServer describes the LLMServer component.
 func specLLMServer() NodeSpec {
 	return NodeSpec{
 		Kind: KLLMServer, Name: "LLM Server", Description: "GPUs that read a prompt and then write the answer one token at a time, many answers sharing each step.",
@@ -661,7 +642,6 @@ func specLLMServer() NodeSpec {
 	}
 }
 
-// specVectorStore describes the VectorStore component.
 func specVectorStore() NodeSpec {
 	return NodeSpec{
 		Kind: KVectorStore, Name: "Vector Store", Description: "Finds the stored items whose embeddings are nearest to a query's, approximately.",
@@ -683,7 +663,6 @@ func specVectorStore() NodeSpec {
 	}
 }
 
-// specIndex describes the Index component.
 func specIndex() NodeSpec {
 	return NodeSpec{
 		Kind: KIndex, Name: "Search Shard", Description: "One slice of a search index. A query has to ask every slice.",
@@ -699,7 +678,6 @@ func specIndex() NodeSpec {
 	}
 }
 
-// specAuth describes the Auth component.
 func specAuth() NodeSpec {
 	return NodeSpec{
 		Kind: KAuth, Name: "Auth Service", Description: "Says whether a token is valid.",
@@ -715,7 +693,6 @@ func specAuth() NodeSpec {
 	}
 }
 
-// specRedis describes the Redis component.
 func specRedis() NodeSpec {
 	return NodeSpec{
 		Kind: KRedis, Name: "Redis", Description: "A fast single-threaded store for locks, geo lookups and leaderboards.",
