@@ -13,10 +13,11 @@ System Design Playground: a browser app where a learner draws a system, sends si
 
 ```
 backend/internal/engine/      the simulator (no I/O). Orientation:
-  types.go registry.go        node kinds, wire types, failure reasons; one NodeSpec per component with its settings (num/sel/flag, .adv() .fixed() .needs() .showIf()) and cost
+  types.go registry.go        node kinds, wire types, failure reasons; one NodeSpec per component with its settings (num/sel/flag, .adv() .fixed() .needs() .showIf()) and cost;
+                              the specs themselves are one function per kind in registry_specs.go, built once on first use (no init())
   sanitize.go                 clamps and validates a diagram from the registry
-  sim.go clients.go flow.go   the Sim, traffic generation and retries, the request path (stations, pools, balancer)
-  data.go chaos.go            per-kind behaviour (app server, cache, database, queue...) and crash/slow/partition/failover
+  sim.go clients.go flow*.go  the Sim, traffic generation and retries, the request path (flow.go hops and calls, flow_station.go, flow_pool.go, flow_balancer.go, flow_cdn.go)
+  data*.go chaos.go           per-kind behaviour (data.go app server, data_cache.go, data_database.go, data_redis.go; queue...) and crash/slow/partition/failover
   workflow.go stream.go ...   one file per feature area (sagas and commits, stream jobs, auth, sessions, gossip, ranking, graph...)
   stats.go scoring.go lint.go statistics (RunStats), Goals and Evaluate (checks, stars), design lint rules
 backend/internal/scenarios/   challenges: defs_*.go, scenarios_open*.go (blank-canvas briefs), alternatives.go (measured "what if" rows),
@@ -27,7 +28,7 @@ frontend/src/{state,sim,draw,ui,api}/   store, bridge to the server, canvas draw
 docs/                         COMPONENTS.md, DEPLOYMENT.md, ACCESSIBILITY_TESTING.md are published; everything else in docs/ is local notes and never committed
 ```
 
-The UI settings panel is rendered from `GET /api/registry`: a setting added in `registry.go` appears with no frontend code.
+The UI settings panel is rendered from `GET /api/registry`: a setting added in `registry_specs.go` appears with no frontend code.
 
 ## Rules of the engine
 
@@ -39,13 +40,13 @@ The UI settings panel is rendered from `GET /api/registry`: a setting added in `
 
 ## Recipes
 
-**Add a setting**: `registry.go` (group, default, range, help text, `.adv()` for advanced), read it with `n.f/n.s/n.b`, test in `engine/*_test.go` using `builder{}` and `run(diagram, Options, seconds)`. Add the row to `docs/COMPONENTS.md`.
+**Add a setting**: the kind's function in `registry_specs.go` (group, default, range, help text, `.adv()` for advanced), read it with `n.f/n.s/n.b`, test in `engine/*_test.go` using `builder{}` and `run(diagram, Options, seconds)`. Add the row to `docs/COMPONENTS.md`.
 
 **Add a goal**: field in `Goals` and a check in `Evaluate` (`scoring.go`), the counter in `RunStats` (`stats.go`), the mirror in `frontend/src/api/types.ts`, a row in `model/goals.ts` with a test row in `goals.test.ts`.
 
-**Add a challenge**: build the start and the reference with `bld{}` in a `defs_*.go`, plus goals, three hints, an answer, a prediction, a debrief and `ConfigOnly` if the topology is fixed. Then: an entry in `levels.go` and `concepts.go`, stored alternatives in `alternatives.go` (numbers come from the failing test output), `UPDATE_GOLDEN=1 go test ./internal/scenarios -run TestCatalogGolden`. Quality gates you will meet: three hints, star targets strictly stricter than limits, reference earns two or more stars on seeds 1-3 and the same stars on seeds 1-8, prediction options within 1.6x in length, at most 24 challenges without a glossary term (`{{id|words}}`; the id must be listed in `glossary.ts`, and challenge ids in `glossary.test.ts`), the Hard count pinned in `debrief_test.go`, component and open-challenge counts pinned in the API test.
+**Add a challenge**: build the start and the reference with `bld{}` in a `defs_*.go` (one `func (c *catalog) addXxx()` per challenge that calls `c.register`, listed in its section's `registerXxx` method; there is no `init()`; if you add a new file of challenges, call it from `buildCatalog` in `scenarios.go`), plus goals, three hints, an answer, a prediction, a debrief and `ConfigOnly` if the topology is fixed. Then: an entry in `levels.go` and `concepts.go`, stored alternatives in `alternatives.go` (numbers come from the failing test output), `UPDATE_GOLDEN=1 go test ./internal/scenarios -run TestCatalogGolden`. Quality gates you will meet: three hints, star targets strictly stricter than limits, reference earns two or more stars on seeds 1-3 and the same stars on seeds 1-8, prediction options within 1.6x in length, at most 24 challenges without a glossary term (`{{id|words}}`; the id must be listed in `glossary.ts`, and challenge ids in `glossary.test.ts`), the Hard count pinned in `debrief_test.go`, component and open-challenge counts pinned in the API test.
 
-**Add a component kind**: constant in `types.go`, `NodeSpec` in `registry.go`, `arrive`/`process` in `flow.go`, a `proc<Kind>`, stats; frontend icon in `draw/icons.ts`, group in `model/library.ts`.
+**Add a component kind**: constant in `types.go`, `NodeSpec` function in `registry_specs.go` (and its line in `buildSpecs`, `registry.go`), `arrive`/`process` in `flow_station.go`, a `proc<Kind>`, stats; frontend icon in `draw/icons.ts`, group in `model/library.ts`.
 
 ## Working agreement
 

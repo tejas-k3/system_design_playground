@@ -15,8 +15,8 @@ One idea per challenge. Decide: the failure the learner sees, the reference fix,
 
 In the fitting `backend/internal/scenarios/defs_*.go` (check the name list with `ls`; open blank-canvas briefs live in `scenarios_open*.go`):
 
-- a function `design := func(fixed bool) engine.Diagram` using `(&bld{}).n(id, kind, col, row, P{...}).e(from, to).done()`; the start and the solution differ only in the fix;
-- `register(&Scenario{ID, Title, Difficulty, ConfigOnly (true when the topology is fixed), Summary, Story, Diagram, Solution, Chaos, Goals, DurationSec, WarmupSec, Speed, Hints [3], Answer, Predictions, Debrief})`;
+- a method `func (c *catalog) addYourChallenge()`, called from the section's `registerXxx` method (or from `buildCatalog` for a new file); in it a function `design := func(fixed bool) engine.Diagram` using `(&bld{}).n(id, kind, col, row, P{...}).e(from, to).done()`; the start and the solution differ only in the fix;
+- `c.register(&Scenario{ID, Title, Difficulty, ConfigOnly (true when the topology is fixed), Summary, Story, Diagram, Solution, Chaos, Goals, DurationSec, WarmupSec, Speed, Hints [3], Answer, Predictions, Debrief})`;
 - `Deeper` is required for every Hard challenge (at least 200 characters).
 
 Add the id to `levels.go` (sde1, sde2 or sde3 list) and `concepts.go` (existing concept ids only).
