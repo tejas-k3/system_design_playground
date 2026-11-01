@@ -310,10 +310,11 @@ func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getStudyDeck(w http.ResponseWriter, r *http.Request) {
 	deck, ok := scenarios.StudyDeck(r.URL.Query().Get("level"))
 	if !ok {
-		writeErr(w, 400, "level must be sde1, sde2 or sde3")
+		writeErr(w, 400, "level must be sde1, sde2 or sde3 and have counter-questions")
 		return
 	}
-	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8") // shown in the browser, and it is Markdown to read
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write([]byte(deck))
 }
 

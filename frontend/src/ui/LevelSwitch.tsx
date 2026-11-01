@@ -14,7 +14,7 @@ export function LevelSwitch() {
           <button key={l.id} aria-pressed={level === l.id} className={level === l.id ? 'on' : ''} onClick={() => setLevel(l.id)}>{l.label}</button>
         ))}
       </div>
-      {deck && <a className="small" href={deck} target="_blank" rel="noopener noreferrer" title="Counter-questions with measured evidence, for a study partner (opens a text page)">Study deck</a>}
+      {deck && <a className="small" href={deck} target="_blank" rel="noopener noreferrer" title="Opens a text page with the answers: counter-questions with measured evidence, for a study partner">Study deck</a>}
     </div>
   )
 }
