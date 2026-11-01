@@ -17,6 +17,9 @@ export function parseLevel(v: unknown): LearnerLevel {
   return v === 'sde1' || v === 'sde2' || v === 'sde3' ? v : 'all'
 }
 
+/** Where the printable study deck for a level is served (Markdown); "all" has none, since a deck belongs to one band. */
+export const studyDeckUrl = (level: LearnerLevel): string | null => (level === 'all' ? null : `/api/study-deck?level=${level}`)
+
 const DIFFICULTY = ['Tutorial', 'Easy', 'Medium', 'Hard']
 const rank = (s: ScenarioSummary) => {
   const i = DIFFICULTY.indexOf(s.difficulty)

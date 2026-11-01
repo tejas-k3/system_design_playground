@@ -832,3 +832,18 @@ func TestHintsPredictionsAndDebriefAreFetchedOnRequest(t *testing.T) {
 		t.Errorf("unknown challenge: %d", code)
 	}
 }
+
+func TestStudyDeckEndpoint(t *testing.T) {
+	ts := newTestServer(t)
+	resp, _ := http.Get(ts.URL + "/api/study-deck?level=sde3")
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/markdown") || !strings.HasPrefix(string(body), "# Study deck: SDE3") || !strings.Contains(string(body), "Why not ") {
+		t.Fatalf("status %d, type %q, body starts %.40q", resp.StatusCode, resp.Header.Get("Content-Type"), body)
+	}
+	for _, q := range []string{"", "?level=sde9"} {
+		resp, _ = http.Get(ts.URL + "/api/study-deck" + q)
+		if resp.StatusCode != 400 {
+			t.Errorf("%q: status %d", q, resp.StatusCode)
+		}
+	}
+}
