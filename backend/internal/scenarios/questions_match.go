@@ -1,7 +1,7 @@
 package scenarios
 
-func init() {
-	registerQuestion(&Question{
+func (c *catalog) registerMatchQuestions() {
+	c.registerQuestion(&Question{
 		ID: "what-does-each-box-do", Title: "What does each box do?", Mode: ModeMatch, Difficulty: "Easy",
 		Summary: "Twelve needs, one component for each. The warm-up before you draw anything.",
 		Prompt:  "Each line describes something a system has to do. Pick the component you would add to do it.",

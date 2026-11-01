@@ -7,7 +7,7 @@ import (
 )
 
 // registerScaleOut registers regions, shards, tail latency, tenants, fan-out, global reach and multi-step transactions.
-func registerScaleOut() {
+func (c *catalog) registerScaleOut() {
 	// Multi-region reads: app servers sit near every user, but the one database is in the US
 	multiRegion := func(fixed bool) engine.Diagram {
 		b := &bld{}
@@ -28,7 +28,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "multi-region-reads", Title: "Multi-region reads", Difficulty: "Medium",
 		Summary: "App servers are in three regions, yet reads in Europe and Asia are still slow.",
 		Story:   "Last quarter the app servers moved close to the users, and every user is sent to the nearest one. The database is still a single primary in the US, so a read from Europe or Asia crosses an ocean twice to be answered, and the app server spends most of its time waiting for the answer. Reads are 98% of the traffic, and {{consistency-levels|a read may be at most a second out of date}}.",
@@ -63,7 +63,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "add-a-shard", Title: "Adding a shard under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "More capacity, and for ten seconds everything gets slower.",
 		Story:   "The {{sharding|four-shard}} database is getting full, so a fifth shard is added at 20 seconds while traffic keeps flowing. The router places each key on a shard by hashing it and taking the remainder after dividing by the number of shards, so adding one changes where almost every key lives. For ten seconds the data of every moved key is still travelling, and each request for one of them takes 400 ms longer.",
@@ -99,7 +99,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "heavy-tail", Title: "The slow one in a hundred", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Three healthy read replicas, and one read in twenty is far slower than the rest.",
 		Story:   "A product page reads from three identical read replicas, taking turns. Most reads take a few milliseconds, but the replicas have a long tail: now and then one read takes ten times as long, whichever replica serves it. The {{p50|median}} is great. {{p95|The slowest one in twenty}} is what customers feel, and adding threads or servers has not moved it.",
@@ -131,7 +131,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 32.0}).
 			e("users", "rl").e("rl", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "noisy-tenant", Title: "The noisy tenant", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One customer is sending most of the traffic, and the others are the ones who suffer.",
 		Story:   "A shared API serves four customers (tenants). One of them runs a heavy integration and sends most of the requests. To protect the servers there is a rate limit of 100 requests a second for everyone together. The heavy tenant uses it all up; the three quiet tenants, who never come near a fair share, get errors.",
@@ -167,7 +167,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "notification-fan-out", Title: "Tell everyone", Difficulty: "Medium",
 		Summary: "An order is placed, and only one of the three notifications goes out.",
 		Story:   "Every order has to produce an email, a push notification and an SMS, each sent by its own worker. The events go through a message queue, and the three workers all read from it. Orders are accepted and nothing errors, but each order produces just one notification: whichever worker got to the message first.",
@@ -209,7 +209,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "go-global", Title: "Go global", Difficulty: "Medium",
 		Summary: "Customers in Europe and Asia find the product slow, and the servers are fine.",
 		Story:   "The whole stack runs in the US. Customers in Europe and Asia get the same servers, the same database and the same code, but every request crosses an ocean twice, and the speed of light is not a setting you can change. The product team wants a snappy experience for everyone.",
@@ -241,7 +241,7 @@ func registerScaleOut() {
 			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 0.0}).label("ship", "Shipping service").
 			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "payment-saga", Title: "The half-finished order", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "When the card is declined, the stock stays reserved and nobody gets the item.",
 		Story:   "Checkout does three things in a row: reserve the item in the stock database, charge the card, and book shipping. The card processor declines about one payment in seven. When it does, the order fails, but the item stays reserved forever: stock slowly drains into orders that never complete. Finance cannot reconcile either.",
@@ -274,7 +274,7 @@ func registerScaleOut() {
 			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 0.0}).label("ship", "Shipping service").
 			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "frozen-checkout", Title: "The frozen checkout", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The checkout server dies mid-order and the stock rows stay locked until it comes back.",
 		Story:   "To be sure no order is ever half done, checkout runs as a two-phase commit: the stock database, the card processor and shipping each vote yes and hold their part, then the server tells all of them to commit. It works until the server dies in the gap between the votes and the decision. The services that voted cannot decide alone, so they sit locked, waiting for a server that is not coming back for a while. Operations wants no order left waiting on a dead coordinator.",
@@ -312,7 +312,7 @@ func registerScaleOut() {
 		}
 		return d
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "nobody-to-wait-for", Title: "Nobody to wait for", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Keep checkout all-or-nothing, but let the services decide alone when the server dies.",
 		Story:   "Checkout is a two-phase commit across the stock database, the card processor and shipping, and when the server dies between the votes and the decision the services sit locked until it returns. Operations prefers not to use a saga, because other customers can then see stock reserved for an order that later vanishes. The services should instead settle on their own when the server stays silent, and the total time rows stay locked must stay small. Operations still wants every order to stay {{consistency-levels|consistent}}.",
@@ -344,7 +344,7 @@ func registerScaleOut() {
 			n("counter", engine.KStream, cols[2], rowMid, st).label("counter", "Orders per 2 seconds").
 			e("users", "app").e("app", "counter").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "restart-the-counter", Title: "Restart the counter", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "After a crash the stream job repeats outputs and takes too long to catch up.",
 		Story:   "A stream job counts orders in two-second windows and saves its place every twenty seconds. When it crashes, it reloads the last save and handles everything since again: the billing system receives some totals twice, and the dashboard is stale for over two seconds. Billing wants no repeated totals and the dashboard wants the job caught up within one and a half seconds, without saving more often.",
@@ -376,7 +376,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], 200, P{"connections": 16.0, "readMs": 3.0}).
 			e("users", "app").e("app", "auth").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "everyone-asks-auth", Title: "Everyone asks auth", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Every request waits for the auth service, and it cannot keep up.",
 		Story:   "Each request carries a token, and the app server asks the auth service whether it is valid before it does anything else. The auth service handles about 200 checks a second and 300 requests arrive, so it is the bottleneck. When it restarts for eight seconds the whole site is down with it. You may not let requests through unchecked, but 500 signed-in users make most of those checks repeats.",
@@ -411,7 +411,7 @@ func registerScaleOut() {
 			n("sessions", engine.KRedis, cols[3], 200, P{}).label("sessions", "Session store").
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").e("app1", "sessions").e("app2", "sessions").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "where-do-sessions-live", Title: "Where do sessions live?", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Users are signed out whenever their requests land on another server, or the server restarts.",
 		Story:   "Each logged-in user's session is kept in the memory of the app server that signed them in. The load balancer sends the next request to either server, so a user keeps finding themselves signed out, and when one server restarts, everyone it held is signed out again. A Redis instance is already in the diagram. Keep the sign-outs at zero and the p95 under 250 ms, without adding servers.",
@@ -444,7 +444,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "readMs": 1.0}).
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "front-door", Title: "The front door", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Half the traffic is turned away at the balancer while the servers behind it sit idle.",
 		Story:   "All traffic enters through one load balancer that reads every request, which is what lets it route on content. Its {{throughput|throughput}} is about 1,200 requests a second. 2,500 arrive. Behind it two app servers could take 6,000 between them and are nearly idle, and the database is bored. Nothing here needs content-aware routing: every request goes to either server. Serve at least 97% of requests within the budget.",
@@ -476,7 +476,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "readMs": 1.0}).
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "stale-registry", Title: "Still on the list", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The balancer keeps sending requests to a server the registry still lists.",
 		Story:   "The balancer does not probe its servers. It reads a {{service-registry|service registry}} every 10 seconds, and a server's entry lives 15 seconds after its last heartbeat. At ten seconds one of the two app servers crashes. The other could carry all the traffic, but until the entry expires and the balancer reads the registry again, about half the requests still go to the dead one. Serve at least 95% of requests.",
@@ -507,7 +507,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 8.0, "readMs": 5.0}).
 			e("users", "fn").e("fn", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "cold-start", Title: "The first request after a pause", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A function that scales to zero makes nearly every user wait for it to start.",
 		Story:   "An endpoint runs as a function that stops after 0.3 seconds without a request, so that nothing is paid for while it is idle. Starting it takes 1.2 seconds. Two requests a second arrive, with gaps that are often longer than 0.3 seconds, so many requests find it stopped. Users should see an answer within 400 ms at the 95th percentile, and the bill should stay under $0.20 an hour.",
@@ -537,7 +537,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "readMs": 3.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "ranked-feed", Title: "The feed that thinks too long", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Ranking 5,000 posts for every read leaves the feed service far behind.",
 		Story:   "A feed is ranked before it is shown: for every read the service scores 5,000 candidate posts with a model, 0.1 ms each, so a read costs half a second of work and the service has eight {{thread-pool|threads}}. Forty reads a second arrive and most time out. Product wants the feed ranked, so the model stays. Keep at least 97% of reads answered, within 250 ms at the 95th percentile, and the bill under $0.70 an hour.",
@@ -573,7 +573,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "chat-order", Title: "Messages out of order", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Replies show up before the question they answer.",
 		Story:   "A chat service puts every message on a {{sharding|partitioned}} log read by four delivery workers. Each conversation is a key. Messages are spread evenly over the partitions, so two messages of one conversation are often delivered by different workers at the same moment, and the later one sometimes overtakes the earlier. Users see replies before the question. No more than five messages in a run may be handled out of order, and all must still be delivered.",
@@ -605,7 +605,7 @@ func registerScaleOut() {
 			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 20.0}).label("ship", "Shipping service").
 			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "failing-refund", Title: "The refund that fails", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The saga undoes a charge, and the undo is declined too.",
 		Story:   "Checkout is already a saga: reserve the item, charge the card, book shipping, and undo in reverse when a step fails. Today shipping fails one time in five. The undo of the charge is a refund to the same card processor, which declines one call in four, and when the refund fails the order is stuck: the customer is charged and has nothing. Support is drowning. At most three orders may end up stuck, and a failed order should still fail within the half-second budget.",
@@ -638,7 +638,7 @@ func registerScaleOut() {
 			n("ledger", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 25.0, "errorPct": 20.0}).label("ledger", "Ledger service").
 			e("users", "app").e("app", "orders").e("app", "card").e("app", "ledger").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "books-balance", Title: "The books must balance", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "At midnight finance finds charges with no order behind them.",
 		Story:   "Checkout reserves the order, charges the card and posts the entry to the ledger service, and undoes the steps already done when one fails. The ledger service declines one call in five, and so does the undo of a charge on the card processor sometimes. Every night finance checks that each charge has its order and each order its charge. Entries that do not balance have to be fixed by hand. Keep them at none while at least 55% of orders succeed.",
@@ -669,7 +669,7 @@ func registerScaleOut() {
 		return b.n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "readMs": 2.0, "writeMs": 15.0}).label("db", "Presence").
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "who-is-online", Title: "Who is online", Difficulty: "Medium",
 		Summary: "Every user's heartbeat is a database write, and the design cannot keep up.",
 		Story:   "A chat app shows a green dot next to friends who are online. Each connected user sends a heartbeat every few seconds, 1,500 a second in all, and the app writes each one to the database. Most of the traffic is writes of a value that is useless a minute later; the occasional read asks who is online. The database does a write in 15 ms and has 16 connections. Serve at least 97% of requests with a {{p95|95th percentile}} under 300 ms.",
@@ -699,7 +699,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], rowMid, db).label("db", "Social graph").
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "friends-of-friends", Title: "Friends of friends", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "\"People you may know\" reads 40,000 rows for every user.",
 		Story:   "The suggestions page lists the friends of a user's friends. A user has about 200 friends, so one hop touches 200 rows and two hops touch 40,000. The social graph lives in a relational database that joins them, and 120 users a second ask. Answer at least 97% of requests with a {{p95|p95}} under 400 ms.",

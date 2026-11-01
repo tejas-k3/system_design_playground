@@ -7,7 +7,7 @@ import (
 )
 
 // These SDE2 open briefs expose requirements but keep each workload and its failure profile server-side.
-func init() {
+func (c *catalog) registerOpenM1Briefs() {
 	open := func(users P) engine.Diagram {
 		return (&bld{}).n("users", engine.KClient, cols[0], rowMid, users).done()
 	}
@@ -22,7 +22,7 @@ func init() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-link-shortener", Title: "Design a link shortener", Difficulty: "Medium", Open: true,
 		Summary: "Build a fast redirect service that keeps links durable and stays inside its budget.",
 		Story:   "Build a link shortener for a product launch. At least 98% of requests must succeed, p95 must stay below 250 ms, and the service must cost no more than $1.60 an hour. A server may fail during the launch, and popular links must still redirect quickly. Start with the users and choose the rest of the design.",
@@ -57,7 +57,7 @@ func init() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-notifications", Title: "Design notifications", Difficulty: "Medium", Open: true,
 		Summary: "Accept notification requests quickly and deliver work despite a provider slowdown.",
 		Story:   "A service sends email and push notifications after user actions. At least 98% of requests must be accepted, p95 acknowledgement latency must stay below 200 ms, at least 94% of accepted jobs must finish, no job may disappear without a recorded disposition, and the system must cost no more than $1.40 an hour. A delivery provider slows down during a traffic rush. Build the service from the users outward.",
@@ -82,7 +82,7 @@ func init() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "queueCap": 500.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-news-feed", Title: "Design a news feed", Difficulty: "Medium", Open: true,
 		Summary: "Balance feed write fan-out against the cost of building timelines on reads.",
 		Story:   "Build a news feed for a growing community. At least 98% of requests must succeed, p95 must stay below 350 ms, and the system must cost no more than $1.50 an hour. Most authors have small audiences, but a few have far more followers. The service must keep serving ordinary readers without letting one large audience overwhelm the rest. Start with the users and choose the design.",
@@ -110,7 +110,7 @@ func init() {
 		b.e("app1", "db").e("app2", "db")
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-nearby-search", Title: "Design nearby search", Difficulty: "Medium", Open: true,
 		Summary: "Serve location searches quickly when demand concentrates in one busy area.",
 		Story:   "A local service helps people find nearby couriers. At least 98% of searches must succeed, p95 must stay below 250 ms, and the system must cost no more than $1.50 an hour. Couriers send frequent location updates, and demand is concentrated in a busy city centre. Searches in the busy centre must stay fast while couriers keep sending updates. Build from the users outward.",
@@ -139,7 +139,7 @@ func init() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-chat", Title: "Design chat", Difficulty: "Medium", Open: true,
 		Summary: "Keep chat connections available through a server restart and reconnect surge.",
 		Story:   "Build a chat service for 900 connected users. At least 97% of requests must succeed, p95 must stay below 500 ms, and the service must cost no more than $1.60 an hour. When an app server restarts, disconnected users should reconnect without overwhelming the remaining servers. Build from the users outward.",

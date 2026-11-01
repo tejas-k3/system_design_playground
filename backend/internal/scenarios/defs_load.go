@@ -5,7 +5,7 @@ import (
 )
 
 // registerLoadAndLiveData registers slow vendors, write floods, crashes, and the live scoreboard and location challenges.
-func registerLoadAndLiveData() {
+func (c *catalog) registerLoadAndLiveData() {
 	// 9 ─ Hard ────────────────────────────────────────────────────────────────────────
 	vendor := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -25,7 +25,7 @@ func registerLoadAndLiveData() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "vendor-wait", Title: "Waiting on a vendor", Difficulty: "Hard",
 		Summary: "A slow third-party API holds every thread hostage.",
 		Story:   "Every write calls an email vendor that takes almost half a second. {{thread-pool|Threads}} pile up waiting, and even reads, which never touch the vendor, are starved.",
@@ -59,7 +59,7 @@ func registerLoadAndLiveData() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "write-flood", Title: "Write flood", Difficulty: "Medium",
 		Summary: "A burst of writes outruns the database.",
 		Story:   "Writes arrive at 300 per second for a short burst, but the database can only {{throughput|commit about 250 per second}}.",
@@ -87,7 +87,7 @@ func registerLoadAndLiveData() {
 			e("users", "lb")
 		return b.servers(servers, cols[2], rowTop, 90, nil).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "server-down", Title: "A server falls over", Difficulty: "Medium",
 		Summary: "Pull the plug on one app server in the middle of peak traffic.",
 		Story:   "At twenty seconds one app server crashes for twenty-five seconds. The survivors have to carry everything.",
@@ -123,7 +123,7 @@ func registerLoadAndLiveData() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "live-scoreboard", Title: "Live scoreboard", Difficulty: "Hard",
 		Summary: "Ranking millions of scores with a SQL query is slow.",
 		Story:   "Every rank lookup sorts scores in the database and costs ten times a normal read. The database is the bottleneck.",
@@ -152,7 +152,7 @@ func registerLoadAndLiveData() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"spatialIndex": indexed}).
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "nearby-drivers", Title: "Nearby drivers", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Finding the closest drivers scans the whole table.",
 		Story:   "Riders ask for drivers near their location. Without the right index, every search reads the entire table. The architecture is fixed.",
@@ -180,7 +180,7 @@ func registerLoadAndLiveData() {
 			n("redis", engine.KRedis, cols[3], rowTop, P{"persistence": persistence}).
 			e("users", "lb").servers(3, cols[2], rowTop, 100, nil, "redis").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "scoreboard-survives", Title: "Scoreboard survives a crash", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Redis holds every score in memory. Pull the plug and watch them vanish.",
 		Story:   "Players submit scores all game long and Redis keeps them. At 25 seconds Redis crashes and comes back three seconds later. How many scores did you lose? The architecture is fixed: fix it with configuration.",

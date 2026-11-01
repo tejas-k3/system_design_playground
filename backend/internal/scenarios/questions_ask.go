@@ -139,7 +139,7 @@ func flipBudget() *askFlip {
 const noEffect = "Good to know, but it does not change how big the system has to be."
 
 // askPrompt lays out a prompt: the two decisive questions go at the given places and the others fill the rest in order.
-func askPrompt(id, title, summary, prompt string, at [2]int, decisive [2]AskOption, others []AskOption) {
+func (c *catalog) askPrompt(id, title, summary, prompt string, at [2]int, decisive [2]AskOption, others []AskOption) {
 	asks := make([]AskOption, 0, 8)
 	next := 0
 	for i := range 8 {
@@ -153,7 +153,7 @@ func askPrompt(id, title, summary, prompt string, at [2]int, decisive [2]AskOpti
 			next++
 		}
 	}
-	registerQuestion(&Question{ID: id, Title: title, Mode: ModeAsk, Difficulty: "Medium", Summary: summary, Prompt: prompt, Asks: asks, Picks: 3})
+	c.registerQuestion(&Question{ID: id, Title: title, Mode: ModeAsk, Difficulty: "Medium", Summary: summary, Prompt: prompt, Asks: asks, Picks: 3})
 }
 
 func noise(text, why string) AskOption { return AskOption{Text: text, why: why} }
@@ -161,10 +161,10 @@ func key(text, why string, flip *askFlip) AskOption {
 	return AskOption{Text: text, decisive: true, why: why, flip: flip}
 }
 
-func init() {
+func (c *catalog) registerAskQuestions() {
 	const ask = "You may ask three questions before you start drawing. Which ones would change the design the most?"
 
-	askPrompt("ask-photo-feed", "A photo feed: what would you ask?", "A one-line brief. Pick the questions that change the design.",
+	c.askPrompt("ask-photo-feed", "A photo feed: what would you ask?", "A one-line brief. Pick the questions that change the design.",
 		"An interviewer says: \"Design a photo feed for a social app.\" That is all you are told. "+ask,
 		[2]int{2, 5}, [2]AskOption{
 			key("What share of the requests are people viewing photos, and what share are uploads?", "Mostly viewing means a cache can take nearly all the load. If many requests are uploads, every one reaches the database, which then has to be sized for them.", flipReads()),
@@ -178,7 +178,7 @@ func init() {
 			noise("Will there also be a mobile app?", "The mobile app calls the same service, so the load is the same."),
 		})
 
-	askPrompt("ask-link-shortener", "A link shortener: what would you ask?", "Two questions settle the cache and the speed target.",
+	c.askPrompt("ask-link-shortener", "A link shortener: what would you ask?", "Two questions settle the cache and the speed target.",
 		"An interviewer says: \"Design a link shortener.\" Nothing more. "+ask,
 		[2]int{1, 6}, [2]AskOption{
 			key("Do a few links get most of the clicks, or are clicks spread evenly over all of them?", "If a few links take most of the clicks, a small cache holds them and the database is barely touched. If clicks are spread over millions of links, the cache rarely helps.", flipSkew()),
@@ -192,7 +192,7 @@ func init() {
 			noise("How many people will work on it?", "It shapes the schedule, not the size of the system."),
 		})
 
-	askPrompt("ask-breaking-news", "A news site: what would you ask?", "How big the spike is, and what you may spend.",
+	c.askPrompt("ask-breaking-news", "A news site: what would you ask?", "How big the spike is, and what you may spend.",
 		"An interviewer says: \"Design the article pages for a news site.\" That is the whole brief. "+ask,
 		[2]int{3, 7}, [2]AskOption{
 			key("When a big story breaks, how many times busier does the site get than on a normal day?", "A site that is quiet most of the day and ten times busier for an hour needs headroom or a way to add servers quickly. The spike, not the average, sets the size.", flipPeak()),
@@ -206,7 +206,7 @@ func init() {
 			noise("What is the site called?", noEffect),
 		})
 
-	askPrompt("ask-chat-history", "Chat history: what would you ask?", "How often old messages are read, and how fast they must load.",
+	c.askPrompt("ask-chat-history", "Chat history: what would you ask?", "How often old messages are read, and how fast they must load.",
 		"An interviewer says: \"Design message history for a chat app.\" Nothing else. "+ask,
 		[2]int{0, 5}, [2]AskOption{
 			key("How often do people read old messages compared with sending new ones?", "If most of the traffic is reading, storing and caching for reads is the job. If people mostly send, the write path is the bottleneck.", flipReads()),
@@ -220,7 +220,7 @@ func init() {
 			noise("Will there be stickers?", "A feature. "+noEffect),
 		})
 
-	askPrompt("ask-ticket-sale", "A ticket sale: what would you ask?", "How many arrive at once, and whether they browse or buy.",
+	c.askPrompt("ask-ticket-sale", "A ticket sale: what would you ask?", "How many arrive at once, and whether they browse or buy.",
 		"An interviewer says: \"Design the website that sells tickets for a stadium concert.\" "+ask,
 		[2]int{4, 2}, [2]AskOption{
 			key("How many people will arrive in the first minute of the sale?", "The first minute is the whole problem: the system is idle for weeks and then takes the entire load at once. Its size decides how many servers must already be running.", flipPeak()),
@@ -234,7 +234,7 @@ func init() {
 			noise("Which venues are included?", noEffect),
 		})
 
-	askPrompt("ask-leaderboard", "A game leaderboard: what would you ask?", "Whether attention is concentrated, and what it may cost.",
+	c.askPrompt("ask-leaderboard", "A game leaderboard: what would you ask?", "Whether attention is concentrated, and what it may cost.",
 		"An interviewer says: \"Design the leaderboard for a mobile game.\" That is all. "+ask,
 		[2]int{6, 1}, [2]AskOption{
 			key("Is most of the attention on a few top players, or spread over everyone?", "If everyone looks at the same top few, a small cache serves nearly every view. If each player looks up their own rank, the requests are spread over every player and a cache helps little.", flipSkew()),

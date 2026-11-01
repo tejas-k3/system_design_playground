@@ -304,21 +304,16 @@ func (q *Question) GradeEstimate(answers map[string]float64) (EstimateResult, er
 	return res, nil
 }
 
-var (
-	allQuestions []*Question
-	questionByID = map[string]*Question{}
-)
-
-func registerQuestion(q *Question) {
-	allQuestions = append(allQuestions, q)
-	questionByID[q.ID] = q
+func (c *catalog) registerQuestion(q *Question) {
+	c.questions = append(c.questions, q)
+	c.questionByID[q.ID] = q
 }
 
 // AllQuestions returns every question in registration order.
-func AllQuestions() []*Question { return append([]*Question(nil), allQuestions...) }
+func AllQuestions() []*Question { return append([]*Question(nil), theCatalog().questions...) }
 
 // Q returns a question by id, or nil.
-func Q(id string) *Question { return questionByID[id] }
+func Q(id string) *Question { return theCatalog().questionByID[id] }
 
 // Candidate is one design a trade-off question lets the learner run. Only its label and description are served;
 // the diagram stays on the server.

@@ -7,7 +7,7 @@ import (
 )
 
 // registerResourceLimits registers search tails, egress, bandwidth, GC, disks, heavy queries, write skew, indexes, store choice and queues.
-func registerResourceLimits() {
+func (c *catalog) registerResourceLimits() {
 	// Search over 16 shards: the slowest shard sets the latency. Config only: ask for fewer answers, or ask again.
 	searchTail := func(fixed bool) engine.Diagram {
 		app := P{"threads": 32.0, "gather": "all"}
@@ -22,7 +22,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "search-tail", Title: "Search at 16 shards", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Every search waits for the slowest of 16 shards.",
 		Story:   "Search is {{sharding|split over 16 shards}} and the app server asks all of them and waits for every answer. Each shard answers in about 30 ms, but some answers take far longer, and {{tail-latency-amplification|with 16 shards nearly every search meets one of them}}. The architecture is fixed; tune the fan-out.",
@@ -54,7 +54,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "queueCap": 500.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "celebrity-post", Title: "The celebrity post", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Most posts are fine, but a few accounts make the whole feed stall.",
 		Story:   "Every post is copied into each follower's timeline when it is written, so reads are fast. Most accounts have a few dozen followers, but {{hot-key|a handful have tens of thousands}}, and every time one of them posts the database is buried under timeline inserts. The architecture is fixed; change how the feed is built.",
@@ -87,7 +87,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "image-egress", Title: "The image feed bill", Difficulty: "Medium",
 		Summary: "Everything works, but the cloud bill is shocking.",
 		Story:   "An image feed serves 100 views a second, each a 300 KB picture fetched from the image store, which charges for every GB that leaves it. The pages are fast and nothing fails, but finance wants the hourly bill under $2.50.",
@@ -123,7 +123,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "video-upload", Title: "Video uploads", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Short uploads work, but videos time out.",
 		Story:   "Creators upload clips of about 10 MB, six a second at the evening peak. The app server streams each one to the video store over a 200 Mbit/s link. In testing with tiny files everything was fine; at the peak most uploads time out after 4 seconds.",
@@ -158,7 +158,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "gc-storm", Title: "The GC storm", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Averages look fine, yet one request in seven fails.",
 		Story:   "Each app server freezes for a second and a half every eight seconds or so (a stop-the-world garbage collection after a heap change). During a pause nothing on that server answers, and the clients give up after 800 ms. The {{p50|median latency}} is healthy, which is why nobody noticed.",
@@ -188,7 +188,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "diskIops": 200.0, "indexes": idx}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "disk-writes", Title: "The disk full of writes", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The database is mostly idle on paper, yet writes queue and time out.",
 		Story:   "A write-heavy service (80 requests a second, mostly writes) runs on a database whose disk does 200 operations a second. Years ago someone added three secondary indexes for a report nobody opens any more. CPU and connections look fine, but writes pile up and time out.",
@@ -218,7 +218,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 64.0, "readMs": 2.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "one-heavy-query", Title: "One heavy query", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One request in twenty is expensive, and everyone suffers.",
 		Story:   "A search page answers in 20 ms, except that one request in twenty runs a report that takes 800 ms of server time. The server has {{thread-pool|16 threads}}. Most requests are light, yet the whole site goes slow in waves and some time out.",
@@ -248,7 +248,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "isolation": iso}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "nobody-on-call", Title: "Nobody on call", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Every rule is checked, and the rule still breaks.",
 		Story:   "A rota has pairs of doctors and the rule is that at least one of each pair stays on call. A doctor going off call first checks that the partner is still on. Nobody ever writes the partner's row, yet some nights both doctors in a pair are off at once.",
@@ -279,7 +279,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "indexes": idx}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "slow-query", Title: "The slow query", Difficulty: "Easy", ConfigOnly: true,
 		Summary: "Most reads search by email, and the database reads every row to find it.",
 		Story:   "Sixty percent of reads look an account up by its email address, not its id. The table has no index on email, so each of those reads scans the table and takes twenty times as long as a lookup by id. At the lunchtime peak {{backpressure|the database queue fills and requests are refused}}.",
@@ -309,7 +309,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "model": model, "queueCap": 500.0}).
 			e("sensors", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "pick-the-store", Title: "Pick the store", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Seven hundred sensor readings a second overwhelm a general-purpose database.",
 		Story:   "Sensors send 700 readings a second and nothing ever reads them back in real time. The readings go into a relational database that spends the same effort on each insert as on an order, and {{backpressure|a quarter of them are refused when its queue fills}}.",
@@ -339,7 +339,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "model": model, "queueCap": 500.0, "readMs": 10.0, "writeMs": 10.0}).label("db", "Readings").
 			e("sensors", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "last-hour", Title: "The last hour of readings", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The dashboard asks for a time range and the database reads every row to find it.",
 		Story:   "Sensors write 1,260 readings a second, and a dashboard reads the latest 500 readings of a sensor about 140 times a second. The readings sit in a relational database with no index on the time, so each dashboard read scans the whole table. Serve at least 97% of requests with a {{p95|p95}} under 300 ms.",
@@ -371,7 +371,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "app").e("app", "q").e("q", "w").e("w", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "poison-pill", Title: "The poison pill", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One in eight messages can never be processed, and everything else queues behind them.",
 		Story:   "A bad deploy upstream means about 12% of the messages are malformed. The queue tries each one ten times, every try occupying a worker for its full processing time, and then silently drops it. Healthy messages wait behind the retries and nobody can find out what was dropped.",
@@ -407,7 +407,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "consumer-lag", Title: "Consumer lag", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Eight consumers, and the backlog still grows.",
 		Story:   "Events stream into a {{sharding|partitioned}} log read by eight consumers, each able to handle several messages at once. Yet the backlog grows all day and processing falls further and further behind. Adding yet more consumers was already tried.",
@@ -442,7 +442,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "hot-cell", Title: "The hot cell", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Four shards, and one of them is on fire.",
 		Story:   "A ride-sharing app stores driver locations in {{sharding|four shards}}, split by map cell. Most pings come from the one busy city centre, so the shard that owns that cell takes most of the load while the other three idle. Adding shards was already tried: the {{hot-key|hot cell}} stays on a single one.",

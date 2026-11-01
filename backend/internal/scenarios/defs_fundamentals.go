@@ -6,9 +6,9 @@ import (
 )
 
 // registerFundamentals registers the first challenges: a database, a front door, caching, connection limits, retries, stale reads and double writes.
-func registerFundamentals() {
+func (c *catalog) registerFundamentals() {
 	// 1 ─ Tutorial ───────────────────────────────────────────────────────────────────
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "hello-world", Title: "Hello, database", Difficulty: "Tutorial",
 		Summary: "Your app answers every request, but remembers nothing.",
 		Story:   "Visitors are hitting your app server and getting answers, but nothing is stored anywhere. Connect the server to the database (drag from the round handle on the server's right edge) so it does real work, then press Play.",
@@ -46,7 +46,7 @@ func registerFundamentals() {
 		b.n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb")
 		return b.servers(servers, cols[2], rowTop, 100, P{"threads": 8.0}).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "opening-night", Title: "Opening night", Difficulty: "Easy",
 		Summary: "A launch sends traffic from 80 to 600 requests per second.",
 		Story:   "Marketing just announced the launch. Traffic will jump to 600 requests per second for a while. One small server will not survive it.",
@@ -84,7 +84,7 @@ func registerFundamentals() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "slow-reads", Title: "Slow reads", Difficulty: "Easy",
 		Summary: "The database groans under a read-heavy, popularity-skewed workload.",
 		Story:   "95% of requests are reads and a few items are far more popular than the rest. Each read costs the database 40 ms, and it is saturated.",
@@ -110,7 +110,7 @@ func registerFundamentals() {
 			e("users", "lb")
 		return b.servers(6, cols[2], 20, 70, P{"threads": 24.0, "dbPool": pool, "queueCap": 200.0}).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "connection-crunch", Title: "Connection crunch", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Every server may open 100 connections. The database allows 64 in total.",
 		Story:   "Six app servers each keep a {{connection-pool|pool}} of up to 100 database connections, but the database only accepts 64 at once. Under load, new connections are refused. The architecture is fixed: fix it with configuration.",
@@ -142,7 +142,7 @@ func registerFundamentals() {
 			e("users", "lb")
 		return b.servers(3, cols[2], rowTop, 100, app).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "retry-pileup", Title: "Retry pile-up", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A short database slowdown turns into a long outage because everyone retries at once.",
 		Story:   "The database gets 10× slower for ten seconds. When it recovers, the system does not: clients {{retry-storm|retry instantly}} and servers keep working on requests whose users already left. The architecture is fixed.",
@@ -177,7 +177,7 @@ func registerFundamentals() {
 			n("replica", engine.KReplica, cols[3], rowBot, P{"replicationLagMs": 2000.0}).
 			e("users", "app").e("app", "cache").e("app", "replica").e("app", "primary").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "stale-prices", Title: "Stale prices", Difficulty: "Medium",
 		Summary: "Shoppers see yesterday's prices because copies lag behind the primary.",
 		Story:   "Prices change often and users tolerate at most half a second of staleness. The cache and the replica both serve old data.",
@@ -208,7 +208,7 @@ func registerFundamentals() {
 			n("db", engine.KDatabase, cols[2], rowMid, dbp).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "double-booked", Title: "Double-booked seats", Difficulty: "Medium",
 		Summary: "Two people buy the same seat at the same moment.",
 		Story:   "Only 300 seats exist and people are racing for them. Booking is 'check, then write', so two overlapping requests for the same seat both succeed.",
@@ -235,7 +235,7 @@ func registerFundamentals() {
 			n("db", engine.KDatabase, cols[2], rowBot, P{"writeMs": 130.0, "connections": 16.0}).
 			e("users", "app").e("app", "pay").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "charged-twice", Title: "Charged twice", Difficulty: "Medium",
 		Summary: "A slow write times out, the client retries, and the customer pays twice.",
 		Story:   "Orders sometimes take longer than the client's patience. The client retries, but the first attempt keeps running and also completes.",
@@ -265,7 +265,7 @@ func registerFundamentals() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "isolation": iso}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "disappearing-money", Title: "The disappearing money", Difficulty: "Medium",
 		Summary: "Two transfers touch the same account at once and one of them vanishes.",
 		Story:   "A payments team moves money between 60 accounts. Every transfer succeeds, yet the books are short: transfers that overlap on an account read the same balance and the second write overwrites the first.",
@@ -299,7 +299,7 @@ func registerFundamentals() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "who-needs-telling", Title: "Who needs telling?", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Four caches serve old prices, and telling all of them about every change costs too many messages.",
 		Story:   "A catalogue is served from four caches in front of one database. Items change all the time and shoppers tolerate at most 200 ms of staleness. Today the caches are left alone when an item changes, so they keep the old one until it expires. Telling every cache about every change would fix that, but each message is a round trip the origin waits for during the write, and the caches can take only a few thousand of them in this run.",

@@ -7,7 +7,7 @@ import (
 )
 
 // registerFailureAndElasticity registers failover, partitions, gray failures, stampedes, fleet scaling, hot shards and scan pollution.
-func registerFailureAndElasticity() {
+func (c *catalog) registerFailureAndElasticity() {
 	// 14b ─ Hard, config only: the primary database dies ───────────────────────────────
 	failover := func(db, replica engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -17,7 +17,7 @@ func registerFailureAndElasticity() {
 			n("replica", engine.KReplica, cols[4], rowBot, replica).
 			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "primary-dies", Title: "The primary dies", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "The database server is gone for a minute. A replica is sitting right there.",
 		Story:       "Six in ten requests write to the database. At 20 seconds the primary crashes and stays down for a minute. There is a read replica, {{replication-lag|three seconds behind}}. Keep most requests succeeding and lose as few acknowledged writes as you can. The architecture is fixed: fix it with configuration.",
@@ -46,7 +46,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(1, cols[2], rowMid, 100, app).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "morning-rush", Title: "Morning rush", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "Traffic climbs to seven times its normal level, then falls. One server does not follow.",
 		Story:       "Over a minute traffic climbs from 80 to 600 requests per second, stays there for 40 seconds, then drops. You run a single app server. A new server takes 20 seconds to boot, and every running server costs money, so buying a huge fleet for the whole day is not the answer. The architecture is fixed: fix it with configuration.",
@@ -76,7 +76,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(2, cols[2], rowTop, 100, app, "cache").e("cache", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "cut-off", Title: "Cut off", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The database does not crash. It just stops answering.",
 		Story:   "At 20 seconds the network around the database goes quiet for 25 seconds. Nothing is refused: requests to it simply never come back. Most reads are served from the cache, but your servers keep waiting on the database for everything else. Keep as many requests succeeding as you can. The architecture is fixed: fix it with configuration.",
@@ -103,7 +103,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(3, cols[2], rowTop, 100, P{"threads": 8.0}).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "flaky-neighbour", Title: "Flaky neighbour", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One of three servers keeps stalling, then recovering, then stalling again.",
 		Story:   "From 15 seconds on, one of your three app servers alternates between normal and fifteen times slower every four seconds (a noisy neighbour, a garbage-collection storm). It never goes down, so the balancer keeps sending it a third of the traffic. Keep users happy. The architecture is fixed: fix it with configuration.",
@@ -131,7 +131,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 8.0, "readMs": 100.0}).
 			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 32.0, "queueCap": 500.0}, "cache").e("cache", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "cache-stampede", Title: "Everything expires at once", Difficulty: "Medium", ConfigOnly: true,
 		Summary:     "The cache starts full, every entry lives exactly ten seconds, and then they all die together.",
 		Story:       "You warmed the cache before launch, so the database sees almost nothing. Entries {{ttl|live ten seconds}}, because prices change and users must not see data older than about fifteen. At the first expiry {{stampede|the whole popular set misses at the same moment}} and four hundred reads a second land on a database that can answer eighty. Keep it standing without letting data go stale. The architecture is fixed: fix it with configuration.",
@@ -160,7 +160,7 @@ func registerFailureAndElasticity() {
 			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
 	}
 	promote := P{"onFailure": "promote", "detectSec": 5.0, "promoteSec": 10.0}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "sync-or-async", Title: "Sync or async?", Difficulty: "Medium", ConfigOnly: true,
 		Summary:     "The primary dies. How many acknowledged writes does the replica know about?",
 		Story:       "Every request is a write that users were told succeeded. At 20 seconds the primary database dies and {{failover|the replica is promoted}}. The replica is {{replication-lag|three seconds behind}}, so it never saw the last three seconds of writes. Lose at most twenty acknowledged writes and keep the slowest ten percent of writes under about a quarter of a second. The architecture is fixed: fix it with configuration.",
@@ -181,7 +181,7 @@ func registerFailureAndElasticity() {
 	})
 
 	// 14h ─ Hard, config only: the old primary comes back ────────────────────────────────
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "fence-the-old-primary", Title: "Fence the old primary", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "The failover worked. Then the dead primary woke up.",
 		Story:       "The primary dies at 10 seconds and {{failover|a replica is promoted}} by 25 seconds. At 50 seconds the old primary restarts. Nobody told it that it was replaced. Keep the data: lose at most a hundred acknowledged writes, and keep most requests succeeding. The architecture is fixed: fix it with configuration.",
@@ -220,7 +220,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(1, cols[2], rowMid, 100, base).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "wave-rider", Title: "Waves faster than boot time", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Autoscaling is on, and users still get errors at the start of every wave.",
 		Story:   "Every forty seconds traffic jumps from 40 to 180 requests a second for twenty seconds and drops again. {{autoscaling|Autoscaling}} is switched on, yet each wave starts with a burst of failures: a new server takes ten seconds to boot, and the scaler only looks at the last thirty seconds of load. Keep success high and the slowest requests fast without buying a big fleet for the whole run. The architecture is fixed: fix it with configuration.",
@@ -248,7 +248,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("staff", "lb").e("public", "lb").servers(1, cols[2], rowMid, 100, app).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "passed-the-load-test", Title: "It passed the load test", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Forty staff tested the system and everything was fine. Then the public arrived.",
 		Story:   "Your team load-tested with forty staff clicking around, each waiting for an answer before the next click: no errors, fast pages. The public launch brings eighty requests a second from people who do not wait for anyone. Both crowds hit the same server. Make the launch survive. The architecture is fixed: fix it with configuration.",
@@ -275,7 +275,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "limiter").e("limiter", "lb").servers(1, cols[3], rowMid, 100, app).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "flash-crowd", Title: "Short, sharp rushes", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The average load is fine. The load a second at a time is not.",
 		Story:   "Traffic averages 90 requests a second, comfortably inside what one server can do. But it arrives in rushes: for a second or two the rate triples, then it eases off. Your server's queue only holds ten requests, so every rush drops hundreds. A rate limiter sits in front of the server. Keep requests succeeding and the slowest ones under 0.7 s, on a budget of 45 cents an hour. The architecture is fixed: fix it with configuration.",
@@ -309,7 +309,7 @@ func registerFailureAndElasticity() {
 		}
 		return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}, "router").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "hot-shard", Title: "One shard on fire", Difficulty: "Medium",
 		Summary: "The data is split four ways, and one celebrity item gets a third of all reads.",
 		Story:   "You {{sharding|sharded}} the database four ways so no shard sees more than a quarter of the traffic. Then {{hot-key|one item went viral}}: 35% of all requests ask for it, and it lives on exactly one shard, which now takes half the load and falls over while the other three idle. Fix it. You may add and connect components.",
@@ -337,7 +337,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 8.0, "readMs": 40.0}).
 			e("users", "lb").e("crawler", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 32.0, "queueCap": 300.0}, "cache").e("cache", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "scan-pollution", Title: "The crawler that ate the cache", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Real users ask for the same few hundred items. A crawler reads every item exactly once.",
 		Story:   "Users keep asking for the same 500 popular items, and the cache holds 600. A search-engine crawler is walking your whole catalogue of 100,000 items, once each, at 150 requests a second. Every item the crawler touches goes into the cache and {{eviction|pushes out something users want}}. The database can only do 200 reads a second. Keep users fast. The architecture is fixed: fix it with configuration.",

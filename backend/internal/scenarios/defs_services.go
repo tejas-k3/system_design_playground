@@ -5,7 +5,7 @@ import (
 )
 
 // registerServicePatterns registers crawlers, LLM serving, load shedding, URL shortener and rate limiting.
-func registerServicePatterns() {
+func (c *catalog) registerServicePatterns() {
 	// Polite crawler: the sites it fetches from refuse a crawler that comes in rushes
 	politeCrawler := func(fixed bool) engine.Diagram {
 		app := P{"threads": 16.0, "queueCap": 500.0, "hostChoice": "byKey"}
@@ -22,7 +22,7 @@ func registerServicePatterns() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "polite-crawler", Title: "The polite crawler", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The sites keep answering 429 to the crawler, and it is about to be blocked.",
 		Story:   "A crawler fetches pages from three sites. Its work arrives in rushes, so for a couple of seconds at a time it asks one site for 16 pages a second, while each site says it will serve a crawler at most 8 a second and answers {{load-shedding|429 (too many requests)}} beyond that. Over a whole minute the crawler is nowhere near the limit, but the sites do not average: a crawler that keeps getting 429 gets blocked for good.",
@@ -53,7 +53,7 @@ func registerServicePatterns() {
 			n("model", engine.KLLMServer, cols[2], rowMid, llm).label("model", "Chat model").
 			e("users", "chat").e("chat", "model").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "slow-first-token", Title: "Slow first token", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Users stare at a blank chat for seconds before the first word appears.",
 		Story:   "A chat assistant runs on one GPU. Users do not mind the answer streaming in word by word, but they stare at a blank screen for many seconds before the first word appears: the time to first token is the whole problem. The GPU takes only four answers at a time, and three new requests arrive every second, each needing about one second of GPU time at that batch size. The budget is about six dollars an hour in all, which pays for one GPU, not two.",
@@ -83,7 +83,7 @@ func registerServicePatterns() {
 			n("docs", engine.KVectorStore, cols[2], rowMid, P{"vectors": 20.0, "dims": 768.0, "efSearch": ef, "connections": 4.0, "queueCap": 300.0}).label("docs", "Document search").
 			e("users", "api").e("api", "docs").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "rag-under-load", Title: "Search under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The document search finds everything, and answers nobody in time.",
 		Story:   "An assistant looks up documents in a vector index before it answers: twenty million passages, searched approximately. Whoever set it up asked for the best recall they could get, so every search examines hundreds of candidates and finds nearly all the true neighbours. At 150 searches a second the four search cores cannot keep up, the queue grows and users time out. Retrieval should still find at least nine of every ten true neighbours.",
@@ -114,7 +114,7 @@ func registerServicePatterns() {
 			n("model", engine.KLLMServer, cols[3], rowMid, P{"gpus": 1.0, "batchSize": 32.0, "kvCacheTokens": 200000.0, "outputTokens": 60.0, "queueCap": 400.0}).label("model", "Chat model").
 			e("users", "gate").e("gate", "chat").e("chat", "model").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "the-gpu-budget", Title: "The GPU budget", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "One user in ten pastes a book, and everyone else's first word takes seconds.",
 		Story:   "A chat assistant runs on the one GPU the budget pays for. Most prompts are short, but one in ten carries twenty times as many tokens (someone pasted a whole document), and reading ten thousand tokens takes the GPU two and a half seconds during which it writes nothing for anyone. The request limiter in front counts requests, so it sees nothing unusual: two a second, as always. Everyone waits for the first word, and a second GPU is not in the budget.",
@@ -145,7 +145,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "shed-the-cheap-traffic", Title: "Shed the cheap traffic", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "More traffic than the server can do, and a long queue makes everyone give up.",
 		Story:   "Midday traffic is 400 requests a second and the app server can finish about 250. Excess requests wait in a queue that holds 2,000 of them, and a request that waited two seconds is abandoned by its user, so most of the work is spent on answers nobody is waiting for. One request in five is marked urgent (checkouts); the rest can be asked again later.",
@@ -183,7 +183,7 @@ func registerServicePatterns() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "url-shortener", Title: "The URL shortener", Difficulty: "Medium",
 		Summary: "Short links are read hundreds of times for every one created, and every new link takes its number from one counter row.",
 		Story:   "Visitors follow short links at 1,200 a second, {{hot-key|a few viral ones far more than the rest}}, and new links are created at 70 a second. Every read goes to the database, which can answer about 600 a second at best. Each new link also takes the next number from a single counter row, and the row lock lets one such write through every 20 ms: 50 a second, while 70 are asked for. The waiting writes hold {{connection-pool|database connections}} that the readers need.",
@@ -216,7 +216,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 7.0, "readMs": 20.0}).
 			e("users", "rl").e("rl", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "rate-limiter-showdown", Title: "Rate limiter showdown", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The limiter promises 300 requests a second, and the database sees twice that for a moment.",
 		Story:   "A partner's batch job fires a burst of requests every other second, centred on the instant the clock ticks over, on top of a steady trickle of other users. The rate limiter promises no more than 300 requests a second to a database that does about 350, yet the database is drowning for a second after every burst. The limiter counts requests in fixed one-second windows that reset on the clock: half of each burst lands at the end of one window and half at the start of the next, and each half is given a full allowance. Most of the burst has to be {{load-shedding|turned away}} either way.",
@@ -242,7 +242,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "indexes": indexes, "diskIops": 130.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "typeahead-index", Title: "Typeahead under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Keep prefix lookups fast while the index is maintained on writes.",
 		Story:   "A catalogue serves suggestions as people type. Most reads search by a name prefix, while new and changed names must still be written. Keep p95 below 300 ms and the hourly cost under $1.20. This exercise models a prefix lookup as a lookup by another indexed field; it does not simulate a trie or matching each prefix length.",
@@ -267,7 +267,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "crawl-dedup", Title: "The repeating crawler", Difficulty: "Medium",
 		Summary: "Stop the frontier from fetching pages it has already found.",
 		Story:   "A crawler visits many sites and each page links to pages already seen as well as new ones. At least 98% of requests must succeed, p95 must stay below 300 ms, cost must stay under $1.20 an hour, at least 98% of new pages must be found, and no page may be fetched twice. Choose a seen-URL check and keep the frontier moving.",

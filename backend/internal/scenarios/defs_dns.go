@@ -2,7 +2,7 @@ package scenarios
 
 import "sysdesign/internal/engine"
 
-func registerDNS() {
+func (c *catalog) registerDNS() {
 	design := func(ttl float64) engine.Diagram {
 		return (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 60.0, "readPct": 100.0, "keySpace": 200.0, "timeoutMs": 1000.0, "retries": 0.0, "dnsTtlSec": ttl}).
@@ -11,7 +11,7 @@ func registerDNS() {
 			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 64.0}).
 			e("users", "app1").e("users", "app2").e("app1", "db").e("app2", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "stale-dns", Title: "A stale DNS record", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The replacement is ready, but users keep calling the failed address.",
 		Story:   "At ten seconds, one of two app servers fails. The other is healthy and reachable. Users keep sending some requests to the old address until their cached {{ttl|DNS record expires}}. Shorten the Users' DNS record TTL so traffic moves to the survivor sooner; name lookups add a small cost.",

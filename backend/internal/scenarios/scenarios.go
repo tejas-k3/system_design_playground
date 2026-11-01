@@ -5,6 +5,7 @@ package scenarios
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"sysdesign/internal/engine"
 )
@@ -130,32 +131,58 @@ func (s *Scenario) Options(seed uint32) engine.Options {
 	}
 }
 
-var (
-	all   []*Scenario
-	byID  = map[string]*Scenario{}
-	order = map[string]int{"Tutorial": 0, "Easy": 1, "Medium": 2, "Hard": 3}
-)
+// difficultyOrder is the sort position of each difficulty band.
+var difficultyOrder = map[string]int{"Tutorial": 0, "Easy": 1, "Medium": 2, "Hard": 3}
 
-func register(s *Scenario) {
+// catalog holds every scenario and question, in registration order. It is built once, on first use, so there is
+// no import-time registration: buildCatalog lists the registering functions explicitly.
+type catalog struct {
+	scenarios    []*Scenario
+	byID         map[string]*Scenario
+	questions    []*Question
+	questionByID map[string]*Question
+}
+
+var theCatalog = sync.OnceValue(buildCatalog)
+
+// buildCatalog registers the scenarios, then the questions (some of which build on a scenario's design). The order
+// of the calls is observable: All sorts stably by difficulty, so it fixes the order within a band, and the study
+// deck and the golden file follow it.
+func buildCatalog() *catalog {
+	c := &catalog{byID: map[string]*Scenario{}, questionByID: map[string]*Question{}}
+	c.registerScenarios()
+	c.registerOpenBriefs()
+	c.registerOpenHardBriefs()
+	c.registerOpenM1Briefs()
+	c.registerAskQuestions()
+	c.registerAssumptionQuestions()
+	c.registerSizingQuestions()
+	c.registerTradeoffQuestions()
+	c.registerReviewQuestions()
+	c.registerMatchQuestions()
+	return c
+}
+
+func (c *catalog) register(s *Scenario) {
 	if s.Speed == 0 {
 		s.Speed = 1
 	}
 	s.Goals = s.Goals.WithStarTargets()
 	s.Concepts = conceptTags[s.ID]
 	s.Level = levelOf[s.ID]
-	all = append(all, s)
-	byID[s.ID] = s
+	c.scenarios = append(c.scenarios, s)
+	c.byID[s.ID] = s
 }
 
 // All returns scenarios ordered by difficulty then registration order.
 func All() []*Scenario {
-	out := append([]*Scenario(nil), all...)
-	sort.SliceStable(out, func(i, j int) bool { return order[out[i].Difficulty] < order[out[j].Difficulty] })
+	out := append([]*Scenario(nil), theCatalog().scenarios...)
+	sort.SliceStable(out, func(i, j int) bool { return difficultyOrder[out[i].Difficulty] < difficultyOrder[out[j].Difficulty] })
 	return out
 }
 
 // Get returns the scenario with the id, or nil.
-func Get(id string) *Scenario { return byID[id] }
+func Get(id string) *Scenario { return theCatalog().byID[id] }
 
 // ---- tiny diagram builder ------------------------------------------------------------
 

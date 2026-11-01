@@ -3,7 +3,7 @@ package scenarios
 import "sysdesign/internal/engine"
 
 // registerStorage registers the challenges about where bytes are kept and how fast they move back.
-func registerStorage() {
+func (c *catalog) registerStorage() {
 	// A 12 GB database is restored from backups in an object store. The restore streams through the slowest of: the
 	// link to the bucket, the bucket's streams (one stream is 50 MB/s; multipart runs several at once) and the
 	// database's own restore speed. The link is narrow AND the bucket is read as a single stream, so fixing either
@@ -26,7 +26,7 @@ func registerStorage() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "restore-window", Title: "The restore window", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The backups are safe in the bucket, but getting them back takes four minutes.",
 		Story:   "The orders database holds 12 GB and is backed up to a bucket every ten seconds. At 25 seconds a bad migration starts corrupting rows, and at 28 seconds someone restores the last good backup. The business says the database may be unavailable for at most 90 seconds while it is restored and may lose at most 15 seconds of writes. The database can write 1,000 MB a second, so it is not the slow part. In the last drill the restore ran for far longer than 90 seconds.",

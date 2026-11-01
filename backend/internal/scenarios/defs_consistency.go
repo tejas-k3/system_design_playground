@@ -7,7 +7,7 @@ import (
 )
 
 // registerConsistencyAndStreams registers restores, replication and quorum consistency, leases, hot rows, and stream counting and ranking.
-func registerConsistencyAndStreams() {
+func (c *catalog) registerConsistencyAndStreams() {
 	// Restore drill: a bad migration corrupts the database; how much is lost and how long until it is back
 	restoreDrill := func(fixed bool) engine.Diagram {
 		every, mbps := 0.0, 200.0
@@ -20,7 +20,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "dataGB": 10.0, "backupEverySec": every, "restoreMBps": mbps}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "restore-drill", Title: "The restore drill", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A bad migration corrupts the database. How much is lost, and for how long is it gone?",
 		Story:   "At 25 seconds a bad migration starts silently corrupting rows. Someone notices three seconds later and restores the last backup from before the damage. The database holds 10 GB. There are no backups at all, and restoring streams 200 MB a second. The business can lose at most five seconds of writes and can be without the database for at most twenty seconds.",
@@ -51,7 +51,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "topology": "multiLeader", "leaders": 2.0, "syncLagMs": 300.0, "conflictPolicy": policy}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "lost-cart", Title: "The lost cart item", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Customers add items to a cart and some of them silently vanish.",
 		Story:   "To keep checkout fast in two regions, the cart database has two leaders that each accept writes and {{replication-lag|pass them to the other 300 ms later}}. Two people adding to the same cart in that gap each succeed, and then one of the additions disappears: the database keeps whichever write is newer. Nothing errors, so nobody notices until customers complain.",
@@ -82,7 +82,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "topology": "multiLeader", "leaders": 2.0, "syncLagMs": 100.0, "conflictPolicy": policy, "clockDriftMsPerMin": 6000.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "older-write-wins", Title: "The older write wins", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Profile edits made later are overwritten by earlier ones, though the leaders had long exchanged them.",
 		Story:   "A profile database has two leaders, one per region, and keeps the write with the later time stamp. The two machines' clocks are not synchronised and the second runs further ahead every minute. After a few minutes the second region's edits carry stamps from the future, and an edit made later in the first region loses to an older one that arrived long before. Users see their last change vanish, with no error. No newer write may lose to an older one.",
@@ -113,7 +113,7 @@ func registerConsistencyAndStreams() {
 			n("config", engine.KCoordinator, cols[2], rowMid, p).label("config", "Configuration group").
 			e("users", "app").e("app", "config").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "liar-in-the-group", Title: "The member that lies", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "One member of the configuration group starts giving wrong answers and the group believes it.",
 		Story:   "Three machines keep the configuration, and a request is answered with the first reply once a majority is alive. That survives a machine that stops. Tonight a machine's disk is faulty and it keeps answering, with the wrong values, and the group passes them on as if they were right. Nothing is down and nothing errors. No wrong answer may get through, and the group should still answer almost every request while the faulty member is on. Adding machines is allowed within the budget.",
@@ -145,7 +145,7 @@ func registerConsistencyAndStreams() {
 			n("config", engine.KCoordinator, cols[2], rowMid, P{"nodes": 3.0, "electionTimeoutMs": 500.0, "stepDownSec": step}).label("config", "Configuration group").
 			e("users", "app").e("app", "config").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "old-leaders-writes", Title: "The old leader's writes", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "A leader cut off from the others keeps saying yes, and its writes disappear.",
 		Story:   "A three-member group keeps the configuration, with one {{leader-election|leader}} that the others follow. At fifteen seconds the leader's network is cut for twenty seconds. The other two elect a new leader for a higher term within a second or two, but the old one has not noticed anything: for eight seconds it goes on acknowledging writes that nobody else has, and when it rejoins they are gone. Users were told their change was saved. At most twenty acknowledged writes may be lost.",
@@ -177,7 +177,7 @@ func registerConsistencyAndStreams() {
 			n("kv", engine.KKVStore, cols[2], rowMid, g).label("kv", "Key-value store").
 			e("users", "app").e("app", "kv").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "slow-news", Title: "Slow news", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A node dies and the cluster takes more than a minute to find out.",
 		Story:   "A thirty-two node store keeps three copies of every key and needs all three to acknowledge a write, with stand-ins for a copy that is down. The nodes learn about a failure by {{gossip|gossip}}: every ten seconds a node that knows tells one other. At ten seconds one node dies. Until a node has heard, the requests it receives are sent to the dead node and wait a second for a reply that never comes. Keep at least 98.5% of the writes succeeding.",
@@ -209,7 +209,7 @@ func registerConsistencyAndStreams() {
 			n("kv", engine.KKVStore, cols[2], rowMid, P{"nodes": 5.0, "replicas": 3.0, "readQuorum": r, "writeQuorum": w, "readMs": 4.0, "writeMs": 60.0, "variability": "exponential", "concurrency": 32.0}).
 			e("users", "app").e("app", "kv").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "quorum-overlap", Title: "Read your own writes", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The store is fast and never errors, but users sometimes lose sight of what they just saved.",
 		Story:   "A five-node key-value store keeps three copies of every key. To be quick, a write returns as soon as one copy has it and {{consistency-levels|a read returns the first copy that answers}}. Users save a setting, reload, and sometimes see the old value. Support has noticed that it also flips back and forth between old and new.",
@@ -242,7 +242,7 @@ func registerConsistencyAndStreams() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "lease-expired", Title: "The lease that ran out", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The lock was held. The seat was booked twice anyway.",
 		Story:   "Seats are booked under a Redis lock that expires after 150 ms, so a crashed server cannot hold one forever. The app servers freeze for 600 ms every so often (a garbage-collection pause). A server that froze while holding a lock wakes up long after it expired, another server has booked the seat in the meantime, and the first one books it anyway: two people have the same seat.",
@@ -275,7 +275,7 @@ func registerConsistencyAndStreams() {
 			n("zk", engine.KCoordinator, cols[4], rowBot, P{"nodes": nodes, "electionTimeoutMs": 1000.0}).label("zk", "Coordination service").
 			e("users", "lb").e("db", "zk").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "who-is-the-leader", Title: "Who is the leader?", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The primary is dead, a replica is ready, and nobody is allowed to promote it.",
 		Story:   "{{failover|Failover}} here is not left to a timer: promotion waits until the coordination service {{leader-election|agrees on who the leader is}}, because promoting without agreement is how {{split-brain|two primaries}} appear. Tonight two of the coordination service's three machines fail at the same time as the database primary. The service has {{quorum|no majority}}, so it elects nobody, so the replica waits. Writes fail the whole time.",
@@ -308,7 +308,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 64.0, "writeMs": 20.0, "hotRowLock": true}).label("db", "Stock database").
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "launch-day", Title: "Launch day", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The new phone goes on sale and every buyer decrements the same stock row.",
 		Story:   "At noon the new phone goes on sale. {{hot-key|Nine in ten orders change the same row}}, the stock counter, and the database locks a row while it writes it, so those writes go one after another: 20 ms each is 50 a second, and 180 a second are arriving. The queue behind that row holds {{connection-pool|database connections}}, and the buyers time out before their turn comes. The rest of the shop has nothing wrong with it.",
@@ -339,7 +339,7 @@ func registerConsistencyAndStreams() {
 			n("clicks", engine.KStream, cols[2], rowMid, st).label("clicks", "Clicks per 10 seconds").
 			e("users", "app").e("app", "clicks").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "count-the-clicks", Title: "Count the clicks", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The click counts are wrong because some clicks arrive late.",
 		Story:   "A dashboard shows clicks per ten seconds, counted by a stream job by the time each click happened. About one click in seven comes from a phone that was offline and reaches the server twenty seconds after it happened. The job has already published the window by then and throws the click away, so the totals are always a little low. The dashboard must still show each window within three seconds of it ending.",
@@ -369,7 +369,7 @@ func registerConsistencyAndStreams() {
 			n("visitors", engine.KStream, cols[2], rowMid, st).label("visitors", "Unique visitors").
 			e("users", "app").e("app", "visitors").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "unique-visitors", Title: "Unique visitors", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Counting each visitor exactly needs a table that grows with the audience.",
 		Story:   "The marketing dashboard shows how many different people visited. The stream job keeps every visitor id it has seen, so the table grows with the audience, and the job has a memory budget of 16 KB for it (in this small run; a real audience is thousands of times larger and so is the table). Marketing is happy with a number that is right to within a few percent.",
@@ -399,7 +399,7 @@ func registerConsistencyAndStreams() {
 			n("trending", engine.KStream, cols[2], rowMid, st).label("trending", "Trending items").
 			e("users", "app").e("app", "trending").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "top-ten", Title: "The top ten", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Find the ten most popular items out of 200,000 without a counter for each.",
 		Story:   "The shop shows a trending list: the ten most viewed items out of a catalogue of 200,000. The stream job keeps an exact counter for every item it has seen, and the table keeps growing: it already needs far more memory than the 16 KB the job is allowed (in this small run; the real catalogue and traffic are far bigger). The list does not have to be perfect, but at least eight of the ten must be right.",
@@ -430,7 +430,7 @@ func registerConsistencyAndStreams() {
 			n("kv", engine.KKVStore, cols[2], rowMid, P{"nodes": 5.0, "replicas": 3.0, "readQuorum": r, "writeQuorum": w, "readMs": 4.0, "writeMs": 60.0, "variability": "exponential", "concurrency": 32.0}).
 			e("authors", "app").e("readers", "app").e("app", "kv").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "effect-before-cause", Title: "The reply before the question", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Readers see a reply, then open the post it answers and find an older version.",
 		Story:   "A discussion app keeps posts and replies in a five-node key-value store with three copies of each item. An author writes a reply straight after reading the post it answers. Readers then sometimes see the reply and, when they open the post it answers, an older version of it: the answer arrives before the question. Nothing fails, so nobody is told.",

@@ -7,7 +7,7 @@ const guidedID = "first-design-links"
 // Open challenges give a blank canvas and a list of requirements. The traffic curve and the failures are hidden
 // from the client (see the API) and no reference solution is ever served; Solution here is a witness that
 // proves the requirements can be met, used only by the tests.
-func init() {
+func (c *catalog) registerOpenBriefs() {
 	blank := func(users P) engine.Diagram {
 		return (&bld{}).n("users", engine.KClient, cols[0], rowMid, users).done()
 	}
@@ -20,7 +20,7 @@ func init() {
 	}
 
 	students := P{"rps": 100.0, "readPct": 80.0}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "ten-thousand-students", Title: "Ten thousand students", Difficulty: "Hard", Open: true,
 		Summary: "Results day: build a site that survives it, within budget.",
 		Story:   "A university will publish exam results at nine o'clock and ten thousand students will refresh the page. Build the system that serves them from a blank canvas: at least 97% of requests must succeed, p95 latency must stay under 500 ms, and it must cost no more than $1.50 an hour to run. You are not told how traffic will behave, only that today's rate is a poor guide, and that servers have a habit of failing at the worst moment.",
@@ -43,7 +43,7 @@ func init() {
 	})
 
 	sale := P{"rps": 60.0, "readPct": 60.0}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "checkout-during-a-sale", Title: "Checkout during a sale", Difficulty: "Hard", Open: true,
 		Summary: "A flash sale, a write-heavy checkout and a database that stumbles.",
 		Story:   "A shop is starting a flash sale. Four in ten requests change something (baskets, stock, orders). Build the whole system from a blank canvas: at least 94% of requests must succeed, p95 latency must stay under 800 ms, and it must cost less than $1.90 an hour. The database is the part you cannot fully trust.",
@@ -66,7 +66,7 @@ func init() {
 	})
 
 	links := P{"rps": 80.0, "readPct": 90.0, "keySpace": 20000.0, "keyDist": "zipf"}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: guidedID, Title: "First design: a link shortener", Difficulty: "Easy", Open: true,
 		Summary:  "A guided blank page: place the first components, then size them.",
 		Story:    "People paste a long web address and get a short one back; anyone who opens the short one is sent to the long one. Nine in ten requests are people following links. Build it from a blank canvas: at least 95% of requests must succeed, p95 latency must stay under 500 ms, and it must cost no more than $0.55 an hour. The checklist shows what any design like this needs; how many of each, and how they are joined, is up to you. A server can fail while people are using it.",
