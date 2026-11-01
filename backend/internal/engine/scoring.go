@@ -160,6 +160,52 @@ func Unwired(d Diagram) []Node {
 // Evaluate checks a finished run against goals and awards 0-3 stars.
 func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	g = g.WithStarTargets()
+	checks := successAndConsistencyChecks(g, run)
+	checks = append(checks, streamAndSearchChecks(g, run)...)
+	checks = append(checks, jobAndCostChecks(g, d, run, cost)...)
+	pass := true
+	for _, c := range checks {
+		pass = pass && c.Pass
+	}
+	stars := 0
+	if pass {
+		stars = awardStars(g, run, cost)
+	}
+	return Score{Pass: pass, Stars: stars, Checks: checks, Run: run, CostPerHour: cost}
+}
+
+// awardStars is the star count of a run that passed every check: one for passing, two when the cost bar is met
+// (or there is none), three when the quality bar is met as well.
+func awardStars(g Goals, run RunStats, cost float64) int {
+	total := run.Resolved + run.Pending
+	rate := 0.0
+	if total > 0 {
+		rate = float64(run.OK) / float64(total)
+	}
+	hasOK := run.OK > 0
+	stars := 1
+	if g.StarCostPerHour == nil || cost <= *g.StarCostPerHour+eps {
+		stars = 2
+		switch {
+		case g.StarP95Ms != nil:
+			if hasOK && run.P95 <= *g.StarP95Ms+eps {
+				stars = 3
+			}
+		case g.MaxP50Ms != nil:
+			if hasOK && run.P50 <= 0.5**g.MaxP50Ms+eps {
+				stars = 3
+			}
+		default:
+			if rate >= 0.999-eps {
+				stars = 3
+			}
+		}
+	}
+	return stars
+}
+
+// successAndConsistencyChecks covers the success rate, latency and the correctness counters of reads and writes.
+func successAndConsistencyChecks(g Goals, run RunStats) []Check {
 	var checks []Check
 	total := run.Resolved + run.Pending
 	rate := 0.0
@@ -247,6 +293,12 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	if g.MaxInconsistent != nil {
 		checks = append(checks, Check{"Orders left half done", fmt.Sprintf("≤ %d", *g.MaxInconsistent), fmt.Sprint(run.Inconsistent), run.Inconsistent <= *g.MaxInconsistent})
 	}
+	return checks
+}
+
+// streamAndSearchChecks covers recall, time to first token, stream jobs, sessions and similar feature goals.
+func streamAndSearchChecks(g Goals, run RunStats) []Check {
+	var checks []Check
 	if g.MinRecall != nil {
 		recall, label := run.Recall, "Vector search recall"
 		if run.Crawl != nil {
@@ -322,6 +374,12 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 		broken := run.ReadYourWritesBroken + run.MonotonicBroken + run.MonoWritesBroken + run.FollowReadBroken + run.CausalBroken
 		checks = append(checks, Check{"Per-client guarantees broken", fmt.Sprintf("≤ %d", *g.MaxSessionViolations), fmt.Sprint(broken), broken <= *g.MaxSessionViolations})
 	}
+	return checks
+}
+
+// jobAndCostChecks covers background jobs, the bill and whether every server reaches a data store.
+func jobAndCostChecks(g Goals, d Diagram, run RunStats, cost float64) []Check {
+	var checks []Check
 	if g.MinJobsCompleted != nil {
 		enq, frac := 0, 1.0
 		if run.Jobs != nil {
@@ -355,32 +413,7 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 		}
 		checks = append(checks, Check{"Wired to data", "every server", who + " never touches a data store", false})
 	}
-	pass := true
-	for _, c := range checks {
-		pass = pass && c.Pass
-	}
-	stars := 0
-	if pass {
-		stars = 1
-		if g.StarCostPerHour == nil || cost <= *g.StarCostPerHour+eps {
-			stars = 2
-			switch {
-			case g.StarP95Ms != nil:
-				if hasOK && run.P95 <= *g.StarP95Ms+eps {
-					stars = 3
-				}
-			case g.MaxP50Ms != nil:
-				if hasOK && run.P50 <= 0.5**g.MaxP50Ms+eps {
-					stars = 3
-				}
-			default:
-				if rate >= 0.999-eps {
-					stars = 3
-				}
-			}
-		}
-	}
-	return Score{Pass: pass, Stars: stars, Checks: checks, Run: run, CostPerHour: cost}
+	return checks
 }
 
 // RunToEnd simulates a scenario headlessly until it finishes and scores it.
