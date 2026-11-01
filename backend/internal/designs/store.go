@@ -155,6 +155,7 @@ func (s *Store) trim() {
 		s.order = s.order[1:]
 		delete(s.items, old)
 		if s.dir != "" {
+			// best effort: the design is already forgotten in memory, and a leftover file is harmless
 			_ = os.Remove(filepath.Join(s.dir, old+".json"))
 		}
 	}

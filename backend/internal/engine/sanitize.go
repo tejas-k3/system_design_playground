@@ -87,10 +87,10 @@ func SanitizeParams(kind string, in Params) (Params, bool) {
 	return out, adjusted
 }
 
-// Sanitize validates a diagram: unknown kinds, bad coordinates, duplicate ids and illegal
-// edges are dropped; parameters and latencies are clamped. The result is always safe to run.
 var knownProtocol = map[string]bool{"http": true, "grpc": true, "tcp": true, "ws": true, "sql": true, "custom": true}
 
+// Sanitize makes a diagram safe to run: unknown kinds, duplicate ids and illegal edges are dropped, and
+// parameters and latencies are clamped. It reports whether anything had to be changed.
 func Sanitize(in Diagram) (Diagram, bool) {
 	adjusted := false
 	seen := map[string]bool{}
