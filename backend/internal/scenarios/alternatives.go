@@ -187,7 +187,7 @@ var alternatives = map[string][]Alternative{
 	},
 	"who-is-online": {
 		alt("Give the database 64 connections", false, 56.4, 643, 3.32, "It barely helps: success only reaches 56% and p95 stays at 643 ms, at a higher bill. Paying for more of a durable store does not fix writes that never needed to be durable.", Change{"db", "connections", 64.0}),
-		alt("Heartbeat every 10 seconds instead of 5", true, 100.0, 124, 2.46, "It passes, and it is the cheapest: half the writes fit the database. The price is not in the bill: a user who leaves stays green for twice as long.", Change{"users", "rps", 750.0}),
+		alt("Heartbeat every 10 seconds instead of 5", true, 100.0, 124, 2.46, "It passes, and it is the cheapest: half the heartbeats (and half the reads) fit the database. The price is not in the bill: a user who leaves stays green for twice as long.", Change{"users", "rps", 750.0}),
 	},
 	"friends-of-friends": {
 		alt("Follow at most 50 friends per hop", true, 100.0, 122, 2.46, "It passes at the same bill: two hops touch 2,550 rows instead of 40,200, so the join is cheap enough. The answer is a sample of the friends of friends, not all of them.", Change{"db", "graphCap", 50.0}),
