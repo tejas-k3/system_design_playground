@@ -48,6 +48,7 @@ var conceptTags = map[string][]string{
 	"nobody-on-call":         {"consistency"},
 	"slow-query":             {"storage-and-payload"},
 	"pick-the-store":         {"storage-and-payload"},
+	"last-hour":              {"storage-and-payload"},
 	"poison-pill":            {"queues", "failure-handling"},
 	"consumer-lag":           {"queues", "sharding"},
 	"hot-cell":               {"sharding"},

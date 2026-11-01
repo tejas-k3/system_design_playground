@@ -193,6 +193,11 @@ var alternatives = map[string][]Alternative{
 		alt("Follow at most 50 friends per hop", true, 100.0, 122, 2.46, "It passes at the same bill: two hops touch 2,550 rows instead of 40,200, so the join is cheap enough. The answer is a sample of the friends of friends, not all of them.", Change{"db", "graphCap", 50.0}),
 		alt("Give the database 64 connections", false, 70.0, 1447, 3.32, "Four times the connections lift success to 70% and nothing more: each read still costs 40,000 rows of work, and the bill goes up by a third.", Change{"db", "connections", 64.0}),
 	},
+	"last-hour": {
+		alt("Add an index on the time", false, 61.2, 753, 2.46, "The dashboard reads become cheap, but every one of the 1,260 writes a second now also updates the index and costs 30% more, and 16 connections cannot keep up: only 61% of requests succeed.", Change{"db", "indexes", 1.0}),
+		alt("Use a wide-column store", false, 0.0, 0, 2.46, "Writes are cheap, but a range over the time is not a lookup by partition key: every read scans every partition, so nothing is answered in time.", Change{"db", "model", "wideColumn"}),
+		alt("Give the database 64 connections", false, 37.1, 1311, 3.32, "Four times the connections help the reads queue less, but each still scans the whole table, and the bill goes up by a third.", Change{"db", "connections", 64.0}),
+	},
 	"cold-start": {
 		alt("Keep one instance warm", false, 100.0, 129, 0.24, "There is no cold start any more, but the instance that never stops costs more than the whole budget of $0.20 an hour.", Change{"fn", "keepWarm", true}),
 		alt("Make the function start in 300 ms", false, 100.0, 424, 0.19, "Requests that find it cold wait a quarter as long, but there are still enough of them for the p95 of 424 ms to be just over the 400 ms goal.", Change{"fn", "coldStartMs", 300.0}),

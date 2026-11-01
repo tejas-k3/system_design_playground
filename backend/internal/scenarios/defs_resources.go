@@ -327,6 +327,36 @@ func registerResourceLimits() {
 		Debrief: "Match the store to the access pattern. Append-heavy, rarely-read data fits an append-optimised layout; paying a general-purpose engine's cost per row for a firehose is how a database becomes the bottleneck.",
 	})
 
+	// The last hour of readings: an index makes the range cheap but slows every write; the right layout does neither
+	lastHour := func(fixed bool) engine.Diagram {
+		model := "relational"
+		if fixed {
+			model = "timeSeries"
+		}
+		return (&bld{}).
+			n("sensors", engine.KClient, cols[0], rowMid, P{"rps": 1400.0, "readPct": 10.0, "rangePct": 100.0, "rangeRows": 500.0, "keySpace": 50000.0, "keyDist": "uniform", "timeoutMs": 1500.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 64.0, "queueCap": 500.0}).
+			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "model": model, "queueCap": 500.0, "readMs": 10.0, "writeMs": 10.0}).label("db", "Readings").
+			e("sensors", "app").e("app", "db").done()
+	}
+	register(&Scenario{
+		ID: "last-hour", Title: "The last hour of readings", Difficulty: "Medium", ConfigOnly: true,
+		Summary: "The dashboard asks for a time range and the database reads every row to find it.",
+		Story:   "Sensors write 1,260 readings a second, and a dashboard reads the latest 500 readings of a sensor about 140 times a second. The readings sit in a relational database with no index on the time, so each dashboard read scans the whole table. Serve at least 97% of requests with a {{p95|p95}} under 300 ms.",
+		Diagram: lastHour(false), Solution: lastHour(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.97, MaxP95Ms: f(300), MaxCostPerHour: f(3.0), StarCostPerHour: f(2.6)},
+		DurationSec: 30, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Open the database: what is full, and are the reads or the writes holding the connections?",
+			"A range read with no index looks at every row. What would let the database find the rows by time?",
+			"An index would speed up the reads, but every index also costs on every write. Is there a layout that suits data that is written in time order and read by time range?",
+		},
+		Answer: "The answer: use a time-series data model. Readings arrive in time order, so a time range is a sequential read and a write is an append: both stay cheap. An index fixes the reads but makes the 1,260 writes a second 30% dearer.",
+		Predictions: []Prediction{{ID: "p1", Question: "An index on the time is added to the relational database. What happens to the writes?", Options: []string{"Each costs 30% more, since the index is updated too", "They stay the same, since the index is only read", "They get cheaper, since the table is organised"}, Answer: 0,
+			Explain: "An index is a second structure that every write must update, so reads gain what writes pay."}},
+		Debrief: "How cheap a range read is depends on how the store lays out its data. A relational or document store answers it from an index, which every write must then keep up to date. A wide-column store reads efficiently by its partition key and has no other access path, so a range over another field touches every partition. A time-series store keeps rows in time order, so a time range is one sequential read and writes are appends. Choose the store for the shape of the questions, not the other way round.",
+	})
+
 	// Poison pill: a malformed job is retried ten times, burning worker time, and then vanishes
 	poisonPill := func(fixed bool) engine.Diagram {
 		attempts, dlq := 10.0, false
