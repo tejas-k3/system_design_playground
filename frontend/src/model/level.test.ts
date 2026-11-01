@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ScenarioSummary } from '../api/types'
 import { dailyForLevel } from './daily'
-import { LEVEL_TAG, orderByLevel, parseLevel, readLevel, writeLevel } from './level'
+import { LEVEL_TAG, orderByLevel, parseLevel, readLevel, studyDeckUrl, writeLevel } from './level'
 import { skillMap } from './skills'
 
 const mk = (id: string, level: ScenarioSummary['level'], difficulty = 'Easy', concepts = ['caching']): ScenarioSummary => ({ id, title: id, difficulty, summary: '', level, concepts })
@@ -90,5 +90,12 @@ describe('level storage', () => {
     } finally {
       delete (globalThis as { window?: unknown }).window
     }
+  })
+})
+
+describe('studyDeckUrl', () => {
+  it('points at the deck of one band and has none for all levels', () => {
+    expect(studyDeckUrl('sde3')).toBe('/api/study-deck?level=sde3')
+    expect(studyDeckUrl('all')).toBeNull()
   })
 })
