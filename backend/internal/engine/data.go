@@ -680,7 +680,50 @@ func (s *Sim) secondaryLookup(c *call) bool {
 	return pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+97)%100) < pct
 }
 
+// rangeRead says whether this read returns a range of rows rather than one (chosen from the request id, so no random draw).
+func (s *Sim) rangeRead(c *call) bool {
+	if c.lg == nil || c.write {
+		return false
+	}
+	pct := c.lg.client.f("rangePct")
+	return pct > 0 && float64(Hash32(uint32(c.rid)*2654435761+193)%100) < pct
+}
+
+// wideScanMult is how many times worse than a plain scan it is to scan every partition of a wide-column store.
+const wideScanMult = 3
+
+// Per-row time of reading a range through an index, and of reading it from a layout kept in time order.
+const (
+	indexRangeRowMs  = 0.01
+	seriesRangeRowMs = 0.003
+)
+
+// rangeMult is the cost of a range read as a multiple of the read time: a time-series store reads a time range in
+// order; a relational or document store needs an index on the field (rows x a small per-row time), else it scans
+// everything; a wide-column store has no access path but its partition key, so it scans every partition.
+func (s *Sim) rangeMult(n *node, c *call) float64 {
+	rows := c.lg.client.f("rangeRows")
+	readMs := math.Max(n.f("readMs"), 0.001)
+	switch n.s("model") {
+	case "timeSeries":
+		return 1 + rows*seriesRangeRowMs/readMs
+	case "wideColumn":
+		return n.f("scanMult") * wideScanMult
+	}
+	m := 1 + rows*indexRangeRowMs/readMs
+	if n.s("model") == "document" {
+		m *= 0.8 // single-document reads are cheaper in a document store
+	}
+	if n.f("indexes") < 1 { // a scan reads at least the rows an index would have found
+		return math.Max(n.f("scanMult"), m)
+	}
+	return m
+}
+
 func (s *Sim) readMultBase(n *node, c *call) float64 {
+	if s.rangeRead(c) && c.wl == wlKV {
+		return s.rangeMult(n, c)
+	}
 	switch c.wl {
 	case wlGeo:
 		if !n.b("spatialIndex") {
@@ -693,7 +736,7 @@ func (s *Sim) readMultBase(n *node, c *call) float64 {
 	if s.secondaryLookup(c) && (n.f("indexes") < 1 || n.s("model") == "wideColumn") {
 		m := n.f("scanMult")
 		if n.s("model") == "wideColumn" {
-			m *= 3 // no secondary access path at all: the scan is over every partition
+			m *= wideScanMult // no secondary access path at all: the scan is over every partition
 		}
 		return m
 	}
