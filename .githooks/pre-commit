@@ -1,8 +1,8 @@
 #!/bin/sh
 # Working notes (review reports, plans, findings) must never reach the repository or its history.
-# Published markdown is an allow-list: README.md, docs/DEPLOYMENT.md, docs/ACCESSIBILITY_TESTING.md, docs/COMPONENTS.md.
+# Published markdown is an allow-list: README.md, AGENTS.md, CLAUDE.md, docs/DEPLOYMENT.md, docs/ACCESSIBILITY_TESTING.md, docs/COMPONENTS.md.
 # Enable with `make hooks` (git config core.hooksPath .githooks). CI enforces the same rule.
-bad=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.md$' | grep -vE '^(README\.md|docs/DEPLOYMENT\.md|docs/ACCESSIBILITY_TESTING\.md|docs/COMPONENTS\.md)$')
+bad=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.md$' | grep -vE '^(README\.md|AGENTS\.md|CLAUDE\.md|docs/DEPLOYMENT\.md|docs/ACCESSIBILITY_TESTING\.md|docs/COMPONENTS\.md)$')
 if [ -n "$bad" ]; then
   echo "pre-commit: refusing to commit working-note markdown:" >&2
   echo "$bad" | sed 's/^/  /' >&2
