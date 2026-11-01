@@ -12,6 +12,23 @@ const (
 )
 
 func (c *catalog) registerSizingQuestions() {
+	c.addSizingQuestionsPart0()
+	c.addPhotoFeedNumbers()
+	c.addChatNumbers()
+	c.addDailyStorageEstimate()
+	c.addDailyUsersRps()
+	c.addImageEgressBandwidth()
+	c.addYearlyStorageReplicated()
+	c.addPeakLoadEstimate()
+	c.addCacheSizeEstimate()
+	c.addSizingQuestionsPart9()
+	c.addSizingQuestionsPart10()
+	c.addSizingQuestionsPart11()
+	c.addSizingQuestionsPart12()
+	c.addSizingQuestionsPart13()
+}
+
+func (c *catalog) addSizingQuestionsPart0() {
 	// URL shortener: 100 M new URLs a month, 10 reads per write, 3x peak, 500 B a record, kept 5 years.
 	writeQps := 100e6 / secPerMonth
 	c.registerQuestion(&Question{
@@ -31,7 +48,9 @@ func (c *catalog) registerSizingQuestions() {
 			{Key: "storageTB", Label: "Storage after 5 years", Unit: "TB", Expected: 100e6 * 12 * 5 * 500 / 1e12, Explain: "100 million x 12 months x 5 years = 6 billion records; x 500 bytes = 3 TB. Small enough for one database, which is the point of doing the sum."},
 		},
 	})
+}
 
+func (c *catalog) addPhotoFeedNumbers() {
 	// Photo feed: 10 M daily users view 50 photos of 200 KB; 90 % served by the CDN.
 	reads := 10e6 * 50 / secPerDay
 	egress := reads * 200e3 * 8 / 1e9
@@ -48,7 +67,9 @@ func (c *catalog) registerSizingQuestions() {
 			{Key: "originGbps", Label: "Bandwidth your servers must serve", Unit: "Gbit/s", Expected: 0.1 * egress, Explain: fmt.Sprintf("Only the 10%% the CDN misses reaches you: %.2f Gbit/s. This is what the CDN is for.", 0.1*egress)},
 		},
 	})
+}
 
+func (c *catalog) addChatNumbers() {
 	// Chat: 50 M daily users send 40 messages of 100 B each; keep 3 years.
 	msgs := 50e6 * 40 / secPerDay
 	c.registerQuestion(&Question{
@@ -64,7 +85,9 @@ func (c *catalog) registerSizingQuestions() {
 			{Key: "storageTB", Label: "Storage after 3 years", Unit: "TB", Expected: 50e6 * 40 * 365 * 3 * 100 / 1e12, Explain: "50 million x 40 = 2 billion messages a day; x 365 x 3 years = about 2.2 trillion; x 100 bytes = about 219 TB. Too big for one machine: sharding is not optional."},
 		},
 	})
+}
 
+func (c *catalog) addDailyStorageEstimate() {
 	c.registerQuestion(&Question{
 		ID: "daily-storage-estimate", Title: "How much storage arrives each day?", Mode: ModeEstimate, Difficulty: "Easy",
 		Summary: "Turn a daily record count into storage per day.",
@@ -72,7 +95,9 @@ func (c *catalog) registerSizingQuestions() {
 		Facts:   []Fact{{"Records stored each day", "20 million"}, {"Size per record", "500 bytes"}},
 		Fields:  []EstimateField{{Key: "storageGBPerDay", Label: "New storage per day", Unit: "GB per day", Expected: 10, Explain: "20 million records x 500 bytes = 10,000,000,000 bytes; divide by 1,000,000,000 bytes per GB = 10 GB per day."}},
 	})
+}
 
+func (c *catalog) addDailyUsersRps() {
 	c.registerQuestion(&Question{
 		ID: "daily-users-rps", Title: "How many requests arrive each second?", Mode: ModeEstimate, Difficulty: "Easy",
 		Summary: "Turn daily users and their actions into an average request rate.",
@@ -80,7 +105,9 @@ func (c *catalog) registerSizingQuestions() {
 		Facts:   []Fact{{"Daily users", "8.64 million"}, {"Requests per user per day", "10"}},
 		Fields:  []EstimateField{{Key: "requestsPerSecond", Label: "Requests per second", Unit: "per second", Expected: 1000, Explain: "8.64 million users x 10 requests = 86.4 million requests per day; divide by 86,400 seconds = 1,000 requests per second."}},
 	})
+}
 
+func (c *catalog) addImageEgressBandwidth() {
 	c.registerQuestion(&Question{
 		ID: "image-egress-bandwidth", Title: "How much bandwidth do image views use?", Mode: ModeEstimate, Difficulty: "Easy",
 		Summary: "Convert image views per second and image size into outbound bandwidth.",
@@ -88,7 +115,9 @@ func (c *catalog) registerSizingQuestions() {
 		Facts:   []Fact{{"Image views", "2,500 per second"}, {"Average image size", "500 KB"}},
 		Fields:  []EstimateField{{Key: "bandwidthGbps", Label: "Outbound bandwidth", Unit: "Gbit/s", Expected: 10, Explain: "2,500 images/s x 500 KB x 1,000 bytes/KB x 8 bits/byte = 10,000,000,000 bits/s; divide by 1,000,000,000 = 10 Gbit/s."}},
 	})
+}
 
+func (c *catalog) addYearlyStorageReplicated() {
 	c.registerQuestion(&Question{
 		ID: "yearly-storage-replicated", Title: "How much storage does a year need?", Mode: ModeEstimate, Difficulty: "Easy",
 		Summary: "Turn daily data into a year of storage, with every byte kept on several machines.",
@@ -96,7 +125,9 @@ func (c *catalog) registerSizingQuestions() {
 		Facts:   []Fact{{"New data each day", "200 GB"}, {"Copies of every byte", "3"}},
 		Fields:  []EstimateField{{Key: "storageTBPerYear", Label: "Disk needed for one year", Unit: "TB", Expected: 219, Explain: "200 GB x 3 copies = 600 GB a day; x 365 days = 219,000 GB; divide by 1,000 GB per TB = 219 TB. Replication multiplies the disk you buy, not the data you have."}},
 	})
+}
 
+func (c *catalog) addPeakLoadEstimate() {
 	c.registerQuestion(&Question{
 		ID: "peak-load-estimate", Title: "How big is the peak?", Mode: ModeEstimate, Difficulty: "Easy",
 		Summary: "Turn an average request rate and a peak factor into the load to design for.",
@@ -104,7 +135,9 @@ func (c *catalog) registerSizingQuestions() {
 		Facts:   []Fact{{"Average load", "1,200 requests per second"}, {"Peak factor", "4 x average"}},
 		Fields:  []EstimateField{{Key: "peakRequestsPerSecond", Label: "Peak requests per second", Unit: "per second", Expected: 4800, Explain: "1,200 x 4 = 4,800 requests per second. Servers must be sized for this peak, because users arrive in bursts and a queue that overflows turns the excess into errors."}},
 	})
+}
 
+func (c *catalog) addCacheSizeEstimate() {
 	c.registerQuestion(&Question{
 		ID: "cache-size-estimate", Title: "How big must the cache be?", Mode: ModeEstimate, Difficulty: "Easy",
 		Summary: "Size a cache to hold the popular share of the data.",
@@ -112,7 +145,9 @@ func (c *catalog) registerSizingQuestions() {
 		Facts:   []Fact{{"Items", "10 million"}, {"Size per item", "2 KB"}, {"Share to keep in the cache", "20%"}},
 		Fields:  []EstimateField{{Key: "cacheGB", Label: "Cache size", Unit: "GB", Expected: 4, Explain: "20% of 10 million = 2 million items; x 2 KB = 4,000,000 KB; divide by 1,000,000 KB per GB = 4 GB. A machine's memory holds that easily, which is why caching the hot set works."}},
 	})
+}
 
+func (c *catalog) addSizingQuestionsPart9() {
 	c.registerDiagnose("cut-off-threads", diagSource{"cut-off", 1, 60}, &Question{
 		Title: "Everything slows, then stops", Difficulty: "Medium",
 		Summary: "Success falls off a cliff and the latency chart goes blank. What is going on?",
@@ -126,7 +161,9 @@ func (c *catalog) registerSizingQuestions() {
 		answer:      1,
 		explanation: "Requests that need the database are not refused, they just never come back. With no call timeout, each one holds a thread for as long as the outage lasts, so all the threads fill up and even cache hits queue behind them. Success falls to near zero at once, and there is no latency to chart because nothing finishes. The fix is a call timeout (so threads are released) and a circuit breaker.",
 	})
+}
 
+func (c *catalog) addSizingQuestionsPart10() {
 	c.registerDiagnose("retry-storm-recovery", diagSource{"retry-pileup", 1, 60}, &Question{
 		Title: "The trigger is gone but the outage is not", Difficulty: "Medium",
 		Summary: "Something briefly slowed the system at 16 seconds. A minute later it is still down.",
@@ -140,7 +177,9 @@ func (c *catalog) registerSizingQuestions() {
 		answer:      1,
 		explanation: "Offered load stays flat (about 380 requests a second), yet requests in flight jump from about 50 to about 600 and stay there. A trigger (a slow database) pushed the queues over, every failure was retried immediately, and the servers kept working on the oldest queued requests, whose users had already left. The effort is wasted and the retries keep the queues full: a metastable failure that outlives its cause. The fixes are retry limits with backoff, newest-first queues, a maximum queue wait, and a circuit breaker.",
 	})
+}
 
+func (c *catalog) addSizingQuestionsPart11() {
 	c.registerDiagnose("watch-server-down", diagSource{"server-down", 1, 60}, &Question{
 		Title: "Who is at fault when a server dies?", Difficulty: "Easy",
 		Summary: "A server crashes and half the requests fail. Pick the component behind most of the errors.",
@@ -154,7 +193,9 @@ func (c *catalog) registerSizingQuestions() {
 		answer:      2,
 		explanation: "Arrivals stay near 350 a second the whole time, so there was no surge. While one server is down the successes fall to about 190 a second, which is all one server can do. Of the roughly 3,800 failures, about 3,500 are 'Queue full' on the surviving server and only about 350 are 'Node down' from the balancer still sending to the dead one for a moment. Losing one of two servers leaves half the capacity for the whole load: size the survivors to carry the peak.",
 	})
+}
 
+func (c *catalog) addSizingQuestionsPart12() {
 	c.registerDiagnose("watch-slow-query", diagSource{"slow-query", 1, 30}, &Question{
 		Title: "The error is here, the cause is not", Difficulty: "Easy",
 		Summary: "Requests are refused at the front, yet the app server is not the problem.",
@@ -168,7 +209,9 @@ func (c *catalog) registerSizingQuestions() {
 		answer:      2,
 		explanation: "The refusal is reported by the app server, but the cause is further along. Latency climbs from about 130 ms at the start to about 570 ms and the number of requests in flight roughly triples, while arrivals stay near 150 a second: every request is spending its time waiting for the database. A thread that waits for the database cannot take a new request, so the app server's queue fills and the refusals show up at the front. Where a symptom appears is not where the cause is: ask what the busy component is waiting for.",
 	})
+}
 
+func (c *catalog) addSizingQuestionsPart13() {
 	c.registerDiagnose("stampede-spikes", diagSource{"cache-stampede", 1, 60}, &Question{
 		Title: "A short outage that fixes itself", Difficulty: "Hard",
 		Summary: "Latency climbs for a few seconds, everything fails for a few more, then all is well.",
@@ -185,6 +228,10 @@ func (c *catalog) registerSizingQuestions() {
 }
 
 func (c *catalog) registerTradeoffQuestions() {
+	c.addTradeoffQuestionsPart0()
+}
+
+func (c *catalog) addTradeoffQuestionsPart0() {
 	base := func(id string) engine.Diagram { return c.byID[id].Diagram }
 
 	pay := base("sync-or-async")
@@ -277,6 +324,10 @@ func reviewShape(users, app, cache, db P, replica P) engine.Diagram {
 }
 
 func (c *catalog) registerReviewQuestions() {
+	c.addRetries()
+}
+
+func (c *catalog) addRetries() {
 	// A web shop with four flaws, one on each of four components.
 	c.registerReview("review-web-shop",
 		reviewShape(
