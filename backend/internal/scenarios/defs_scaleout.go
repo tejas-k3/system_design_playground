@@ -7,7 +7,30 @@ import (
 )
 
 // registerScaleOut registers regions, shards, tail latency, tenants, fan-out, global reach and multi-step transactions.
-func registerScaleOut() {
+func (c *catalog) registerScaleOut() {
+	c.addMultiRegionReads()
+	c.addAddAShard()
+	c.addHeavyTail()
+	c.addNoisyTenant()
+	c.addNotificationFanOut()
+	c.addGoGlobal()
+	c.addPaymentSaga()
+	c.addFrozenCheckout()
+	c.addRestartTheCounter()
+	c.addEveryoneAsksAuth()
+	c.addWhereDoSessionsLive()
+	c.addFrontDoor()
+	c.addStaleRegistry()
+	c.addColdStart()
+	c.addRankedFeed()
+	c.addChatOrder()
+	c.addFailingRefund()
+	c.addBooksBalance()
+	c.addWhoIsOnline()
+	c.addFriendsOfFriends()
+}
+
+func (c *catalog) addMultiRegionReads() {
 	// Multi-region reads: app servers sit near every user, but the one database is in the US
 	multiRegion := func(fixed bool) engine.Diagram {
 		b := &bld{}
@@ -28,7 +51,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "multi-region-reads", Title: "Multi-region reads", Difficulty: "Medium",
 		Summary: "App servers are in three regions, yet reads in Europe and Asia are still slow.",
 		Story:   "Last quarter the app servers moved close to the users, and every user is sent to the nearest one. The database is still a single primary in the US, so a read from Europe or Asia crosses an ocean twice to be answered, and the app server spends most of its time waiting for the answer. Reads are 98% of the traffic, and {{consistency-levels|a read may be at most a second out of date}}.",
@@ -45,7 +68,9 @@ func registerScaleOut() {
 			Explain: "A replica serves reads only. Every write still has to reach the one primary, so a write from Asia keeps paying the distance."}},
 		Debrief: "Replicas near the readers fix read latency; they do not move the writes, and they add {{replication-lag|replication lag}} that grows with the distance to the primary (here about 190 ms to Europe and 250 ms to Asia). Moving writes close too needs several leaders, which brings conflicts, or {{sharding|sharding}} users by home region. The extra round trips show why {{distributed-system-pitfalls|latency is not zero}}.",
 	})
+}
 
+func (c *catalog) addAddAShard() {
 	// Add a shard: capacity is added under load, and how keys are placed decides how many requests it slows
 	addShard := func(fixed bool) engine.Diagram {
 		hashing := "mod"
@@ -57,13 +82,13 @@ func registerScaleOut() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 48.0, "queueCap": 2000.0, "dbPool": 200.0}).
 			n("shards", engine.KShardRouter, cols[2], rowMid, P{"hashing": hashing, "vnodes": 128.0, "rebalanceSec": 10.0, "rebalanceMs": 400.0}).
 			e("users", "app").e("app", "shards")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("db%d", k+1)
 			b.n(id, engine.KDatabase, cols[3], float64(k)*100+30, P{"connections": 32.0, "readMs": 5.0}).e("shards", id)
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "add-a-shard", Title: "Adding a shard under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "More capacity, and for ten seconds everything gets slower.",
 		Story:   "The {{sharding|four-shard}} database is getting full, so a fifth shard is added at 20 seconds while traffic keeps flowing. The router places each key on a shard by hashing it and taking the remainder after dividing by the number of shards, so adding one changes where almost every key lives. For ten seconds the data of every moved key is still travelling, and each request for one of them takes 400 ms longer.",
@@ -81,7 +106,9 @@ func registerScaleOut() {
 			Explain: "Changing the divisor changes the remainder for almost every key. A ring only reassigns the arc the new shard takes over, about one key in five."}},
 		Debrief: "Hash mod n makes resizing a cluster as expensive as rebuilding it. {{consistent-hashing|Consistent hashing}} moves only about 1/n of the keys when a node joins or leaves, which is why caches and key-value stores use it.",
 	})
+}
 
+func (c *catalog) addHeavyTail() {
 	// Heavy tail: identical replicas whose service times have a long tail; capacity cannot shorten it, a second ask can
 	heavyTail := func(fixed bool) engine.Diagram {
 		hedge := 0.0
@@ -93,13 +120,13 @@ func registerScaleOut() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 48.0, "queueCap": 2000.0, "dbPool": 100.0, "readSpread": "roundRobin", "hedgeReadsMs": hedge}).
 			n("db", engine.KDatabase, cols[3], 20, P{"connections": 16.0}).
 			e("users", "app").e("app", "db")
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			id := fmt.Sprintf("replica%d", k+1)
 			b.n(id, engine.KReplica, cols[2], float64(k)*100+60, P{"connections": 16.0, "readMs": 40.0, "variability": "heavy", "replicationLagMs": 50.0}).e("app", id)
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "heavy-tail", Title: "The slow one in a hundred", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Three healthy read replicas, and one read in twenty is far slower than the rest.",
 		Story:   "A product page reads from three identical read replicas, taking turns. Most reads take a few milliseconds, but the replicas have a long tail: now and then one read takes ten times as long, whichever replica serves it. The {{p50|median}} is great. {{p95|The slowest one in twenty}} is what customers feel, and adding threads or servers has not moved it.",
@@ -117,7 +144,9 @@ func registerScaleOut() {
 		Debrief: "Hedged requests trade a little extra load for a much shorter tail: the chance that two independent replicas are both slow is the square of the chance that one is. Wait about the {{p95}} of a normal request before hedging, or you simply double your traffic.",
 		Deeper:  "A hedged request sends a second copy to another replica after a short wait and takes whichever answers first; if slowness is independent between replicas, the chance both are slow is the square of the chance one is. Waiting about the {{p95}} of a normal read means only the slowest few percent of reads are duplicated, so the extra load is small, while hedging immediately simply doubles your traffic. It is only safe for requests that can run twice, so reads and {{idempotency|idempotent}} calls, and you cancel the loser when you can. The assumption breaks when slowness is shared, for example a failing network path or a server that is overloaded, and then {{retry-storm|hedging adds load to a system that is already struggling}}. An interviewer will ask why not retry after a timeout, how to pick the delay adaptively, and how hedging combines with ejecting a consistently slow replica.",
 	})
+}
 
+func (c *catalog) addNoisyTenant() {
 	// Noisy tenant: one customer of a shared service sends most of the traffic; a single shared limit punishes everyone
 	noisyTenant := func(fixed bool) engine.Diagram {
 		keyBy := "none"
@@ -131,7 +160,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 32.0}).
 			e("users", "rl").e("rl", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "noisy-tenant", Title: "The noisy tenant", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One customer is sending most of the traffic, and the others are the ones who suffer.",
 		Story:   "A shared API serves four customers (tenants). One of them runs a heavy integration and sends most of the requests. To protect the servers there is a rate limit of 100 requests a second for everyone together. The heavy tenant uses it all up; the three quiet tenants, who never come near a fair share, get errors.",
@@ -148,7 +177,9 @@ func registerScaleOut() {
 			Explain: "A shared limit divides capacity in proportion to demand, so the loudest tenant keeps getting the most. A limit per tenant divides it fairly."}},
 		Debrief: "A global rate limit protects the servers but not the tenants from each other. {{bulkhead|Limit per customer so one customer's burst runs into its own allowance}}, and add a shared limit on top if the total must be bounded too.",
 	})
+}
 
+func (c *catalog) addNotificationFanOut() {
 	// Notification fan-out: one event must reach email, push and SMS. A queue gives each message to one worker only
 	fanOut := func(fixed bool) engine.Diagram {
 		kind := engine.KQueue
@@ -167,7 +198,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "notification-fan-out", Title: "Tell everyone", Difficulty: "Medium",
 		Summary: "An order is placed, and only one of the three notifications goes out.",
 		Story:   "Every order has to produce an email, a push notification and an SMS, each sent by its own worker. The events go through a message queue, and the three workers all read from it. Orders are accepted and nothing errors, but each order produces just one notification: whichever worker got to the message first.",
@@ -184,7 +215,9 @@ func registerScaleOut() {
 			Explain: "Workers on a queue compete for messages: each message is processed once. To give every consumer its own copy you need publish/subscribe."}},
 		Debrief: "A queue is for sharing work among identical workers; a topic is for telling several different consumers about the same event. The two look alike on a diagram and behave very differently.",
 	})
+}
 
+func (c *catalog) addGoGlobal() {
 	// Go global: users on three continents, one stack in one region
 	goGlobal := func(fixed bool) engine.Diagram {
 		b := &bld{}
@@ -209,7 +242,7 @@ func registerScaleOut() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "go-global", Title: "Go global", Difficulty: "Medium",
 		Summary: "Customers in Europe and Asia find the product slow, and the servers are fine.",
 		Story:   "The whole stack runs in the US. Customers in Europe and Asia get the same servers, the same database and the same code, but every request crosses an ocean twice, and the speed of light is not a setting you can change. The product team wants a snappy experience for everyone.",
@@ -226,7 +259,9 @@ func registerScaleOut() {
 			Explain: "Latency to a far region is dominated by the distance each way. Capacity helps when servers are busy, not when the wait is the speed of light."}},
 		Debrief: "To serve a global audience, put the stack near the users and route them to it. The cost is running several copies, and the hard part moves to {{consistency-levels|keeping their data consistent}} (which the multi-region database challenges are about). Do not assume {{distributed-system-pitfalls|latency is zero}}: users far from the stack pay for the distance.",
 	})
+}
 
+func (c *catalog) addPaymentSaga() {
 	// Payment saga: checkout spans stock, card and shipping; a failed step must not leave a half-done order
 	paymentSaga := func(fixed bool) engine.Diagram {
 		mode := "naive"
@@ -241,7 +276,7 @@ func registerScaleOut() {
 			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 0.0}).label("ship", "Shipping service").
 			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "payment-saga", Title: "The half-finished order", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "When the card is declined, the stock stays reserved and nobody gets the item.",
 		Story:   "Checkout does three things in a row: reserve the item in the stock database, charge the card, and book shipping. The card processor declines about one payment in seven. When it does, the order fails, but the item stays reserved forever: stock slowly drains into orders that never complete. Finance cannot reconcile either.",
@@ -259,7 +294,9 @@ func registerScaleOut() {
 		Debrief: "Without a distributed transaction, consistency across services comes from compensation: every step has an undo, and a failure runs the undos backwards. Compensations must be possible, repeatable ({{idempotency|idempotent}}), and watched: one that fails leaves a stuck order for a person.",
 		Deeper:  "A saga replaces one distributed transaction with a chain of local ones, each with a compensating action, and it is {{consistency-levels|eventually consistent}}: other users can see the item reserved before the order completes, so you model a pending state and do not pretend there is isolation. Order the steps so the hardest to undo comes late, because a refund may itself fail or take time, and make every compensation {{idempotency|idempotent}} so that retrying it is safe. The saga's own progress has to be stored somewhere durable, otherwise a crash between charging and recording leaves exactly the half-done order you were avoiding; with an idempotency key the retry cannot charge twice. An interviewer will ask what happens when a compensation keeps failing, and the honest answer is an alert and a person, as the debrief says. The failure pattern is the orchestrator that dies mid-saga with no record of how far it got.",
 	})
+}
 
+func (c *catalog) addFrozenCheckout() {
 	// Frozen checkout: two-phase commit across stock, card and shipping, and the server dies between the votes and the decision
 	frozenCheckout := func(fixed bool) engine.Diagram {
 		mode := "twoPhase"
@@ -274,7 +311,7 @@ func registerScaleOut() {
 			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 0.0}).label("ship", "Shipping service").
 			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "frozen-checkout", Title: "The frozen checkout", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The checkout server dies mid-order and the stock rows stay locked until it comes back.",
 		Story:   "To be sure no order is ever half done, checkout runs as a two-phase commit: the stock database, the card processor and shipping each vote yes and hold their part, then the server tells all of them to commit. It works until the server dies in the gap between the votes and the decision. The services that voted cannot decide alone, so they sit locked, waiting for a server that is not coming back for a while. Operations wants no order left waiting on a dead coordinator.",
@@ -312,7 +349,7 @@ func registerScaleOut() {
 		}
 		return d
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "nobody-to-wait-for", Title: "Nobody to wait for", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Keep checkout all-or-nothing, but let the services decide alone when the server dies.",
 		Story:   "Checkout is a two-phase commit across the stock database, the card processor and shipping, and when the server dies between the votes and the decision the services sit locked until it returns. Operations prefers not to use a saga, because other customers can then see stock reserved for an order that later vanishes. The services should instead settle on their own when the server stays silent, and the total time rows stay locked must stay small. Operations still wants every order to stay {{consistency-levels|consistent}}.",
@@ -331,7 +368,9 @@ func registerScaleOut() {
 		Debrief: "Three-phase commit removes the uncertain state: after the pre-commit round everyone knows the outcome, so the services can finish alone when the coordinator dies. It pays a third round on every transaction, and it assumes bounded delays and crashes without partitions, which real networks do not guarantee. That is why practice replicates the coordinator with consensus, or avoids the distributed transaction with sagas.",
 		Deeper:  "Two-phase commit blocks because a participant that voted yes cannot tell whether the others voted yes too, so it cannot decide alone. Three-phase commit adds a pre-commit round: once a participant has seen it, everybody has voted yes, so on silence it commits; if it has not seen it, nobody has committed, so it aborts. That removes the blocking on a coordinator crash, at the cost of a round on every transaction, but it works only if the network delivers within known bounds and a silent coordinator really is dead. With a partition or a long pause, one side can commit while the other times out and aborts, and the atomicity is gone, which is why it is rarely used. The practical routes are a replicated coordinator that agrees on its decision with a consensus protocol, so there is no single machine to wait for, or a saga that accepts that other readers see the intermediate states. An interviewer will ask what a participant does after it has voted yes and then lost the coordinator, and why timeouts alone cannot settle it.",
 	})
+}
 
+func (c *catalog) addRestartTheCounter() {
 	// Restart the counter: a stream job crashes and must catch up fast without sending outputs twice
 	restartCounter := func(fixed bool) engine.Diagram {
 		st := P{"windowSec": 2.0, "watermarkDelaySec": 1.0, "checkpointSec": 20.0}
@@ -344,7 +383,7 @@ func registerScaleOut() {
 			n("counter", engine.KStream, cols[2], rowMid, st).label("counter", "Orders per 2 seconds").
 			e("users", "app").e("app", "counter").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "restart-the-counter", Title: "Restart the counter", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "After a crash the stream job repeats outputs and takes too long to catch up.",
 		Story:   "A stream job counts orders in two-second windows and saves its place every twenty seconds. When it crashes, it reloads the last save and handles everything since again: the billing system receives some totals twice, and the dashboard is stale for over two seconds. Billing wants no repeated totals and the dashboard wants the job caught up within one and a half seconds, without saving more often.",
@@ -362,7 +401,9 @@ func registerScaleOut() {
 			Explain: "A save captures state at one moment; a log records everything after it, so the job can be brought back to just before the crash. The price is a log write on every event."}},
 		Debrief: "Checkpointing alone restarts from the last saved state and repeats the work since, so a long gap between saves means a long recovery and repeated outputs. Message logging (a {{write-ahead-log|log}} of the input) records each event before it is handled, so recovery replays deterministically from the last save and receivers can discard what they already saw. You pay one log write per event; the alternative is saving more often, which also costs.",
 	})
+}
 
+func (c *catalog) addEveryoneAsksAuth() {
 	// Everyone asks auth: every request waits for the auth service, which is slow under load and then goes down
 	everyoneAsksAuth := func(fixed bool) engine.Diagram {
 		app := P{"threads": 32.0, "queueCap": 400.0, "authMode": "service", "tokenUsers": 500.0}
@@ -376,7 +417,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], 200, P{"connections": 16.0, "readMs": 3.0}).
 			e("users", "app").e("app", "auth").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "everyone-asks-auth", Title: "Everyone asks auth", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Every request waits for the auth service, and it cannot keep up.",
 		Story:   "Each request carries a token, and the app server asks the auth service whether it is valid before it does anything else. The auth service handles about 200 checks a second and 300 requests arrive, so it is the bottleneck. When it restarts for eight seconds the whole site is down with it. You may not let requests through unchecked, but 500 signed-in users make most of those checks repeats.",
@@ -394,7 +435,9 @@ func registerScaleOut() {
 			Explain: "A remembered yes is not checked again until it expires, so a revocation takes up to a minute to take effect. A shorter time lowers the risk and raises the load."}},
 		Debrief: "A service every request depends on is both a bottleneck and a single point of failure. Remembering its answers for a short time removes most of the load and rides out a short outage; verifying a signed token on each server removes the call altogether, at the price of noticing a revocation only when the token expires. Failing open keeps the site up by letting everyone in, which is rarely acceptable.",
 	})
+}
 
+func (c *catalog) addWhereDoSessionsLive() {
 	// Where login sessions live: two app servers keep sessions in memory; one restarts
 	loginSessions := func(fixed bool) engine.Diagram {
 		state := "local"
@@ -411,7 +454,7 @@ func registerScaleOut() {
 			n("sessions", engine.KRedis, cols[3], 200, P{}).label("sessions", "Session store").
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").e("app1", "sessions").e("app2", "sessions").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "where-do-sessions-live", Title: "Where do sessions live?", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Users are signed out whenever their requests land on another server, or the server restarts.",
 		Story:   "Each logged-in user's session is kept in the memory of the app server that signed them in. The load balancer sends the next request to either server, so a user keeps finding themselves signed out, and when one server restarts, everyone it held is signed out again. A Redis instance is already in the diagram. Keep the sign-outs at zero and the p95 under 250 ms, without adding servers.",
@@ -429,7 +472,9 @@ func registerScaleOut() {
 			Explain: "Stickiness only keeps a user's requests on the same server. It does not copy anything, so the memory of a restarted server is gone."}},
 		Debrief: "A {{stateless-service|stateless}} server keeps nothing between requests, so any healthy server can take the next one. Keeping a session in one server's memory makes the user depend on that server. Sticky routing keeps the requests together but not the state: it loads servers unevenly and does not survive a restart. A shared store lets any server find the session, adding a call to every request and a dependency that must itself stay up; a session that expires when idle is soft state, which the user notices only when it is gone.",
 	})
+}
 
+func (c *catalog) addFrontDoor() {
 	// The front door: the balancer in front of plenty of servers is the first thing to fill up
 	frontDoorFull := func(fixed bool) engine.Diagram {
 		lb := P{"maxRps": 1200.0, "layer": "layer7"}
@@ -444,7 +489,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "readMs": 1.0}).
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "front-door", Title: "The front door", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Half the traffic is turned away at the balancer while the servers behind it sit idle.",
 		Story:   "All traffic enters through one load balancer that reads every request, which is what lets it route on content. Its {{throughput|throughput}} is about 1,200 requests a second. 2,500 arrive. Behind it two app servers could take 6,000 between them and are nearly idle, and the database is bored. Nothing here needs content-aware routing: every request goes to either server. Serve at least 97% of requests within the budget.",
@@ -461,7 +506,9 @@ func registerScaleOut() {
 			Explain: "A request must pass the balancer before any server sees it, so capacity behind it cannot raise what gets through."}},
 		Debrief: "Every request passes the entry point, so it is the first place a design can saturate, and adding servers behind it changes nothing. A layer-7 balancer reads the request, which allows routing by path, header or user, at the price of more work per request; a layer-4 balancer forwards connections and passes far more. Choose layer 7 only when you route on content, or run several balancers behind DNS or anycast when one is not enough.",
 	})
+}
 
+func (c *catalog) addStaleRegistry() {
 	// A service registry: a dead server stays listed until its entry expires and the balancer reads the registry again
 	registryPool := func(fixed bool) engine.Diagram {
 		lb := P{"membership": "registry", "registryTtlSec": 15.0, "registryRefreshSec": 10.0}
@@ -476,7 +523,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "readMs": 1.0}).
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "stale-registry", Title: "Still on the list", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The balancer keeps sending requests to a server the registry still lists.",
 		Story:   "The balancer does not probe its servers. It reads a {{service-registry|service registry}} every 10 seconds, and a server's entry lives 15 seconds after its last heartbeat. At ten seconds one of the two app servers crashes. The other could carry all the traffic, but until the entry expires and the balancer reads the registry again, about half the requests still go to the dead one. Serve at least 95% of requests.",
@@ -494,7 +541,9 @@ func registerScaleOut() {
 			Explain: "The entry must expire first, and the balancer only notices at its next read, so the two waits add."}},
 		Debrief: "A {{service-registry|service registry}} lets servers join and leave a pool without anyone editing the balancer: each one announces itself and keeps its entry alive with a heartbeat. The price is delay. A crashed server stays listed until its entry expires, and the balancer sees that only at its next read; a restarted server is used from the next read as well. Short times shrink the window but add heartbeats and reads. A health check on the balancer reacts to a failed probe instead, which is quicker, but every balancer must be told about each server.",
 	})
+}
 
+func (c *catalog) addColdStart() {
 	// The first request after a pause: a function that scales to zero starts cold
 	coldFunction := func(fixed bool) engine.Diagram {
 		app := P{"threads": 8.0, "cpuMs": 20.0, "coldStartMs": 1200.0, "idleSec": 0.3}
@@ -507,7 +556,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 8.0, "readMs": 5.0}).
 			e("users", "fn").e("fn", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "cold-start", Title: "The first request after a pause", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A function that scales to zero makes nearly every user wait for it to start.",
 		Story:   "An endpoint runs as a function that stops after 0.3 seconds without a request, so that nothing is paid for while it is idle. Starting it takes 1.2 seconds. Two requests a second arrive, with gaps that are often longer than 0.3 seconds, so many requests find it stopped. Users should see an answer within 400 ms at the 95th percentile, and the bill should stay under $0.20 an hour.",
@@ -524,7 +573,9 @@ func registerScaleOut() {
 			Explain: "A function stops after its idle time, so a request after a longer gap pays the start-up; steady traffic keeps it warm."}},
 		Debrief: "A function that {{autoscaling|scales to zero}} trades cost for latency: it costs nothing while idle, and the first request after an idle spell waits for it to start. Steady traffic keeps it warm; sparse traffic meets a cold start almost every time. The levers are the idle time, a smaller and quicker image, and paying for an instance that stays warm. A container starts in seconds, a virtual machine in tens of seconds, which is why functions run in containers.",
 	})
+}
 
+func (c *catalog) addRankedFeed() {
 	// The ranked feed: a model scores thousands of candidate posts for every read
 	rankedFeed := func(fixed bool) engine.Diagram {
 		cand := 5000.0
@@ -537,7 +588,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "readMs": 3.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "ranked-feed", Title: "The feed that thinks too long", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Ranking 5,000 posts for every read leaves the feed service far behind.",
 		Story:   "A feed is ranked before it is shown: for every read the service scores 5,000 candidate posts with a model, 0.1 ms each, so a read costs half a second of work and the service has eight {{thread-pool|threads}}. Forty reads a second arrive and most time out. Product wants the feed ranked, so the model stays. Keep at least 97% of reads answered, within 250 ms at the 95th percentile, and the bill under $0.70 an hour.",
@@ -554,7 +605,9 @@ func registerScaleOut() {
 			Explain: "Each candidate is scored once, so the work grows in step with the number of candidates."}},
 		Debrief: "A ranking stage multiplies the cost of a read by the number of candidates it scores. Production feeds work in stages: a cheap candidate generator narrows millions of posts to hundreds, and the expensive model ranks only those. The number of candidates trades quality of choice against latency and cost, so choose it from the latency budget.",
 	})
+}
 
+func (c *catalog) addChatOrder() {
 	// The chat that arrives out of order: messages of one conversation spread over several consumers
 	chatOrder := func(fixed bool) engine.Diagram {
 		by := "roundRobin"
@@ -567,13 +620,13 @@ func registerScaleOut() {
 			n("log", engine.KLog, cols[2], rowMid, P{"partitions": 4.0, "partitionBy": by, "capacity": 50000.0}).label("log", "Message log").
 			n("db", engine.KDatabase, cols[4], rowMid, nil).label("db", "Message store").
 			e("users", "app").e("app", "log")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("c%d", k+1)
 			b.n(id, engine.KWorker, cols[3], float64(k)*70, P{"concurrency": 1.0, "processMs": 40.0}).label(id, fmt.Sprintf("Delivery %d", k+1)).e("log", id).e(id, "db")
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "chat-order", Title: "Messages out of order", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Replies show up before the question they answer.",
 		Story:   "A chat service puts every message on a {{sharding|partitioned}} log read by four delivery workers. Each conversation is a key. Messages are spread evenly over the partitions, so two messages of one conversation are often delivered by different workers at the same moment, and the later one sometimes overtakes the earlier. Users see replies before the question. No more than five messages in a run may be handled out of order, and all must still be delivered.",
@@ -590,7 +643,9 @@ func registerScaleOut() {
 			Explain: "A partition is ordered on its own. Messages of one conversation in different partitions are handled by different workers, in no particular order."}},
 		Debrief: "A log orders messages within a partition, not across partitions. To keep a conversation in order, send all its messages to the same partition by key. That caps how fast one key can be handled, because one worker reads its partition. A sequence number on each message lets the receiver detect and reorder what still arrives late.",
 	})
+}
 
+func (c *catalog) addFailingRefund() {
 	// The refund that fails: a saga whose undo calls can also be declined
 	failingRefund := func(fixed bool) engine.Diagram {
 		retries := 0.0
@@ -605,7 +660,7 @@ func registerScaleOut() {
 			n("ship", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 30.0, "errorPct": 20.0}).label("ship", "Shipping service").
 			e("users", "app").e("app", "stock").e("app", "card").e("app", "ship").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "failing-refund", Title: "The refund that fails", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The saga undoes a charge, and the undo is declined too.",
 		Story:   "Checkout is already a saga: reserve the item, charge the card, book shipping, and undo in reverse when a step fails. Today shipping fails one time in five. The undo of the charge is a refund to the same card processor, which declines one call in four, and when the refund fails the order is stuck: the customer is charged and has nothing. Support is drowning. At most three orders may end up stuck, and a failed order should still fail within the half-second budget.",
@@ -623,7 +678,9 @@ func registerScaleOut() {
 		Debrief: "A saga moves the problem from the transaction to the undo, which can fail like any step. Make each compensation {{idempotency|idempotent}} so it can be retried safely, retry it with a limit, and send what still fails to a queue a person works through. Count the orders that end up stuck, because that is the real size of the problem.",
 		Deeper:  "In a saga every step has a compensation, and a compensation is a call to another service, so it can fail, time out or succeed without the caller knowing. The ways to make that safe are to make compensations idempotent (an idempotency key per order) so a retry never refunds twice, to retry with a limit and backoff, to persist the saga's state so a crash does not forget which undos remain, and to route the ones that still fail to a dead-letter queue or a manual queue with an alert. Compensations that cannot be undone, such as an email sent, belong at the end of the saga. The cost of retrying is a longer failed order and more load on a processor that is already struggling, so a circuit breaker belongs here too. An interviewer will ask what happens when the compensation itself fails and how you know an order is stuck.",
 	})
+}
 
+func (c *catalog) addBooksBalance() {
 	// The books: every charge needs its order and every order its charge
 	books := func(fixed bool) engine.Diagram {
 		retries := 0.0
@@ -638,7 +695,7 @@ func registerScaleOut() {
 			n("ledger", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 25.0, "errorPct": 20.0}).label("ledger", "Ledger service").
 			e("users", "app").e("app", "orders").e("app", "card").e("app", "ledger").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "books-balance", Title: "The books must balance", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "At midnight finance finds charges with no order behind them.",
 		Story:   "Checkout reserves the order, charges the card and posts the entry to the ledger service, and undoes the steps already done when one fails. The ledger service declines one call in five, and so does the undo of a charge on the card processor sometimes. Every night finance checks that each charge has its order and each order its charge. Entries that do not balance have to be fixed by hand. Keep them at none while at least 55% of orders succeed.",
@@ -656,7 +713,9 @@ func registerScaleOut() {
 		Debrief: "A ledger balances when every entry has its counterpart, and the nightly reconciliation is the check that finds the ones that do not. In a distributed workflow the usual leaks are a step done with no partner, a write that was saved but never announced, and an undo that failed. Undo calls have to be as reliable as the steps they undo: repeat them, make them {{idempotency|safe to repeat}}, and keep a list of the entries still open so that a person or a job can finish them.",
 		Deeper:  "Reconciliation compares two records of the same facts, here the orders and the charges, and reports the entries that exist on one side only. Whatever the cause, the cure has the same shape: a durable record of what was started, a repeat that can do no harm when it runs twice, and a sweeper that finishes what the first attempt left open. An undo with retries is that shape inside one request. Money systems add a second line, a periodic job that matches the two sides and raises the differences, because no protocol removes every leak. Counting what the sweep finds, as this goal does, shows whether the design leaks at all.",
 	})
+}
 
+func (c *catalog) addWhoIsOnline() {
 	// Presence: a heartbeat from every user is a write, and it does not need to survive a restart
 	presence := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -669,7 +728,7 @@ func registerScaleOut() {
 		return b.n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "readMs": 2.0, "writeMs": 15.0}).label("db", "Presence").
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "who-is-online", Title: "Who is online", Difficulty: "Medium",
 		Summary: "Every user's heartbeat is a database write, and the design cannot keep up.",
 		Story:   "A chat app shows a green dot next to friends who are online. Each connected user sends a heartbeat every few seconds, 1,500 a second in all, and the app writes each one to the database. Most of the traffic is writes of a value that is useless a minute later; the occasional read asks who is online. The database does a write in 15 ms and has 16 connections. Serve at least 97% of requests with a {{p95|95th percentile}} under 300 ms.",
@@ -686,7 +745,9 @@ func registerScaleOut() {
 			Explain: "Each user sends half as many heartbeats, so there are half as many writes. The last heartbeat of a user who left is older for longer before it counts as missing, so the dot stays green longer."}},
 		Debrief: "Presence is soft state: it is rewritten every few seconds, it is wrong the moment it is read, and losing it costs nothing lasting. Paying for durable writes on it wastes the database. A store that spreads writes over several nodes and acknowledges after one fits. In a real store an expiry per entry (not modelled here) removes a user whose heartbeats stop, and its length sets how long a green dot stays wrong. The interval is a trade-off in its own right: a shorter heartbeat finds departures sooner and multiplies the writes, and telling every friend on each change multiplies them again, so large systems send changes only to friends who are looking.",
 	})
+}
 
+func (c *catalog) addFriendsOfFriends() {
 	// Friends of friends: every hop multiplies the rows a read touches
 	friendsOfFriends := func(fixed bool) engine.Diagram {
 		db := P{"connections": 16.0, "readMs": 2.0}
@@ -699,7 +760,7 @@ func registerScaleOut() {
 			n("db", engine.KDatabase, cols[2], rowMid, db).label("db", "Social graph").
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "friends-of-friends", Title: "Friends of friends", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "\"People you may know\" reads 40,000 rows for every user.",
 		Story:   "The suggestions page lists the friends of a user's friends. A user has about 200 friends, so one hop touches 200 rows and two hops touch 40,000. The social graph lives in a relational database that joins them, and 120 users a second ask. Answer at least 97% of requests with a {{p95|p95}} under 400 ms.",

@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"math"
 )
 
 // Finding is one piece of advice about a design. Lint is advisory: it never changes a simulation.
@@ -20,9 +19,44 @@ func ps(p Params, k string) string { s, _ := p[k].(string); return s }
 // challenge). It is pure and deterministic, and conservative: it prefers a missed finding to a wrong
 // one, and reports `error` only for shapes that are broken, not merely risky.
 func Lint(d Diagram) []Finding {
-	kind := map[string]string{}
-	res := map[string]Params{}
-	out, in := map[string]int{}, map[string]int{}
+	l := newLintRun(d)
+	l.ruleSingleServers()
+	l.ruleIgnoredRouting()
+	l.ruleSmallVote()
+	l.ruleIdentity()
+	l.ruleAuth()
+	l.ruleTimeouts()
+	l.ruleRetries()
+	l.ruleCapacityAndPatience()
+	l.ruleSecondaryReads()
+	l.ruleQuorumOverlap()
+	l.ruleClientGuarantees()
+	l.ruleMessageSize()
+	l.ruleDatabaseFailover()
+	l.ruleDanglingNodes()
+	l.ruleUnreachable()
+	return l.fs
+}
+
+// lintRun is the facts about one design that the rules share, and the findings collected so far.
+type lintRun struct {
+	d          Diagram
+	kind       map[string]string // node id to kind
+	res        map[string]Params // node id to settings with defaults filled in
+	out, in    map[string]int    // edges leaving and entering each node
+	apps, dbs  []string
+	clients    []string
+	hasReplica bool
+	fs         []Finding
+}
+
+func (l *lintRun) add(rule, sev, msg, fix string, nodes ...string) {
+	l.fs = append(l.fs, Finding{Rule: rule, Severity: sev, Message: msg, Fix: fix, Nodes: nodes})
+}
+
+func newLintRun(d Diagram) *lintRun {
+	l := &lintRun{d: d, kind: map[string]string{}, res: map[string]Params{}, out: map[string]int{}, in: map[string]int{}}
+	kind, res, out, in := l.kind, l.res, l.out, l.in
 	for _, n := range d.Nodes {
 		kind[n.ID] = n.Kind
 		res[n.ID] = Resolve(n.Kind, n.Params)
@@ -30,10 +64,6 @@ func Lint(d Diagram) []Finding {
 	for _, e := range d.Edges {
 		out[e.From]++
 		in[e.To]++
-	}
-	var fs []Finding
-	add := func(rule, sev, msg, fix string, nodes ...string) {
-		fs = append(fs, Finding{Rule: rule, Severity: sev, Message: msg, Fix: fix, Nodes: nodes})
 	}
 	var apps, dbs, clients []string
 	hasReplica := false
@@ -50,6 +80,17 @@ func Lint(d Diagram) []Finding {
 		}
 	}
 
+	l.apps, l.dbs, l.clients, l.hasReplica = apps, dbs, clients, hasReplica
+	return l
+}
+
+func (l *lintRun) ruleSingleServers() {
+	res := l.res
+	in := l.in
+	apps := l.apps
+	dbs := l.dbs
+	hasReplica := l.hasReplica
+	add := l.add
 	if len(apps) == 1 && !pb(res[apps[0]], "autoscale") {
 		add("spof-server", "warn", "One app server: if it fails or is restarted, nothing answers.", "Run at least two behind a load balancer, or turn on autoscaling.", apps...)
 	}
@@ -58,6 +99,12 @@ func Lint(d Diagram) []Finding {
 			add("spof-database", "warn", "The only copy of the data lives on one database: if it crashes, every request that needs it fails.", "Add a read replica and set the database to promote it on failure.", id)
 		}
 	}
+}
+
+func (l *lintRun) ruleIgnoredRouting() {
+	d := l.d
+	res := l.res
+	add := l.add
 	var ignoredRouting []string
 	for _, n := range d.Nodes {
 		if n.Kind == KLoadBalancer && ps(res[n.ID], "layer") == "layer4" && (pf(res[n.ID], "canaryPct", 0) > 0 || pb(res[n.ID], "sticky")) {
@@ -67,15 +114,30 @@ func Lint(d Diagram) []Finding {
 	if len(ignoredRouting) > 0 {
 		add("layer4-ignores-content-routing", "warn", "A layer-4 balancer does not read requests, so its canary share and sticky routing are ignored.", "Use layer 7 if you need to route by content, or remove the setting.", ignoredRouting...)
 	}
+}
+
+func (l *lintRun) ruleSmallVote() {
+	d := l.d
+	res := l.res
+	add := l.add
 	var smallVote []string
 	for _, n := range d.Nodes {
-		if n.Kind == KCoordinator && ps(res[n.ID], "faultModel") == "arbitrary" && math.Min(9, pf(res[n.ID], "nodes", 3)) < 3*pf(res[n.ID], "faultsTolerated", 1)+1 {
+		if n.Kind == KCoordinator && ps(res[n.ID], "faultModel") == "arbitrary" && min(9, pf(res[n.ID], "nodes", 3)) < 3*pf(res[n.ID], "faultsTolerated", 1)+1 {
 			smallVote = append(smallVote, n.ID)
 		}
 	}
 	if len(smallVote) > 0 {
 		add("group-too-small-to-vote", "warn", "To outvote k members that give wrong answers a group needs at least 3k+1 members. With fewer, it cannot find enough matching answers and refuses requests while a member gives wrong answers.", "Add members, or lower the number of faulty members to tolerate.", smallVote...)
 	}
+}
+
+func (l *lintRun) ruleIdentity() {
+	d := l.d
+	kind := l.kind
+	res := l.res
+	apps := l.apps
+	clients := l.clients
+	add := l.add
 	var noStore, noIdentity []string
 	anyIdentity := false
 	for _, id := range clients {
@@ -103,6 +165,14 @@ func Lint(d Diagram) []Finding {
 	if len(noStore) > 0 {
 		add("session-store-missing", "warn", "These servers keep sessions in a shared store, but no Redis is connected to them, so nothing is checked.", "Connect a Redis, or keep the sessions in the server's memory.", noStore...)
 	}
+}
+
+func (l *lintRun) ruleAuth() {
+	d := l.d
+	kind := l.kind
+	res := l.res
+	apps := l.apps
+	add := l.add
 	var noAuth, askEvery, failOpen []string
 	for _, id := range apps {
 		if ps(res[id], "authMode") != "service" {
@@ -130,6 +200,13 @@ func Lint(d Diagram) []Finding {
 	if len(failOpen) > 0 {
 		add("auth-fails-open", "warn", "If the auth service fails, these servers let every request through unchecked.", "Accept that risk only on purpose; otherwise fail closed and keep the auth service available.", failOpen...)
 	}
+}
+
+func (l *lintRun) ruleTimeouts() {
+	res := l.res
+	out := l.out
+	apps := l.apps
+	add := l.add
 	var noTimeout, breaker []string
 	for _, id := range apps {
 		if out[id] == 0 {
@@ -148,7 +225,14 @@ func Lint(d Diagram) []Finding {
 	if len(breaker) > 0 {
 		add("breaker-without-timeout", "warn", "The circuit breaker counts failures, but a call that never times out never fails, so it can never trip.", "Set a call timeout so a silent dependency counts as a failure.", breaker...)
 	}
+}
 
+func (l *lintRun) ruleRetries() {
+	res := l.res
+	out := l.out
+	apps := l.apps
+	clients := l.clients
+	add := l.add
 	var noBackoff, amplifiers []string
 	retrying, patience := false, 0.0
 	for _, id := range clients {
@@ -185,7 +269,14 @@ func Lint(d Diagram) []Finding {
 			add("retry-amplification", "warn", "Clients retry, and these servers hold a deep first-in-first-out queue with no wait limit: queued work goes stale, users retry, and the queue never drains.", "Shorten the queue, set a maximum queue wait, or serve newest first.", amplifiers...)
 		}
 	}
+}
 
+func (l *lintRun) ruleCapacityAndPatience() {
+	d := l.d
+	res := l.res
+	apps := l.apps
+	clients := l.clients
+	add := l.add
 	// users' patience: the shortest client timeout; load: the busiest rate the clients offer
 	minPatience, rps, writes, strict := 0.0, 0.0, false, false
 	for _, id := range clients {
@@ -238,7 +329,14 @@ func Lint(d Diagram) []Finding {
 			add("autoscale-max-low", "warn", fmt.Sprintf("The most this fleet can ever do is about %.0f requests a second, and the clients offer about %.0f.", ceiling, share), "Raise the maximum number of servers.", id)
 		}
 	}
+}
 
+func (l *lintRun) ruleSecondaryReads() {
+	d := l.d
+	res := l.res
+	in := l.in
+	clients := l.clients
+	add := l.add
 	// reads by another field with no index to serve them
 	secondary, ranges := false, false
 	for _, id := range clients {
@@ -259,7 +357,12 @@ func Lint(d Diagram) []Finding {
 			add("secondary-reads-without-index", "warn", "Some reads look items up by a field other than the key, or return a range of rows, and this database has no secondary index, so each of those reads scans.", "Add a secondary index (each index makes writes about 30% slower).", scans...)
 		}
 	}
+}
 
+func (l *lintRun) ruleQuorumOverlap() {
+	d := l.d
+	res := l.res
+	add := l.add
 	for _, n := range d.Nodes {
 		if n.Kind != KKVStore {
 			continue
@@ -272,7 +375,13 @@ func Lint(d Diagram) []Finding {
 		msg := fmt.Sprintf("With N=%.0f and W=%.0f, two writes can succeed without meeting, so they can conflict.", copies, writeQuorum)
 		add("write-quorum-no-overlap", "warn", msg, "Raise the write quorum above half the copies.", n.ID)
 	}
+}
 
+func (l *lintRun) ruleClientGuarantees() {
+	d := l.d
+	res := l.res
+	clients := l.clients
+	add := l.add
 	// a per-client guarantee that the store behind the users cannot judge reads zero, which looks like a pass
 	for _, id := range clients {
 		if ps(res[id], "consistency") != "writesFollowReads" {
@@ -287,7 +396,14 @@ func Lint(d Diagram) []Finding {
 			add("guarantee-not-judged", "warn", "Writes follow reads is only judged against a key-value store's copies. Here the users reach only a plain database, so the count stays at 0, and a 0 is not a pass.", "Use a key-value store, or ask for monotonic writes or read your writes, which every store can judge.", id)
 		}
 	}
+}
 
+func (l *lintRun) ruleMessageSize() {
+	d := l.d
+	kind := l.kind
+	res := l.res
+	clients := l.clients
+	add := l.add
 	// a payload the queue cannot carry: the users' request size against each queue's message limit
 	biggest := 0.0
 	for _, id := range clients {
@@ -306,7 +422,14 @@ func Lint(d Diagram) []Finding {
 			add("large-payload-into-queue", "warn", fmt.Sprintf("Requests are %.0f KB but this queue refuses messages above its limit, so every one of those writes will fail.", biggest), "Store the body in an object store and queue a pointer to it (the claim-check pattern), or raise the queue's message limit if it really allows it.", small...)
 		}
 	}
+}
 
+func (l *lintRun) ruleDatabaseFailover() {
+	d := l.d
+	kind := l.kind
+	res := l.res
+	dbs := l.dbs
+	add := l.add
 	for _, db := range dbs {
 		pool, who := 0.0, []string{}
 		for _, e := range d.Edges {
@@ -330,7 +453,14 @@ func Lint(d Diagram) []Finding {
 			add("unfenced-failover", "error", "After a promotion the old primary can come back and accept writes next to the new one (split brain).", "Turn on fencing.", db)
 		}
 	}
+}
 
+func (l *lintRun) ruleDanglingNodes() {
+	d := l.d
+	res := l.res
+	out := l.out
+	in := l.in
+	add := l.add
 	for _, n := range d.Nodes {
 		if n.Kind == KClient {
 			continue
@@ -343,10 +473,14 @@ func Lint(d Diagram) []Finding {
 			add("synchronised-expiry", "warn", "Everything is cached at the same moment with the same lifetime, so it all expires together and the database takes every miss at once.", "Add TTL jitter, or start cold.", n.ID)
 		}
 	}
-	for _, n := range Unwired(d) {
+}
+
+func (l *lintRun) ruleUnreachable() {
+	d := l.d
+	add := l.add
+	for _, n := range unwired(d) {
 		add("unreachable-store", "error", "This component never reaches a data store, so it cannot serve a real request.", "Connect it to a database, cache or queue.", n.ID)
 	}
-	return fs
 }
 
 // claimChecked reports whether every app server that feeds this queue also uploads to an object store, which makes

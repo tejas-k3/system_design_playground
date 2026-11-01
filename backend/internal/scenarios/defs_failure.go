@@ -7,7 +7,21 @@ import (
 )
 
 // registerFailureAndElasticity registers failover, partitions, gray failures, stampedes, fleet scaling, hot shards and scan pollution.
-func registerFailureAndElasticity() {
+func (c *catalog) registerFailureAndElasticity() {
+	c.addPrimaryDies()
+	c.addMorningRush()
+	c.addCutOff()
+	c.addFlakyNeighbour()
+	c.addCacheStampede()
+	c.addSyncOrAsync()
+	c.addWaveRider()
+	c.addPassedTheLoadTest()
+	c.addFlashCrowd()
+	c.addHotShard()
+	c.addScanPollution()
+}
+
+func (c *catalog) addPrimaryDies() {
 	// 14b ─ Hard, config only: the primary database dies ───────────────────────────────
 	failover := func(db, replica engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -17,7 +31,7 @@ func registerFailureAndElasticity() {
 			n("replica", engine.KReplica, cols[4], rowBot, replica).
 			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "primary-dies", Title: "The primary dies", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "The database server is gone for a minute. A replica is sitting right there.",
 		Story:       "Six in ten requests write to the database. At 20 seconds the primary crashes and stays down for a minute. There is a read replica, {{replication-lag|three seconds behind}}. Keep most requests succeeding and lose as few acknowledged writes as you can. The architecture is fixed: fix it with configuration.",
@@ -37,7 +51,9 @@ func registerFailureAndElasticity() {
 		Debrief: "{{failover|Failover}} has two costs. Time: while the failure is noticed and a replica takes over, nothing can write. Data: with asynchronous replication, whatever the replica had not yet copied is gone. Both are settings you choose: faster detection risks false alarms, and a smaller {{replication-lag|lag}} costs the primary more work.",
 		Deeper:  "A {{failover|failover}} costs time and data, and they are separate dials: time is detection plus promotion, data is whatever the replica had not yet received when the primary died. Detecting faster risks promoting on a blip, which creates an outage that did not need to happen, and a smaller {{replication-lag|replication lag}} costs the primary more work or, if you make replication synchronous, makes every write wait for the replica. At larger scale you promote the most caught-up replica rather than any replica and let clients find the new primary through a service name instead of a cached address. An interviewer will ask what happens to the old primary when it returns, which is a later challenge in this set, and how you would reconcile writes it accepted that were never copied. The usual failure is promoting a lagging replica and then silently discarding the unreplicated tail.",
 	})
+}
 
+func (c *catalog) addMorningRush() {
 	// 14c ─ Hard, config only: the traffic ramps and the fleet is fixed ─────────────────────
 	elastic := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -46,7 +62,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(1, cols[2], rowMid, 100, app).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "morning-rush", Title: "Morning rush", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "Traffic climbs to seven times its normal level, then falls. One server does not follow.",
 		Story:       "Over a minute traffic climbs from 80 to 600 requests per second, stays there for 40 seconds, then drops. You run a single app server. A new server takes 20 seconds to boot, and every running server costs money, so buying a huge fleet for the whole day is not the answer. The architecture is fixed: fix it with configuration.",
@@ -66,7 +82,9 @@ func registerFailureAndElasticity() {
 		Debrief: "{{autoscaling|Autoscaling}} trades money for time. A low target busy level orders servers early and costs more; a high one is cheap and late. Boot time sets how far ahead you must look, and a wait before removing servers stops the fleet flapping. The very large fixed fleet works too, but costs all day what you only need at the peak.",
 		Deeper:  "Reactive {{autoscaling|autoscaling}} always lags demand by the measuring window plus the boot time, which here is 20 seconds, so the target busy level is really a decision about how far ahead you pay for capacity: lower means earlier and dearer, higher means cheaper and late. When the wave is predictable, scheduled or predictive scaling and a pool of servers kept ready beat any threshold, and scaling on queue depth or latency reacts to the symptom that users feel rather than to CPU. The downstream side matters too, because every new server {{connection-pool|opens its own connections}}, so a fleet that grows quickly can overload the database that was fine a minute earlier. An interviewer will ask what the maximum should be and what happens when the cloud cannot supply the servers you ordered. The failure pattern is flapping: scaling in too eagerly removes the capacity the next wave needs.",
 	})
+}
 
+func (c *catalog) addCutOff() {
 	// 14d ─ Medium, config only: the database is cut off (a partition, not a crash) ─────────
 	cutOff := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -76,7 +94,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(2, cols[2], rowTop, 100, app, "cache").e("cache", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "cut-off", Title: "Cut off", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The database does not crash. It just stops answering.",
 		Story:   "At 20 seconds the network around the database goes quiet for 25 seconds. Nothing is refused: requests to it simply never come back. Most reads are served from the cache, but your servers keep waiting on the database for everything else. Keep as many requests succeeding as you can. The architecture is fixed: fix it with configuration.",
@@ -94,7 +112,9 @@ func registerFailureAndElasticity() {
 			Explain: "Each waiting request holds a thread for good. Within a second or two none are left, and cache hits queue behind them."}},
 		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up {{thread-pool|threads}} until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a {{circuit-breaker|circuit breaker}} stops you spending a thread on every attempt. A distributed design must not assume {{distributed-system-pitfalls|the network is reliable}}.",
 	})
+}
 
+func (c *catalog) addFlakyNeighbour() {
 	// 14e ─ Medium, config only: one server keeps stalling (a gray failure that pulses) ────
 	flaky := func(lb engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -103,7 +123,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(3, cols[2], rowTop, 100, P{"threads": 8.0}).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "flaky-neighbour", Title: "Flaky neighbour", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One of three servers keeps stalling, then recovering, then stalling again.",
 		Story:   "From 15 seconds on, one of your three app servers alternates between normal and fifteen times slower every four seconds (a noisy neighbour, a garbage-collection storm). It never goes down, so the balancer keeps sending it a third of the traffic. Keep users happy. The architecture is fixed: fix it with configuration.",
@@ -121,7 +141,9 @@ func registerFailureAndElasticity() {
 			Explain: "A slow server is worse than a dead one: a dead one is skipped, a slow one keeps being given work it cannot finish."}},
 		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because a sick server is the one with the most unfinished work.",
 	})
+}
 
+func (c *catalog) addCacheStampede() {
 	// 14f ─ Medium, config only: every cache entry expires at the same instant ────────────
 	stampede := func(cache engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -131,7 +153,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 8.0, "readMs": 100.0}).
 			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 32.0, "queueCap": 500.0}, "cache").e("cache", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "cache-stampede", Title: "Everything expires at once", Difficulty: "Medium", ConfigOnly: true,
 		Summary:     "The cache starts full, every entry lives exactly ten seconds, and then they all die together.",
 		Story:       "You warmed the cache before launch, so the database sees almost nothing. Entries {{ttl|live ten seconds}}, because prices change and users must not see data older than about fifteen. At the first expiry {{stampede|the whole popular set misses at the same moment}} and four hundred reads a second land on a database that can answer eighty. Keep it standing without letting data go stale. The architecture is fixed: fix it with configuration.",
@@ -149,7 +171,9 @@ func registerFailureAndElasticity() {
 			Explain: "A warm start gives every entry the same creation time, so they share one expiry time. Misses arrive as a wave, not a trickle."}},
 		Debrief: "A cache hides load until the moment it cannot. Synchronised {{ttl|expiry}} turns a 99% {{cache-hit-rate|hit rate}} into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the {{stampede|stampede}}, but it trades it for stale data, which is why this challenge limits staleness.",
 	})
+}
 
+func (c *catalog) addSyncOrAsync() {
 	// 14g ─ Medium, config only: how much data may a failover lose? ─────────────────────
 	replicas := func(db, rep engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -160,7 +184,7 @@ func registerFailureAndElasticity() {
 			e("users", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
 	}
 	promote := P{"onFailure": "promote", "detectSec": 5.0, "promoteSec": 10.0}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "sync-or-async", Title: "Sync or async?", Difficulty: "Medium", ConfigOnly: true,
 		Summary:     "The primary dies. How many acknowledged writes does the replica know about?",
 		Story:       "Every request is a write that users were told succeeded. At 20 seconds the primary database dies and {{failover|the replica is promoted}}. The replica is {{replication-lag|three seconds behind}}, so it never saw the last three seconds of writes. Lose at most twenty acknowledged writes and keep the slowest ten percent of writes under about a quarter of a second. The architecture is fixed: fix it with configuration.",
@@ -181,7 +205,7 @@ func registerFailureAndElasticity() {
 	})
 
 	// 14h ─ Hard, config only: the old primary comes back ────────────────────────────────
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "fence-the-old-primary", Title: "Fence the old primary", Difficulty: "Hard", ConfigOnly: true,
 		Summary:     "The failover worked. Then the dead primary woke up.",
 		Story:       "The primary dies at 10 seconds and {{failover|a replica is promoted}} by 25 seconds. At 50 seconds the old primary restarts. Nobody told it that it was replaced. Keep the data: lose at most a hundred acknowledged writes, and keep most requests succeeding. The architecture is fixed: fix it with configuration.",
@@ -201,11 +225,13 @@ func registerFailureAndElasticity() {
 		Debrief: "{{failover|Failover}} is only half the job: you also have to make sure the old primary cannot come back as one. {{fencing|Fencing}} (a token, a lease, or simply keeping the node out until it is reconciled) is what prevents {{split-brain|split brain}}. Staying down avoids the problem but costs the whole outage.",
 		Deeper:  "{{failover|Failover}} without {{fencing|fencing}} creates {{split-brain|two nodes that both believe they are the primary}}, and whichever the clients reach next wins while the other side's writes are quietly lost. Fencing has to be enforced where the data lives: a monotonically increasing term or token that the storage layer checks, a lease the old primary must renew, or simply keeping the node out until it has been reconciled, because a node cannot be trusted to know it was replaced. Staying down is the safe answer and costs the whole outage; fencing keeps both safety and availability but needs {{leader-election|a source of truth for who the current primary is}}, which leads to the coordination service in a later challenge. An interviewer will push on the harder case where the old primary never crashed and was only partitioned, so it keeps serving writes it believes are valid. That is the real split-brain failure, and it is why the check must come from the resource and not from the process.",
 	})
+}
 
+func (c *catalog) addWaveRider() {
 	// 14i ─ Medium, config only: demand swings faster than a new server boots ─────────────
 	var waves []engine.TrafficPoint
 	waves = append(waves, engine.TrafficPoint{0, 40})
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		at := float64(20 + 40*k)
 		waves = append(waves, engine.TrafficPoint{at, 40}, engine.TrafficPoint{at + 2, 180}, engine.TrafficPoint{at + 22, 180}, engine.TrafficPoint{at + 24, 40})
 	}
@@ -220,7 +246,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(1, cols[2], rowMid, 100, base).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "wave-rider", Title: "Waves faster than boot time", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Autoscaling is on, and users still get errors at the start of every wave.",
 		Story:   "Every forty seconds traffic jumps from 40 to 180 requests a second for twenty seconds and drops again. {{autoscaling|Autoscaling}} is switched on, yet each wave starts with a burst of failures: a new server takes ten seconds to boot, and the scaler only looks at the last thirty seconds of load. Keep success high and the slowest requests fast without buying a big fleet for the whole run. The architecture is fixed: fix it with configuration.",
@@ -238,7 +264,9 @@ func registerFailureAndElasticity() {
 			Explain: "Reactive scaling always lags demand by the measuring window plus the boot time. When waves are shorter than that lag, only capacity that is already running helps."}},
 		Debrief: "{{autoscaling|Autoscaling}} is reactive, so it suits changes slower than its own reaction time. For predictable, fast waves, pre-provision a floor (or scale on a schedule); a lower target busy level buys earlier action at a higher cost. Waiting longer before scaling down avoids flapping but would not have fixed the wave start.",
 	})
+}
 
+func (c *catalog) addPassedTheLoadTest() {
 	// 14j ─ Medium, config only: the load test passed, the launch did not ─────────────────
 	loadTest := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -248,7 +276,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("staff", "lb").e("public", "lb").servers(1, cols[2], rowMid, 100, app).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "passed-the-load-test", Title: "It passed the load test", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Forty staff tested the system and everything was fine. Then the public arrived.",
 		Story:   "Your team load-tested with forty staff clicking around, each waiting for an answer before the next click: no errors, fast pages. The public launch brings eighty requests a second from people who do not wait for anyone. Both crowds hit the same server. Make the launch survive. The architecture is fixed: fix it with configuration.",
@@ -265,7 +293,9 @@ func registerFailureAndElasticity() {
 			Explain: "A fixed crowd that waits is self-limiting: latency rises, arrivals fall. Real internet traffic keeps coming at the same rate however slow you are."}},
 		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so size for the arrival rate, not for the number of testers.",
 	})
+}
 
+func (c *catalog) addFlashCrowd() {
 	// 14k ─ Medium, config only: short intense rushes at a modest average ───────────────────
 	rush := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -275,7 +305,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "limiter").e("limiter", "lb").servers(1, cols[3], rowMid, 100, app).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "flash-crowd", Title: "Short, sharp rushes", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The average load is fine. The load a second at a time is not.",
 		Story:   "Traffic averages 90 requests a second, comfortably inside what one server can do. But it arrives in rushes: for a second or two the rate triples, then it eases off. Your server's queue only holds ten requests, so every rush drops hundreds. A rate limiter sits in front of the server. Keep requests succeeding and the slowest ones under 0.7 s, on a budget of 45 cents an hour. The architecture is fixed: fix it with configuration.",
@@ -292,14 +322,16 @@ func registerFailureAndElasticity() {
 			Explain: "Utilisation is an average over time; failures happen in the moments when arrivals exceed capacity. Queues and headroom absorb those moments."}},
 		Debrief: "Provision for the burst, not the mean. A queue absorbs a burst only if it is large enough and drains fast enough; it trades errors for waiting time. {{load-shedding|Rate limiting}} protects a system from overload but does not make rejected users succeed, so it is the wrong tool when the burst is short enough to wait out.",
 	})
+}
 
+func (c *catalog) addHotShard() {
 	// 14l ─ Medium: a hot key overloads one shard; more shards do not help ────────────────
 	hotShard := func(shards int, cache bool) engine.Diagram {
 		b := (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 700.0, "readPct": 90.0, "keySpace": 100000.0, "hotKeyPct": 35.0, "timeoutMs": 2000.0}).
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
 			n("router", engine.KShardRouter, cols[3], rowMid, nil)
-		for k := 0; k < shards; k++ {
+		for k := range shards {
 			b.n(fmt.Sprintf("db%d", k+1), engine.KDatabase, cols[4], rowTop+float64(k)*60, P{"connections": 8.0, "readMs": 30.0, "writeMs": 40.0}).e("router", fmt.Sprintf("db%d", k+1))
 		}
 		b.e("users", "lb")
@@ -309,7 +341,7 @@ func registerFailureAndElasticity() {
 		}
 		return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}, "router").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "hot-shard", Title: "One shard on fire", Difficulty: "Medium",
 		Summary: "The data is split four ways, and one celebrity item gets a third of all reads.",
 		Story:   "You {{sharding|sharded}} the database four ways so no shard sees more than a quarter of the traffic. Then {{hot-key|one item went viral}}: 35% of all requests ask for it, and it lives on exactly one shard, which now takes half the load and falls over while the other three idle. Fix it. You may add and connect components.",
@@ -326,7 +358,9 @@ func registerFailureAndElasticity() {
 			Explain: "Resharding spreads the other keys thinner, but a single key cannot be split by hashing: its load stays on whichever shard owns it."}},
 		Debrief: "{{sharding|Sharding}} balances many keys, not one. A {{hot-key|hot key}} needs a different tool: a cache in front, a replica set for that key, or splitting the key (for example, a counter sharded into N sub-counters). Check the load per shard, not the average.",
 	})
+}
 
+func (c *catalog) addScanPollution() {
 	// 14m ─ Medium, config only: a scan flushes the useful part of the cache ────────────────
 	scanned := func(cache engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -337,7 +371,7 @@ func registerFailureAndElasticity() {
 			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 8.0, "readMs": 40.0}).
 			e("users", "lb").e("crawler", "lb").servers(2, cols[2], rowTop, 100, P{"threads": 32.0, "queueCap": 300.0}, "cache").e("cache", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "scan-pollution", Title: "The crawler that ate the cache", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Real users ask for the same few hundred items. A crawler reads every item exactly once.",
 		Story:   "Users keep asking for the same 500 popular items, and the cache holds 600. A search-engine crawler is walking your whole catalogue of 100,000 items, once each, at 150 requests a second. Every item the crawler touches goes into the cache and {{eviction|pushes out something users want}}. The database can only do 200 reads a second. Keep users fast. The architecture is fixed: fix it with configuration.",

@@ -7,7 +7,7 @@ import (
 )
 
 // These SDE2 open briefs expose requirements but keep each workload and its failure profile server-side.
-func init() {
+func (c *catalog) registerOpenM1Briefs() {
 	open := func(users P) engine.Diagram {
 		return (&bld{}).n("users", engine.KClient, cols[0], rowMid, users).done()
 	}
@@ -16,13 +16,13 @@ func init() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb")
 		b.n("cache", engine.KCache, cols[3], rowTop, P{"ttlSec": 60.0, "ttlJitterPct": 20.0, "capacityItems": 4000.0})
 		b.n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 24.0})
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			id := fmt.Sprintf("app%d", i+1)
 			b.n(id, engine.KAppServer, cols[2], rowTop+float64(i)*70, P{"threads": 16.0, "callTimeoutMs": 400.0, "circuitBreaker": true}).e("lb", id).e(id, "cache").e(id, "db")
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-link-shortener", Title: "Design a link shortener", Difficulty: "Medium", Open: true,
 		Summary: "Build a fast redirect service that keeps links durable and stays inside its budget.",
 		Story:   "Build a link shortener for a product launch. At least 98% of requests must succeed, p95 must stay below 250 ms, and the service must cost no more than $1.60 an hour. A server may fail during the launch, and popular links must still redirect quickly. Start with the users and choose the rest of the design.",
@@ -46,18 +46,18 @@ func init() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0, "queueCap": 200.0}).
 			n("events", engine.KQueue, cols[2], rowMid, P{"capacity": 3000.0, "maxAttempts": 4.0, "deadLetter": deadLetter})
 		b.e("users", "app").e("app", "events")
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			id := fmt.Sprintf("sender%d", i+1)
 			b.n(id, engine.KWorker, cols[3], rowTop+float64(i)*70, P{"concurrency": 8.0, "processMs": 80.0, "poisonPct": 4.0}).e("events", id)
 		}
 		b.n("provider", engine.KExternalAPI, cols[4], rowMid, P{"latencyMs": 50.0, "errorPct": 0.0})
 		b.n("db", engine.KDatabase, cols[5], rowMid, P{"connections": 16.0})
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			b.e(fmt.Sprintf("sender%d", i+1), "provider").e(fmt.Sprintf("sender%d", i+1), "db")
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-notifications", Title: "Design notifications", Difficulty: "Medium", Open: true,
 		Summary: "Accept notification requests quickly and deliver work despite a provider slowdown.",
 		Story:   "A service sends email and push notifications after user actions. At least 98% of requests must be accepted, p95 acknowledgement latency must stay below 200 ms, at least 94% of accepted jobs must finish, no job may disappear without a recorded disposition, and the system must cost no more than $1.40 an hour. A delivery provider slows down during a traffic rush. Build the service from the users outward.",
@@ -82,7 +82,7 @@ func init() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "queueCap": 500.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-news-feed", Title: "Design a news feed", Difficulty: "Medium", Open: true,
 		Summary: "Balance feed write fan-out against the cost of building timelines on reads.",
 		Story:   "Build a news feed for a growing community. At least 98% of requests must succeed, p95 must stay below 350 ms, and the system must cost no more than $1.50 an hour. Most authors have small audiences, but a few have far more followers. The service must keep serving ordinary readers without letting one large audience overwhelm the rest. Start with the users and choose the design.",
@@ -110,7 +110,7 @@ func init() {
 		b.e("app1", "db").e("app2", "db")
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-nearby-search", Title: "Design nearby search", Difficulty: "Medium", Open: true,
 		Summary: "Serve location searches quickly when demand concentrates in one busy area.",
 		Story:   "A local service helps people find nearby couriers. At least 98% of searches must succeed, p95 must stay below 250 ms, and the system must cost no more than $1.50 an hour. Couriers send frequent location updates, and demand is concentrated in a busy city centre. Searches in the busy centre must stay fast while couriers keep sending updates. Build from the users outward.",
@@ -133,13 +133,13 @@ func init() {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"arrival": "sessions", "connections": 900.0, "sessionSec": 900.0, "msgsPerMin": 6.0, "reconnectJitterSec": jitter, "readPct": 50.0, "timeoutMs": 2000.0, "retries": 0.0}).
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb")
 		b.n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 24.0})
-		for i := 0; i < apps; i++ {
+		for i := range apps {
 			id := fmt.Sprintf("app%d", i+1)
 			b.n(id, engine.KAppServer, cols[2], rowTop+float64(i)*70, P{"threads": 16.0, "maxConns": 350.0, "handshakeMs": 20.0}).e("lb", id).e(id, "db")
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-chat", Title: "Design chat", Difficulty: "Medium", Open: true,
 		Summary: "Keep chat connections available through a server restart and reconnect surge.",
 		Story:   "Build a chat service for 900 connected users. At least 97% of requests must succeed, p95 must stay below 500 ms, and the service must cost no more than $1.60 an hour. When an app server restarts, disconnected users should reconnect without overwhelming the remaining servers. Build from the users outward.",

@@ -5,7 +5,16 @@ import (
 )
 
 // registerLoadAndLiveData registers slow vendors, write floods, crashes, and the live scoreboard and location challenges.
-func registerLoadAndLiveData() {
+func (c *catalog) registerLoadAndLiveData() {
+	c.addVendorWait()
+	c.addWriteFlood()
+	c.addServerDown()
+	c.addLiveScoreboard()
+	c.addNearbyDrivers()
+	c.addScoreboardSurvives()
+}
+
+func (c *catalog) addVendorWait() {
 	// 9 ─ Hard ────────────────────────────────────────────────────────────────────────
 	vendor := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -25,7 +34,7 @@ func registerLoadAndLiveData() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "vendor-wait", Title: "Waiting on a vendor", Difficulty: "Hard",
 		Summary: "A slow third-party API holds every thread hostage.",
 		Story:   "Every write calls an email vendor that takes almost half a second. {{thread-pool|Threads}} pile up waiting, and even reads, which never touch the vendor, are starved.",
@@ -43,7 +52,9 @@ func registerLoadAndLiveData() {
 		Debrief: "Anything slow, unreliable or non-essential for the response belongs behind a queue. You trade immediacy for resilience and must watch the backlog.",
 		Deeper:  "A queue turns a latency problem into a backlog problem: users no longer wait for the vendor, but the age of the oldest message now tells you whether you are keeping up, so that is the number to alert on rather than the error rate. Workers need bounded concurrency, backoff and {{dead-letter-queue|somewhere for hopeless jobs to go}}, otherwise a vendor outage grows the queue and the recovery arrives as a burst that knocks the vendor over again. {{exactly-once-delivery|Queues deliver at least once}}, so the vendor call must be {{idempotency|idempotent}} or the user gets two emails. An interviewer will ask what the user is told while the email is late, and how you drain a backlog without flattening the vendor. The classic failure is the gap between committing the write and enqueueing the job, which silently drops the side effect; a transactional outbox closes it.",
 	})
+}
 
+func (c *catalog) addWriteFlood() {
 	// 10 ─ Medium ─────────────────────────────────────────────────────────────────────
 	spike := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -59,7 +70,7 @@ func registerLoadAndLiveData() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "write-flood", Title: "Write flood", Difficulty: "Medium",
 		Summary: "A burst of writes outruns the database.",
 		Story:   "Writes arrive at 300 per second for a short burst, but the database can only {{throughput|commit about 250 per second}}.",
@@ -77,7 +88,9 @@ func registerLoadAndLiveData() {
 			Explain: "The write is acknowledged before it is applied, so readers may briefly not see it."}},
 		Debrief: "A queue is a shock absorber: it converts a rate spike into a delay. It must be big enough for the spike and workers must eventually catch up.",
 	})
+}
 
+func (c *catalog) addServerDown() {
 	// 11 ─ Medium ─────────────────────────────────────────────────────────────────────
 	crash := func(servers int) engine.Diagram {
 		b := (&bld{}).
@@ -87,7 +100,7 @@ func registerLoadAndLiveData() {
 			e("users", "lb")
 		return b.servers(servers, cols[2], rowTop, 90, nil).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "server-down", Title: "A server falls over", Difficulty: "Medium",
 		Summary: "Pull the plug on one app server in the middle of peak traffic.",
 		Story:   "At twenty seconds one app server crashes for twenty-five seconds. The survivors have to carry everything.",
@@ -105,7 +118,9 @@ func registerLoadAndLiveData() {
 			Explain: "Health checks run periodically, so for a couple of seconds the balancer still sends traffic to a dead server."}},
 		Debrief: "Redundancy only helps if the survivors have {{utilisation|headroom}}. Shorter health-check intervals shrink the blip, at the price of more checking.",
 	})
+}
 
+func (c *catalog) addLiveScoreboard() {
 	// 12 ─ Hard ───────────────────────────────────────────────────────────────────────
 	board := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -123,7 +138,7 @@ func registerLoadAndLiveData() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "live-scoreboard", Title: "Live scoreboard", Difficulty: "Hard",
 		Summary: "Ranking millions of scores with a SQL query is slow.",
 		Story:   "Every rank lookup sorts scores in the database and costs ten times a normal read. The database is the bottleneck.",
@@ -141,7 +156,9 @@ func registerLoadAndLiveData() {
 		Debrief: "Use the data structure that matches the question. Sorted sets make 'who is in the top 10' cheap where a relational sort is not.",
 		Deeper:  "A sorted set answers rank and top-N in logarithmic time because the data is kept in the order the question asks for, which a relational sort recomputes on every read. The price is a second copy of the truth in memory, so you must decide which side wins after a partial failure and how Redis is rebuilt when it is lost. At larger scale one single-threaded instance becomes the ceiling, and you {{sharding|shard}} by board or season, or accept approximate ranks for very large boards. An interviewer will ask about ties, about friends-only boards that cannot use one global set, and about what happens to scores written while Redis was down. The common failure is drift: the database and the set disagree after a dropped write and nobody notices until a player complains.",
 	})
+}
 
+func (c *catalog) addNearbyDrivers() {
 	// 13 ─ Hard, config only ──────────────────────────────────────────────────────────
 	drivers := func(indexed bool) engine.Diagram {
 		return (&bld{}).
@@ -152,7 +169,7 @@ func registerLoadAndLiveData() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"spatialIndex": indexed}).
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("app1", "db").e("app2", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "nearby-drivers", Title: "Nearby drivers", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Finding the closest drivers scans the whole table.",
 		Story:   "Riders ask for drivers near their location. Without the right index, every search reads the entire table. The architecture is fixed.",
@@ -170,7 +187,9 @@ func registerLoadAndLiveData() {
 		Debrief: "The cheapest scaling fix is often a better index. Measure first: the database was doing 25× the work for every search.",
 		Deeper:  "A spatial index (a grid, geohash prefixes, a quadtree or an R-tree) lets a proximity query visit only the cells around the rider instead of every row, which is why the work falls by an order of magnitude here. Moving drivers make the write side the real cost: every location update must maintain the index, so many systems keep live positions in memory grouped by cell and store history separately. A query near a cell edge has to look at the neighbouring cells too, and a dense cell such as a stadium exit becomes a {{hot-key|hot spot}} that needs splitting. An interviewer will ask how fresh the results must be, how often drivers report, and how you {{sharding|shard}} by geography. The failure pattern is a skewed city centre: sharding by region balances the map but not the demand.",
 	})
+}
 
+func (c *catalog) addScoreboardSurvives() {
 	// 14 ─ Hard, config only ──────────────────────────────────────────────────────────
 	durable := func(persistence string) engine.Diagram {
 		return (&bld{}).
@@ -180,7 +199,7 @@ func registerLoadAndLiveData() {
 			n("redis", engine.KRedis, cols[3], rowTop, P{"persistence": persistence}).
 			e("users", "lb").servers(3, cols[2], rowTop, 100, nil, "redis").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "scoreboard-survives", Title: "Scoreboard survives a crash", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Redis holds every score in memory. Pull the plug and watch them vanish.",
 		Story:   "Players submit scores all game long and Redis keeps them. At 25 seconds Redis crashes and comes back three seconds later. How many scores did you lose? The architecture is fixed: fix it with configuration.",

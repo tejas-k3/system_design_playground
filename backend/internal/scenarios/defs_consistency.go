@@ -7,7 +7,24 @@ import (
 )
 
 // registerConsistencyAndStreams registers restores, replication and quorum consistency, leases, hot rows, and stream counting and ranking.
-func registerConsistencyAndStreams() {
+func (c *catalog) registerConsistencyAndStreams() {
+	c.addRestoreDrill()
+	c.addLostCart()
+	c.addOlderWriteWins()
+	c.addLiarInTheGroup()
+	c.addOldLeadersWrites()
+	c.addSlowNews()
+	c.addQuorumOverlap()
+	c.addLeaseExpired()
+	c.addWhoIsTheLeader()
+	c.addLaunchDay()
+	c.addCountTheClicks()
+	c.addUniqueVisitors()
+	c.addTopTen()
+	c.addEffectBeforeCause()
+}
+
+func (c *catalog) addRestoreDrill() {
 	// Restore drill: a bad migration corrupts the database; how much is lost and how long until it is back
 	restoreDrill := func(fixed bool) engine.Diagram {
 		every, mbps := 0.0, 200.0
@@ -20,7 +37,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "dataGB": 10.0, "backupEverySec": every, "restoreMBps": mbps}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "restore-drill", Title: "The restore drill", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A bad migration corrupts the database. How much is lost, and for how long is it gone?",
 		Story:   "At 25 seconds a bad migration starts silently corrupting rows. Someone notices three seconds later and restores the last backup from before the damage. The database holds 10 GB. There are no backups at all, and restoring streams 200 MB a second. The business can lose at most five seconds of writes and can be without the database for at most twenty seconds.",
@@ -38,7 +55,9 @@ func registerConsistencyAndStreams() {
 			Explain: "How often you back up sets how much you can lose; how fast a backup streams back sets how long you wait. They are separate levers."}},
 		Debrief: "RPO and RTO are different dials: backup frequency sets the recovery point, restore bandwidth and data size set the recovery time. Pick them from what the business can bear, and then practise the restore.",
 	})
+}
 
+func (c *catalog) addLostCart() {
 	// Lost cart: two leaders accept writes for the same cart; last-writer-wins silently drops one of them
 	lostCart := func(fixed bool) engine.Diagram {
 		policy := "lastWriterWins"
@@ -51,7 +70,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "topology": "multiLeader", "leaders": 2.0, "syncLagMs": 300.0, "conflictPolicy": policy}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "lost-cart", Title: "The lost cart item", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Customers add items to a cart and some of them silently vanish.",
 		Story:   "To keep checkout fast in two regions, the cart database has two leaders that each accept writes and {{replication-lag|pass them to the other 300 ms later}}. Two people adding to the same cart in that gap each succeed, and then one of the additions disappears: the database keeps whichever write is newer. Nothing errors, so nobody notices until customers complain.",
@@ -69,7 +88,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "With more than one writer, concurrent writes to the same item are normal, and the conflict rule decides who loses. Last-writer-wins is easy and loses data silently; data types that merge keep every update.",
 		Deeper:  "With several writers, concurrent writes to one item are normal, and the conflict rule decides what survives; last-writer-wins is simple and drops data without any error. Merging types such as a set that adds, or a counter, keep every update, but they only work when the data model can be merged, and removals need extra care or a deleted item comes back. Shortening the {{replication-lag|replication delay}} only makes conflicts rarer, and routing all writes for a cart to one home region removes them at the cost of a slow write for far users. At larger scale you need version vectors or similar to tell concurrent writes from ordered ones, because relying on clocks lets skew pick the wrong winner. An interviewer will ask what you do with a conflict that cannot be merged, such as a stock count, and how a user would be shown it.",
 	})
+}
 
+func (c *catalog) addOlderWriteWins() {
 	// The older write wins: two leaders stamp writes with their own clocks, and one clock runs ahead
 	olderWins := func(fixed bool) engine.Diagram {
 		policy := "lastWriterWins"
@@ -82,7 +103,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "topology": "multiLeader", "leaders": 2.0, "syncLagMs": 100.0, "conflictPolicy": policy, "clockDriftMsPerMin": 6000.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "older-write-wins", Title: "The older write wins", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Profile edits made later are overwritten by earlier ones, though the leaders had long exchanged them.",
 		Story:   "A profile database has two leaders, one per region, and keeps the write with the later time stamp. The two machines' clocks are not synchronised and the second runs further ahead every minute. After a few minutes the second region's edits carry stamps from the future, and an edit made later in the first region loses to an older one that arrived long before. Users see their last change vanish, with no error. No newer write may lose to an older one.",
@@ -100,7 +121,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "Time stamps from different machines cannot order events closer together than the error between their clocks, and last-writer-wins trusts them completely. A {{logical-clock|logical clock}} counts events instead: a write that has seen another is numbered after it. It orders what is causally related and leaves truly concurrent writes as conflicts to resolve.",
 		Deeper:  "Physical clocks drift and are corrected by a synchronisation protocol only to within some error, so a timestamp can order two events reliably only when they are further apart than that error. Last-writer-wins treats the stamp as truth, so the machine with the fastest clock wins every close contest, and a newer write is dropped without any error. Logical clocks avoid the problem: a Lamport clock gives every event a number larger than any it has seen, so causally related events are ordered correctly, while a vector clock also tells you when two writes are concurrent so both can be kept and merged by the application. Systems that do need real time, such as globally ordered transactions, pay for it with special hardware and by waiting out the uncertainty. An interviewer will ask why synchronising clocks is not enough, and what you would do for two writes that are really concurrent.",
 	})
+}
 
+func (c *catalog) addLiarInTheGroup() {
 	// The member that lies: a group of three members that believes what it hears, and one of them starts giving wrong answers
 	liarInTheGroup := func(fixed bool) engine.Diagram {
 		p := P{"nodes": 3.0}
@@ -113,7 +136,7 @@ func registerConsistencyAndStreams() {
 			n("config", engine.KCoordinator, cols[2], rowMid, p).label("config", "Configuration group").
 			e("users", "app").e("app", "config").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "liar-in-the-group", Title: "The member that lies", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "One member of the configuration group starts giving wrong answers and the group believes it.",
 		Story:   "Three machines keep the configuration, and a request is answered with the first reply once a majority is alive. That survives a machine that stops. Tonight a machine's disk is faulty and it keeps answering, with the wrong values, and the group passes them on as if they were right. Nothing is down and nothing errors. No wrong answer may get through, and the group should still answer almost every request while the faulty member is on. Adding machines is allowed within the budget.",
@@ -132,7 +155,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "A member that stops is easy to survive with a {{quorum|majority}}. A member that gives wrong answers, an {{arbitrary-fault|arbitrary or Byzantine fault}}, must be outvoted, and that takes more members: to tolerate k of them the group needs 3k+1, waits for all but k replies, and needs k+1 matching ones. It also costs an extra round. A checksum catches accidental damage but not a member that sends a wrong value with a valid checksum.",
 		Deeper:  "Crash faults are masked by a majority: with 2k+1 members any two majorities overlap in at least one member, and a member that stops never says anything false. Arbitrary faults break that, because a faulty member can say different things to different members. To tolerate k of them, a group cannot wait for more than n-k replies, since k may never come, and among those n-k at most k can be wrong, so it needs n-k-k at least k+1 honest ones to be a match that cannot be forged: n at least 3k+1. Practical protocols pay for it with extra message rounds and signatures, which is why they are used where members do not trust each other, such as blockchains, and rarely inside one company, where the usual answer is checksums, replication of the data itself, and treating a member that returns bad data as crashed. An interviewer will ask why 2f+1 is not enough and what a signature changes.",
 	})
+}
 
+func (c *catalog) addOldLeadersWrites() {
 	// The old leader's write: a leader cut off from the others goes on acknowledging writes that are then lost
 	oldLeaderWrites := func(fixed bool) engine.Diagram {
 		step := 8.0
@@ -145,7 +170,7 @@ func registerConsistencyAndStreams() {
 			n("config", engine.KCoordinator, cols[2], rowMid, P{"nodes": 3.0, "electionTimeoutMs": 500.0, "stepDownSec": step}).label("config", "Configuration group").
 			e("users", "app").e("app", "config").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "old-leaders-writes", Title: "The old leader's writes", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "A leader cut off from the others keeps saying yes, and its writes disappear.",
 		Story:   "A three-member group keeps the configuration, with one {{leader-election|leader}} that the others follow. At fifteen seconds the leader's network is cut for twenty seconds. The other two elect a new leader for a higher term within a second or two, but the old one has not noticed anything: for eight seconds it goes on acknowledging writes that nobody else has, and when it rejoins they are gone. Users were told their change was saved. At most twenty acknowledged writes may be lost.",
@@ -164,7 +189,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "A leader is only the leader while a majority follows it, and each election starts a higher {{leader-election|term}}. A leader that does not notice it has lost its majority acknowledges writes that no majority holds, and they vanish when the new leader's log wins. The cure is to step down on missing heartbeats, and for clients and storage to refuse a leader from an older term, which is also how fencing tokens work.",
 		Deeper:  "Consensus protocols such as Raft number every leadership with a term and let a write count as committed only when a majority has stored it, so two leaders can never both commit. A leader cut off from the majority can still receive client requests, but it cannot commit them, and a correct implementation does not acknowledge before commit. The danger in this scenario is a leader that acknowledges early, or a read served locally from a leader that has been replaced. The usual defences are a step-down rule (leave leadership when no majority has answered for an election timeout), leader leases whose length is shorter than the election timeout so a replaced leader stops serving before a new one starts, and terms or fencing tokens checked by whoever receives the writes. The cost of stepping down quickly is false step-downs during a slow network, which this simulation does not model. An interviewer will ask what happens to a write that reached only some followers, and why a read from the leader may still be stale.",
 	})
+}
 
+func (c *catalog) addSlowNews() {
 	// Who knows it is dead: a thirty-two node store where the news of a failure spreads too slowly
 	slowNews := func(fixed bool) engine.Diagram {
 		g := P{"nodes": 32.0, "replicas": 3.0, "readQuorum": 1.0, "writeQuorum": 3.0, "writeMs": 5.0, "sloppyQuorum": true, "hintedHandoff": true, "failureDetection": "gossip", "detectMs": 500.0, "gossipIntervalMs": 10000.0, "gossipFanout": 1.0, "probeTimeoutMs": 1000.0}
@@ -177,7 +204,7 @@ func registerConsistencyAndStreams() {
 			n("kv", engine.KKVStore, cols[2], rowMid, g).label("kv", "Key-value store").
 			e("users", "app").e("app", "kv").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "slow-news", Title: "Slow news", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A node dies and the cluster takes more than a minute to find out.",
 		Story:   "A thirty-two node store keeps three copies of every key and needs all three to acknowledge a write, with stand-ins for a copy that is down. The nodes learn about a failure by {{gossip|gossip}}: every ten seconds a node that knows tells one other. At ten seconds one node dies. Until a node has heard, the requests it receives are sent to the dead node and wait a second for a reply that never comes. Keep at least 98.5% of the writes succeeding.",
@@ -196,7 +223,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "{{gossip|Gossip}} spreads news the way a rumour spreads: each node that knows tells a few others every round, so the time to reach everyone grows with the logarithm of the cluster and no node sends more than its fanout per round. It is slower than telling everyone directly but scales, and it needs no central list. The interval and the fanout set the time, and until the news arrives, a node acts on an out-of-date view.",
 		Deeper:  "Epidemic dissemination reaches all N nodes in about log base (1+fanout) of N rounds with high probability, and the work per node per round is constant, so it scales to thousands of nodes and tolerates the loss of any node or message, since the news arrives by many paths. The costs are delay, which sets how long a node acts on an old view; duplicate messages, because nodes keep telling nodes that already know; and probabilistic guarantees instead of certain ones. Direct broadcast is fastest and simplest but puts N messages on one node, and fails if that node dies mid-send. Systems that gossip membership and failure suspicion, such as Cassandra and Consul, add suspicion levels and indirect probes so one lost message does not mark a healthy node dead. An interviewer will ask how long a rumour takes to reach everyone, why the number of rounds is logarithmic, and how a partition changes that: the two sides each learn their own news and merge it when they reconnect.",
 	})
+}
 
+func (c *catalog) addQuorumOverlap() {
 	// Quorum overlap: a key-value store that answers quickly but sometimes shows a client its own old data
 	quorumOverlap := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0
@@ -209,7 +238,7 @@ func registerConsistencyAndStreams() {
 			n("kv", engine.KKVStore, cols[2], rowMid, P{"nodes": 5.0, "replicas": 3.0, "readQuorum": r, "writeQuorum": w, "readMs": 4.0, "writeMs": 60.0, "variability": "exponential", "concurrency": 32.0}).
 			e("users", "app").e("app", "kv").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "quorum-overlap", Title: "Read your own writes", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The store is fast and never errors, but users sometimes lose sight of what they just saved.",
 		Story:   "A five-node key-value store keeps three copies of every key. To be quick, a write returns as soon as one copy has it and {{consistency-levels|a read returns the first copy that answers}}. Users save a setting, reload, and sometimes see the old value. Support has noticed that it also flips back and forth between old and new.",
@@ -227,7 +256,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "{{quorum|R + W > N}} makes every read share a copy with the latest completed write, so the read sees that write. Also, W > N/2 makes any two write quorums share a copy, so two writes cannot succeed without meeting. These rules do not stop successive reads going backwards while a write is only partly applied. You buy them with latency (the kth fastest copy instead of the fastest) and availability (fewer failures tolerated). Choose R and W for the workload: read-heavy systems often use a cheap read quorum and a larger write quorum.",
 		Deeper:  "When R + W > N, every read shares a copy with the latest completed write, so it sees that write; W > N/2 also makes any two write quorums share a copy, so two writes cannot succeed without meeting. These rules do not stop successive reads going backwards while a write is only partly applied. You buy them with latency (the kth fastest copy instead of the fastest) and availability (fewer failures tolerated); for a read-heavy workload you can make reads cheap and writes expensive, but then one dead copy blocks every write. The guarantee is weaker than it looks: a write that reached only some copies before failing can still be seen by some reads, concurrent writes need a version or clock to order them, and {{quorum|sloppy quorums}} that accept stand-in nodes during an outage give up the overlap exactly when you need it. At larger scale you add read repair and background anti-entropy so copies converge. An interviewer will ask what changes across data centres, where a local quorum is cheap and a global one is slow.",
 	})
+}
 
+func (c *catalog) addLeaseExpired() {
 	// Lease expired: a frozen lock holder wakes up and books a seat someone else already took
 	leaseExpired := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -236,13 +267,13 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "writeMs": 40.0, "conditionalWrite": fixed}).
 			n("redis", engine.KRedis, cols[2], 320, nil).
 			e("users", "lb")
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			id := fmt.Sprintf("app%d", k+1)
 			b.n(id, engine.KAppServer, cols[2], float64(k)*100+30, P{"threads": 24.0, "queueCap": 2000.0, "lockTtlMs": 150.0, "lockWaitMs": 300.0, "dbPool": 100.0, "gcPauseMs": 600.0, "gcEverySec": 0.5}).e("lb", id).e(id, "db").e(id, "redis")
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "lease-expired", Title: "The lease that ran out", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The lock was held. The seat was booked twice anyway.",
 		Story:   "Seats are booked under a Redis lock that expires after 150 ms, so a crashed server cannot hold one forever. The app servers freeze for 600 ms every so often (a garbage-collection pause). A server that froze while holding a lock wakes up long after it expired, another server has booked the seat in the meantime, and the first one books it anyway: two people have the same seat.",
@@ -260,7 +291,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "Treat a lock as an optimisation, not a guarantee. Make the write itself safe: a conditional write (compare-and-set, unique constraint) refuses whatever arrives late, and a {{fencing|fencing token}} does the same when the resource can compare tokens.",
 		Deeper:  "A lock with an expiry only bounds how long a dead holder blocks others; it cannot stop a live holder that was paused by garbage collection, a swapped-out process or a slow network from acting after the lease has passed to someone else. The write itself must refuse stale work: a conditional write such as compare-and-set or a unique constraint does not depend on timing, while a {{fencing|fencing token}} only helps when the resource can compare tokens and sees them in order. The lock is still useful as an optimisation because it reduces contention, so treat it as that and not as the safety mechanism. An interviewer will ask what you do when the final resource, such as an external API, cannot do a conditional write; the usual answer is to make the operation {{idempotency|idempotent}} or to give each key a single consumer. The failure pattern is any pause longer than the lease, and clock jumps produce the same result.",
 	})
+}
 
+func (c *catalog) addWhoIsTheLeader() {
 	// Who is the leader: failover is decided by a coordination service that has itself lost its majority
 	whoLeads := func(fixed bool) engine.Diagram {
 		nodes := 3.0
@@ -275,7 +308,7 @@ func registerConsistencyAndStreams() {
 			n("zk", engine.KCoordinator, cols[4], rowBot, P{"nodes": nodes, "electionTimeoutMs": 1000.0}).label("zk", "Coordination service").
 			e("users", "lb").e("db", "zk").servers(2, cols[2], rowTop, 100, P{"threads": 16.0}, "replica").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "who-is-the-leader", Title: "Who is the leader?", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The primary is dead, a replica is ready, and nobody is allowed to promote it.",
 		Story:   "{{failover|Failover}} here is not left to a timer: promotion waits until the coordination service {{leader-election|agrees on who the leader is}}, because promoting without agreement is how {{split-brain|two primaries}} appear. Tonight two of the coordination service's three machines fail at the same time as the database primary. The service has {{quorum|no majority}}, so it elects nobody, so the replica waits. Writes fail the whole time.",
@@ -294,7 +327,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "{{quorum|Quorums}} trade availability for safety. N machines tolerate (N-1)/2 failures: 3 tolerate one, 5 tolerate two. Size the cluster for the failures you expect together, and spread it across failure domains so they do not happen together.",
 		Deeper:  "A coordination service stays safe by refusing to act without {{quorum|a majority}}, so {{cap-trade-off|it trades availability for the guarantee that two leaders can never exist}}; with N machines it tolerates (N-1)/2 failures, which is why three survive one loss and five survive two. An even number adds cost without adding tolerance. Machines that share a zone, rack or power feed fail together, so the count only protects you if the members sit in different failure domains. Keep the data path out of the coordinator and use it only for {{leader-election|election}} and small configuration, since every request through it needs a majority round trip. An interviewer will ask what the database does while there is no leader, which here is failing writes rather than risking {{split-brain|two primaries}}, and how clients find the new leader. The classic failure is a cluster that lost its majority during a rolling upgrade because one member was already down.",
 	})
+}
 
+func (c *catalog) addLaunchDay() {
 	// Launch day: nearly every write is to one row, and row locks make those writes queue one behind the other
 	launchDay := func(fixed bool) engine.Diagram {
 		app := P{"threads": 64.0, "queueCap": 2000.0, "dbPool": 100.0}
@@ -308,7 +343,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 64.0, "writeMs": 20.0, "hotRowLock": true}).label("db", "Stock database").
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "launch-day", Title: "Launch day", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "The new phone goes on sale and every buyer decrements the same stock row.",
 		Story:   "At noon the new phone goes on sale. {{hot-key|Nine in ten orders change the same row}}, the stock counter, and the database locks a row while it writes it, so those writes go one after another: 20 ms each is 50 a second, and 180 a second are arriving. The queue behind that row holds {{connection-pool|database connections}}, and the buyers time out before their turn comes. The rest of the shop has nothing wrong with it.",
@@ -326,7 +361,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "A {{hot-key|hot row}} is a {{throughput|throughput}} ceiling of one over the write time, however big the database. Split the counter (several sub-rows added up on read), batch the updates, or queue them so they are applied in order without making buyers wait.",
 		Deeper:  "A row lock makes writes to one row sequential, so the ceiling is one over the write time however large the database is; here that is 50 a second against 180 arriving. Splitting the counter over several rows lets the writes proceed in parallel but turns every read of the total into a sum, and it makes the question whether stock is zero inexact, so overselling needs care: hand each sub-row a share of the stock and rebalance when one runs dry. Batching or queueing the updates also works and keeps them ordered, at the cost of buyers waiting or learning of a failure later. The same shape appears in like counters and view counts. An interviewer will ask how you guarantee you never sell more than you have and whether a virtual waiting room would be fairer. The failure pattern is timeouts on the hot row {{retry-storm|triggering retries}}, which lengthens the very queue that caused them.",
 	})
+}
 
+func (c *catalog) addCountTheClicks() {
 	// Count the clicks: a stream job counts clicks per window, but some arrive long after they happened
 	countClicks := func(fixed bool) engine.Diagram {
 		st := P{"windowSec": 10.0, "watermarkDelaySec": 2.0, "lateEventPct": 15.0, "lateBySec": 20.0}
@@ -339,7 +376,7 @@ func registerConsistencyAndStreams() {
 			n("clicks", engine.KStream, cols[2], rowMid, st).label("clicks", "Clicks per 10 seconds").
 			e("users", "app").e("app", "clicks").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "count-the-clicks", Title: "Count the clicks", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The click counts are wrong because some clicks arrive late.",
 		Story:   "A dashboard shows clicks per ten seconds, counted by a stream job by the time each click happened. About one click in seven comes from a phone that was offline and reaches the server twenty seconds after it happened. The job has already published the window by then and throws the click away, so the totals are always a little low. The dashboard must still show each window within three seconds of it ending.",
@@ -356,7 +393,9 @@ func registerConsistencyAndStreams() {
 			Explain: "A longer watermark delay trades freshness for completeness. Allowed lateness gives both, at the price of results that change after they were shown."}},
 		Debrief: "Event time is when something happened, not when you heard about it. The watermark is a guess about how late data can be: too tight and you drop data, too loose and you answer slowly. Allowed lateness, with updates to published windows, lets you answer early and still end up correct.",
 	})
+}
 
+func (c *catalog) addUniqueVisitors() {
 	// Unique visitors: counting different people exactly needs memory that grows with the audience
 	uniqueVisitors := func(fixed bool) engine.Diagram {
 		st := P{"counting": "exact"}
@@ -369,7 +408,7 @@ func registerConsistencyAndStreams() {
 			n("visitors", engine.KStream, cols[2], rowMid, st).label("visitors", "Unique visitors").
 			e("users", "app").e("app", "visitors").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "unique-visitors", Title: "Unique visitors", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Counting each visitor exactly needs a table that grows with the audience.",
 		Story:   "The marketing dashboard shows how many different people visited. The stream job keeps every visitor id it has seen, so the table grows with the audience, and the job has a memory budget of 16 KB for it (in this small run; a real audience is thousands of times larger and so is the table). Marketing is happy with a number that is right to within a few percent.",
@@ -386,7 +425,9 @@ func registerConsistencyAndStreams() {
 			Explain: "The error falls with the square root of the registers: doubling them divides it by about 1.4, while memory doubles. Accuracy gets expensive quickly."}},
 		Debrief: "Approximate structures trade a bounded, known error for memory that does not grow with the data: HyperLogLog counts distinct items, a Bloom filter answers 'seen before?', a count-min sketch counts how often. They are the answer whenever the exact version will not fit.",
 	})
+}
 
+func (c *catalog) addTopTen() {
 	// Top ten: the ten most popular items out of a huge catalogue, in a small amount of memory
 	topTen := func(fixed bool) engine.Diagram {
 		st := P{"topK": "exact"}
@@ -399,7 +440,7 @@ func registerConsistencyAndStreams() {
 			n("trending", engine.KStream, cols[2], rowMid, st).label("trending", "Trending items").
 			e("users", "app").e("app", "trending").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "top-ten", Title: "The top ten", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Find the ten most popular items out of 200,000 without a counter for each.",
 		Story:   "The shop shows a trending list: the ten most viewed items out of a catalogue of 200,000. The stream job keeps an exact counter for every item it has seen, and the table keeps growing: it already needs far more memory than the 16 KB the job is allowed (in this small run; the real catalogue and traffic are far bigger). The list does not have to be perfect, but at least eight of the ten must be right.",
@@ -417,6 +458,9 @@ func registerConsistencyAndStreams() {
 		Debrief: "{{hot-key|Heavy hitters}} are few, and a structure that only needs to be right about them can be tiny. A count-min sketch plus a short candidate list finds the top items in a fixed table; the width bounds the overcount and the depth bounds the chance of it. Exactness costs memory in proportion to the number of different items.",
 		Deeper:  "Exact counting needs memory in proportion to the number of different items, while a count-min sketch uses a fixed table: each occurrence increments one counter per row, so an estimate can be too high because of collisions but never too low, and taking the smallest counter keeps the overcount small. The table here holds width times depth counters of 4 bytes each, so the budget fixes how wide it can be; the sketch gives counts but not names, so you also keep a short candidate list of the current leaders. Sketches from different workers merge by adding the tables, which is what makes them practical when the stream is spread over many machines. An interviewer will ask how you would get the top ten for the last hour, which needs a sketch per time slice, and when an exact structure with a bounded number of counters is a better fit. The failure is a table too narrow for a long tail: the noise floor rises until items near the bottom of the top ten swap places.",
 	})
+}
+
+func (c *catalog) addEffectBeforeCause() {
 	// Effect before cause: replies are seen before the post they answer, because a read can land on a copy that has not caught up
 	effectBeforeCause := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0
@@ -430,7 +474,7 @@ func registerConsistencyAndStreams() {
 			n("kv", engine.KKVStore, cols[2], rowMid, P{"nodes": 5.0, "replicas": 3.0, "readQuorum": r, "writeQuorum": w, "readMs": 4.0, "writeMs": 60.0, "variability": "exponential", "concurrency": 32.0}).
 			e("authors", "app").e("readers", "app").e("app", "kv").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "effect-before-cause", Title: "The reply before the question", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Readers see a reply, then open the post it answers and find an older version.",
 		Story:   "A discussion app keeps posts and replies in a five-node key-value store with three copies of each item. An author writes a reply straight after reading the post it answers. Readers then sometimes see the reply and, when they open the post it answers, an older version of it: the answer arrives before the question. Nothing fails, so nobody is told.",

@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"sort"
+	"slices"
 	"time"
 
 	"sysdesign/internal/engine"
@@ -170,7 +170,7 @@ func (s *Server) sweep(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	sort.Float64s(xs)
+	slices.Sort(xs)
 
 	release, ok := s.acquireRunSlot(w)
 	if !ok {

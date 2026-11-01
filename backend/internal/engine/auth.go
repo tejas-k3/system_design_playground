@@ -1,7 +1,5 @@
 package engine
 
-import "math"
-
 // Who is calling. Every request carries a token. The app server either asks the auth service whether it is valid (and may
 // remember a yes for a while, per user), or verifies the signature itself. When the auth service fails, the server
 // refuses the request (closed) or lets it through unchecked (open). Encryption is a time cost only; nothing is encrypted.
@@ -14,8 +12,8 @@ func (s *Sim) securityMs(n *node, c *call) float64 {
 		ms += n.f("verifyMs")
 	}
 	if tls := n.f("tlsMs"); tls > 0 {
-		if float64(Hash32(uint32(c.rid)*2654435761+5)%100) < n.f("newConnPct") {
-			if float64(Hash32(uint32(c.rid)*40503+23)%100) < n.f("tlsResumePct") {
+		if float64(hash32(uint32(c.rid)*2654435761+5)%100) < n.f("newConnPct") {
+			if float64(hash32(uint32(c.rid)*40503+23)%100) < n.f("tlsResumePct") {
 				tls /= 3
 			}
 			ms += tls
@@ -26,7 +24,7 @@ func (s *Sim) securityMs(n *node, c *call) float64 {
 
 // authenticate asks the auth service about the request's token, unless a yes for that user is still remembered.
 func (s *Sim) authenticate(n *node, e *edge, c *call, then func(Result)) {
-	user := int(Hash32(uint32(c.rid)*40503+9) % uint32(max(1, int(n.f("tokenUsers")))))
+	user := int(hash32(uint32(c.rid)*40503+9) % uint32(max(1, int(n.f("tokenUsers")))))
 	ttl := n.f("tokenCacheSec") * 1000
 	if ttl > 0 {
 		if exp, ok := n.authTokens[user]; ok && exp > s.now {
@@ -73,5 +71,5 @@ func (s *Sim) coldStartWait(n *node) float64 {
 		n.coldWarmAt = s.now + cs
 	}
 	n.coldUp, n.coldLast = true, s.now
-	return math.Max(0, n.coldWarmAt-s.now)
+	return max(0, n.coldWarmAt-s.now)
 }

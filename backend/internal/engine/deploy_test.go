@@ -12,7 +12,7 @@ func fleetDesign(servers int, ejection bool) Diagram {
 		node("lb", KLoadBalancer, Params{"healthCheckSec": 1.0, "outlierEjection": ejection})
 	b.edge("u", "lb")
 	b.node("db", KDatabase, Params{"connections": 64.0})
-	for i := 0; i < servers; i++ {
+	for i := range servers {
 		id := fmt.Sprintf("a%d", i+1)
 		b.node(id, KAppServer, Params{"threads": 16.0})
 		b.edge("lb", id).edge(id, "db")

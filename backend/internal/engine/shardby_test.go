@@ -23,7 +23,7 @@ func shardLoads(shardBy string) (busiestOverMean float64) {
 	s := New(d, Options{Seed: 5})
 	s.Advance(3000)
 	tot := map[string]float64{}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		s.Advance(1000)
 		for _, id := range ids {
 			tot[id] += s.Snapshot().Nodes[id].Arr

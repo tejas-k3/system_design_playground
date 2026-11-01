@@ -67,14 +67,14 @@ func TestARollingRestartOfCachesDipsOncePerCacheAndRecovers(t *testing.T) {
 	d, _ := Sanitize(b.d)
 	s := New(d, Options{Seed: 7, Chaos: []ChaosEvent{{Type: "rollingRestart", Kind: KCache, IntervalSec: 12, DownSec: 1, AtSec: 10}}})
 	var sizes [][3]int
-	for sec := 0; sec < 50; sec++ {
+	for range 50 {
 		s.Advance(1000)
 		n := s.Snapshot().Nodes
 		sizes = append(sizes, [3]int{n["c1"].Size, n["c2"].Size, n["c3"].Size})
 	}
 	dips := 0
 	for i := 1; i < len(sizes); i++ {
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			if sizes[i-1][k] >= 50 && sizes[i][k] < sizes[i-1][k]/2 {
 				dips++ // this cache lost more than half of what it held
 			}

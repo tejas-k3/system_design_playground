@@ -8,7 +8,7 @@ package engine
 func (s *Sim) replicaRead(n *node, c *call, reps []*edge, cb func(Result)) {
 	first := s.pickCyclic(n, "replica", reps, nil)
 	hedgeMs := n.f("hedgeReadsMs")
-	pending, fin, hedged := 1, false, false
+	pending, fin := 1, false
 	resolve := func(r Result) {
 		pending--
 		if fin {
@@ -16,9 +16,6 @@ func (s *Sim) replicaRead(n *node, c *call, reps []*edge, cb func(Result)) {
 		}
 		if r.OK || pending == 0 {
 			fin = true
-			if hedged && r.OK {
-				s.runHedgeWins++
-			}
 			cb(r)
 		}
 	}
@@ -34,7 +31,6 @@ func (s *Sim) replicaRead(n *node, c *call, reps []*edge, cb func(Result)) {
 		if next == nil {
 			return
 		}
-		hedged = true
 		pending++
 		s.runHedged++
 		s.callCmd(n, next, c, cmdRead, 0, resolve)

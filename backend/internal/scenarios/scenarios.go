@@ -5,10 +5,12 @@ package scenarios
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"sysdesign/internal/engine"
 )
 
+// Prediction is a multiple-choice "what will happen" question asked before a challenge is run.
 type Prediction struct {
 	ID       string   `json:"id"`
 	Question string   `json:"question"`
@@ -93,6 +95,7 @@ func (s *Scenario) Prediction(id string) *Prediction {
 	return nil
 }
 
+// Scenario is one challenge: the broken design, its goals, traffic and failures, and the teaching text around it.
 type Scenario struct {
 	ID          string                           `json:"id"`
 	Title       string                           `json:"title"`
@@ -128,31 +131,58 @@ func (s *Scenario) Options(seed uint32) engine.Options {
 	}
 }
 
-var (
-	all   []*Scenario
-	byID  = map[string]*Scenario{}
-	order = map[string]int{"Tutorial": 0, "Easy": 1, "Medium": 2, "Hard": 3}
-)
+// difficultyOrder is the sort position of each difficulty band.
+var difficultyOrder = map[string]int{"Tutorial": 0, "Easy": 1, "Medium": 2, "Hard": 3}
 
-func register(s *Scenario) {
+// catalog holds every scenario and question, in registration order. It is built once, on first use, so there is
+// no import-time registration: buildCatalog lists the registering functions explicitly.
+type catalog struct {
+	scenarios    []*Scenario
+	byID         map[string]*Scenario
+	questions    []*Question
+	questionByID map[string]*Question
+}
+
+var theCatalog = sync.OnceValue(buildCatalog)
+
+// buildCatalog registers the scenarios, then the questions (some of which build on a scenario's design). The order
+// of the calls is observable: All sorts stably by difficulty, so it fixes the order within a band, and the study
+// deck and the golden file follow it.
+func buildCatalog() *catalog {
+	c := &catalog{byID: map[string]*Scenario{}, questionByID: map[string]*Question{}}
+	c.registerScenarios()
+	c.registerOpenBriefs()
+	c.registerOpenHardBriefs()
+	c.registerOpenM1Briefs()
+	c.registerAskQuestions()
+	c.registerAssumptionQuestions()
+	c.registerSizingQuestions()
+	c.registerTradeoffQuestions()
+	c.registerReviewQuestions()
+	c.registerMatchQuestions()
+	return c
+}
+
+func (c *catalog) register(s *Scenario) {
 	if s.Speed == 0 {
 		s.Speed = 1
 	}
 	s.Goals = s.Goals.WithStarTargets()
 	s.Concepts = conceptTags[s.ID]
 	s.Level = levelOf[s.ID]
-	all = append(all, s)
-	byID[s.ID] = s
+	c.scenarios = append(c.scenarios, s)
+	c.byID[s.ID] = s
 }
 
 // All returns scenarios ordered by difficulty then registration order.
 func All() []*Scenario {
-	out := append([]*Scenario(nil), all...)
-	sort.SliceStable(out, func(i, j int) bool { return order[out[i].Difficulty] < order[out[j].Difficulty] })
+	out := append([]*Scenario(nil), theCatalog().scenarios...)
+	sort.SliceStable(out, func(i, j int) bool { return difficultyOrder[out[i].Difficulty] < difficultyOrder[out[j].Difficulty] })
 	return out
 }
 
-func Get(id string) *Scenario { return byID[id] }
+// Get returns the scenario with the id, or nil.
+func Get(id string) *Scenario { return theCatalog().byID[id] }
 
 // ---- tiny diagram builder ------------------------------------------------------------
 
@@ -167,7 +197,7 @@ func (b *bld) n(id, kind string, x, y float64, p engine.Params) *bld {
 // servers adds n app servers (app1..appN) in a column. Each is fed by the "lb" node and wired to
 // "db" plus any extra targets, which is the shape most challenges share.
 func (b *bld) servers(n int, x, y0, dy float64, p engine.Params, extra ...string) *bld {
-	for k := 0; k < n; k++ {
+	for k := range n {
 		id := fmt.Sprintf("app%d", k+1)
 		b.n(id, engine.KAppServer, x, y0+float64(k)*dy, p).e("lb", id).e(id, "db")
 		for _, t := range extra {
@@ -214,4 +244,5 @@ const (
 	rowTop, rowMid, rowBot = 40.0, 164.0, 288.0
 )
 
+// P is shorthand for component settings in the challenge definitions.
 type P = engine.Params

@@ -25,7 +25,7 @@ func crawlDesign(client Params, hosts int, app Params) Diagram {
 	if hosts == 0 {
 		b.node("db", KDatabase, Params{"connections": 64.0}).edge("a", "db")
 	}
-	for i := 0; i < hosts; i++ {
+	for i := range hosts {
 		h := string(rune('p' + i))
 		b.node(h, KExternalAPI, Params{"latencyMs": 100.0, "errorPct": 0.0, "calledFor": "all", "politeRps": 8.0})
 		b.edge("a", h)
@@ -124,11 +124,11 @@ func TestCrawlKeepsPerHostPoliteness(t *testing.T) {
 		}
 		d := crawlDesign(Params{"rps": 12.0, "arrival": "bursty", "burstFactor": 4.0, "burstSec": 2.0, "crawlHosts": 3.0, "crawlLinks": 3.0, "crawlDupPct": 30.0}, 3, app)
 		s := New(d, Options{Seed: 9})
-		for sec := 0; sec < 120; sec++ {
+		for range 120 {
 			s.Advance(1000)
 			st := s.Snapshot()
 			for _, h := range []string{"p", "q", "r"} {
-				peak = math.Max(peak, st.Nodes[h].Arr)
+				peak = max(peak, st.Nodes[h].Arr)
 			}
 		}
 		return peak, s.RunSnapshot().Errors["rateLimited"]

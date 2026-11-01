@@ -11,7 +11,7 @@ import (
 // after that updates the window if it is within the allowed lateness and is dropped beyond it.
 type evt struct{ at, arrive float64 }
 
-func feed(w *WindowAgg, events []evt) {
+func feed(w *windowAgg, events []evt) {
 	sort.Slice(events, func(i, j int) bool { return events[i].arrive < events[j].arrive })
 	for _, e := range events {
 		w.Add(e.at)
@@ -19,7 +19,7 @@ func feed(w *WindowAgg, events []evt) {
 	w.Flush()
 }
 
-func finalCounts(w *WindowAgg) map[float64]int {
+func finalCounts(w *windowAgg) map[float64]int {
 	last := map[float64]int{}
 	for _, e := range w.Emitted {
 		last[e.Start] = e.Count // the latest emission of a window is its final value
@@ -28,13 +28,13 @@ func finalCounts(w *WindowAgg) map[float64]int {
 }
 
 func TestTumblingWindowsCountEveryEventOnce(t *testing.T) {
-	rng := NewRNG(5)
+	rng := newPRNG(5)
 	var evs []evt
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		at := float64(i) * 0.01                       // 100 events a second for 50 s
 		evs = append(evs, evt{at, at + rng.Next()*2}) // up to 2 s late
 	}
-	w := NewWindowAgg(10, 10, 5, 0) // 10 s windows, watermark 5 s behind: nothing is late enough to drop
+	w := newWindowAgg(10, 10, 5, 0) // 10 s windows, watermark 5 s behind: nothing is late enough to drop
 	feed(w, evs)
 	total := 0
 	for _, c := range finalCounts(w) {
@@ -54,9 +54,9 @@ func TestTumblingWindowsCountEveryEventOnce(t *testing.T) {
 func TestEventsBeyondTheLatenessAreDropped(t *testing.T) {
 	// 100 events a second; 10% of them arrive 8 s late. Watermark delay 1 s, no allowed lateness: a late event is
 	// dropped once the watermark has passed its window.
-	rng := NewRNG(6)
+	rng := newPRNG(6)
 	var evs []evt
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		at := float64(i) * 0.01
 		d := 0.0
 		if rng.Next() < 0.1 {
@@ -64,11 +64,11 @@ func TestEventsBeyondTheLatenessAreDropped(t *testing.T) {
 		}
 		evs = append(evs, evt{at, at + d})
 	}
-	strict := NewWindowAgg(5, 5, 1, 0)
+	strict := newWindowAgg(5, 5, 1, 0)
 	feed(strict, append([]evt(nil), evs...))
-	patient := NewWindowAgg(5, 5, 1, 10)
+	patient := newWindowAgg(5, 5, 1, 10)
 	feed(patient, append([]evt(nil), evs...))
-	counted := func(w *WindowAgg) int {
+	counted := func(w *windowAgg) int {
 		n := 0
 		for _, c := range finalCounts(w) {
 			n += c
@@ -88,8 +88,8 @@ func TestEventsBeyondTheLatenessAreDropped(t *testing.T) {
 }
 
 func TestSlidingWindowsPutAnEventInSizeOverSlideWindows(t *testing.T) {
-	w := NewWindowAgg(10, 2, 0, 0) // 10 s windows every 2 s: 5 windows hold each event
-	for i := 0; i < 1000; i++ {
+	w := newWindowAgg(10, 2, 0, 0) // 10 s windows every 2 s: 5 windows hold each event
+	for i := range 1000 {
 		w.Add(20 + float64(i)*0.01)
 	}
 	w.Flush()

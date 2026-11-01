@@ -4,7 +4,7 @@ import "testing"
 
 // Live asks whether a key is held and unexpired without touching the store: no recency bump, no removal.
 func TestLiveReadsAStoreWithoutChangingIt(t *testing.T) {
-	s := NewStore("lru", 4, 1000, NewRNG(1))
+	s := newStore("lru", 4, 1000, newPRNG(1))
 	s.Set(0, 7, 3)
 	if !s.Live(500, 7) || s.Live(500, 8) {
 		t.Fatal("a held key is live and an absent one is not")
@@ -81,13 +81,13 @@ func TestALeaseStillReachesACacheThatKeepsPieces(t *testing.T) {
 // Per-item TTL: a share of the items live for a shorter time than the rest.
 func TestAShareOfItemsCanHaveAShorterTTL(t *testing.T) {
 	live := func(shortPct float64) int {
-		s := NewStore("lru", 1000, 100000, NewRNG(1))
-		s.SetShortTTL(shortPct, 1000)
-		for k := 0; k < 400; k++ {
+		s := newStore("lru", 1000, 100000, newPRNG(1))
+		s.setShortTTL(shortPct, 1000)
+		for k := range 400 {
 			s.Set(0, k, 1)
 		}
 		n := 0
-		for k := 0; k < 400; k++ {
+		for k := range 400 {
 			if s.Live(5000, k) {
 				n++
 			}

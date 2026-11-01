@@ -196,10 +196,10 @@ backend/
   internal/engine/       the simulator (no I/O, fully unit tested)
     sim.go                   core types, event loop, 100 ms tick
     topology.go clients.go   building and live-editing the graph; traffic, retries
-    flow.go data.go          request flow, pools, queues; per-node behaviour
+    flow*.go data*.go        request flow, pools, queues; per-node behaviour
     chaos.go versions.go     failure injection; item versions and staleness
     trace.go                 sampled per-request traces (observation only)
-    registry.go sanitize.go  node kinds and parameters; validation of untrusted diagrams
+    registry*.go sanitize.go node kinds and parameters; validation of untrusted diagrams
     scoring.go stats.go      goals and stars; the snapshots the UI renders
   internal/scenarios/    challenges as data (+ tests: start must fail, solution must pass)
   internal/api/          REST + WebSocket session

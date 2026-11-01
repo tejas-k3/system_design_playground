@@ -4,14 +4,14 @@ import "sysdesign/internal/engine"
 
 // Open Hard briefs: a blank canvas, a requirement list, hidden load and failures. The witness only proves that the
 // requirements can be met; it is never served.
-func init() {
+func (c *catalog) registerOpenHardBriefs() {
 	blank := func(users P) engine.Diagram {
 		return (&bld{}).n("users", engine.KClient, cols[0], rowMid, users).done()
 	}
 
 	// The database dies: the answer is a replica that can take over, and the settings that say how fast
 	dbUsers := P{"rps": 100.0, "readPct": 40.0, "keyDist": "uniform", "keySpace": 20000.0}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-database-failure", Title: "Survive the database dying", Difficulty: "Hard", Open: true,
 		Summary: "Build a service whose only database is going to fail for a while.",
 		Story:   "A service takes 100 requests a second, six in ten of them writes. Build it from a blank canvas: at least 85% of requests must succeed, p95 latency must stay under 800 ms, no more than 100 acknowledged writes may be lost, and it must cost no more than $2.50 an hour. You are not told when, or for how long, something will fail.",
@@ -38,7 +38,7 @@ func init() {
 
 	// Pay once: slow writes make the clients retry, and the answer is a key that makes a retry harmless
 	payUsers := P{"rps": 30.0, "readPct": 0.0, "timeoutMs": 450.0, "retries": 2.0, "backoff": "none"}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "open-pay-once", Title: "Charge once", Difficulty: "Hard", Open: true,
 		Summary: "Build a payment path that survives a slow database without charging twice.",
 		Story:   "A checkout takes 30 orders a second and charges a card for each. Clients give up after 450 ms and retry up to twice at once. Build it from a blank canvas: at least 95% of requests must succeed, no order may be charged twice, p95 latency must stay under 1.5 seconds, and it must cost no more than $1.50 an hour. You are not told what will go wrong.",

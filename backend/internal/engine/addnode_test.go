@@ -9,7 +9,7 @@ func addNodeRun(hashing string) *Sim {
 	b.node("a", KAppServer, Params{"threads": 256.0, "queueCap": 2000.0, "dbPool": 200.0})
 	b.node("sr", KShardRouter, Params{"hashing": hashing, "vnodes": 128.0, "rebalanceSec": 15.0, "rebalanceMs": 400.0})
 	b.edge("u", "a").edge("a", "sr")
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "db" + string(rune('a'+i))
 		b.node(id, KDatabase, Params{"connections": 32.0, "readMs": 5.0})
 		b.edge("sr", id)
@@ -50,7 +50,7 @@ func TestWithoutTheEventTheRouterKeepsFourShards(t *testing.T) {
 	b.node("a", KAppServer, Params{})
 	b.node("sr", KShardRouter, nil)
 	b.edge("u", "a").edge("a", "sr")
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "db" + string(rune('a'+i))
 		b.node(id, KDatabase, nil)
 		b.edge("sr", id)

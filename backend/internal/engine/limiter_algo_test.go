@@ -18,7 +18,7 @@ func limiterSim(algo string, limit, window float64) (*Sim, *node) {
 func send(s *Sim, rl *node, t float64, n int) int {
 	s.now = t
 	got := 0
-	for i := 0; i < n; i++ {
+	for range n {
 		if s.admit(rl, &call{}) {
 			got++
 		}

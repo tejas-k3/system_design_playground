@@ -61,7 +61,7 @@ func TestCoalescingCollapsesMissesOnOneHotKey(t *testing.T) {
 		s := New(d, Options{Seed: 3})
 		s.Advance(4900)
 		var total float64
-		for i := 0; i < 20; i++ { // 100 ms ticks across the first expiry at 5 s
+		for range 20 { // 100 ms ticks across the first expiry at 5 s
 			s.Advance(100)
 			total += s.Snapshot().Nodes["db"].Arr * 0.1
 		}

@@ -5,14 +5,14 @@ import (
 	"sort"
 )
 
-// WindowAgg counts events in windows of event time (when the event happened, not when it arrived). A window is
+// windowAgg counts events in windows of event time (when the event happened, not when it arrived). A window is
 // emitted once the watermark, the newest event time seen minus Delay, passes its end. An event for a window already
 // emitted updates it (and the window is emitted again) as long as the watermark has not passed the end by more than
 // Lateness; after that the event is dropped. Size == Slide gives tumbling windows; a smaller Slide gives sliding
 // windows, and an event then belongs to Size / Slide of them.
-type WindowAgg struct {
+type windowAgg struct {
 	Size, Slide, Delay, Lateness float64
-	Emitted                      []Emission
+	Emitted                      []windowEmission
 	LateDropped, Updates         int
 
 	maxEvent float64
@@ -24,20 +24,24 @@ type winState struct {
 	emitted bool
 }
 
-// Emission is one result of a window: its first firing, or an update after a late event.
-type Emission struct {
+// windowEmission is one result of a window: its first firing, or an update after a late event.
+type windowEmission struct {
 	Start, End float64
 	Count      int
 	Update     bool
 }
 
-func NewWindowAgg(size, slide, delay, lateness float64) *WindowAgg {
-	return &WindowAgg{Size: size, Slide: slide, Delay: delay, Lateness: lateness, maxEvent: math.Inf(-1), open: map[int64]*winState{}}
+// newWindowAgg returns an aggregator of event-time windows of the given size and slide, a watermark that trails the
+// newest event by delay, and an allowed lateness (all in milliseconds).
+func newWindowAgg(size, slide, delay, lateness float64) *windowAgg {
+	return &windowAgg{Size: size, Slide: slide, Delay: delay, Lateness: lateness, maxEvent: math.Inf(-1), open: map[int64]*winState{}}
 }
 
-func (w *WindowAgg) watermark() float64 { return w.maxEvent - w.Delay }
+func (w *windowAgg) watermark() float64 { return w.maxEvent - w.Delay }
 
-func (w *WindowAgg) Add(at float64) {
+// Add places an event with the given event time into every window it belongs to, and drops it when all of them are
+// already closed.
+func (w *windowAgg) Add(at float64) {
 	if at > w.maxEvent {
 		w.maxEvent = at
 	}
@@ -57,7 +61,7 @@ func (w *WindowAgg) Add(at float64) {
 		st.count++
 		if st.emitted {
 			w.Updates++
-			w.Emitted = append(w.Emitted, Emission{float64(k) * w.Slide, end, st.count, true})
+			w.Emitted = append(w.Emitted, windowEmission{float64(k) * w.Slide, end, st.count, true})
 		}
 	}
 	if !placed {
@@ -66,7 +70,7 @@ func (w *WindowAgg) Add(at float64) {
 	w.emitReady(wm)
 }
 
-func (w *WindowAgg) keys() []int64 {
+func (w *windowAgg) keys() []int64 {
 	ks := make([]int64, 0, len(w.open))
 	for k := range w.open {
 		ks = append(ks, k)
@@ -75,12 +79,12 @@ func (w *WindowAgg) keys() []int64 {
 	return ks
 }
 
-func (w *WindowAgg) emitReady(wm float64) {
+func (w *windowAgg) emitReady(wm float64) {
 	for _, k := range w.keys() {
 		st, end := w.open[k], float64(k)*w.Slide+w.Size
 		if !st.emitted && wm >= end {
 			st.emitted = true
-			w.Emitted = append(w.Emitted, Emission{float64(k) * w.Slide, end, st.count, false})
+			w.Emitted = append(w.Emitted, windowEmission{float64(k) * w.Slide, end, st.count, false})
 		}
 		if wm >= end+w.Lateness { // nothing can change it any more
 			delete(w.open, k)
@@ -89,26 +93,26 @@ func (w *WindowAgg) emitReady(wm float64) {
 }
 
 // Flush emits every window that has not fired yet, at the end of the stream.
-func (w *WindowAgg) Flush() {
+func (w *windowAgg) Flush() {
 	for _, k := range w.keys() {
 		if st := w.open[k]; !st.emitted {
 			st.emitted = true
-			w.Emitted = append(w.Emitted, Emission{float64(k) * w.Slide, float64(k)*w.Slide + w.Size, st.count, false})
+			w.Emitted = append(w.Emitted, windowEmission{float64(k) * w.Slide, float64(k)*w.Slide + w.Size, st.count, false})
 		}
 	}
 }
 
 // StreamResult is what the sink received from a stream job that may have crashed once.
 type StreamResult struct {
-	Delivered      []Emission
+	Delivered      []windowEmission
 	Duplicates     int // outputs the sink received for a window it had already been given
 	Checkpoints    int
 	CheckpointCost float64 // relative cost: at-least-once only saves state, exactly-once also commits the outputs with it
 }
 
-func (w *WindowAgg) clone() *WindowAgg {
+func (w *windowAgg) clone() *windowAgg {
 	c := *w
-	c.Emitted = append([]Emission(nil), w.Emitted...)
+	c.Emitted = append([]windowEmission(nil), w.Emitted...)
 	c.open = make(map[int64]*winState, len(w.open))
 	for k, v := range w.open {
 		s := *v
@@ -117,14 +121,14 @@ func (w *WindowAgg) clone() *WindowAgg {
 	return &c
 }
 
-// RunStream feeds events (their event times, in arrival order) to a windowed aggregation that checkpoints every
+// runStream feeds events (their event times, in arrival order) to a windowed aggregation that checkpoints every
 // checkpointSec of event time and crashes once, just before event number crashAt (-1 = never). After a crash it
 // restores the last checkpoint and reads the input again from there. With atLeastOnce every output goes to the sink as
 // soon as it is produced, so the ones produced since the checkpoint are produced, and delivered, again. With
 // exactlyOnce outputs are held and handed over together with the next checkpoint, so a crash discards the held ones.
-func RunStream(events []float64, size, lateness, checkpointSec float64, delivery string, crashAt int) StreamResult {
+func runStream(events []float64, size, lateness, checkpointSec float64, delivery string, crashAt int) StreamResult {
 	var res StreamResult
-	w := NewWindowAgg(size, size, 0, lateness)
+	w := newWindowAgg(size, size, 0, lateness)
 	snap, snapIdx, delivered, nextCP := w.clone(), 0, 0, checkpointSec
 	flushOut := func() {
 		res.Delivered = append(res.Delivered, w.Emitted[delivered:]...)

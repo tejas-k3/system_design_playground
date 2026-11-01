@@ -87,7 +87,7 @@ func TestAutoscaleScalesBackDownAfterTheDownDelay(t *testing.T) {
 
 func TestShortScaleDownDelayCausesThrash(t *testing.T) {
 	wave := []TrafficPoint{{0, 40}}
-	for k := 0; k < 30; k++ { // 20 s high, 20 s low, repeatedly
+	for k := range 30 { // 20 s high, 20 s low, repeatedly
 		at := float64(20 + 40*k)
 		wave = append(wave, TrafficPoint{at, 40}, TrafficPoint{at + 2, 160}, TrafficPoint{at + 20, 160}, TrafficPoint{at + 22, 30})
 	}
@@ -111,8 +111,8 @@ func TestAutoscaleCostFollowsInstanceHours(t *testing.T) {
 		sum += float64(s.nodes["a"].as.instances)
 		n++
 	}
-	unit := NodeCost(Node{Kind: KAppServer, Params: Params{"threads": 4.0, "cpuMs": 40.0}})
-	want := unit*sum/float64(n) + NodeCost(Node{Kind: KDatabase})
+	unit := nodeCost(Node{Kind: KAppServer, Params: Params{"threads": 4.0, "cpuMs": 40.0}})
+	want := unit*sum/float64(n) + nodeCost(Node{Kind: KDatabase})
 	if got := s.CostPerHour(); math.Abs(got-want)/want > 0.05 {
 		t.Errorf("cost %.3f $/hr, want %.3f (average %.2f instances x $%.3f + database)", got, want, sum/float64(n), unit)
 	}
@@ -135,12 +135,12 @@ func TestAutoscaleIsDeterministic(t *testing.T) {
 }
 
 func TestAFleetCostsAtLeastItsMinimum(t *testing.T) {
-	one := NodeCost(Node{Kind: KAppServer, Params: Params{"threads": 8.0}})
-	three := NodeCost(Node{Kind: KAppServer, Params: Params{"threads": 8.0, "autoscale": true, "minInstances": 3.0}})
+	one := nodeCost(Node{Kind: KAppServer, Params: Params{"threads": 8.0}})
+	three := nodeCost(Node{Kind: KAppServer, Params: Params{"threads": 8.0, "autoscale": true, "minInstances": 3.0}})
 	if math.Abs(three-3*one) > 1e-9 {
 		t.Errorf("3 servers should cost 3x one: %v vs %v", three, one)
 	}
-	off := NodeCost(Node{Kind: KAppServer, Params: Params{"threads": 8.0, "minInstances": 3.0}})
+	off := nodeCost(Node{Kind: KAppServer, Params: Params{"threads": 8.0, "minInstances": 3.0}})
 	if off != one {
 		t.Errorf("minInstances is ignored while autoscaling is off: %v vs %v", off, one)
 	}

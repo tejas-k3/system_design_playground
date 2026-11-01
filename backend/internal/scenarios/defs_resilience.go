@@ -7,7 +7,20 @@ import (
 )
 
 // registerResilienceAndCapstones registers reconnect storms, bad deploys, zone outages, retry storms, bots, uploads and the capstones.
-func registerResilienceAndCapstones() {
+func (c *catalog) registerResilienceAndCapstones() {
+	c.addReconnectStorm()
+	c.addBadDeploy()
+	c.addZoneOutage()
+	c.addRetryStorm()
+	c.addBotFlood()
+	c.addUpload500kb()
+	c.addEdgeCache()
+	c.addOneSlowServer()
+	c.addSplitTheDatabase()
+	c.addLaunchDayCapstone()
+}
+
+func (c *catalog) addReconnectStorm() {
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
@@ -20,7 +33,7 @@ func registerResilienceAndCapstones() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "reconnect-storm", Title: "The reconnect storm", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The server comes back in seconds, and the outage lasts minutes.",
 		Story:   "A chat server holds 1,500 live connections. It restarts for a few seconds, which is fine, but when it returns {{thundering-herd|every client reconnects in the same instant}}. Setting up a connection costs real work, so the server cannot keep up, the clients give up and try again together, and it never catches its breath.",
@@ -38,7 +51,9 @@ func registerResilienceAndCapstones() {
 			Explain: "The same number of connections are set up, but the peak rate falls from the whole population at once to about fifty a second."}},
 		Debrief: "A restart is not the end of the incident: {{retry-storm|every client retrying in lockstep}} can keep the server down. Add random jitter (and backoff) to reconnects so the {{thundering-herd|herd}} arrives as a stream.",
 	})
+}
 
+func (c *catalog) addBadDeploy() {
 	// The bad deploy: version 2 is rolled out to half the fleet at once and it serves errors
 	badDeploy := func(fixed bool) engine.Diagram {
 		canary := 0.0
@@ -50,7 +65,7 @@ func registerResilienceAndCapstones() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, P{"healthCheckSec": 1.0, "canaryPct": canary}).
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0}).
 			e("users", "lb")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("app%d", k+1)
 			v := "v1"
 			if k >= 2 {
@@ -60,7 +75,7 @@ func registerResilienceAndCapstones() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "bad-deploy", Title: "The bad deploy", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Half the fleet runs the new version, and the new version is broken.",
 		Story:   "Release day: two of the four servers already run version 2. Twelve seconds into the evening peak version 2 starts answering every request with an error, and it stays that way for half a minute before anyone rolls it back. Because the load balancer treats all four servers alike, half of all requests fail.",
@@ -78,7 +93,9 @@ func registerResilienceAndCapstones() {
 			Explain: "A canary sends the new version only its small share, so a broken release hurts only that share until it is rolled back."}},
 		Debrief: "Release safety is about blast radius. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
 	})
+}
 
+func (c *catalog) addZoneOutage() {
 	// Zone outage: every component sits in the default zone, so one zone failing is a total outage
 	zoneOutage := func(fixed bool) engine.Diagram {
 		zl, za, zb, zc, zd := "az-a", "az-a", "az-a", "az-a", "az-a"
@@ -94,7 +111,7 @@ func registerResilienceAndCapstones() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "zone": zd}).
 			e("users", "lb").e("lb", "app1").e("lb", "app2").e("lb", "app3").e("app1", "db").e("app2", "db").e("app3", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "zone-outage", Title: "When a zone goes dark", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Three servers, a balancer and a database, and one data-centre zone fails.",
 		Story:   "Everything runs in zone A of the region. At twelve seconds into the peak the whole zone loses power for twenty seconds: the load balancer, the three app servers and the database go with it. The architecture has plenty of redundancy on paper, but all of it sits in one place.",
@@ -112,7 +129,9 @@ func registerResilienceAndCapstones() {
 			Explain: "A balancer in a healthy zone has nothing to send traffic to if every server it knows is in the failed zone. All the pieces a request needs must survive."}},
 		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance. A design must account for {{distributed-system-pitfalls|topology changes}}.",
 	})
+}
 
+func (c *catalog) addRetryStorm() {
 	// Retry storm: a five-second slowdown that never ends, because the clients' retries keep the database saturated
 	retryStorm := func(fixed bool) engine.Diagram {
 		budget := 0.0
@@ -125,7 +144,7 @@ func registerResilienceAndCapstones() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "writeMs": 40.0, "queueCap": 2000.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "retry-storm", Title: "The retry storm", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "A five-second blip, and the site never recovers.",
 		Story:   "The database slows down for five seconds. Each client gives up after 400 ms and tries again, up to three more times, immediately. By the time the database is healthy again it is {{retry-storm|buried under the retries}} of requests that timed out, which time out in turn and are retried again. {{metastable-failure|Fifty seconds later it is still down}}.",
@@ -144,7 +163,9 @@ func registerResilienceAndCapstones() {
 		Debrief: "{{retry-storm|Retries multiply load exactly when a dependency is weakest}}. Keep them bounded: a retry budget as a share of normal traffic, backoff with jitter, and a limit on attempts. Without that, a short blip turns into a long outage.",
 		Deeper:  "{{retry-storm|Retries multiply load exactly when the dependency is weakest}}, and the multiplication compounds across layers: if three layers each try an operation four times, one user action can become sixty-four calls at the bottom. The state is {{metastable-failure|metastable}}, meaning the system stays broken after the original trigger is gone, as in this story where it is still down fifty seconds after a five-second slowdown. The remedies work together: a retry budget as a share of normal traffic, backoff with jitter so retries do not arrive in step, retries at one layer only, deadlines that travel with the request, and {{load-shedding|shedding load}} so the queue does not hold dead requests. The cost is that a budget gives up on some requests that would have succeeded. An interviewer will ask which layer should retry and why the operation must be {{idempotency|idempotent}}.",
 	})
+}
 
+func (c *catalog) addBotFlood() {
 	// Bot flood: a scraper on three accounts, and a limiter that cannot tell it from a customer
 	botFlood := func(fixed bool) engine.Diagram {
 		keyBy, limit, burst := "none", 150.0, 50.0
@@ -160,7 +181,7 @@ func registerResilienceAndCapstones() {
 			n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 16.0, "readMs": 20.0, "queueCap": 500.0}).
 			e("users", "rl").e("bot", "rl").e("rl", "app").e("app", "cache").e("cache", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "bot-flood", Title: "The bot flood", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "A scraper is burying the database, and the limiter keeps turning customers away.",
 		Story:   "A scraper asks for item after item nobody has cached, at 600 requests a second from just three accounts, on top of 1,000 customers who send 100 a second between them. The database is saturated. Someone put {{load-shedding|a rate limiter}} in front of everything, but it counts all traffic together, so customers are rejected right along with the bot. Only the customers' experience counts here.",
@@ -177,7 +198,9 @@ func registerResilienceAndCapstones() {
 			Explain: "A shared limit that is high enough for the customers lets most of the bot through too. The two have to be told apart by who they are."}},
 		Debrief: "{{load-shedding|A global limit}} protects the system but not the people. Limit per identity so a heavy or abusive account runs out of allowance on its own, and size the per-user rate to legitimate use rather than to total capacity.",
 	})
+}
 
+func (c *catalog) addUpload500kb() {
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
@@ -191,7 +214,7 @@ func registerResilienceAndCapstones() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "upload-500kb", Title: "The 500 KB upload", Difficulty: "Medium",
 		Summary: "Every upload is refused by the queue. Why?",
 		Story:   "Users upload photos of about 500 KB. The app server hands each upload to a message queue, and workers store it. Since the launch, nearly every upload fails and the queue is nearly empty. The queue's limit on message size is set by your provider and cannot be changed.",
@@ -208,7 +231,9 @@ func registerResilienceAndCapstones() {
 			Explain: "Queues and databases are built for small records. Large bodies go to an object store; what travels through the queue is a reference to it."}},
 		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes retries cheap, because a retry re-sends a pointer, not 500 KB.",
 	})
+}
 
+func (c *catalog) addEdgeCache() {
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
@@ -222,7 +247,7 @@ func registerResilienceAndCapstones() {
 		}
 		return b.servers(3, cols[3], rowTop, 100, nil).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "edge-cache", Title: "Serve it from the edge", Difficulty: "Easy",
 		Summary: "Nearly everyone asks for the same pages, and every request still reaches your servers.",
 		Story:   "A product page goes viral: 900 requests per second, almost all reads of a small set of popular items. Your three servers answer every one themselves and cannot keep up.",
@@ -239,7 +264,9 @@ func registerResilienceAndCapstones() {
 			Explain: "Cached copies are served until they expire, so freshness is traded for speed unless writes invalidate them."}},
 		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is freshness, which is why caching suits content that changes slowly.",
 	})
+}
 
+func (c *catalog) addOneSlowServer() {
 	// 16 ─ Medium, config only ─────────────────────────────────────────────────────────
 	lopsided := func(algorithm string) engine.Diagram {
 		return (&bld{}).
@@ -248,7 +275,7 @@ func registerResilienceAndCapstones() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "lb").servers(4, cols[2], rowTop, 80, nil).done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "one-slow-server", Title: "One slow server", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Round robin keeps feeding a server that has become eight times slower.",
 		Story:   "One of four servers starts running eight times slower (a noisy neighbour, a bad disk). The load balancer still hands it a quarter of the traffic, and users feel it. The architecture is fixed.",
@@ -266,7 +293,9 @@ func registerResilienceAndCapstones() {
 			Explain: "Requests pile up on the slow server, so its in-flight count is high and new requests go elsewhere."}},
 		Debrief: "Balancing is not about equal shares, it is about equal outcomes. Least connections adapts to slowness automatically; {{circuit-breaker|ejecting outliers}} goes further and rests a sick server entirely.",
 	})
+}
 
+func (c *catalog) addSplitTheDatabase() {
 	// 17 ─ Hard ────────────────────────────────────────────────────────────────────────
 	sharded := func(shards int) engine.Diagram {
 		b := (&bld{}).
@@ -278,14 +307,14 @@ func registerResilienceAndCapstones() {
 			return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}).done()
 		}
 		b.n("router", engine.KShardRouter, cols[3], rowMid, nil)
-		for k := 0; k < shards; k++ {
+		for k := range shards {
 			id := fmt.Sprintf("shard%d", k+1)
 			b.n(id, engine.KDatabase, cols[4], rowTop+float64(k)*140, db).e("router", id)
 		}
 		b.e("users", "lb")
 		return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}, "router").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "split-the-database", Title: "Split the database", Difficulty: "Hard",
 		Summary: "630 writes a second against a database that can commit about 400.",
 		Story:   "A busy write-heavy service has outgrown its single database. Buying a bigger one is not an option, so the data has to be {{sharding|spread over several databases}}.",
@@ -303,7 +332,9 @@ func registerResilienceAndCapstones() {
 		Debrief: "{{sharding|Sharding}} multiplies write capacity by splitting the data, at the price of complexity: queries across shards get hard and skew can recreate the {{hot-key|hotspot}} you were escaping.",
 		Deeper:  "{{sharding|Sharding}} multiplies write capacity by splitting the data, but you pay in operations: the shard key decides which queries stay on one shard and which fan out, cross-shard transactions and joins become difficult, and {{hot-key|a key that is hot}} or a tenant that is large recreates the hot spot you were escaping. Hashing spreads keys evenly and loses range scans, ranges keep scans and make monotonic keys hot, and a {{consistent-hashing|consistent-hashing ring}} or fixed virtual shards makes adding capacity move only a fraction of the data. Resharding a live system needs copying, double writes and a cut-over, so choose more logical shards than machines at the start. An interviewer will ask why you did not first try read replicas, a bigger machine or a different data model, and how you generate unique ids across shards. The failure pattern is a shard key that looks even in testing and skews in production.",
 	})
+}
 
+func (c *catalog) addLaunchDayCapstone() {
 	// 18 ─ Hard capstone ───────────────────────────────────────────────────────────────
 	capstone := func(hardened bool) engine.Diagram {
 		clients := P{"readPct": 85.0, "keySpace": 8000.0, "timeoutMs": 1500.0, "retries": 2.0, "backoff": "exponential"}
@@ -318,7 +349,7 @@ func registerResilienceAndCapstones() {
 		b.n("cache", engine.KCache, cols[3], rowTop, P{"capacityItems": 3000.0}).e("cache", "db")
 		return b.servers(5, cols[2], 0, 80, P{"threads": 8.0, "callTimeoutMs": 500.0, "queueOrder": "lifo", "queueTimeoutMs": 400.0}, "cache").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "launch-day-capstone", Title: "Launch day", Difficulty: "Hard",
 		Summary: "A traffic ramp, a database slowdown and a crashed server, all in one afternoon.",
 		Story:   "Traffic climbs from 100 to 800 requests per second. Midway the database slows down for a while, and shortly after a server crashes. {{retry-storm|Clients retry}}, as clients do. Design a system that keeps most users happy through all of it.",

@@ -25,7 +25,7 @@ const (
 
 func erlangC(c int, a float64) float64 { // probability an arrival has to wait in M/M/c
 	sum, term := 0.0, 1.0
-	for k := 0; k < c; k++ {
+	for k := range c {
 		sum += term
 		term *= a / float64(k+1) // after the loop term = a^c / c!
 	}
@@ -97,19 +97,19 @@ func TestMultiServerQueueMatchesAllenCunneen(t *testing.T) {
 // mean*(0.5 + 0.5*Exp(1)), which is always at least half the mean and has a squared coefficient of
 // variation of 0.25. Real services are usually far more variable (SCV of 1 or well above).
 func TestServiceTimesAreLowVariance(t *testing.T) {
-	r := NewRNG(3)
+	r := newPRNG(3)
 	const n = 400000
-	var sum, sumSq, min float64
-	min = math.MaxFloat64
-	for i := 0; i < n; i++ {
+	var sum, sumSq, lowest float64
+	lowest = math.MaxFloat64
+	for range n {
 		v := r.Service(10)
 		sum += v
 		sumSq += v * v
-		min = math.Min(min, v)
+		lowest = min(lowest, v)
 	}
 	mean := sum / n
 	scv := (sumSq/n - mean*mean) / (mean * mean)
-	if math.Abs(mean-10) > 0.05 || math.Abs(scv-0.25) > 0.01 || min < 5 {
-		t.Fatalf("service times changed: mean %.3f, SCV %.3f, min %.3f (was 10, 0.25, >=5)", mean, scv, min)
+	if math.Abs(mean-10) > 0.05 || math.Abs(scv-0.25) > 0.01 || lowest < 5 {
+		t.Fatalf("service times changed: mean %.3f, SCV %.3f, min %.3f (was 10, 0.25, >=5)", mean, scv, lowest)
 	}
 }

@@ -11,7 +11,7 @@ func gatherDesign(shards int, gather string, variability string) Diagram {
 	b.node("u", KClient, Params{"rps": 40.0, "readPct": 100.0, "timeoutMs": 5000.0}).
 		node("a", KAppServer, Params{"threads": 64.0, "gather": gather})
 	b.edge("u", "a")
-	for i := 0; i < shards; i++ {
+	for i := range shards {
 		id := fmt.Sprintf("s%d", i)
 		b.node(id, KIndex, Params{"queryMs": 30.0, "connections": 16.0, "variability": variability})
 		b.edge("a", id)
@@ -41,7 +41,7 @@ func TestEveryShardIsQueriedOncePerRequest(t *testing.T) {
 	s := run(gatherDesign(4, "all", "steady"), Options{Seed: 11}, 30)
 	r := s.RunSnapshot()
 	total := r.OK + r.Failed
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		got := s.Snapshot().Edges[fmt.Sprintf("a>s%d", i)]
 		if got.Rps <= 0 {
 			t.Fatalf("shard %d received nothing", i)

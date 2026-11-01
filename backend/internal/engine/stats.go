@@ -26,6 +26,7 @@ type NodeStats struct {
 	Extra     map[string]float64 `json:"extra,omitempty"`
 }
 
+// EdgeStats is what the last stats window measured on one connection.
 type EdgeStats struct {
 	ID      string  `json:"id"`
 	Rps     float64 `json:"rps"`
@@ -35,6 +36,7 @@ type EdgeStats struct {
 	Util    float64 `json:"util,omitempty"` // Mbps as a share of the link's bandwidth, if it has a limit
 }
 
+// JobStats counts the work of a queue or stream consumer: jobs enqueued, done, retried and given up.
 type JobStats struct {
 	Enqueued        int     `json:"enqueued"`
 	Completed       int     `json:"completed"`
@@ -56,6 +58,8 @@ type LatencyBucket struct {
 	Count int     `json:"count"`
 }
 
+// RunStats is the outcome of a run so far: request counts by result and reason, latency quantiles, cost and the
+// feature counters that goals are checked against.
 type RunStats struct {
 	Resolved             int             `json:"resolved"`
 	Pending              int             `json:"pending"`
@@ -143,6 +147,8 @@ type Event struct {
 
 const maxEvents = 200
 
+// GlobalStats is the snapshot sent to the browser each frame: time, the current window, the whole run and the time
+// series.
 type GlobalStats struct {
 	Now      float64  `json:"now"` // seconds
 	InFlight int      `json:"inFlight"`
@@ -179,197 +185,11 @@ func (s *Sim) Snapshot() Stats {
 		if n.removed {
 			continue
 		}
-		sum, u := s.nodeWindow(n)
-		ns := NodeStats{
-			ID: n.id, Arr: float64(sum.arr) / span, Ok: float64(sum.ok) / span, Err: float64(sum.err) / span,
-			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted, Instances: s.scaledInstances(n),
-		}
-		ns.Phase, ns.PhaseLeft = s.failoverPhase(n)
-		if s.autoscaled(n) {
-			ns.Booting = n.as.pending
-		}
-		if c := s.capacity(n); c < 1<<20 {
-			ns.Cap = c
-		}
-		if n.kind == KQueue || n.kind == KTopic || n.kind == KLog {
-			ns.QLen = s.queued(n)
-			ns.Cap = int(n.f("capacity"))
-		}
-		if n.kind == KWorker { // a subscriber's own backlog
-			for _, e := range n.in {
-				if !e.removed && e.from.kind == KTopic {
-					ns.QLen += len(e.subJobs) - e.subHead
-				}
-				if !e.removed && e.from.kind == KLog {
-					ns.QLen += s.workerLag(e.from, n)
-				}
-			}
-		}
-		if n.slow > 1 {
-			ns.Slow = n.slow
-		}
-		if sum.hit+sum.miss > 0 {
-			ns.HitRate = float64(sum.hit) / float64(sum.hit+sum.miss)
-		}
-		if n.store != nil {
-			ns.Size = n.store.Size()
-		}
-		for r := Reason(0); r < NumReasons; r++ {
-			if v := sum.reason[r]; v > 0 {
-				if ns.Reasons == nil {
-					ns.Reasons = map[string]float64{}
-				}
-				ns.Reasons[r.String()] = float64(v) / span
-			}
-		}
+		ns, sum := s.nodeStats(n, span)
 		ex := map[string]float64{}
-		if n.kind == KClient {
-			s.crawlExtra(n, ex)
-		}
-		s.adaptiveExtra(n, ex)
-		if n.kind == KAppServer || n.kind == KWorker {
-			ex["poolWaiting"] = float64(s.poolWaiting(n))
-		}
-		if n.kind == KDatabase || n.kind == KReplica {
-			ex["openConns"] = float64(n.openConns)
-			ex["maxConns"] = n.f("maxConnections")
-		}
-		if n.kind == KObjectStore && (n.f("dataGB") > 0 || n.f("growthGBPerDay") > 0) {
-			ex["storedGB"] = n.f("dataGB")
-			// the average size over the next 365 days, charged by the month
-			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
-		}
-		if n.kind == KAppServer && n.guard != nil && n.guardChecked > 0 {
-			ex["bloomFalsePositivePct"] = float64(n.guardFalse) / float64(n.guardChecked) * 100
-			ex["bloomBlocked"] = float64(n.guardBlocked)
-			ex["bloomKB"] = float64(len(n.guard.bits)*8) / 1024
-		}
-		if n.kind == KVectorStore {
-			ef := n.f("efSearch")
-			ex["searchMs"] = n.f("searchBaseMs") + ef*n.f("perCandidateMs")
-			ex["recall"] = 1 - math.Pow(0.5, ef/32)
-			ex["memoryGB"] = n.f("vectors") * 1e6 * n.f("dims") * 4 * 1.5 / 1e9
-		}
-		if n.kind == KLLMServer && n.llm != nil && s.now > 0 {
-			st := n.llm
-			ex["tokensPerSec"] = float64(st.tokens) / (s.now / 1000)
-			if st.steps > 0 {
-				ex["avgBatch"] = float64(st.seqSum) / float64(st.steps)
-			}
-			ex["maxBatch"] = float64(st.maxB)
-			ex["gpuBusyPct"] = st.busyMs / (s.now * float64(len(st.gpus))) * 100
-			ex["waiting"] = float64(len(st.queue))
-		}
-		if n.kind == KStream && n.win != nil {
-			emitted := 0
-			for _, e := range n.win.Emitted {
-				if !e.Update {
-					emitted++
-				}
-			}
-			ex["windows"] = float64(emitted)
-			ex["lateDropped"] = float64(n.win.LateDropped)
-			ex["windowUpdates"] = float64(n.win.Updates)
-			ex["duplicateWindows"] = float64(n.winDup)
-			if n.winLogged > 0 {
-				ex["loggedEvents"] = float64(n.winLogged)
-			}
-			if n.winRecSec > 0 {
-				ex["recoverySec"] = n.winRecSec
-			}
-			memory := 0.0
-			if r, kb, ok := s.topStats(n); ok {
-				ex["topKRecall"] = r
-				memory += kb
-			}
-			if u, kb, e, ok := s.visitorStats(n); ok {
-				ex["uniques"], ex["countErrorPct"] = u, e
-				memory += kb
-			}
-			if memory > 0 {
-				ex["stateKB"] = memory
-			}
-		}
-		if n.kind == KLog && n.rebalances > 0 {
-			ex["rebalances"] = float64(n.rebalances)
-		}
-		if n.outboxBacklog > 0 || (n.kind == KAppServer && n.s("eventPublish") == "outbox") {
-			ex["outboxBacklog"] = float64(n.outboxBacklog)
-		}
-		if n.kind == KCoordinator && len(n.coordDown) > 0 {
-			ex["term"] = float64(n.coordTerm)
-			ex["leader"] = float64(n.coordLeader)
-			ex["nodesUp"] = float64(s.coordUpCount(n))
-			ex["elections"] = float64(n.coordElections)
-			if n.coordStaleAcks > 0 {
-				ex["staleLeaderWrites"] = float64(n.coordStaleAcks)
-			}
-		}
-		if n.kvMemberMsgs > 0 || n.kvStaleView > 0 {
-			ex["membershipMsgs"] = n.kvMemberMsgs
-			ex["timeToAllSec"] = n.kvTimeToAll / 1000
-			ex["staleViewRequests"] = float64(n.kvStaleView)
-		}
-		if n.kvRepairs > 0 {
-			ex["repairs"] = float64(n.kvRepairs)
-		}
-		if n.kx != nil && n.kind == KKVStore {
-			n.kx.extras(ex, n.b("siblings"))
-		}
-		if n.kvAERepairs > 0 {
-			ex["antiEntropyRepairs"] = float64(n.kvAERepairs)
-		}
-		if n.kvHintsReplayed > 0 {
-			ex["hintsReplayed"] = float64(n.kvHintsReplayed)
-		}
-		if n.mlConflicts > 0 {
-			ex["writeConflicts"] = float64(n.mlConflicts)
-		}
-		if n.kind == KDatabase && (n.f("dataGB") > 0 || n.f("growthGBPerDay") > 0) {
-			ex["storedGB"] = n.f("dataGB")
-			// the average size over the next 365 days, charged by the month
-			ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
-			if g, pool := n.f("growthGBPerDay"), n.f("bufferPoolGB"); g > 0 && n.f("dataGB") < pool {
-				ex["daysUntilBufferPoolFull"] = (pool - n.f("dataGB")) / g
-			}
-		}
-		if n.kind == KShardRouter && n.reshards > 0 {
-			ex["keysMoved"] = n.keysMoved
-			if n.slowedMoves > 0 {
-				ex["slowedByMove"] = float64(n.slowedMoves)
-			}
-		}
-		if n.kind == KAppServer && (n.sessConns > 0 || sum.connects > 0) {
-			ex["sessions"] = float64(n.sessConns)
-			ex["connectRps"] = float64(sum.connects) / span
-			if cp := s.connCapacity(n); cp < 1<<30 {
-				ex["sessionCap"] = float64(cp)
-			}
-			if pt := s.pushThreads(n); pt > 0 {
-				ex["pushThreads"] = pt
-			}
-		}
-		if sum.localHit > 0 {
-			ex["localHitRps"] = float64(sum.localHit) / span
-		}
-		if n.fillBytes > 0 {
-			ex["originMB"] = n.fillBytes / 1e6
-		}
-		if sum.evict > 0 {
-			ex["evictRps"] = float64(sum.evict) / span
-		}
-		if sum.stale > 0 {
-			ex["staleRps"] = float64(sum.stale) / span
-		}
-		if sum.dup > 0 {
-			ex["dupRps"] = float64(sum.dup) / span
-		}
-		if sum.conflict > 0 {
-			ex["conflictRps"] = float64(sum.conflict) / span
-		}
-		if sum.lockBusy > 0 {
-			ex["lockBusyRps"] = float64(sum.lockBusy) / span
-		}
+		s.nodeExtraByKind(n, ex)
+		s.nodeExtraFeatures(n, ex, sum, span)
+		s.nodeExtraCounters(n, ex, sum, span)
 		if len(ex) > 0 {
 			ns.Extra = ex
 		}
@@ -388,7 +208,7 @@ func (s *Sim) Snapshot() Stats {
 		if bits > 0 {
 			es.Mbps = bits / span / 1e6
 			if e.bw > 0 {
-				es.Util = math.Min(1, es.Mbps/e.bw)
+				es.Util = min(1, es.Mbps/e.bw)
 			}
 		}
 		if e.from.kind == KAppServer && e.from.b("circuitBreaker") {
@@ -396,19 +216,234 @@ func (s *Sim) Snapshot() Stats {
 		}
 		st.Edges[e.id] = es
 	}
-	buckets := s.hist.Buckets(LatencyBounds)
+	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: s.snapshotCost(), AvgCost: s.CostPerHour(), Run: s.snapshotRun()}
+	st.Series = append(make([]SeriesPoint, 0, len(s.series)), s.series...) // never nil: JSON must be [] not null
+	st.Events = append(make([]Event, 0, len(s.events)), s.events...)
+	return st
+}
+
+// nodeStats is the window statistics of one node, before the per-kind extras.
+func (s *Sim) nodeStats(n *node, span float64) (NodeStats, counters) {
+	sum, u := s.nodeWindow(n)
+	ns := NodeStats{
+		ID: n.id, Arr: float64(sum.arr) / span, Ok: float64(sum.ok) / span, Err: float64(sum.err) / span,
+		Util: min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted, Instances: s.scaledInstances(n),
+	}
+	ns.Phase, ns.PhaseLeft = s.failoverPhase(n)
+	if s.autoscaled(n) {
+		ns.Booting = n.as.pending
+	}
+	if c := s.capacity(n); c < 1<<20 {
+		ns.Cap = c
+	}
+	if n.kind == KQueue || n.kind == KTopic || n.kind == KLog {
+		ns.QLen = s.queued(n)
+		ns.Cap = int(n.f("capacity"))
+	}
+	if n.kind == KWorker { // a subscriber's own backlog
+		for _, e := range n.in {
+			if !e.removed && e.from.kind == KTopic {
+				ns.QLen += len(e.subJobs) - e.subHead
+			}
+			if !e.removed && e.from.kind == KLog {
+				ns.QLen += s.workerLag(e.from, n)
+			}
+		}
+	}
+	if n.slow > 1 {
+		ns.Slow = n.slow
+	}
+	if sum.hit+sum.miss > 0 {
+		ns.HitRate = float64(sum.hit) / float64(sum.hit+sum.miss)
+	}
+	if n.store != nil {
+		ns.Size = n.store.Size()
+	}
+	for r := Reason(0); r < NumReasons; r++ {
+		if v := sum.reason[r]; v > 0 {
+			if ns.Reasons == nil {
+				ns.Reasons = map[string]float64{}
+			}
+			ns.Reasons[r.String()] = float64(v) / span
+		}
+	}
+	return ns, sum
+}
+
+// nodeExtraByKind adds the numbers only some kinds of component have.
+func (s *Sim) nodeExtraByKind(n *node, ex map[string]float64) {
+	if n.kind == KClient {
+		s.crawlExtra(n, ex)
+	}
+	s.adaptiveExtra(n, ex)
+	if n.kind == KAppServer || n.kind == KWorker {
+		ex["poolWaiting"] = float64(s.poolWaiting(n))
+	}
+	if n.kind == KDatabase || n.kind == KReplica {
+		ex["openConns"] = float64(n.openConns)
+		ex["maxConns"] = n.f("maxConnections")
+	}
+	if n.kind == KObjectStore && (n.f("dataGB") > 0 || n.f("growthGBPerDay") > 0) {
+		ex["storedGB"] = n.f("dataGB")
+		// the average size over the next 365 days, charged by the month
+		ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
+	}
+	if n.kind == KAppServer && n.guard != nil && n.guardChecked > 0 {
+		ex["bloomFalsePositivePct"] = float64(n.guardFalse) / float64(n.guardChecked) * 100
+		ex["bloomBlocked"] = float64(n.guardBlocked)
+		ex["bloomKB"] = float64(len(n.guard.bits)*8) / 1024
+	}
+	if n.kind == KVectorStore {
+		ef := n.f("efSearch")
+		ex["searchMs"] = n.f("searchBaseMs") + ef*n.f("perCandidateMs")
+		ex["recall"] = 1 - math.Pow(0.5, ef/32)
+		ex["memoryGB"] = n.f("vectors") * 1e6 * n.f("dims") * 4 * 1.5 / 1e9
+	}
+	if n.kind == KLLMServer && n.llm != nil && s.now > 0 {
+		st := n.llm
+		ex["tokensPerSec"] = float64(st.tokens) / (s.now / 1000)
+		if st.steps > 0 {
+			ex["avgBatch"] = float64(st.seqSum) / float64(st.steps)
+		}
+		ex["maxBatch"] = float64(st.maxB)
+		ex["gpuBusyPct"] = st.busyMs / (s.now * float64(len(st.gpus))) * 100
+		ex["waiting"] = float64(len(st.queue))
+	}
+	if n.kind == KStream && n.win != nil {
+		emitted := 0
+		for _, e := range n.win.Emitted {
+			if !e.Update {
+				emitted++
+			}
+		}
+		ex["windows"] = float64(emitted)
+		ex["lateDropped"] = float64(n.win.LateDropped)
+		ex["windowUpdates"] = float64(n.win.Updates)
+		ex["duplicateWindows"] = float64(n.winDup)
+		if n.winLogged > 0 {
+			ex["loggedEvents"] = float64(n.winLogged)
+		}
+		if n.winRecSec > 0 {
+			ex["recoverySec"] = n.winRecSec
+		}
+		memory := 0.0
+		if r, kb, ok := s.topStats(n); ok {
+			ex["topKRecall"] = r
+			memory += kb
+		}
+		if u, kb, e, ok := s.visitorStats(n); ok {
+			ex["uniques"], ex["countErrorPct"] = u, e
+			memory += kb
+		}
+		if memory > 0 {
+			ex["stateKB"] = memory
+		}
+	}
+	if n.kind == KLog && n.rebalances > 0 {
+		ex["rebalances"] = float64(n.rebalances)
+	}
+	if n.outboxBacklog > 0 || (n.kind == KAppServer && n.s("eventPublish") == "outbox") {
+		ex["outboxBacklog"] = float64(n.outboxBacklog)
+	}
+}
+
+// nodeExtraFeatures adds the numbers of coordination, key-value, storage and routing features.
+func (s *Sim) nodeExtraFeatures(n *node, ex map[string]float64, sum counters, span float64) {
+	if n.kind == KCoordinator && len(n.coordDown) > 0 {
+		ex["term"] = float64(n.coordTerm)
+		ex["leader"] = float64(n.coordLeader)
+		ex["nodesUp"] = float64(s.coordUpCount(n))
+		ex["elections"] = float64(n.coordElections)
+		if n.coordStaleAcks > 0 {
+			ex["staleLeaderWrites"] = float64(n.coordStaleAcks)
+		}
+	}
+	if n.kvMemberMsgs > 0 || n.kvStaleView > 0 {
+		ex["membershipMsgs"] = n.kvMemberMsgs
+		ex["timeToAllSec"] = n.kvTimeToAll / 1000
+		ex["staleViewRequests"] = float64(n.kvStaleView)
+	}
+	if n.kvRepairs > 0 {
+		ex["repairs"] = float64(n.kvRepairs)
+	}
+	if n.kx != nil && n.kind == KKVStore {
+		n.kx.extras(ex, n.b("siblings"))
+	}
+	if n.kvAERepairs > 0 {
+		ex["antiEntropyRepairs"] = float64(n.kvAERepairs)
+	}
+	if n.kvHintsReplayed > 0 {
+		ex["hintsReplayed"] = float64(n.kvHintsReplayed)
+	}
+	if n.mlConflicts > 0 {
+		ex["writeConflicts"] = float64(n.mlConflicts)
+	}
+	if n.kind == KDatabase && (n.f("dataGB") > 0 || n.f("growthGBPerDay") > 0) {
+		ex["storedGB"] = n.f("dataGB")
+		// the average size over the next 365 days, charged by the month
+		ex["yearStorageCost"] = (n.f("dataGB") + n.f("growthGBPerDay")*365/2) * n.f("storagePerGBMonth") * 12
+		if g, pool := n.f("growthGBPerDay"), n.f("bufferPoolGB"); g > 0 && n.f("dataGB") < pool {
+			ex["daysUntilBufferPoolFull"] = (pool - n.f("dataGB")) / g
+		}
+	}
+	if n.kind == KShardRouter && n.reshards > 0 {
+		ex["keysMoved"] = n.keysMoved
+		if n.slowedMoves > 0 {
+			ex["slowedByMove"] = float64(n.slowedMoves)
+		}
+	}
+	if n.kind == KAppServer && (n.sessConns > 0 || sum.connects > 0) {
+		ex["sessions"] = float64(n.sessConns)
+		ex["connectRps"] = float64(sum.connects) / span
+		if cp := s.connCapacity(n); cp < 1<<30 {
+			ex["sessionCap"] = float64(cp)
+		}
+		if pt := s.pushThreads(n); pt > 0 {
+			ex["pushThreads"] = pt
+		}
+	}
+}
+
+// nodeExtraCounters adds the per-second rates of the window counters that are not zero.
+func (s *Sim) nodeExtraCounters(n *node, ex map[string]float64, sum counters, span float64) {
+	if sum.localHit > 0 {
+		ex["localHitRps"] = float64(sum.localHit) / span
+	}
+	if n.fillBytes > 0 {
+		ex["originMB"] = n.fillBytes / 1e6
+	}
+	if sum.evict > 0 {
+		ex["evictRps"] = float64(sum.evict) / span
+	}
+	if sum.stale > 0 {
+		ex["staleRps"] = float64(sum.stale) / span
+	}
+	if sum.dup > 0 {
+		ex["dupRps"] = float64(sum.dup) / span
+	}
+	if sum.conflict > 0 {
+		ex["conflictRps"] = float64(sum.conflict) / span
+	}
+	if sum.lockBusy > 0 {
+		ex["lockBusyRps"] = float64(sum.lockBusy) / span
+	}
+}
+
+// snapshotRun is the whole-run statistics so far.
+func (s *Sim) snapshotRun() RunStats {
+	buckets := s.hist.buckets(latencyBounds)
 	lb := make([]LatencyBucket, len(buckets))
 	for i, c := range buckets {
 		le := 1e9
-		if i < len(LatencyBounds) {
-			le = LatencyBounds[i]
+		if i < len(latencyBounds) {
+			le = latencyBounds[i]
 		}
 		lb[i] = LatencyBucket{LeMs: le, Count: c}
 	}
 	run := RunStats{LatencyBuckets: lb,
 		Resolved: s.runResolved, Pending: s.runPending, OK: s.runOK, Failed: s.runFailed,
-		P50: s.hist.Quantile(0.5), P95: s.hist.Quantile(0.95), P99: s.hist.Quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.Quantile(0.5),
-		Errors: map[string]int{}, DNSLookups: s.runDNSLookups, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, WrongAnswers: s.runWrongAnswers, ClockLost: s.runClockLost, SessionsLost: s.runLoginsLost, Reauth: s.runLoginRefused, AuthCalls: s.runAuthCalls, AuthCached: s.runAuthCached, Unchecked: s.runUnchecked, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.Quantile(0.95), ITLMs: s.itlHist.Quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, RepeatedOutputs: s.streamRepeated(), RecoverySec: s.streamRecovery(), Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Revalidated: s.runRevalidated, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.Quantile(0.95), HeavyP95: s.heavyHist.Quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
+		P50: s.hist.quantile(0.5), P95: s.hist.quantile(0.95), P99: s.hist.quantile(0.99), Mean: s.hist.Mean(), FailP50: s.failHist.quantile(0.5),
+		Errors: map[string]int{}, DNSLookups: s.runDNSLookups, Conflicts: s.runConflicts, Fresh: s.runFresh, Stale: s.runStale, EventsLost: s.runEventsLost, Inconsistent: s.runInconsistent, Compensated: s.runCompensated, Stuck: s.runStuck, InDoubt: s.runInDoubt, WrongAnswers: s.runWrongAnswers, ClockLost: s.runClockLost, SessionsLost: s.runLoginsLost, Reauth: s.runLoginRefused, AuthCalls: s.runAuthCalls, AuthCached: s.runAuthCached, Unchecked: s.runUnchecked, EventDups: s.runEventDups, LateDropped: s.streamLate(), StateKB: s.stateKB(), Recall: s.vectorRecall(), TTFTMs: s.ttftHist.quantile(0.95), ITLMs: s.itlHist.quantile(0.95), TopKRecall: s.topRecall(), CountErrorPct: s.countErr(), ResultDelaySec: s.streamDelay(), HottestKeyShare: s.hottestKeyShare(), BlockedSec: s.runBlockedSec, RepeatedOutputs: s.streamRepeated(), RecoverySec: s.streamRecovery(), Tenants: s.tenantCount(), WorstTenantSuccess: s.worstTenant(), RpoSec: s.runRPO, RtoSec: s.runRTO, SessionReads: s.runSessReads, ReadYourWritesBroken: s.runRYW, MonotonicBroken: s.runMono, MonoWritesBroken: s.runMonoWriteBroken, FollowReadBroken: s.runFollowReadBroken, CausalBroken: s.runCausalBroken, CacheMsgs: s.runCacheMsgs, Revalidated: s.runRevalidated, Dups: s.runDup, Partial: s.runPartial, Hedged: s.runHedged, LightP95: s.lightHist.quantile(0.95), HeavyP95: s.heavyHist.quantile(0.95), CustomerOK: s.runCustOK, CustomerTotal: s.runCustTotal, HighOK: s.runHighOK, HighTotal: s.runHighTotal, DeadlineSkipped: s.runDeadlineSkipped, WriteSkew: s.runWriteSkew, FanoutWrites: s.runFanWrites, FanoutReads: s.runFanReads, LostWrites: s.runLost, LostUpdates: s.runLostUpdates, TxAborts: s.runTxAborts, Deadlocks: s.runDeadlocks,
 	}
 	for r := Reason(0); r < NumReasons; r++ {
 		if s.runErrors[r] > 0 {
@@ -420,9 +455,14 @@ func (s *Sim) Snapshot() Stats {
 	if s.hasQueue {
 		run.Jobs = &JobStats{
 			Enqueued: s.jobEnqueued, Completed: s.jobCompleted, Lost: s.jobLost, Retried: s.jobRetried, Dead: s.jobDead, Redelivered: s.jobRedelivered,
-			Backlog: s.backlog(), P50: s.jobHist.Quantile(0.5), P95: s.jobHist.Quantile(0.95), HighP95: s.jobHistHigh.Quantile(0.95), OrderViolations: s.jobOrderViolations,
+			Backlog: s.backlog(), P50: s.jobHist.quantile(0.5), P95: s.jobHist.quantile(0.95), HighP95: s.jobHistHigh.quantile(0.95), OrderViolations: s.jobOrderViolations,
 		}
 	}
+	return run
+}
+
+// snapshotCost is the hourly cost of the design as it stands now.
+func (s *Sim) snapshotCost() float64 {
 	var cost float64
 	for _, n := range s.order {
 		if !n.removed {
@@ -430,10 +470,7 @@ func (s *Sim) Snapshot() Stats {
 		}
 	}
 	cost += s.dnsCostPerHour()
-	st.Global = GlobalStats{Now: s.now / 1000, InFlight: s.unresolved, Cost: cost, AvgCost: s.CostPerHour(), Run: run}
-	st.Series = append(make([]SeriesPoint, 0, len(s.series)), s.series...) // never nil: JSON must be [] not null
-	st.Events = append(make([]Event, 0, len(s.events)), s.events...)
-	return st
+	return cost
 }
 
 // RunSnapshot returns just the run totals (cheap, used by scoring).
@@ -477,7 +514,7 @@ func (s *Sim) recordNodePoints() {
 		if n.kind == KQueue {
 			q = len(n.jobs) - n.jh + len(n.hjobs) - n.hh
 		}
-		n.hist = append(n.hist, NodePoint{T: s.now / 1000, Util: math.Min(1, u), QLen: q, Arr: float64(sum.arr) / span, Err: float64(sum.err) / span, Instances: s.scaledInstances(n)})
+		n.hist = append(n.hist, NodePoint{T: s.now / 1000, Util: min(1, u), QLen: q, Arr: float64(sum.arr) / span, Err: float64(sum.err) / span, Instances: s.scaledInstances(n)})
 		if len(n.hist) > nodeHistory {
 			n.hist = append([]NodePoint(nil), n.hist[len(n.hist)-nodeHistory:]...)
 		}

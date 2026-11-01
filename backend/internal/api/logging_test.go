@@ -3,7 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,14 +34,10 @@ func (s *syncBuf) String() string {
 	return s.b.String()
 }
 
-// captureLog redirects the standard logger for the test and returns what was written.
-func captureLog(t *testing.T) *syncBuf {
-	t.Helper()
+// captureLog returns a logger to pass in Config.Logger and the buffer it writes to.
+func captureLog() (*syncBuf, *slog.Logger) {
 	buf := &syncBuf{}
-	oldW := log.Writer()
-	log.SetOutput(buf)
-	t.Cleanup(func() { log.SetOutput(oldW) })
-	return buf
+	return buf, slog.New(slog.NewTextHandler(buf, nil))
 }
 
 func doReq(t *testing.T, method, url string) int {
@@ -56,12 +52,12 @@ func doReq(t *testing.T, method, url string) int {
 }
 
 func TestRequestLogNeverContainsADesignID(t *testing.T) {
-	logs := captureLog(t)
+	logs, logger := captureLog()
 	st, err := designs.New(t.TempDir(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(New(Config{Designs: st}).Handler())
+	ts := httptest.NewServer(New(Config{Designs: st, Logger: logger}).Handler())
 	t.Cleanup(ts.Close)
 
 	var saved struct {
@@ -77,13 +73,13 @@ func TestRequestLogNeverContainsADesignID(t *testing.T) {
 	if strings.Contains(out, saved.ID) {
 		t.Fatalf("log leaks the design id:\n%s", out)
 	}
-	for _, want := range []string{"GET /api/designs/{id} 200 ", "POST /api/designs 201 "} {
+	for _, want := range []string{"method=GET route=/api/designs/{id} status=200 ", "method=POST route=/api/designs status=201 "} {
 		if !strings.Contains(out, want) {
 			t.Errorf("log missing %q:\n%s", want, out)
 		}
 	}
 
-	if !regexp.MustCompile(`GET /api/designs/\{id\} 200 [0-9.]+(ms|s|µs)\n`).MatchString(out) {
+	if !regexp.MustCompile(`method=GET route=/api/designs/\{id\} status=200 duration=[0-9.]+(ms|s|µs)\n`).MatchString(out) {
 		t.Errorf("log line has no duration:\n%s", out)
 	}
 
@@ -102,13 +98,13 @@ func TestRequestLogNeverContainsADesignID(t *testing.T) {
 			t.Fatalf("log leaks id %s:\n%s", id, out)
 		}
 	}
-	if !strings.Contains(out, " 404 ") || !strings.Contains(out, " 405 ") {
+	if !strings.Contains(out, " status=404 ") || !strings.Contains(out, " status=405 ") {
 		t.Errorf("expected 404 and 405 lines:\n%s", out)
 	}
 }
 
 func TestSaveFailureLogsNoDesignID(t *testing.T) {
-	logs := captureLog(t)
+	logs, logger := captureLog()
 	dir := filepath.Join(t.TempDir(), "designs")
 	st, err := designs.New(dir, 0)
 	if err != nil {
@@ -117,7 +113,7 @@ func TestSaveFailureLogsNoDesignID(t *testing.T) {
 	if err := os.RemoveAll(dir); err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(New(Config{Designs: st}).Handler())
+	ts := httptest.NewServer(New(Config{Designs: st, Logger: logger}).Handler())
 	t.Cleanup(ts.Close)
 	b, _ := json.Marshal(map[string]any{"diagram": scenarios.Get("hello-world").Solution})
 	resp, err := http.Post(ts.URL+"/api/designs", "application/json", bytes.NewReader(b))
@@ -129,7 +125,7 @@ func TestSaveFailureLogsNoDesignID(t *testing.T) {
 		t.Fatalf("status %d, want 500", resp.StatusCode)
 	}
 	out := logs.String()
-	if !strings.Contains(out, "save design") {
+	if !strings.Contains(out, `msg="save design"`) {
 		t.Fatalf("failure not logged:\n%s", out)
 	}
 	if strings.Contains(out, ".tmp") || strings.Contains(out, ".json") || strings.Contains(out, dir) {

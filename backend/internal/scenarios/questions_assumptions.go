@@ -1,7 +1,7 @@
 package scenarios
 
-func init() {
-	registerQuestion(&Question{
+func (c *catalog) registerAssumptionQuestions() {
+	c.registerQuestion(&Question{
 		ID: "network-assumptions", Title: "Which assumption broke?", Mode: ModeMatch, Difficulty: "Medium",
 		Summary: "Eight familiar assumptions, eight ways a distributed design can fail.",
 		Prompt:  "Each case describes a failure from a system design. Choose the assumption it exposes.",

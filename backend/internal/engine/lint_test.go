@@ -165,7 +165,7 @@ func TestLintIsPureAndDeterministic(t *testing.T) {
 func TestLintIsFastOnABigDesign(t *testing.T) {
 	d := lintDiagram(90, Params{"retries": 3.0, "backoff": "none"}, Params{"queueCap": 900.0}, nil)
 	best := time.Hour
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		t0 := time.Now()
 		Lint(d)
 		if el := time.Since(t0); el < best {

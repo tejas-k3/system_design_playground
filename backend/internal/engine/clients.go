@@ -26,7 +26,7 @@ func (s *Sim) rate(n *node, tMs float64) float64 {
 		return pts[len(pts)-1][1]
 	}
 	base, peak := n.f("rps"), n.f("peakRps")
-	period := math.Max(0.001, n.f("periodSec"))
+	period := max(0.001, n.f("periodSec"))
 	switch n.s("pattern") {
 	case "ramp":
 		if t >= period {
@@ -65,7 +65,7 @@ func (s *Sim) startClient(n *node) {
 // startCrowd runs a closed-loop population: each user sends one request, waits for it to finish (success, failure or
 // give-up, retries included), thinks for a random time, and goes again. Offered load therefore falls as latency rises.
 func (s *Sim) startCrowd(n *node, gen int) {
-	think := func() float64 { return s.rng.Exp() * n.f("thinkMs") }
+	think := func() float64 { return s.rng.exp() * n.f("thinkMs") }
 	var user func()
 	user = func() {
 		if gen != n.arrivalGen || n.removed || n.down || s.trafficStopped() {
@@ -81,8 +81,8 @@ func (s *Sim) startCrowd(n *node, gen int) {
 // burstMultiplier scales a bursty client's rate: rushes take a fifth of the time at burstFactor times the average, and the
 // quiet phases run slower so that the long-run average is unchanged.
 func (s *Sim) burstMultiplier(n *node) float64 {
-	factor := math.Min(5, math.Max(1.5, n.f("burstFactor")))
-	mean := math.Max(0.5, n.f("burstSec")) * 1000
+	factor := min(5, max(1.5, n.f("burstFactor")))
+	mean := max(0.5, n.f("burstSec")) * 1000
 	for s.now >= n.burstUntil {
 		n.burstOn = !n.burstOn
 		phase := mean
@@ -90,12 +90,12 @@ func (s *Sim) burstMultiplier(n *node) float64 {
 			phase = mean * 4
 		}
 		// Erlang-4 phase lengths: random, but regular enough that the long-run average does not wander
-		n.burstUntil = math.Max(n.burstUntil, s.now) + (s.rng.Exp()+s.rng.Exp()+s.rng.Exp()+s.rng.Exp())/4*phase
+		n.burstUntil = max(n.burstUntil, s.now) + (s.rng.exp()+s.rng.exp()+s.rng.exp()+s.rng.exp())/4*phase
 	}
 	if n.burstOn {
 		return factor
 	}
-	return math.Max(0.05, (1-0.2*factor)/0.8)
+	return max(0.05, (1-0.2*factor)/0.8)
 }
 
 func (s *Sim) nextArrival(n *node, gen int) {
@@ -110,11 +110,11 @@ func (s *Sim) nextArrival(n *node, gen int) {
 		s.after(100, func() { s.nextArrival(n, gen) })
 		return
 	}
-	gap := s.rng.Exp() / r * 1000
+	gap := s.rng.exp() / r * 1000
 	if n.s("arrival") == "bursty" && s.now+gap > n.burstUntil {
 		// the rate changes before this arrival would happen: redraw at the change (exponential gaps are memoryless),
 		// otherwise a long quiet-phase gap would swallow the start of the next rush and the average would sag
-		s.after(math.Max(1, n.burstUntil-s.now), func() { s.nextArrival(n, gen) })
+		s.after(max(1, n.burstUntil-s.now), func() { s.nextArrival(n, gen) })
 		return
 	}
 	s.after(gap, func() {
@@ -194,34 +194,34 @@ func (s *Sim) createLogical(c *node) *logical {
 		id: s.logicalSeq, client: c, createdAt: s.now,
 		write:   s.rng.Next() >= c.f("readPct")/100,
 		counted: s.now >= s.opts.WarmupMs,
-		hash:    Hash32(uint32(s.logicalSeq)),
+		hash:    hash32(uint32(s.logicalSeq)),
 		wl:      workloadOf(c),
 	}
 	if pct := c.f("heavyPct"); pct > 0 {
-		lg.heavy = float64(Hash32(uint32(s.logicalSeq)*668265263+29)%100) < pct
+		lg.heavy = float64(hash32(uint32(s.logicalSeq)*668265263+29)%100) < pct
 	}
 	if pct := c.f("priorityPct"); pct > 0 {
-		lg.high = float64(Hash32(uint32(s.logicalSeq)*374761393+17)%100) < pct
+		lg.high = float64(hash32(uint32(s.logicalSeq)*374761393+17)%100) < pct
 	}
 	if lg.wl == wlTransfer || lg.wl == wlOnCall {
 		lg.write = true // a transfer is always a transaction
 	}
 	if tok := c.f("requestTokens"); tok > 0 {
 		lg.tok = int32(tok)
-		if float64(Hash32(uint32(s.logicalSeq)*3266489917+41)%100) < c.f("bigRequestPct") {
+		if float64(hash32(uint32(s.logicalSeq)*3266489917+41)%100) < c.f("bigRequestPct") {
 			lg.tok *= 20
 		}
 	}
-	lg.key = c.keys.Sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
+	lg.key = c.keys.sample(c.s("keyDist"), int(c.f("keySpace")), c.f("zipfS"), c.f("hotKeyPct"), s.keyRng)
 	if lg.wl == wlCrawl {
 		lg.key = s.crawlFetch(c) // the site of the page taken from the frontier
 	}
 	if lg.counted {
 		s.countKey(lg.key)
 	}
-	if pct := c.f("missingPct"); pct > 0 && float64(Hash32(uint32(s.logicalSeq)*2891336453+53)%100) < pct {
+	if pct := c.f("missingPct"); pct > 0 && float64(hash32(uint32(s.logicalSeq)*2891336453+53)%100) < pct {
 		ks := int(c.f("keySpace")) // an id outside the real ones: negative, so it can never match a stored item
-		lg.key = -(ks + 1 + int(Hash32(uint32(s.logicalSeq)*374761393+59)%uint32(10*ks)))
+		lg.key = -(ks + 1 + int(hash32(uint32(s.logicalSeq)*374761393+59)%uint32(10*ks)))
 	}
 	c.stampSeen(lg)
 	if n := int(c.f("identities")); n > 0 {
@@ -229,7 +229,7 @@ func (s *Sim) createLogical(c *node) *logical {
 		if c.f("identitySkew") > 0 {
 			dist = "zipf"
 		}
-		lg.user = c.idBase + c.userKeys.Sample(dist, n, c.f("identitySkew"), 0, s.keyRng)
+		lg.user = c.idBase + c.userKeys.sample(dist, n, c.f("identitySkew"), 0, s.keyRng)
 	}
 	if c.b("abuse") { // a scraper: items picked from a huge space, so almost none is cached
 		lg.key = 1 + int(s.keyRng.Next()*abuseKeySpace)

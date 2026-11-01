@@ -6,19 +6,19 @@ import "testing"
 // item exactly takes a counter for each item seen; a count-min sketch with a short candidate list takes a fixed few
 // thousand counters and still finds nearly the same ten.
 func topKStream() []uint32 {
-	var ks KeySampler
-	rng := NewRNG(21)
+	var ks keySampler
+	rng := newPRNG(21)
 	out := make([]uint32, 300000)
 	for i := range out {
-		out[i] = uint32(ks.Sample("zipf", 200000, 1.1, 0, rng))
+		out[i] = uint32(ks.sample("zipf", 200000, 1.1, 0, rng))
 	}
 	return out
 }
 
 func TestSketchTopKFindsMostOfTheTrueTopTen(t *testing.T) {
 	stream := topKStream()
-	exact := NewExactTopK()
-	sk := NewSketchTopK(10, 1000, 3, 7)
+	exact := newExactTopK()
+	sk := newSketchTopK(10, 1000, 3, 7)
 	for _, x := range stream {
 		exact.Add(x)
 		sk.Add(x)
@@ -34,15 +34,15 @@ func TestSketchTopKFindsMostOfTheTrueTopTen(t *testing.T) {
 			hit++
 		}
 	}
-	t.Logf("recall@10 %d/10; memory: exact %d counters, sketch %d counters + %d candidates", hit, exact.Counters(), sk.Counters(), sk.Candidates())
+	t.Logf("recall@10 %d/10; memory: exact %d counters, sketch %d counters + %d candidates", hit, exact.counters(), sk.counters(), sk.Candidates())
 	if hit < 9 {
 		t.Errorf("the sketch should find at least 9 of the true top 10: %d", hit)
 	}
-	if sk.Counters()*10 > exact.Counters() {
-		t.Errorf("the sketch should use a small fraction of the exact table's memory: %d vs %d", sk.Counters(), exact.Counters())
+	if sk.counters()*10 > exact.counters() {
+		t.Errorf("the sketch should use a small fraction of the exact table's memory: %d vs %d", sk.counters(), exact.counters())
 	}
 	// a sketch narrower than the crowd of rare items finds fewer
-	tiny := NewSketchTopK(10, 40, 2, 7)
+	tiny := newSketchTopK(10, 40, 2, 7)
 	for _, x := range stream {
 		tiny.Add(x)
 	}

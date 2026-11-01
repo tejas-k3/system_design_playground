@@ -43,11 +43,11 @@ func goodput(d Diagram, seed uint32, warm, measure float64) (float64, *Sim) {
 // with m running takes S(m) = base x (1 + c x max(0, m-knee)/knee); m solves m = T x S/(cpu+net+S). Throughput = T/(cpu+net+S).
 func contendedTheory(T float64) (tput, m float64) {
 	m = T
-	for i := 0; i < 200; i++ {
-		S := cBase * (1 + cCont*math.Max(0, m-cKnee)/cKnee)
+	for range 200 {
+		S := cBase * (1 + cCont*max(0, m-cKnee)/cKnee)
 		m = T * S / (cCPU + cNet + S)
 	}
-	S := cBase * (1 + cCont*math.Max(0, m-cKnee)/cKnee)
+	S := cBase * (1 + cCont*max(0, m-cKnee)/cKnee)
 	return 1000 * T / (cCPU + cNet + S), m
 }
 
@@ -122,10 +122,10 @@ func TestAdaptiveLimitConvergesWithinABand(t *testing.T) {
 		s := New(contendedDesign(64, "adaptive", cCont, 3000), Options{Seed: seed})
 		s.Advance(15000)
 		lo, hi := math.Inf(1), 0.0
-		for i := 0; i < 90; i++ {
+		for range 90 {
 			s.Advance(1000)
 			l := s.Snapshot().Nodes["a"].Extra["concurrencyLimit"]
-			lo, hi = math.Min(lo, l), math.Max(hi, l)
+			lo, hi = min(lo, l), max(hi, l)
 		}
 		t.Logf("seed %d: limit stayed between %.1f and %.1f over 90 s (knee %.0f)", seed, lo, hi, cKnee)
 		if lo < cKnee || hi > upper+1 {

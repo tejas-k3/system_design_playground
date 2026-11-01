@@ -17,9 +17,9 @@ func TestSanitizeDiagramName(t *testing.T) {
 		{"trimmed", "  Checkout  ", "Checkout", true},
 		{"control characters removed", "a\x00b\tc\nd\x7f", "abcd", true},
 		{"blank becomes empty", " \t ", "", true},
-		{"long is cut to the limit", strings.Repeat("é", MaxDiagramName+10), strings.Repeat("é", MaxDiagramName), true},
-		{"leading blanks do not count against the limit", "   " + strings.Repeat("a", MaxDiagramName), strings.Repeat("a", MaxDiagramName), true},
-		{"cut then trimmed", strings.Repeat("a", MaxDiagramName-1) + "   b", strings.Repeat("a", MaxDiagramName-1), true},
+		{"long is cut to the limit", strings.Repeat("é", maxDiagramName+10), strings.Repeat("é", maxDiagramName), true},
+		{"leading blanks do not count against the limit", "   " + strings.Repeat("a", maxDiagramName), strings.Repeat("a", maxDiagramName), true},
+		{"cut then trimmed", strings.Repeat("a", maxDiagramName-1) + "   b", strings.Repeat("a", maxDiagramName-1), true},
 	}
 	for _, c := range cases {
 		out, adj := Sanitize(Diagram{Name: c.in})

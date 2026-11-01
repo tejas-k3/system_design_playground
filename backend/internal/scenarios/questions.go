@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 
 	"sysdesign/internal/engine"
 )
@@ -39,6 +39,7 @@ type EstimateField struct {
 	Explain  string  `json:"-"` // how the expected value follows from the facts
 }
 
+// Fact is one labelled number shown in the brief of a question.
 type Fact struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
@@ -52,6 +53,7 @@ type MatchItem struct {
 	why     string
 }
 
+// Question is one practice question as served to the learner; the answer and the explanations stay on the server.
 type Question struct {
 	ID         string          `json:"id"`
 	Title      string          `json:"title"`
@@ -81,7 +83,7 @@ type Question struct {
 }
 
 // Symptoms are what a monitoring page and one trace would show during an incident. They are generated from a
-// seeded run of a real challenge's starting design (see GenerateSymptoms), never typed in.
+// seeded run of a real challenge's starting design (see generateSymptoms), never typed in.
 type Symptoms struct {
 	DurationSec float64              `json:"durationSec"`
 	Series      []engine.SeriesPoint `json:"series"` // one point every 2 simulated seconds
@@ -110,8 +112,8 @@ func loadSymptoms(id string) *Symptoms {
 	return &s
 }
 
-// GenerateSymptoms runs a challenge's starting design with a seed and records what an operator would see.
-func GenerateSymptoms(src diagSource) (*Symptoms, error) {
+// generateSymptoms runs a challenge's starting design with a seed and records what an operator would see.
+func generateSymptoms(src diagSource) (*Symptoms, error) {
 	sc := Get(src.ScenarioID)
 	if sc == nil {
 		return nil, fmt.Errorf("no scenario %q", src.ScenarioID)
@@ -137,6 +139,7 @@ func GenerateSymptoms(src diagSource) (*Symptoms, error) {
 	return out, nil
 }
 
+// ChoiceResult is the verdict on a multiple-choice answer.
 type ChoiceResult struct {
 	Correct bool   `json:"correct"`
 	Answer  int    `json:"answer"`
@@ -163,12 +166,14 @@ func (q *Question) GradeChoice(choice int) (ChoiceResult, error) {
 	return r, nil
 }
 
+// MatchItemResult is the verdict on one need of a matching question.
 type MatchItemResult struct {
 	Correct bool   `json:"correct"`
 	Answer  int    `json:"answer"`
 	Explain string `json:"explain"`
 }
 
+// MatchResult is the verdict on a whole matching question.
 type MatchResult struct {
 	Items   []MatchItemResult `json:"items"`
 	Correct int               `json:"correct"`
@@ -214,6 +219,7 @@ func matchStars(correct, total int) int {
 	return 0
 }
 
+// FieldResult is the verdict on one number of an estimation question.
 type FieldResult struct {
 	Key      string  `json:"key"`
 	Label    string  `json:"label"`
@@ -224,6 +230,7 @@ type FieldResult struct {
 	Explain  string  `json:"explain"`
 }
 
+// EstimateResult is the verdict on a whole estimation question.
 type EstimateResult struct {
 	Fields []FieldResult `json:"fields"`
 	Score  float64       `json:"score"` // good = 1, close = 0.5, off = 0, averaged
@@ -265,7 +272,7 @@ func (q *Question) GradeEstimate(answers map[string]float64) (EstimateResult, er
 		}
 	}
 	if len(extra) > 0 {
-		sort.Strings(extra)
+		slices.Sort(extra)
 		return EstimateResult{}, fmt.Errorf("unknown field %q", extra[0])
 	}
 	res := EstimateResult{}
@@ -297,21 +304,16 @@ func (q *Question) GradeEstimate(answers map[string]float64) (EstimateResult, er
 	return res, nil
 }
 
-var (
-	allQuestions []*Question
-	questionByID = map[string]*Question{}
-)
-
-func registerQuestion(q *Question) {
-	allQuestions = append(allQuestions, q)
-	questionByID[q.ID] = q
+func (c *catalog) registerQuestion(q *Question) {
+	c.questions = append(c.questions, q)
+	c.questionByID[q.ID] = q
 }
 
 // AllQuestions returns every question in registration order.
-func AllQuestions() []*Question { return append([]*Question(nil), allQuestions...) }
+func AllQuestions() []*Question { return append([]*Question(nil), theCatalog().questions...) }
 
 // Q returns a question by id, or nil.
-func Q(id string) *Question { return questionByID[id] }
+func Q(id string) *Question { return theCatalog().questionByID[id] }
 
 // Candidate is one design a trade-off question lets the learner run. Only its label and description are served;
 // the diagram stays on the server.
@@ -373,12 +375,14 @@ type Defect struct {
 	Explain string
 }
 
+// DefectOut is one defect of a design under review, with the nodes it concerns.
 type DefectOut struct {
 	ID      string   `json:"id"`
 	Nodes   []string `json:"nodes"`
 	Explain string   `json:"explain"`
 }
 
+// ReviewResult is the verdict on a design review: the defects found and missed.
 type ReviewResult struct {
 	Found      []DefectOut `json:"found"`
 	Missed     []DefectOut `json:"missed"`
@@ -469,12 +473,14 @@ type buildSpec struct {
 	seconds   float64
 }
 
+// The verdicts of a sizing question: fewer servers than needed, about right, or more than needed.
 const (
 	BuildUnder = "under"
 	BuildRight = "right"
 	BuildOver  = "over"
 )
 
+// BuildResult is the verdict on a sizing question: the servers chosen against the servers needed.
 type BuildResult struct {
 	Servers      int        `json:"servers"`
 	RightServers int        `json:"rightServers"`

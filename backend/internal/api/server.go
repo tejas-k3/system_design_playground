@@ -7,13 +7,14 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"sysdesign/internal/designs"
@@ -52,6 +53,7 @@ type Config struct {
 	IdleTimeout    time.Duration  // close a session that is not running and has been silent this long; 0 means DefaultIdleTimeout
 	Designs        *designs.Store // where shared designs live; nil means an in-memory store
 	SaveLimit      int            // designs one client may save per minute; 0 means DefaultSaveLimit
+	Logger         *slog.Logger   // request and failure log; nil means slog.Default()
 }
 
 // Server wires the routes together.
@@ -65,6 +67,9 @@ type Server struct {
 	designs   *designs.Store
 	saves     *limiter
 	metrics   metrics
+	log       *slog.Logger
+	done      chan struct{} // closed by Close: live sessions end
+	closeOnce sync.Once
 }
 
 // New builds a server from cfg.
@@ -84,7 +89,10 @@ func New(cfg Config) *Server {
 	if cfg.Designs == nil {
 		cfg.Designs, _ = designs.New("", 0) // in-memory never fails
 	}
-	s := &Server{designs: cfg.Designs, saves: newLimiter(cfg.SaveLimit, time.Minute), mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), runSlots: make(chan struct{}, cfg.MaxRuns), idle: cfg.IdleTimeout}
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
+	s := &Server{log: cfg.Logger, done: make(chan struct{}), designs: cfg.Designs, saves: newLimiter(cfg.SaveLimit, time.Minute), mux: http.NewServeMux(), staticDir: cfg.StaticDir, origins: cfg.OriginPatterns, slots: make(chan struct{}, cfg.MaxSessions), runSlots: make(chan struct{}, cfg.MaxRuns), idle: cfg.IdleTimeout}
 	staticDir := cfg.StaticDir
 	s.mux.HandleFunc("GET /api/metrics", s.metrics.serve(cfg.Designs.Len))
 	s.mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
@@ -118,25 +126,33 @@ func New(cfg Config) *Server {
 	return s
 }
 
-func (s *Server) Handler() http.Handler { return secureHeaders(logRequests(s.mux)) }
+// Handler is the whole HTTP handler: routes, request logging and security headers.
+func (s *Server) Handler() http.Handler { return secureHeaders(s.logRequests(s.mux)) }
 
 type statusWriter struct {
 	http.ResponseWriter
 	code int
 }
 
+// WriteHeader remembers the status code for the request log.
 func (w *statusWriter) WriteHeader(c int) { w.code = c; w.ResponseWriter.WriteHeader(c) }
 
 // Hijack/Flush pass through so WebSocket upgrades keep working.
 func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
-func logRequests(next http.Handler) http.Handler {
+// Close ends every live session; call it when the HTTP server is shutting down, because Shutdown does not wait
+// for (or close) hijacked WebSocket connections.
+func (s *Server) Close() { s.closeOnce.Do(func() { close(s.done) }) }
+
+func (s *Server) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: 200}
 		next.ServeHTTP(sw, r)
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/healthz" {
-			log.Printf("%s %s %d %s", r.Method, routeLabel(r), sw.code, time.Since(start).Round(time.Millisecond))
+			s.log.LogAttrs(r.Context(), slog.LevelInfo, "request",
+				slog.String("method", r.Method), slog.String("route", routeLabel(r)),
+				slog.Int("status", sw.code), slog.Duration("duration", time.Since(start).Round(time.Millisecond)))
 		}
 	})
 }
@@ -166,7 +182,7 @@ func pathFreeErr(err error) string {
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v) // the status line is sent; a failed write means the client left
 }
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
@@ -315,7 +331,7 @@ func (s *Server) getStudyDeck(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8") // shown in the browser, and it is Markdown to read
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write([]byte(deck))
+	_, _ = w.Write([]byte(deck)) // the client may have left; nothing to recover
 }
 
 func (s *Server) getSolution(w http.ResponseWriter, r *http.Request) {
@@ -465,7 +481,7 @@ func (s *Server) saveDesign(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := s.designs.Put(d)
 	if err != nil {
-		log.Printf("save design: %s", pathFreeErr(err))
+		s.log.ErrorContext(r.Context(), "save design", "error", pathFreeErr(err))
 		writeErr(w, http.StatusInternalServerError, "could not save the design")
 		return
 	}

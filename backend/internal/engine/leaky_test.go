@@ -20,7 +20,7 @@ func TestALeakyBucketSpacesABurstAtTheSteadyRate(t *testing.T) {
 	s, rl := leakySim(100, 200)
 	s.now = 0
 	var last float64
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		ok, d := s.leak(rl, &call{})
 		if !ok {
 			t.Fatalf("request %d of 50 should fit a queue of 200", i)
@@ -39,7 +39,7 @@ func TestALeakyBucketRefusesWhatDoesNotFitTheQueue(t *testing.T) {
 	s, rl := leakySim(100, 20)
 	s.now = 0
 	got := 0
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		if ok, _ := s.leak(rl, &call{}); ok {
 			got++
 		}
@@ -67,7 +67,7 @@ func TestALeakyBucketSmoothsWhatTheServersSee(t *testing.T) {
 		d, _ := Sanitize(b.d)
 		s := New(d, Options{Seed: 4})
 		p := 0.0
-		for i := 0; i < 40; i++ {
+		for range 40 {
 			s.Advance(1000)
 			if a := s.Snapshot().Nodes["a"].Arr; a > p {
 				p = a
@@ -101,7 +101,7 @@ func TestAPerTenantLimitContainsTheNoisyTenant(t *testing.T) {
 		for ms := 0.0; ms < 10000; ms += 10 { // every 10 ms
 			s.now = ms
 			send := func(tenant, count int) {
-				for i := 0; i < count; i++ {
+				for range count {
 					user := cl.idBase + (tenant-1)*25 + 1 // an account of that tenant (blocks of 25 of the 100)
 					lg := &logical{client: cl}
 					if s.admit(rl, &call{user: user, lg: lg}) {

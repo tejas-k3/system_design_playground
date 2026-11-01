@@ -91,14 +91,14 @@ func (s *Sim) crawlOf(c *node) *crawlState {
 	}
 	if c.s("crawlDedup") == "bloom" && st.bloom == nil {
 		m := max(64, int(c.f("crawlBitsPerUrl")*c.f("crawlUrls")))
-		st.bloom, st.bloomKB = NewBloom(m, int(c.f("crawlHashes"))), float64(m)/8/1024
+		st.bloom, st.bloomKB = newBloom(m, int(c.f("crawlHashes"))), float64(m)/8/1024
 	}
 	return st
 }
 
 // hostOf is the site a new URL is on: Zipf over the sites, from the URL number.
 func (st *crawlState) hostOf(id uint32) int32 {
-	u := float64(Hash32(id*0x9e3779b1+0x1234567)) / 4294967296
+	u := float64(hash32(id*0x9e3779b1+0x1234567)) / 4294967296
 	i := sort.SearchFloat64s(st.cdf, u)
 	return int32(min(i, len(st.cdf)-1))
 }
@@ -111,7 +111,7 @@ func (st *crawlState) accept(c *node, id uint32) bool {
 	case "bloom":
 		k, m := float64(st.bloom.k), float64(st.bloom.m)
 		st.expected += math.Pow(1-math.Exp(-k*float64(st.added)/m), k)
-		if st.bloom.Has(id) {
+		if st.bloom.has(id) {
 			st.missed++
 			return false
 		}
@@ -178,11 +178,11 @@ func (st *crawlState) expand(c *node, pg crawlPage, trapOn bool, trapHost int32)
 	}
 	dupPct := c.f("crawlDupPct")
 	dedup := c.s("crawlDedup")
-	for i := 0; i < links; i++ {
-		h := Hash32(pg.id*2654435761 ^ uint32(i+1)*40503 + 0x51ed27)
+	for i := range links {
+		h := hash32(pg.id*2654435761 ^ uint32(i+1)*40503 + 0x51ed27)
 		st.found++
 		if !pg.trap && len(st.known) > 0 && float64(h%1000) < dupPct*10 {
-			ref := st.known[Hash32(h+1)%uint32(len(st.known))]
+			ref := st.known[hash32(h+1)%uint32(len(st.known))]
 			if dedup == "none" {
 				st.push(crawlPage{id: ref.id, host: ref.host, depth: pg.depth + 1, dup: true})
 			} else {
@@ -194,7 +194,7 @@ func (st *crawlState) expand(c *node, pg crawlPage, trapOn bool, trapHost int32)
 		id := st.next
 		st.next++
 		host := pg.host
-		if !pg.trap && Hash32(h+7)%2 != 0 { // half the links stay on the site, the rest go anywhere
+		if !pg.trap && hash32(h+7)%2 != 0 { // half the links stay on the site, the rest go anywhere
 			host = st.hostOf(id)
 		}
 		if !st.accept(c, id) {

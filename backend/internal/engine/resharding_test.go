@@ -15,7 +15,7 @@ func reshard(hashing string, vnodes float64, n int) (before, after *Sim, moved f
 		}
 		b.node("sr", KShardRouter, rp)
 		b.edge("u", "a").edge("a", "sr")
-		for i := 0; i < count; i++ {
+		for i := range count {
 			id := "db" + string(rune('a'+i))
 			b.node(id, KDatabase, Params{"connections": 16.0})
 			b.edge("sr", id)
@@ -50,7 +50,7 @@ func TestMoreVirtualNodesEvenOutTheRing(t *testing.T) {
 	spread := func(v float64) float64 {
 		b := &builder{}
 		b.node("sr", KShardRouter, Params{"hashing": "ring", "vnodes": v})
-		for i := 0; i < 6; i++ {
+		for i := range 6 {
 			id := "db" + string(rune('a'+i))
 			b.node(id, KDatabase, Params{})
 			b.edge("sr", id)

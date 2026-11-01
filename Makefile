@@ -4,7 +4,7 @@
 PORT ?= 8090
 export ADDR := :$(PORT)
 
-.PHONY: check help install dev dev-backend dev-frontend build run test test-backend test-frontend lint bench perf-guard browser-check docker-build docker-run up down logs
+.PHONY: check help install dev dev-backend dev-frontend build run test test-backend test-race test-frontend lint bench perf-guard browser-check docker-build docker-run up down logs
 
 help:
 	@echo "make install   install frontend dependencies"
@@ -60,6 +60,10 @@ test: test-backend test-frontend
 
 test-backend:
 	cd backend && go vet ./... && go test -count=1 ./...
+
+# the packages that own goroutines (the WebSocket session, the server); the engine is single-threaded
+test-race:
+	cd backend && go test -race -count=1 ./internal/api/ ./cmd/...
 
 test-frontend:
 	cd frontend && npm run typecheck && npm test

@@ -41,7 +41,7 @@ func TestMultipartUploadTimeFollowsTheRoundsFormula(t *testing.T) {
 	for _, c := range cases {
 		got := single - uploadMean(multipartDesign(c.chunk, c.par, 0))
 		t.Logf("chunk %.0f KB x %.0f: saves %.1f ms (formula %.0f)", c.chunk, c.par, got, c.saves)
-		if math.Abs(got-c.saves) > math.Max(2, c.saves*0.05) {
+		if math.Abs(got-c.saves) > max(2, c.saves*0.05) {
 			t.Errorf("chunk %.0f KB x %.0f: expected to save %.0f ms, saved %.1f", c.chunk, c.par, c.saves, got)
 		}
 	}

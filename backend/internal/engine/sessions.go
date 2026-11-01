@@ -72,12 +72,12 @@ func (s *Sim) sessionUp(sess *session) {
 			return
 		}
 		s.createLogical(c)
-		s.after(s.rng.Exp()*60000/c.f("msgsPerMin"), msg)
+		s.after(s.rng.exp()*60000/c.f("msgsPerMin"), msg)
 	}
 	if c.f("msgsPerMin") > 0 {
-		s.after(s.rng.Exp()*60000/c.f("msgsPerMin"), msg)
+		s.after(s.rng.exp()*60000/c.f("msgsPerMin"), msg)
 	}
-	s.after(s.rng.Exp()*c.f("sessionSec")*1000, func() {
+	s.after(s.rng.exp()*c.f("sessionSec")*1000, func() {
 		if life != sess.life {
 			return
 		}

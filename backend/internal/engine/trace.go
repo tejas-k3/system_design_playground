@@ -121,6 +121,7 @@ type SpanOut struct {
 	Late    bool    `json:"late,omitempty"`
 }
 
+// TraceOut is the wire form of one traced request.
 type TraceOut struct {
 	ID        int       `json:"id"`
 	Client    string    `json:"client"`
@@ -133,6 +134,7 @@ type TraceOut struct {
 	Spans     []SpanOut `json:"spans"`
 }
 
+// TraceSet is the traced requests kept for a run, split by outcome.
 type TraceSet struct {
 	Failed []TraceOut `json:"failed"`
 	OK     []TraceOut `json:"ok"`

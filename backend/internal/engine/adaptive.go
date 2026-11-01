@@ -110,7 +110,7 @@ func (s *Sim) adaptiveSample(n *node, a *adaptiveLimit, rtt float64, busy int) {
 	maxLimit := float64(s.capacity(n))
 	switch {
 	case mean > adaptHigh*a.base:
-		a.limit = math.Max(1, a.limit*adaptDecrease)
+		a.limit = max(1, a.limit*adaptDecrease)
 		a.slow = false
 		a.decreases++
 	case mean <= adaptLow*a.base && float64(a.peak) >= math.Floor(a.limit):
@@ -120,7 +120,7 @@ func (s *Sim) adaptiveSample(n *node, a *adaptiveLimit, rtt float64, busy int) {
 			a.limit++
 		}
 	}
-	a.limit = math.Min(a.limit, maxLimit)
+	a.limit = min(a.limit, maxLimit)
 	a.winStart, a.sum, a.cnt, a.peak = s.now, 0, 0, 0
 }
 

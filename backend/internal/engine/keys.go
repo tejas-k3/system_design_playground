@@ -2,16 +2,18 @@ package engine
 
 import "math"
 
-// KeySampler draws item keys for a client: Zipf (default), uniform or a sequential scan.
+// keySampler draws item keys for a client: Zipf (default), uniform or a sequential scan.
 // Key 0 is reserved for the "hot key" override.
-type KeySampler struct {
+type keySampler struct {
 	cdf      []float64
 	cdfK     int
 	cdfS     float64
 	scanNext int
 }
 
-func (k *KeySampler) Sample(dist string, keySpace int, zipfS, hotPct float64, rng *RNG) int {
+// sample draws a key in [0, keySpace) from the named distribution, optionally sending hotPct percent of the draws to
+// key 0.
+func (k *keySampler) sample(dist string, keySpace int, zipfS, hotPct float64, rng *prng) int {
 	if hotPct > 0 && rng.Next() < hotPct/100 {
 		return 0
 	}
@@ -31,7 +33,7 @@ func (k *KeySampler) Sample(dist string, keySpace int, zipfS, hotPct float64, rn
 	return 1 + k.rank(keySpace, zipfS, rng.Next())
 }
 
-func (k *KeySampler) rank(n int, s, u float64) int {
+func (k *keySampler) rank(n int, s, u float64) int {
 	if k.cdf == nil || k.cdfK != n || k.cdfS != s {
 		k.cdf = make([]float64, n)
 		var sum float64

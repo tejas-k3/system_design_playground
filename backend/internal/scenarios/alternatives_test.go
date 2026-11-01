@@ -27,7 +27,7 @@ func TestAlternativesMatchTheEngine(t *testing.T) {
 			if res.Pass != a.Pass {
 				t.Errorf("%s / %s: stored pass=%v, engine says %v (%+v)", id, a.Label, a.Pass, res.Pass, res.Checks)
 			}
-			success := math.Floor(100*float64(res.Run.OK)/math.Max(1, float64(res.Run.Resolved+res.Run.Pending))*10) / 10
+			success := math.Floor(100*float64(res.Run.OK)/max(1, float64(res.Run.Resolved+res.Run.Pending))*10) / 10
 			if math.Abs(success-a.SuccessPct) > 0.05 || math.Abs(math.Round(res.Run.P95)-a.P95Ms) > 0.5 || math.Abs(math.Round(res.CostPerHour*100)/100-a.CostPerHour) > 0.005 {
 				t.Errorf("%s / %s: stored %.1f%% p95 %.0f ms $%.2f, engine %.1f%% p95 %.0f ms $%.2f", id, a.Label, a.SuccessPct, a.P95Ms, a.CostPerHour, success, math.Round(res.Run.P95), res.CostPerHour)
 			}

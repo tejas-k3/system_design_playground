@@ -24,7 +24,7 @@ func TestPerfGuard(t *testing.T) {
 	}
 	const maxAllocs, maxBytes = 2_000_000, 125 << 20
 	best := testing.Benchmark(BenchmarkLargeDesign)
-	for i := 0; i < 2; i++ { // the allocation numbers are stable, the time is the noisy one: keep the fastest of three
+	for range 2 { // the allocation numbers are stable, the time is the noisy one: keep the fastest of three
 		if r := testing.Benchmark(BenchmarkLargeDesign); r.NsPerOp() < best.NsPerOp() {
 			best = r
 		}

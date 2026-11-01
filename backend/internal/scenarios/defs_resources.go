@@ -7,7 +7,24 @@ import (
 )
 
 // registerResourceLimits registers search tails, egress, bandwidth, GC, disks, heavy queries, write skew, indexes, store choice and queues.
-func registerResourceLimits() {
+func (c *catalog) registerResourceLimits() {
+	c.addSearchTail()
+	c.addCelebrityPost()
+	c.addImageEgress()
+	c.addVideoUpload()
+	c.addGcStorm()
+	c.addDiskWrites()
+	c.addOneHeavyQuery()
+	c.addNobodyOnCall()
+	c.addSlowQuery()
+	c.addPickTheStore()
+	c.addLastHour()
+	c.addPoisonPill()
+	c.addConsumerLag()
+	c.addHotCell()
+}
+
+func (c *catalog) addSearchTail() {
 	// Search over 16 shards: the slowest shard sets the latency. Config only: ask for fewer answers, or ask again.
 	searchTail := func(fixed bool) engine.Diagram {
 		app := P{"threads": 32.0, "gather": "all"}
@@ -16,13 +33,13 @@ func registerResourceLimits() {
 		}
 		b := (&bld{}).n("users", engine.KClient, cols[0], 200, P{"rps": 60.0, "readPct": 100.0, "timeoutMs": 2000.0}).
 			n("app", engine.KAppServer, cols[1], 200, app).e("users", "app")
-		for k := 0; k < 16; k++ {
+		for k := range 16 {
 			id := fmt.Sprintf("shard%d", k+1)
 			b.n(id, engine.KIndex, cols[2], float64(k)*80, P{"queryMs": 30.0, "variability": "heavy", "connections": 16.0}).label(id, fmt.Sprintf("Search Shard %d", k+1)).e("app", id)
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "search-tail", Title: "Search at 16 shards", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Every search waits for the slowest of 16 shards.",
 		Story:   "Search is {{sharding|split over 16 shards}} and the app server asks all of them and waits for every answer. Each shard answers in about 30 ms, but some answers take far longer, and {{tail-latency-amplification|with 16 shards nearly every search meets one of them}}. The architecture is fixed; tune the fan-out.",
@@ -40,7 +57,9 @@ func registerResourceLimits() {
 		Debrief: "{{tail-latency-amplification|Waiting for all N answers makes latency the maximum of N draws}}, so tail latency grows with fan-out. Answering on the first K, hedging slow calls, or allowing partial results trade completeness or extra load for a much shorter tail.",
 		Deeper:  "{{tail-latency-amplification|When a request waits for all N shards its latency is the maximum of N draws}}, and the chance that at least one shard is slow grows quickly with N, so the tail gets worse as you add shards even if every shard is healthy. Answering on the first K trades completeness for latency, so the response must say it is partial and you must know how much relevance you give up; hedging a slow shard to a replica trades extra load for a shorter tail but only works when the slowness is independent between copies. At larger scale you limit fan-out with routing or tiered indexes and keep replicas per shard so a hedge has somewhere to go. An interviewer will ask how you choose K and how you spot a shard that is slow every time, which calls for ejecting it rather than hedging around it. The failure pattern is hedging during overload: the extra requests make every shard slower and the tail gets worse.",
 	})
+}
 
+func (c *catalog) addCelebrityPost() {
 	// A celebrity's post is pushed into millions of timelines. Config only: stop pushing for the few huge accounts.
 	celebrity := func(fixed bool) engine.Diagram {
 		app := P{"threads": 32.0, "queueCap": 500.0}
@@ -54,7 +73,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "queueCap": 500.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "celebrity-post", Title: "The celebrity post", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Most posts are fine, but a few accounts make the whole feed stall.",
 		Story:   "Every post is copied into each follower's timeline when it is written, so reads are fast. Most accounts have a few dozen followers, but {{hot-key|a handful have tens of thousands}}, and every time one of them posts the database is buried under timeline inserts. The architecture is fixed; change how the feed is built.",
@@ -71,7 +90,9 @@ func registerResourceLimits() {
 			Explain: "Fan-out on write spends effort once per follower; fan-out on read spends it once per reader. A hybrid pays the cheap side for each kind of account."}},
 		Debrief: "Push makes reads cheap and writes proportional to the audience; pull makes writes cheap and reads proportional to who you follow. With heavy skew a hybrid wins: push for the many small accounts and pull {{hot-key|the few giants}}.",
 	})
+}
 
+func (c *catalog) addImageEgress() {
 	// Image downloads billed per GB: every view pays egress unless a CDN answers it
 	imageFeed := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -87,7 +108,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "image-egress", Title: "The image feed bill", Difficulty: "Medium",
 		Summary: "Everything works, but the cloud bill is shocking.",
 		Story:   "An image feed serves 100 views a second, each a 300 KB picture fetched from the image store, which charges for every GB that leaves it. The pages are fast and nothing fails, but finance wants the hourly bill under $2.50.",
@@ -104,7 +125,9 @@ func registerResourceLimits() {
 			Explain: "Views are skewed, so a small cache catches the popular ones, but every miss still downloads from the store and pays for it."}},
 		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN {{cache-hit-rate|sized to the popular set}} turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest. Data transfer has a cost, so {{distributed-system-pitfalls|transport is not free}}.",
 	})
+}
 
+func (c *catalog) addVideoUpload() {
 	// Video uploads of 10 MB at 6 a second need 480 Mbit/s on every hop: the link to the store is sized for far less
 	videoUpload := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -123,7 +146,7 @@ func registerResourceLimits() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "video-upload", Title: "Video uploads", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Short uploads work, but videos time out.",
 		Story:   "Creators upload clips of about 10 MB, six a second at the evening peak. The app server streams each one to the video store over a 200 Mbit/s link. In testing with tiny files everything was fine; at the peak most uploads time out after 4 seconds.",
@@ -140,7 +163,9 @@ func registerResourceLimits() {
 			Explain: "Parallel uploads still squeeze through one link. When a link is the limit, adding workers only adds more bytes waiting for it."}},
 		Debrief: "Bandwidth is a capacity like any other: {{throughput|bytes per second in must be less than the link can carry}}. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones. {{distributed-system-pitfalls|Bandwidth is finite}}.",
 	})
+}
 
+func (c *catalog) addGcStorm() {
 	// GC storm: long stop-the-world pauses on every app server. Config only: tune the pauses, do not paper over them.
 	gcStorm := func(fixed bool) engine.Diagram {
 		pause := 1500.0
@@ -152,13 +177,13 @@ func registerResourceLimits() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
 			n("db", engine.KDatabase, cols[3], rowMid, nil).
 			e("users", "lb")
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			id := fmt.Sprintf("app%d", k+1)
 			b.n(id, engine.KAppServer, cols[2], float64(k)*110+60, P{"threads": 16.0, "gcPauseMs": pause, "gcEverySec": 8.0}).e("lb", id).e(id, "db")
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "gc-storm", Title: "The GC storm", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Averages look fine, yet one request in seven fails.",
 		Story:   "Each app server freezes for a second and a half every eight seconds or so (a stop-the-world garbage collection after a heap change). During a pause nothing on that server answers, and the clients give up after 800 ms. The {{p50|median latency}} is healthy, which is why nobody noticed.",
@@ -175,7 +200,9 @@ func registerResourceLimits() {
 			Explain: "A retry reaches a healthy server, so more requests succeed, but each rescued request has already waited out its timeout: the tail gets worse."}},
 		Debrief: "A stop-the-world pause is invisible in averages and brutal at the tail. Retries and extra servers mask it at a cost; the real fix is a shorter pause. Watch {{p99}} and the timeouts, not the mean.",
 	})
+}
 
+func (c *catalog) addDiskWrites() {
 	// Disk full of writes: every secondary index is another disk write per row, against a disk with a fixed IOPS budget
 	diskWrites := func(fixed bool) engine.Diagram {
 		idx := 3.0
@@ -188,7 +215,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0, "diskIops": 200.0, "indexes": idx}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "disk-writes", Title: "The disk full of writes", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The database is mostly idle on paper, yet writes queue and time out.",
 		Story:   "A write-heavy service (80 requests a second, mostly writes) runs on a database whose disk does 200 operations a second. Years ago someone added three secondary indexes for a report nobody opens any more. CPU and connections look fine, but writes pile up and time out.",
@@ -205,7 +232,9 @@ func registerResourceLimits() {
 			Explain: "Each write must update every index as well as the table. With no reads using them, they only cost disk writes."}},
 		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
 	})
+}
 
+func (c *catalog) addOneHeavyQuery() {
 	// A few expensive requests hold every thread: head-of-line blocking. Config only: give the server more threads.
 	oneHeavy := func(fixed bool) engine.Diagram {
 		threads := 16.0
@@ -218,7 +247,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 64.0, "readMs": 2.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "one-heavy-query", Title: "One heavy query", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One request in twenty is expensive, and everyone suffers.",
 		Story:   "A search page answers in 20 ms, except that one request in twenty runs a report that takes 800 ms of server time. The server has {{thread-pool|16 threads}}. Most requests are light, yet the whole site goes slow in waves and some time out.",
@@ -235,7 +264,9 @@ func registerResourceLimits() {
 			Explain: "Every request shares the same threads. A few long requests occupy a large share of thread-time, so the quick ones wait behind them."}},
 		Debrief: "{{throughput|Throughput}} is not the only budget: a small share of expensive requests can take most of the worker time and make the cheap majority slow. Look at latency by request type, and {{bulkhead|keep heavy work from sharing the pool the light work needs}}.",
 	})
+}
 
+func (c *catalog) addNobodyOnCall() {
 	// Write skew: each doctor leaves after checking the other is still on call. Config only: raise the isolation level.
 	onCall := func(fixed bool) engine.Diagram {
 		iso := "readCommitted"
@@ -248,7 +279,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "isolation": iso}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "nobody-on-call", Title: "Nobody on call", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "Every rule is checked, and the rule still breaks.",
 		Story:   "A rota has pairs of doctors and the rule is that at least one of each pair stays on call. A doctor going off call first checks that the partner is still on. Nobody ever writes the partner's row, yet some nights both doctors in a pair are off at once.",
@@ -266,7 +297,9 @@ func registerResourceLimits() {
 		Debrief: "Write skew is the anomaly snapshot isolation misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
 		Deeper:  "Write skew happens when two transactions read an overlapping set of rows, each decides it is safe, and each writes a different row, so snapshot isolation sees no conflict even though the rule across the rows is broken. You have three fixes: run the transactions serializably and accept aborts that the client must retry, lock the rows the rule reads, or turn the rule into something the database enforces, for example by making both writers touch one row that represents the pair. At larger scale the rule gets harder when the rows live on {{sharding|different shards}}, which is a reason to keep an invariant inside one partition. An interviewer will ask for other examples such as booking the same room or spending from two accounts, and what your database really means by repeatable read, because the name does not guarantee the same behaviour everywhere. The failure is silent: nothing errors and the broken invariant is noticed by a person, as in this story.",
 	})
+}
 
+func (c *catalog) addSlowQuery() {
 	// The slow query: most reads look an item up by a field other than its key, and there is no index for it
 	slowQuery := func(fixed bool) engine.Diagram {
 		idx := 0.0
@@ -279,7 +312,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "indexes": idx}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "slow-query", Title: "The slow query", Difficulty: "Easy", ConfigOnly: true,
 		Summary: "Most reads search by email, and the database reads every row to find it.",
 		Story:   "Sixty percent of reads look an account up by its email address, not its id. The table has no index on email, so each of those reads scans the table and takes twenty times as long as a lookup by id. At the lunchtime peak {{backpressure|the database queue fills and requests are refused}}.",
@@ -296,7 +329,9 @@ func registerResourceLimits() {
 			Explain: "Every write also updates each index, so a read speed-up is paid for with a small write cost. Worth it when reads dominate."}},
 		Debrief: "A lookup on an unindexed field is a full scan. An index trades a little write cost and storage for turning that scan into a seek. Check the access paths your queries really use.",
 	})
+}
 
+func (c *catalog) addPickTheStore() {
 	// Pick the store: a sensor firehose. The write path of the relational baseline is the bottleneck
 	pickStore := func(fixed bool) engine.Diagram {
 		model := "relational"
@@ -309,7 +344,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "model": model, "queueCap": 500.0}).
 			e("sensors", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "pick-the-store", Title: "Pick the store", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Seven hundred sensor readings a second overwhelm a general-purpose database.",
 		Story:   "Sensors send 700 readings a second and nothing ever reads them back in real time. The readings go into a relational database that spends the same effort on each insert as on an order, and {{backpressure|a quarter of them are refused when its queue fills}}.",
@@ -326,7 +361,9 @@ func registerResourceLimits() {
 			Explain: "Appending to the end of a log-structured layout avoids random in-place updates, so each write costs a fraction of a general-purpose engine's."}},
 		Debrief: "Match the store to the access pattern. Append-heavy, rarely-read data fits an append-optimised layout; paying a general-purpose engine's cost per row for a firehose is how a database becomes the bottleneck.",
 	})
+}
 
+func (c *catalog) addLastHour() {
 	// The last hour of readings: an index makes the range cheap but slows every write; the right layout does neither
 	lastHour := func(fixed bool) engine.Diagram {
 		model := "relational"
@@ -339,7 +376,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "model": model, "queueCap": 500.0, "readMs": 10.0, "writeMs": 10.0}).label("db", "Readings").
 			e("sensors", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "last-hour", Title: "The last hour of readings", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The dashboard asks for a time range and the database reads every row to find it.",
 		Story:   "Sensors write 1,260 readings a second, and a dashboard reads the latest 500 readings of a sensor about 140 times a second. The readings sit in a relational database with no index on the time, so each dashboard read scans the whole table. Serve at least 97% of requests with a {{p95|p95}} under 300 ms.",
@@ -356,7 +393,9 @@ func registerResourceLimits() {
 			Explain: "An index is a second structure that every write must update, so reads gain what writes pay."}},
 		Debrief: "How cheap a range read is depends on how the store lays out its data. A relational or document store answers it from an index, which every write must then keep up to date. A wide-column store reads efficiently by its partition key and has no other access path, so a range over another field touches every partition. A time-series store keeps rows in time order, so a time range is one sequential read and writes are appends. Choose the store for the shape of the questions, not the other way round.",
 	})
+}
 
+func (c *catalog) addPoisonPill() {
 	// Poison pill: a malformed job is retried ten times, burning worker time, and then vanishes
 	poisonPill := func(fixed bool) engine.Diagram {
 		attempts, dlq := 10.0, false
@@ -371,7 +410,7 @@ func registerResourceLimits() {
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "app").e("app", "q").e("q", "w").e("w", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "poison-pill", Title: "The poison pill", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "One in eight messages can never be processed, and everything else queues behind them.",
 		Story:   "A bad deploy upstream means about 12% of the messages are malformed. The queue tries each one ten times, every try occupying a worker for its full processing time, and then silently drops it. Healthy messages wait behind the retries and nobody can find out what was dropped.",
@@ -388,7 +427,9 @@ func registerResourceLimits() {
 			Explain: "Fewer retries stop the waste, but a job that used up its attempts is gone. A dead-letter queue keeps it where someone can look at it."}},
 		Debrief: "Retries help against transient failures and hurt against permanent ones. Bound the attempts, back off, and route what still fails to a {{dead-letter-queue|dead-letter queue}} so it is visible and recoverable instead of lost.",
 	})
+}
 
+func (c *catalog) addConsumerLag() {
 	// Consumer lag: eight consumers, four partitions
 	consumerLag := func(fixed bool) engine.Diagram {
 		parts := 4.0
@@ -401,13 +442,13 @@ func registerResourceLimits() {
 			n("log", engine.KLog, cols[2], rowMid, P{"partitions": parts, "capacity": 50000.0}).
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "app").e("app", "log")
-		for k := 0; k < 8; k++ {
+		for k := range 8 {
 			id := fmt.Sprintf("c%d", k+1)
 			b.n(id, engine.KWorker, cols[3], float64(k)*60, P{"concurrency": 2.0, "processMs": 100.0}).label(id, fmt.Sprintf("Consumer %d", k+1)).e("log", id).e(id, "db")
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "consumer-lag", Title: "Consumer lag", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Eight consumers, and the backlog still grows.",
 		Story:   "Events stream into a {{sharding|partitioned}} log read by eight consumers, each able to handle several messages at once. Yet the backlog grows all day and processing falls further and further behind. Adding yet more consumers was already tried.",
@@ -424,7 +465,9 @@ func registerResourceLimits() {
 			Explain: "Within a consumer group each partition is assigned to exactly one member, so parallelism is capped by the partition count."}},
 		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the {{throughput|throughput}} you will need, since changing it later also changes how keys map to partitions.",
 	})
+}
 
+func (c *catalog) addHotCell() {
 	// Hot cell: location pings from one busy city all land on the shard that owns that map cell
 	hotCell := func(fixed bool) engine.Diagram {
 		by := "key"
@@ -436,13 +479,13 @@ func registerResourceLimits() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 2000.0, "dbPool": 200.0}).
 			n("shards", engine.KShardRouter, cols[2], rowMid, P{"shardBy": by}).
 			e("users", "app").e("app", "shards")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("r%d", k+1)
 			b.n(id, engine.KRedis, cols[3], float64(k)*100+30, P{"scoreMs": 4.0}).e("shards", id)
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "hot-cell", Title: "The hot cell", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Four shards, and one of them is on fire.",
 		Story:   "A ride-sharing app stores driver locations in {{sharding|four shards}}, split by map cell. Most pings come from the one busy city centre, so the shard that owns that cell takes most of the load while the other three idle. Adding shards was already tried: the {{hot-key|hot cell}} stays on a single one.",

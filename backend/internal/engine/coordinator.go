@@ -256,7 +256,7 @@ func (s *Sim) memberHit(c *call, j int, until, pct float64, salt uint32) bool {
 	if c.at != nil {
 		attempt = uint32(c.at.n)
 	}
-	return float64(Hash32(uint32(c.rid)*2654435761+salt+uint32(j)*97+attempt*7919)%100) < pct
+	return float64(hash32(uint32(c.rid)*2654435761+salt+uint32(j)*97+attempt*7919)%100) < pct
 }
 
 // coordVote decides one request that goes to the group of members. It reports whether the group answered, and whether
@@ -269,7 +269,7 @@ func (s *Sim) coordVote(n *node, c *call) (answered, wrong bool) {
 	members := len(n.coordDown)
 	f.fit(members)
 	honest, liars := 0, 0
-	for j := 0; j < members; j++ {
+	for j := range members {
 		if !s.coordUp(n, j) || s.memberHit(c, j, f.muteUntil[j], f.mutePct[j], 11) {
 			continue // down, or it drops this request
 		}

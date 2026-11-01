@@ -77,8 +77,8 @@ func TestLinkFaultSettingsAreSanitized(t *testing.T) {
 	d := faultyLink(10, 20)
 	d.Edges[1].LossPct, d.Edges[1].JitterMs = -3, 99999
 	out, adjusted := Sanitize(d)
-	if out.Edges[1].LossPct != 0 || out.Edges[1].JitterMs != MaxJitterMs || !adjusted {
-		t.Fatalf("negative loss dropped, huge jitter clamped to %v: %+v adjusted=%v", MaxJitterMs, out.Edges[1], adjusted)
+	if out.Edges[1].LossPct != 0 || out.Edges[1].JitterMs != maxJitterMs || !adjusted {
+		t.Fatalf("negative loss dropped, huge jitter clamped to %v: %+v adjusted=%v", maxJitterMs, out.Edges[1], adjusted)
 	}
 	d.Edges[1].LossPct = 250
 	if out, _ := Sanitize(d); out.Edges[1].LossPct != 100 {

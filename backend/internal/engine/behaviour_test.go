@@ -60,7 +60,7 @@ func TestAClosedCrowdBelowCapacityIsLimitedByThinkTime(t *testing.T) {
 func arrivalCounts(s *Sim, seconds int) []float64 {
 	out := make([]float64, 0, seconds)
 	prev := s.logicalSeq
-	for i := 0; i < seconds; i++ {
+	for range seconds {
 		s.Advance(1000)
 		out = append(out, float64(s.logicalSeq-prev))
 		prev = s.logicalSeq

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"time"
@@ -95,6 +95,7 @@ type session struct {
 	lastStat   time.Time
 	active     time.Time // last client message, or the last moment the simulation was running
 	idle       time.Duration
+	log        *slog.Logger
 }
 
 func emptyStats() *engine.Stats {
@@ -145,13 +146,15 @@ func (s *Server) sim(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	ss := &session{conn: conn, seed: 42, speed: 1, status: "stopped", active: time.Now(), idle: s.idle}
+	ss := &session{conn: conn, seed: 42, speed: 1, status: "stopped", active: time.Now(), idle: s.idle, log: s.log}
 	ticker := time.NewTicker(frameEvery)
 	defer ticker.Stop()
 	ss.send(ctx, frameMsg{Type: "frame", Status: ss.status, Speed: ss.speed, Stats: emptyStats()})
 	for {
 		select {
 		case <-ctx.Done():
+			return
+		case <-s.done:
 			return
 		case m := <-in:
 			ss.active = time.Now()
@@ -169,7 +172,7 @@ func (s *Server) sim(w http.ResponseWriter, r *http.Request) {
 func (ss *session) send(ctx context.Context, v any) bool {
 	data, err := json.Marshal(v)
 	if err != nil {
-		log.Printf("marshal: %v", err)
+		ss.log.ErrorContext(ctx, "marshal frame", "error", err)
 		return true
 	}
 	wctx, cancel := context.WithTimeout(ctx, 5*time.Second)

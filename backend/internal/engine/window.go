@@ -1,23 +1,24 @@
 package engine
 
-import "sort"
+import "slices"
 
-// Window is an append-only sliding window of (time, ok, latency) samples.
-type Window struct {
+// reqWindow is an append-only sliding window of (time, ok, latency) samples.
+type reqWindow struct {
 	t    []float64
 	ok   []bool
 	lat  []float64
 	head int
 }
 
-func (w *Window) Push(t float64, ok bool, lat float64) {
+// Push records one finished request: when it ended, whether it succeeded and its latency.
+func (w *reqWindow) Push(t float64, ok bool, lat float64) {
 	w.t = append(w.t, t)
 	w.ok = append(w.ok, ok)
 	w.lat = append(w.lat, lat)
 }
 
-// Prune drops samples with time <= before.
-func (w *Window) Prune(before float64) {
+// prune drops samples with time <= before.
+func (w *reqWindow) prune(before float64) {
 	for w.head < len(w.t) && w.t[w.head] <= before {
 		w.head++
 	}
@@ -29,7 +30,7 @@ func (w *Window) Prune(before float64) {
 	}
 }
 
-func (w *Window) first(after float64) int {
+func (w *reqWindow) first(after float64) int {
 	lo, hi := w.head, len(w.t)
 	for lo < hi {
 		m := (lo + hi) / 2
@@ -49,7 +50,8 @@ type WindowStats struct {
 	Mean          float64
 }
 
-func (w *Window) Stats(after float64) WindowStats {
+// Stats summarises the requests that ended after the given time.
+func (w *reqWindow) Stats(after float64) WindowStats {
 	var s WindowStats
 	var lats []float64
 	var sum float64
@@ -62,7 +64,7 @@ func (w *Window) Stats(after float64) WindowStats {
 			s.Failed++
 		}
 	}
-	sort.Float64s(lats)
+	slices.Sort(lats)
 	q := func(p float64) float64 {
 		if len(lats) == 0 {
 			return 0
@@ -84,4 +86,4 @@ func (w *Window) Stats(after float64) WindowStats {
 }
 
 // Count returns the number of samples newer than `after`.
-func (w *Window) Count(after float64) int { return len(w.t) - w.first(after) }
+func (w *reqWindow) Count(after float64) int { return len(w.t) - w.first(after) }

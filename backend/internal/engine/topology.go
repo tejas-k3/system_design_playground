@@ -1,7 +1,5 @@
 package engine
 
-import "math"
-
 // Topology: building the node and edge graph and applying live edits (Sync).
 
 func (s *Sim) addNode(d Node) *node {
@@ -28,12 +26,6 @@ func (s *Sim) addNode(d Node) *node {
 		if n.b("abuse") {
 			s.hasAbuse = true
 		}
-		if n.s("workload") == "booking" {
-			s.hasBooking = true
-		}
-		if n.s("consistency") != "eventual" {
-			s.hasFresh = true
-		}
 	}
 	return n
 }
@@ -49,7 +41,7 @@ func (s *Sim) configStore(n *node) {
 	capItems := int(n.f("capacityItems"))
 	ttlMs := n.f("ttlSec") * 1000
 	if ttlMs > 0 {
-		ttlMs = math.Max(1, ttlMs-n.f("clockSkewMs")) // a clock ahead sees the stamped lifetime as shorter
+		ttlMs = max(1, ttlMs-n.f("clockSkewMs")) // a clock ahead sees the stamped lifetime as shorter
 	}
 	pieces := s.rangePiecesOf(n)
 	if pieces > 0 { // the item limit counts whole objects: it allows that many pieces
@@ -69,16 +61,16 @@ func (s *Sim) configStore(n *node) {
 		capItems = min(capItems, int(mb*1000/kb))
 	}
 	if n.store == nil || n.storePol != pol {
-		n.store = NewStore(pol, capItems, ttlMs, s.rng)
-		n.store.SetJitter(n.f("ttlJitterPct") / 100)
-		n.store.SetShortTTL(n.f("shortTtlPct"), math.Max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
+		n.store = newStore(pol, capItems, ttlMs, s.rng)
+		n.store.setJitter(n.f("ttlJitterPct") / 100)
+		n.store.setShortTTL(n.f("shortTtlPct"), max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
 		n.storePol = pol
 		return
 	}
-	n.c.evict += n.store.SetCapacity(capItems)
-	n.store.SetTTL(ttlMs)
-	n.store.SetJitter(n.f("ttlJitterPct") / 100)
-	n.store.SetShortTTL(n.f("shortTtlPct"), math.Max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
+	n.c.evict += n.store.setCapacity(capItems)
+	n.store.setTTL(ttlMs)
+	n.store.setJitter(n.f("ttlJitterPct") / 100)
+	n.store.setShortTTL(n.f("shortTtlPct"), max(1, n.f("shortTtlSec")*1000-n.f("clockSkewMs")))
 }
 
 func (s *Sim) addEdge(d Edge) {
@@ -164,13 +156,7 @@ func (s *Sim) Sync(d Diagram) {
 			n.zone, n.region = n.s("zone"), n.s("region")
 			s.configStore(n)
 			if n.kind == KRateLimiter {
-				n.tokens = math.Min(n.tokens, n.f("burst"))
-			}
-			if n.kind == KClient && n.s("workload") == "booking" {
-				s.hasBooking = true
-			}
-			if n.kind == KClient && n.s("consistency") != "eventual" {
-				s.hasFresh = true
+				n.tokens = min(n.tokens, n.f("burst"))
 			}
 		} else {
 			if n != nil {

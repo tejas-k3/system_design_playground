@@ -4,7 +4,7 @@ import "testing"
 
 func movedShare(a, b *kvRing, keys int) float64 {
 	moved := 0
-	for k := 0; k < keys; k++ {
+	for k := range keys {
 		if a.order(k, 1)[0] != b.order(k, 1)[0] {
 			moved++
 		}
@@ -27,7 +27,7 @@ func TestRingPlacementMovesOnlyAboutOneNth(t *testing.T) {
 		t.Errorf("removing a node should move 1/10 of the keys within 20%%: %.4f", rem)
 	}
 	mod := 0
-	for k := 0; k < keys; k++ {
+	for k := range keys {
 		if kvModFirst(k, 10) != kvModFirst(k, 11) {
 			mod++
 		}
@@ -42,7 +42,7 @@ func TestRingPlacementMovesOnlyAboutOneNth(t *testing.T) {
 func TestRingPreferenceListsAreDistinctAndBalanced(t *testing.T) {
 	r := newKVRing(10, 100)
 	count := make([]int, 10)
-	for k := 0; k < 20000; k++ {
+	for k := range 20000 {
 		o := r.order(k, 3)
 		if len(o) != 3 || o[0] == o[1] || o[1] == o[2] || o[0] == o[2] {
 			t.Fatalf("key %d: %v", k, o)

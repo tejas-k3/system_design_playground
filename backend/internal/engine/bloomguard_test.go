@@ -22,7 +22,7 @@ func guardRun(app Params) (*Sim, RunStats) {
 	d, _ := Sanitize(b.d)
 	s := New(d, Options{Seed: 8})
 	guardDB = 0
-	for i := 0; i < 120; i++ { // add up the database's answers second by second
+	for range 120 { // add up the database's answers second by second
 		s.Advance(1000)
 		guardDB += s.Snapshot().Nodes["db"].Ok
 	}

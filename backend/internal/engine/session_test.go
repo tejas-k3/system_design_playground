@@ -84,7 +84,7 @@ func writesFollowReadViolations(t *testing.T, copyVersion int) string {
 		"readMs": 0.1, "writeMs": 0.1, "variability": "steady",
 	})
 	client.down = true
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		s.bumpVer(1)
 	}
 	s.countSession(&logical{client: client, counted: true, key: 1}, Result{OK: true, Ver: 5})
@@ -221,7 +221,7 @@ func TestWritesFollowReadsIsJudgedOnHintedCopies(t *testing.T) {
 			"readMs": 0.1, "writeMs": 0.1, "variability": "steady",
 		})
 		client.down = true
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			s.bumpVer(1)
 		}
 		s.countSession(&logical{client: client, counted: true, key: 1}, Result{OK: true, Ver: 5})

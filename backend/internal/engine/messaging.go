@@ -209,7 +209,7 @@ func (s *Sim) runJob(q, w *node, j *job) {
 			fin(fail(RNodeDown))
 			return
 		}
-		if pct := w.f("poisonPct"); pct > 0 && float64(Hash32(uint32(j.rid)*2654435761+211)%100) < pct {
+		if pct := w.f("poisonPct"); pct > 0 && float64(hash32(uint32(j.rid)*2654435761+211)%100) < pct {
 			fin(fail(RPoisonJob)) // a malformed job fails the same way every time
 			return
 		}
@@ -368,7 +368,7 @@ func (s *Sim) arriveLog(n *node, c *call, cb func(Result)) {
 		return
 	}
 	parts := int(n.f("partitions"))
-	p := int(Hash32(uint32(c.key)*2654435761+7) % uint32(parts))
+	p := int(hash32(uint32(c.key)*2654435761+7) % uint32(parts))
 	if n.s("partitionBy") == "roundRobin" {
 		p = n.rrNext % parts
 		n.rrNext++

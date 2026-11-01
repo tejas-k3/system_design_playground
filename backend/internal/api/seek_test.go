@@ -148,12 +148,12 @@ func TestSeekMessageAnswersPausedAtThatTimeWithTheDesignThenAndErrorsBeforeARun(
 
 	sendMsg(t, c, ctx, clientMsg{Type: "init", Diagram: &sc.Diagram})
 	readType(t, c, ctx, "frame")
-	for i := 0; i < 80; i++ { // 8 simulated seconds
+	for range 80 { // 8 simulated seconds
 		sendMsg(t, c, ctx, clientMsg{Type: "step"})
 	}
 	bumped := bumpThreads(sc.Diagram, 3)
 	sendMsg(t, c, ctx, clientMsg{Type: "diagram", Diagram: &bumped})
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		sendMsg(t, c, ctx, clientMsg{Type: "step"})
 	}
 	sendMsg(t, c, ctx, clientMsg{Type: "seek", T: 5})

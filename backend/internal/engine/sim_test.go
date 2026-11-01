@@ -44,7 +44,7 @@ func stack(apps int, client, app, cache, db Params) *builder {
 		b.node("c", KCache, cache)
 		b.edge("c", "db")
 	}
-	for i := 0; i < apps; i++ {
+	for i := range apps {
 		id := fmt.Sprintf("a%d", i)
 		b.node(id, KAppServer, app)
 		b.edge("lb", id)
@@ -203,10 +203,10 @@ func TestCacheHitRateGrowsWithCapacity(t *testing.T) {
 }
 
 func TestEvictionPoliciesUnderScan(t *testing.T) {
-	r := NewRNG(1)
+	r := newPRNG(1)
 	for _, pol := range []string{"lru", "lfu", "fifo", "random"} {
-		s := NewStore(pol, 10, 0, r)
-		for i := 0; i < 1000; i++ {
+		s := newStore(pol, 10, 0, r)
+		for i := range 1000 {
 			s.Set(0, i%37, i)
 			if s.Size() > 10 {
 				t.Fatalf("%s: size %d > cap", pol, s.Size())
@@ -214,7 +214,7 @@ func TestEvictionPoliciesUnderScan(t *testing.T) {
 			s.Get(0, (i*7)%37)
 		}
 	}
-	lru := NewStore("lru", 2, 0, r)
+	lru := newStore("lru", 2, 0, r)
 	lru.Set(0, 1, 1)
 	lru.Set(0, 2, 1)
 	lru.Get(0, 1)
@@ -222,7 +222,7 @@ func TestEvictionPoliciesUnderScan(t *testing.T) {
 	if _, hit, _ := lru.Get(0, 2); hit {
 		t.Fatal("lru kept least recently used")
 	}
-	ttl := NewStore("lru", 2, 100, r)
+	ttl := newStore("lru", 2, 100, r)
 	ttl.Set(0, 1, 1)
 	if _, hit, exp := ttl.Get(200, 1); hit || !exp {
 		t.Fatal("ttl did not expire")
@@ -365,7 +365,7 @@ func BenchmarkLargeDesign(b *testing.B) {
 	bd.node("u", KClient, Params{"rps": 1000.0, "readPct": 90.0}).node("lb", KLoadBalancer, nil).edge("u", "lb")
 	bd.node("db", KDatabase, Params{"connections": 64.0}).node("rep", KReplica, nil).node("c", KCache, nil).node("q", KQueue, nil).node("w", KWorker, nil)
 	bd.edge("c", "db").edge("q", "w").edge("w", "db")
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		id := fmt.Sprintf("a%d", i)
 		bd.node(id, KAppServer, Params{"threads": 16.0}).edge("lb", id).edge(id, "c").edge(id, "rep").edge(id, "db").edge(id, "q")
 	}

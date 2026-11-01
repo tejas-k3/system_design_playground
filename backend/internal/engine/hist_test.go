@@ -5,7 +5,7 @@ import "testing"
 func TestLatencyBucketsAddUpAndContainTheQuantiles(t *testing.T) {
 	s := run(stack(2, Params{"rps": 150.0, "readPct": 100.0}, Params{}, nil, nil).d, Options{Seed: 3}, 20)
 	r := s.RunSnapshot()
-	if len(r.LatencyBuckets) != len(LatencyBounds)+1 {
+	if len(r.LatencyBuckets) != len(latencyBounds)+1 {
 		t.Fatalf("one bucket per bound plus an overflow bucket, got %d", len(r.LatencyBuckets))
 	}
 	total := 0
@@ -48,9 +48,9 @@ func TestLatencyBucketsAddUpAndContainTheQuantiles(t *testing.T) {
 }
 
 func TestLatencyBucketBoundsAreFixedAndIncreasing(t *testing.T) {
-	for i := 1; i < len(LatencyBounds); i++ {
-		if LatencyBounds[i] <= LatencyBounds[i-1] {
-			t.Fatalf("bounds must increase: %v", LatencyBounds)
+	for i := 1; i < len(latencyBounds); i++ {
+		if latencyBounds[i] <= latencyBounds[i-1] {
+			t.Fatalf("bounds must increase: %v", latencyBounds)
 		}
 	}
 }

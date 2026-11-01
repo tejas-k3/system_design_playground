@@ -126,7 +126,7 @@ func (s *Sim) fireChaos(ev ChaosEvent) {
 		}
 		return
 	}
-	factor := math.Max(1, ev.Factor)
+	factor := max(1, ev.Factor)
 	s.logEvent("slow", t, 0)
 	t.slow = factor
 	t.slowUntil = s.now + ev.DurationSec*1000
@@ -340,7 +340,7 @@ func (s *Sim) syncReplicaCost(db *node) (wait float64, down bool) {
 		if r.down {
 			return 0, true
 		}
-		wait = math.Max(wait, r.f("writeMs")+10)
+		wait = max(wait, r.f("writeMs")+10)
 	}
 	return wait, false
 }
@@ -492,7 +492,7 @@ func (s *Sim) changeEvent(ev ChaosEvent) {
 		s.logEvent("badDeploy", n, 0)
 		switch ev.Mode {
 		case "slow":
-			n.slow, n.slowUntil = math.Max(2, ev.Factor), until
+			n.slow, n.slowUntil = max(2, ev.Factor), until
 			if ev.Factor <= 1 {
 				n.slow = 5
 			}

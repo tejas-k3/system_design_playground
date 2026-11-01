@@ -5,7 +5,19 @@ import (
 )
 
 // registerServicePatterns registers crawlers, LLM serving, load shedding, URL shortener and rate limiting.
-func registerServicePatterns() {
+func (c *catalog) registerServicePatterns() {
+	c.addPoliteCrawler()
+	c.addSlowFirstToken()
+	c.addRagUnderLoad()
+	c.addTheGpuBudget()
+	c.addShedTheCheapTraffic()
+	c.addUrlShortener()
+	c.addRateLimiterShowdown()
+	c.addTypeaheadIndex()
+	c.addCrawlDedup()
+}
+
+func (c *catalog) addPoliteCrawler() {
 	// Polite crawler: the sites it fetches from refuse a crawler that comes in rushes
 	politeCrawler := func(fixed bool) engine.Diagram {
 		app := P{"threads": 16.0, "queueCap": 500.0, "hostChoice": "byKey"}
@@ -22,7 +34,7 @@ func registerServicePatterns() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "polite-crawler", Title: "The polite crawler", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The sites keep answering 429 to the crawler, and it is about to be blocked.",
 		Story:   "A crawler fetches pages from three sites. Its work arrives in rushes, so for a couple of seconds at a time it asks one site for 16 pages a second, while each site says it will serve a crawler at most 8 a second and answers {{load-shedding|429 (too many requests)}} beyond that. Over a whole minute the crawler is nowhere near the limit, but the sites do not average: a crawler that keeps getting 429 gets blocked for good.",
@@ -39,7 +51,9 @@ func registerServicePatterns() {
 			Explain: "A limit is a ceiling: a rush that used to be refused now queues. Nothing is lost, but pages wait their turn, and a limit below the average load would make the queue grow without end."}},
 		Debrief: "Politeness is a per-host rate limit on the crawler itself, usually with {{bulkhead|a queue per host}} so that waiting for one slow or strict site does not block the others. The average rate is what you plan capacity with, but the peak rate decides whether you get blocked.",
 	})
+}
 
+func (c *catalog) addSlowFirstToken() {
 	// Slow first token: a chat service on one GPU whose batch is far too small for the traffic
 	slowFirstToken := func(fixed bool) engine.Diagram {
 		llm := P{"gpus": 1.0, "batchSize": 4.0, "kvCacheTokens": 32000.0, "promptTokens": 500.0, "outputTokens": 150.0, "queueCap": 400.0}
@@ -53,7 +67,7 @@ func registerServicePatterns() {
 			n("model", engine.KLLMServer, cols[2], rowMid, llm).label("model", "Chat model").
 			e("users", "chat").e("chat", "model").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "slow-first-token", Title: "Slow first token", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Users stare at a blank chat for seconds before the first word appears.",
 		Story:   "A chat assistant runs on one GPU. Users do not mind the answer streaming in word by word, but they stare at a blank screen for many seconds before the first word appears: the time to first token is the whole problem. The GPU takes only four answers at a time, and three new requests arrive every second, each needing about one second of GPU time at that batch size. The budget is about six dollars an hour in all, which pays for one GPU, not two.",
@@ -70,7 +84,9 @@ func registerServicePatterns() {
 			Explain: "Each decode step is a little longer with more answers sharing it, but a step produces a token for every answer in the batch. Batching trades a little speed per answer for a lot more answers per second."}},
 		Debrief: "A GPU's {{throughput|throughput}} comes from batching: decoding is limited by reading the model, which is shared by every answer in the batch. The limits are the KV cache (memory for every answer in progress) and the per-answer slowdown. Time to first token is mostly queueing, so fix the throughput, not the prompt reading.",
 	})
+}
 
+func (c *catalog) addRagUnderLoad() {
 	// RAG under load: document search that finds everything but cannot keep up
 	ragSearch := func(fixed bool) engine.Diagram {
 		ef := 512.0
@@ -83,7 +99,7 @@ func registerServicePatterns() {
 			n("docs", engine.KVectorStore, cols[2], rowMid, P{"vectors": 20.0, "dims": 768.0, "efSearch": ef, "connections": 4.0, "queueCap": 300.0}).label("docs", "Document search").
 			e("users", "api").e("api", "docs").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "rag-under-load", Title: "Search under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The document search finds everything, and answers nobody in time.",
 		Story:   "An assistant looks up documents in a vector index before it answers: twenty million passages, searched approximately. Whoever set it up asked for the best recall they could get, so every search examines hundreds of candidates and finds nearly all the true neighbours. At 150 searches a second the four search cores cannot keep up, the queue grows and users time out. Retrieval should still find at least nine of every ten true neighbours.",
@@ -100,7 +116,9 @@ func registerServicePatterns() {
 			Explain: "Recall climbs steeply at first and then flattens: the last candidates add little. Time grows steadily with every candidate, so the extra recall at the top is the most expensive part."}},
 		Debrief: "Approximate nearest-neighbour search is a dial between recall and latency, and the top of the dial is steep: 99% recall costs far more than 94%. Pick the recall the application needs, not the maximum, and spend the saved time on capacity.",
 	})
+}
 
+func (c *catalog) addTheGpuBudget() {
 	// The GPU budget: a few huge prompts stall the one GPU the budget pays for
 	gpuBudget := func(fixed bool) engine.Diagram {
 		lim := P{"limitRps": 1000.0, "burst": 1000.0}
@@ -114,7 +132,7 @@ func registerServicePatterns() {
 			n("model", engine.KLLMServer, cols[3], rowMid, P{"gpus": 1.0, "batchSize": 32.0, "kvCacheTokens": 200000.0, "outputTokens": 60.0, "queueCap": 400.0}).label("model", "Chat model").
 			e("users", "gate").e("gate", "chat").e("chat", "model").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "the-gpu-budget", Title: "The GPU budget", Difficulty: "Hard", ConfigOnly: true,
 		Summary: "One user in ten pastes a book, and everyone else's first word takes seconds.",
 		Story:   "A chat assistant runs on the one GPU the budget pays for. Most prompts are short, but one in ten carries twenty times as many tokens (someone pasted a whole document), and reading ten thousand tokens takes the GPU two and a half seconds during which it writes nothing for anyone. The request limiter in front counts requests, so it sees nothing unusual: two a second, as always. Everyone waits for the first word, and a second GPU is not in the budget.",
@@ -132,7 +150,9 @@ func registerServicePatterns() {
 		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. {{load-shedding|Limiting by tokens}} (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
 		Deeper:  "In an LLM service the cost of a request is its tokens, not its count: reading a long prompt keeps the GPU busy while it writes nothing for anyone, so one pasted document delays everyone's first word. A limiter that counts tokens charges the prompt up front, since the answer length is not yet known, and can settle the difference when the answer is finished; capping the prompt length and billing per token pushes the same pressure back onto users. In practice you also {{bulkhead|separate long prompts onto their own pool}} or priority, and split a long read into chunks so the decode work for other users is not blocked behind it. An interviewer will ask how to be fair per tenant rather than globally, and what the memory for the attention cache does to your batch size. The failure pattern is head-of-line blocking: a few expensive requests that look identical to cheap ones at the door.",
 	})
+}
 
+func (c *catalog) addShedTheCheapTraffic() {
 	// Shed the cheap traffic: more arrives than the server can do, and a deep queue makes every request wait out its timeout
 	shedCheap := func(fixed bool) engine.Diagram {
 		app := P{"threads": 8.0, "queueCap": 2000.0}
@@ -145,7 +165,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 32.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "shed-the-cheap-traffic", Title: "Shed the cheap traffic", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "More traffic than the server can do, and a long queue makes everyone give up.",
 		Story:   "Midday traffic is 400 requests a second and the app server can finish about 250. Excess requests wait in a queue that holds 2,000 of them, and a request that waited two seconds is abandoned by its user, so most of the work is spent on answers nobody is waiting for. One request in five is marked urgent (checkouts); the rest can be asked again later.",
@@ -162,7 +182,9 @@ func registerServicePatterns() {
 			Explain: "An overloaded server with a deep queue serves requests so late that their users have left: very little of its work counts. Shedding spends the same capacity on requests that are still wanted."}},
 		Debrief: "Overload is not fixed by queueing more. Bound the wait, {{load-shedding|shed the requests that can be retried}}, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
 	})
+}
 
+func (c *catalog) addUrlShortener() {
 	// URL shortener: millions of reads of short links, and every new link takes its number from one counter row
 	urlShortener := func(fixed bool) engine.Diagram {
 		app := P{"threads": 64.0, "queueCap": 1000.0, "dbPool": 60.0}
@@ -183,7 +205,7 @@ func registerServicePatterns() {
 		}
 		return b.done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "url-shortener", Title: "The URL shortener", Difficulty: "Medium",
 		Summary: "Short links are read hundreds of times for every one created, and every new link takes its number from one counter row.",
 		Story:   "Visitors follow short links at 1,200 a second, {{hot-key|a few viral ones far more than the rest}}, and new links are created at 70 a second. Every read goes to the database, which can answer about 600 a second at best. Each new link also takes the next number from a single counter row, and the row lock lets one such write through every 20 ms: 50 a second, while 70 are asked for. The waiting writes hold {{connection-pool|database connections}} that the readers need.",
@@ -200,7 +222,9 @@ func registerServicePatterns() {
 			Explain: "A cache absorbs repeated reads. Creating a link is a write, and every write to the counter row still has to take its turn at the database."}},
 		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and {{cache-hit-rate|the database is left with the misses}}. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
 	})
+}
 
+func (c *catalog) addRateLimiterShowdown() {
 	// Rate limiter showdown: a partner's job fires a burst on the second, across the edge of the limiter's window
 	var edgeSpikes []engine.TrafficPoint
 	edgeSpikes = append(edgeSpikes, engine.TrafficPoint{0, 100})
@@ -216,7 +240,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 7.0, "readMs": 20.0}).
 			e("users", "rl").e("rl", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "rate-limiter-showdown", Title: "Rate limiter showdown", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "The limiter promises 300 requests a second, and the database sees twice that for a moment.",
 		Story:   "A partner's batch job fires a burst of requests every other second, centred on the instant the clock ticks over, on top of a steady trickle of other users. The rate limiter promises no more than 300 requests a second to a database that does about 350, yet the database is drowning for a second after every burst. The limiter counts requests in fixed one-second windows that reset on the clock: half of each burst lands at the end of one window and half at the start of the next, and each half is given a full allowance. Most of the burst has to be {{load-shedding|turned away}} either way.",
@@ -234,7 +258,9 @@ func registerServicePatterns() {
 			Explain: "Each window has its own count: the last moments of one window and the first moments of the next can each admit the whole allowance."}},
 		Debrief: "Every rate-limiting algorithm makes a different promise at the boundary. A fixed window is cheap but allows up to twice the limit across its edge; a sliding log is exact and costs memory per request; a sliding counter is cheap and close; a token bucket allows a burst up to its size and then a steady rate. Pick the one whose worst case your backend can survive.",
 	})
+}
 
+func (c *catalog) addTypeaheadIndex() {
 	typeahead := func(indexes float64) engine.Diagram {
 		return (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 70.0, "secondaryPct": 80.0, "timeoutMs": 1500.0, "retries": 0.0}).
@@ -242,7 +268,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0, "indexes": indexes, "diskIops": 130.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "typeahead-index", Title: "Typeahead under load", Difficulty: "Medium", ConfigOnly: true,
 		Summary: "Keep prefix lookups fast while the index is maintained on writes.",
 		Story:   "A catalogue serves suggestions as people type. Most reads search by a name prefix, while new and changed names must still be written. Keep p95 below 300 ms and the hourly cost under $1.20. This exercise models a prefix lookup as a lookup by another indexed field; it does not simulate a trie or matching each prefix length.",
@@ -259,7 +285,9 @@ func registerServicePatterns() {
 			Explain: "An index saves read work for lookups by that field, and adds work whenever the field is written."}},
 		Debrief: "A {{secondary-index|secondary index}} trades extra work on writes for faster lookups by another field. Keep only indexes that serve a real access path. This model treats a prefix query as one alternate-field lookup; it does not measure autocomplete ranking or results for each prefix length.",
 	})
+}
 
+func (c *catalog) addCrawlDedup() {
 	crawler := func(dedup string, bits float64) engine.Diagram {
 		return (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 25.0, "readPct": 100.0, "workload": "crawl", "crawlHosts": 40.0, "crawlHostSkew": 1.2, "crawlLinks": 6.0, "crawlDupPct": 80.0, "crawlDedup": dedup, "crawlUrls": 30000.0, "crawlBitsPerUrl": bits, "crawlHashes": 7.0, "timeoutMs": 2000.0, "retries": 0.0}).
@@ -267,7 +295,7 @@ func registerServicePatterns() {
 			n("db", engine.KDatabase, cols[2], rowMid, P{"connections": 16.0}).
 			e("users", "app").e("app", "db").done()
 	}
-	register(&Scenario{
+	c.register(&Scenario{
 		ID: "crawl-dedup", Title: "The repeating crawler", Difficulty: "Medium",
 		Summary: "Stop the frontier from fetching pages it has already found.",
 		Story:   "A crawler visits many sites and each page links to pages already seen as well as new ones. At least 98% of requests must succeed, p95 must stay below 300 ms, cost must stay under $1.20 an hour, at least 98% of new pages must be found, and no page may be fetched twice. Choose a seen-URL check and keep the frontier moving.",

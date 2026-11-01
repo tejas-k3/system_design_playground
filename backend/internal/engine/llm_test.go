@@ -31,7 +31,7 @@ func llmRun(llm Params, rps float64, sec float64) (*Sim, RunStats) {
 // (a request a second keeps the server busy 13% of the time, so most requests find it empty: compare medians).
 func TestOneRequestAloneFollowsTheHandCalculation(t *testing.T) {
 	s, _ := llmRun(Params{"promptTokens": 100.0, "outputTokens": 5.0}, 1, 300)
-	ttft, itl := s.ttftHist.Quantile(0.5), s.itlHist.Quantile(0.5)
+	ttft, itl := s.ttftHist.quantile(0.5), s.itlHist.quantile(0.5)
 	t.Logf("TTFT p50 %.1f ms (hand: 45.5), inter-token gap p50 %.1f ms (hand: 20.5)", ttft, itl)
 	if math.Abs(ttft-45.5) > 3 {
 		t.Errorf("time to first token %.1f, expected 45.5", ttft)
@@ -102,7 +102,7 @@ func TestTimeToFirstTokenGrowsWithTheQueue(t *testing.T) {
 	small := Params{"promptTokens": 100.0, "outputTokens": 5.0, "batchSize": 1.0}
 	light, _ := llmRun(small, 1, 120)
 	heavy, _ := llmRun(small, 12, 120) // 12 requests a second, one at a time at 127.5 ms each: about 7.8 a second possible
-	a, b := light.ttftHist.Quantile(0.95), heavy.ttftHist.Quantile(0.95)
+	a, b := light.ttftHist.quantile(0.95), heavy.ttftHist.quantile(0.95)
 	t.Logf("TTFT p95: %.0f ms when idle, %.0f ms at 12 requests a second against a capacity of 7.8", a, b)
 	if a > 400 || b < 5*a {
 		t.Errorf("an overloaded server makes the first token wait in the queue: %.0f vs %.0f", a, b)
@@ -122,7 +122,7 @@ func TestHugePromptsStallTheGPUForEveryoneElse(t *testing.T) {
 		d, _ := Sanitize(b.d)
 		s := New(d, Options{Seed: 6})
 		s.Advance(300000)
-		return s.ttftHist.Quantile(0.95)
+		return s.ttftHist.quantile(0.95)
 	}
 	plain, huge := run(0), run(10)
 	t.Logf("p95 first token: %.0f ms when every prompt is 500 tokens, %.0f ms when one in ten is 10,000", plain, huge)
@@ -136,7 +136,7 @@ func TestHugePromptsStallTheGPUForEveryoneElse(t *testing.T) {
 func TestFirstTokenWaitsInProportionToThePromptLength(t *testing.T) {
 	for _, prompt := range []float64{100, 400, 1600} {
 		s, _ := llmRun(Params{"promptTokens": prompt, "outputTokens": 5.0}, 1, 300)
-		got := s.ttftHist.Quantile(0.5)
+		got := s.ttftHist.quantile(0.5)
 		want := prompt/4000*1000 + 20.5
 		t.Logf("prompt %4.0f tokens: first token %.1f ms (hand: %.1f)", prompt, got, want)
 		if math.Abs(got-want)/want > 0.10 {

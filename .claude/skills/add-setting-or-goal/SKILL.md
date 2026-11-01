@@ -17,7 +17,7 @@ Ship it with the `ship-pr` skill.
 ## A setting
 
 1. **Test first**: in `backend/internal/engine/<feature>_test.go` (check the name is free with `ls`), using `builder{}` (`b.node(id, kind, Params{...}).edge(from, to)`), `Sanitize`, `New(d, Options{Seed: n})`, `s.Advance(ms)` and `s.RunSnapshot()` or `s.Snapshot().Nodes[id]`. Compare against a formula you can write down, or compare two settings by the extra time over a baseline. Watch it fail for the right reason.
-2. **Registry**: `registry.go`, in the kind's `Params`: `num(key, label, group, default, min, max, step, unit, help)`, `sel(...)`, `flag(...)`; `.adv()` hides it under advanced, `.fixed()` locks it in challenges, `.showIf(key, "value")` is for selects and flags only (it compares strings), `.needs(kinds...)` for settings that need a neighbour. If it raises the cost, add it to the kind's `cost` function.
+2. **Registry**: `registry_specs.go`, in the kind's function, in its `Params`: `num(key, label, group, default, min, max, step, unit, help)`, `sel(...)`, `flag(...)`; `.adv()` hides it under advanced, `.fixed()` locks it in challenges, `.showIf(key, "value")` is for selects and flags only (it compares strings), `.needs(kinds...)` for settings that need a neighbour. If it raises the cost, add it to the kind's `cost` function.
 3. **Engine**: read it with `n.f("key")`, `n.s("key")`, `n.b("key")` (defaults are filled in). Put the behaviour in the file for its area (a new file per feature area is normal).
 4. **Lint**: if misuse is common, add a rule in `lint.go` with a test.
 5. **Docs**: the row in `docs/COMPONENTS.md` for the component and a feature row in the README with the measured numbers. The settings panel itself needs no frontend code.

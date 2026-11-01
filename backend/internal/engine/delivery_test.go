@@ -8,7 +8,7 @@ import "testing"
 // exactly-once the sink only accepts an output together with its checkpoint, so the repeat replaces it.
 func deliveryEvents() []float64 {
 	var ev []float64
-	for i := 0; i < 6000; i++ { // 100 events a second for 60 s, in order
+	for i := range 6000 { // 100 events a second for 60 s, in order
 		ev = append(ev, float64(i)*0.01)
 	}
 	return ev
@@ -16,9 +16,9 @@ func deliveryEvents() []float64 {
 
 func TestAtLeastOnceRepeatsOutputsAfterACrash(t *testing.T) {
 	ev := deliveryEvents()
-	clean := RunStream(ev, 2, 0, 10, "atLeastOnce", -1)
-	alo := RunStream(ev, 2, 0, 10, "atLeastOnce", 3800)
-	eo := RunStream(ev, 2, 0, 10, "exactlyOnce", 3800)
+	clean := runStream(ev, 2, 0, 10, "atLeastOnce", -1)
+	alo := runStream(ev, 2, 0, 10, "atLeastOnce", 3800)
+	eo := runStream(ev, 2, 0, 10, "exactlyOnce", 3800)
 	t.Logf("windows delivered: clean %d, at-least-once after a crash %d (%d duplicates), exactly-once %d (%d duplicates)", len(clean.Delivered), len(alo.Delivered), alo.Duplicates, len(eo.Delivered), eo.Duplicates)
 	if clean.Duplicates != 0 {
 		t.Errorf("no crash, no repeats: %d", clean.Duplicates)

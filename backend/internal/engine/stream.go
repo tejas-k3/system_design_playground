@@ -15,10 +15,10 @@ func (s *Sim) arriveStream(n *node, c *call, cb func(Result)) {
 		if slide <= 0 {
 			slide = n.f("windowSec")
 		}
-		n.win = NewWindowAgg(n.f("windowSec"), slide, n.f("watermarkDelaySec"), n.f("allowedLatenessSec"))
+		n.win = newWindowAgg(n.f("windowSec"), slide, n.f("watermarkDelaySec"), n.f("allowedLatenessSec"))
 	}
 	at := s.now / 1000
-	if pct := n.f("lateEventPct"); pct > 0 && float64(Hash32(uint32(c.rid)*2246822519+11)%100) < pct { // no random draw: the same events are late in every run
+	if pct := n.f("lateEventPct"); pct > 0 && float64(hash32(uint32(c.rid)*2246822519+11)%100) < pct { // no random draw: the same events are late in every run
 		at -= n.f("lateBySec")
 	}
 	n.win.Add(at)
@@ -118,7 +118,7 @@ func (s *Sim) countVisitor(n *node, id int) {
 	n.uniqExact[id] = struct{}{} // the truth; in hyperLogLog mode it is only kept to measure the error
 	if mode == "hyperLogLog" {
 		if n.uniqHLL == nil {
-			n.uniqHLL = NewHLL(uint(n.f("hllPrecision")))
+			n.uniqHLL = newHLL(uint(n.f("hllPrecision")))
 		}
 		n.uniqHLL.Add(uint32(id))
 	}
@@ -167,13 +167,13 @@ func (s *Sim) trackTop(n *node, id int) {
 	switch n.s("topK") {
 	case "exact":
 		if n.topExact == nil {
-			n.topExact = NewExactTopK()
+			n.topExact = newExactTopK()
 		}
 		n.topExact.Add(uint32(id))
 	case "countMin":
 		if n.topSketch == nil {
-			n.topSketch = NewSketchTopK(10, int(n.f("sketchWidth")), int(n.f("sketchDepth")), 7)
-			n.topTruth = NewExactTopK()
+			n.topSketch = newSketchTopK(10, int(n.f("sketchWidth")), int(n.f("sketchDepth")), 7)
+			n.topTruth = newExactTopK()
 		}
 		n.topSketch.Add(uint32(id))
 		n.topTruth.Add(uint32(id))
@@ -187,7 +187,7 @@ func (s *Sim) topStats(n *node) (recall, kb float64, ok bool) {
 		if n.topExact == nil {
 			return 0, 0, false
 		}
-		return 1, float64(n.topExact.Counters()) * 16 / 1024, true
+		return 1, float64(n.topExact.counters()) * 16 / 1024, true
 	case "countMin":
 		if n.topSketch == nil {
 			return 0, 0, false
@@ -202,7 +202,7 @@ func (s *Sim) topStats(n *node) (recall, kb float64, ok bool) {
 				hit++
 			}
 		}
-		return float64(hit) / 10, (float64(n.topSketch.Counters())*4 + float64(n.topSketch.Candidates())*16) / 1024, true
+		return float64(hit) / 10, (float64(n.topSketch.counters())*4 + float64(n.topSketch.Candidates())*16) / 1024, true
 	}
 	return 0, 0, false
 }
@@ -275,7 +275,7 @@ func (s *Sim) bloomBlocks(n *node, c *call) bool {
 	ks := int(c.lg.client.f("keySpace"))
 	if n.guard == nil {
 		bits := max(64, int(n.f("bloomBitsPerKey"))*(ks+1))
-		n.guard = NewBloom(bits, int(n.f("bloomHashes")))
+		n.guard = newBloom(bits, int(n.f("bloomHashes")))
 		for id := 0; id <= ks; id++ {
 			n.guard.Add(uint32(id))
 		}
@@ -284,7 +284,7 @@ func (s *Sim) bloomBlocks(n *node, c *call) bool {
 		return false // a real id always passes: the filter never forgets what it holds
 	}
 	n.guardChecked++
-	if n.guard.Has(uint32(-c.key)) {
+	if n.guard.has(uint32(-c.key)) {
 		n.guardFalse++
 		return false
 	}
