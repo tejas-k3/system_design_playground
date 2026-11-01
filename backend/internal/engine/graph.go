@@ -11,9 +11,10 @@ const (
 
 // graphMs is the time a read adds by following the friend links of its user: each hop reaches as many rows as the user
 // has friends (or the cap, if the database follows at most that many) times the rows of the hop before. A write and a
-// plain read follow no links.
+// plain read follow no links. A read replica has no data model or cap of its own, so it pays the join price for every
+// friend: sending the reads to a replica does not make them cheaper.
 func (s *Sim) graphMs(n *node, c *call) float64 {
-	if c.write || c.lg == nil || n.kind != KDatabase {
+	if c.write || c.lg == nil || (n.kind != KDatabase && n.kind != KReplica) { // a replica joins like a relational database and has no cap
 		return 0
 	}
 	hops := int(c.lg.client.f("friendHops"))

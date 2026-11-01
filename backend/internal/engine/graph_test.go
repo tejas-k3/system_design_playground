@@ -58,3 +58,25 @@ func TestNoHopsChangesNothing(t *testing.T) {
 		t.Errorf("without hops the other settings are inert: %.2f vs %.2f", a.Mean, b.Mean)
 	}
 }
+
+// A read replica has no graph model and no cap, so reads sent to it pay the full join price.
+func TestAReplicaPaysTheJoinPriceForEveryFriend(t *testing.T) {
+	run := func(withReplica bool) float64 {
+		b := &builder{}
+		b.node("u", KClient, Params{"rps": 40.0, "readPct": 100.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 3000.0, "friendHops": 2.0, "friendsEach": 100.0})
+		b.node("a", KAppServer, Params{"threads": 64.0, "readRouting": "nearest"}).node("db", KDatabase, Params{"connections": 16.0, "readMs": 2.0, "model": "graph", "graphCap": 10.0})
+		b.edge("u", "a").edge("a", "db")
+		if withReplica {
+			b.node("r", KReplica, Params{"connections": 16.0, "readMs": 2.0, "replicationLagMs": 10.0}).edge("a", "r")
+		}
+		d, _ := Sanitize(b.d)
+		s := New(d, Options{Seed: 5})
+		s.Advance(20000)
+		return s.RunSnapshot().Mean
+	}
+	plain, repl := run(false), run(true)
+	t.Logf("mean read: %.1f ms on the capped graph database, %.1f ms with a replica taking the reads", plain, repl)
+	if repl <= plain+10 {
+		t.Errorf("the replica joins 10,100 rows a read, so it must not be cheaper: %.1f vs %.1f", repl, plain)
+	}
+}
