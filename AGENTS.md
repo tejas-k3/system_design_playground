@@ -50,12 +50,18 @@ The UI settings panel is rendered from `GET /api/registry`: a setting added in `
 ## Working agreement
 
 - One branch and one PR per item. Test first: write the failing test, watch it fail for the right reason, then implement. Never loosen, delete or skip a test to get green; report the disappointing number instead.
-- Before every push run the whole chain and wait for it: `make test`, `make lint`, `make perf-guard`, `cd frontend && npm run build`. Do not chain these with `;` (a failure in the middle must stop the push).
+- Before every push run `make check` (tests, lint, perf guard, frontend build; it stops at the first failure) and wait for it. If you run the steps yourself, join them with `&&`, never `;`.
 - Review the diff with the `code-review` skill and fix what it finds, then wait for green CI and merge with a merge commit (`gh pr merge N --merge`). No direct pushes to `main`, no force pushes. Commit trailers and PR footers follow the session's attribution reminder.
 - Comment on a finished ticket and close it. The owner runs the 900x700 browser check; a look at 1280x820 in a real browser is fine for UI changes (`make browser-check` runs the automated layout checks).
-- Published markdown is an allow-list (`README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/COMPONENTS.md`, `docs/DEPLOYMENT.md`, `docs/ACCESSIBILITY_TESTING.md`). The pre-commit hook (`make hooks`) and CI enforce it. Never commit `docs/review/`.
+- Published markdown is an allow-list (`README.md`, `AGENTS.md`, `CLAUDE.md`, `.claude/skills/*/SKILL.md`, `docs/COMPONENTS.md`, `docs/DEPLOYMENT.md`, `docs/ACCESSIBILITY_TESTING.md`). The pre-commit hook (`make hooks`) and CI enforce it. Never commit `docs/review/`.
 - Accessibility is a requirement: new UI needs an accessible name, a keyboard path, 4.5:1 text contrast in both themes and must not rely on colour alone.
 - Report honestly in PRs: what was measured, what was not tested.
+
+## Skills and hooks (in `.claude/`)
+
+- Skills: `ship-pr` (check, local review, PR, CI, merge, ticket, cleanup), `add-challenge`, `add-setting-or-goal`. Use them instead of working from memory.
+- Claude Code hooks (`.claude/settings.json`, scripts in `.claude/hooks/`): gofmt after Go edits; refusal of force pushes, pushes to `main`, `git add -f`, staging `node_modules` or `docs/review/`, and `git worktree add` onto an existing path.
+- Git hooks (`make hooks` once per clone): pre-commit (markdown allow-list, staged `node_modules`, gofmt) and pre-push (refuses `main`).
 
 ## Pitfalls that already cost time
 
