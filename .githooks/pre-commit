@@ -15,10 +15,14 @@ if git diff --cached --name-only | grep -q '^frontend/node_modules'; then
   echo "pre-commit: frontend/node_modules is staged (a worktree symlink?); unstage it" >&2
   exit 1
 fi
-# Go files must be formatted, or `make lint` fails in CI
-unformatted=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.go$' | xargs -r gofmt -l 2>/dev/null)
-if [ -n "$unformatted" ]; then
+# Go files must be formatted and parse, or `make lint` fails in CI (the staged contents are checked, not the working copy)
+bad_go=""
+for f in $(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.go$'); do
+  out=$(git show ":$f" | gofmt -l 2>&1) || { echo "pre-commit: $f does not parse: $out" >&2; exit 1; }
+  [ -n "$out" ] && bad_go="$bad_go $f"
+done
+if [ -n "$bad_go" ]; then
   echo "pre-commit: gofmt -w these files first:" >&2
-  echo "$unformatted" | sed 's/^/  /' >&2
+  for f in $bad_go; do echo "  $f" >&2; done
   exit 1
 fi

@@ -15,13 +15,13 @@ Run these in order and stop at the first failure. Never skip a step or loosen a 
 
 ## 1. Full local check
 
-`make check` (tests, lint, perf guard, frontend build; stops at the first failure). It takes a few minutes, so start it with `run_in_background` and wait for its notification, or run `make test`, `make lint`, `make perf-guard` and `cd frontend && npm run build` as separate commands joined with `&&`, never `;`.
+`make check` (markdown allow-list, tests, lint, perf guard, frontend build; stops at the first failure. The browser checks run in CI only). It takes a few minutes, so start it with `run_in_background` and wait for its notification, or run `make test`, `make lint`, `make perf-guard` and `cd frontend && npm run build` as separate commands joined with `&&`, never `;`.
 
 If the perf guard moved, say so in the PR (ceilings: 125 MB and 2.0M allocations; the engine sits near 115 MB and 1.86M). If a golden file changed on purpose, regenerate it with `UPDATE_GOLDEN=1 go test ./internal/scenarios -run TestCatalogGolden` and read the diff.
 
 ## 2. Commit
 
-- Stage by path (`git add backend docs README.md`), never `-f`, never `node_modules` or `docs/review/`.
+- Stage by path (`git add backend frontend/src docs/COMPONENTS.md README.md`), never the bare `docs` directory (it holds local review tools), never `-f`, never `node_modules` or `docs/review/`.
 - Subject under about 72 characters, a body that says why and what was measured, and the session's attribution trailer.
 - The pre-commit hook checks the markdown allow-list, a staged `node_modules` and gofmt.
 
@@ -29,7 +29,7 @@ If the perf guard moved, say so in the PR (ceilings: 125 MB and 2.0M allocations
 
 Run the `code-review` skill on this worktree, passing the path explicitly (a review started from another shell directory reviews that directory's diff):
 
-`/code-review medium /Users/tejas/code/sdp-<topic>`
+`/code-review medium <the worktree's absolute path>` (from `git rev-parse --show-toplevel`)
 
 Triage every finding: fix the real ones, answer the others in the PR description. Typical real ones here: a default that changed, a random draw added to a default path, prose or alternatives text that contradicts the measured numbers, a bypass (a replica, a second route) around a new cost, docs or README not updated. After fixing, go back to step 1.
 

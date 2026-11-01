@@ -11,7 +11,7 @@ help:
 	@echo "make dev       run API (:$(PORT)) and Vite dev server (:5173) together"
 	@echo "make build     build the Go binary and the production frontend"
 	@echo "make run       serve the built frontend from the Go binary on :$(PORT)"
-	@echo "make check     everything CI runs, stopping at the first failure (run before a PR)"
+	@echo "make check     what CI runs except the browser checks, stopping at the first failure (run before a PR)"
 	@echo "make test      run backend and frontend tests"
 	@echo "make lint      gofmt check and staticcheck on the backend"
 	@echo "make bench     engine benchmark (30 simulated seconds of a 1k rps system)"
@@ -45,8 +45,11 @@ browser-check: build ## Browser regression checks (layout, drag, fit, accessibil
 run: build
 	./backend/bin/server -static frontend/dist
 
-check: ## Everything CI runs, in order, stopping at the first failure: tests, lint, perf guard, build
+check: ## What CI runs except the browser checks, stopping at the first failure: markdown allow-list, tests, lint, perf guard, build
 	@! git ls-files | grep -q '^frontend/node_modules' || { echo "check: frontend/node_modules is tracked; untrack it"; exit 1; }
+	@# keep this list in step with .githooks/pre-commit and .github/workflows/ci.yml
+	@bad=$$(git ls-files '*.md' | grep -vE '^(README\.md|AGENTS\.md|CLAUDE\.md|\.claude/skills/[a-z-]+/SKILL\.md|docs/DEPLOYMENT\.md|docs/ACCESSIBILITY_TESTING\.md|docs/COMPONENTS\.md)$$' || true); \
+		[ -z "$$bad" ] || { echo "check: unexpected tracked markdown:"; echo "$$bad"; exit 1; }
 	$(MAKE) test
 	$(MAKE) lint
 	$(MAKE) perf-guard
