@@ -26,12 +26,6 @@ func (s *Sim) addNode(d Node) *node {
 		if n.b("abuse") {
 			s.hasAbuse = true
 		}
-		if n.s("workload") == "booking" {
-			s.hasBooking = true
-		}
-		if n.s("consistency") != "eventual" {
-			s.hasFresh = true
-		}
 	}
 	return n
 }
@@ -163,12 +157,6 @@ func (s *Sim) Sync(d Diagram) {
 			s.configStore(n)
 			if n.kind == KRateLimiter {
 				n.tokens = min(n.tokens, n.f("burst"))
-			}
-			if n.kind == KClient && n.s("workload") == "booking" {
-				s.hasBooking = true
-			}
-			if n.kind == KClient && n.s("consistency") != "eventual" {
-				s.hasFresh = true
 			}
 		} else {
 			if n != nil {

@@ -367,7 +367,7 @@ type Sim struct {
 	keyCount                                  []int32 // requests per bucket of items
 	keyTotal                                  int
 	runRPO, runRTO                            float64 // seconds of data lost and seconds without the database at the last restore
-	runPartial, runHedged, runHedgeWins       int
+	runPartial, runHedged                     int
 	runFanWrites, runFanReads                 int
 	runWriteSkew                              int
 	runLostUpdates, runTxAborts, runDeadlocks int
@@ -385,7 +385,7 @@ type Sim struct {
 	lightHist, heavyHist                           latencyHist // latencies of light and heavy requests when the users mix both
 	ttftHist, itlHist                              latencyHist // time to first token and gap between tokens of the LLM answers
 	jobHist, jobHistHigh                           latencyHist
-	hasQueue, hasBooking, hasFresh                 bool
+	hasQueue                                       bool
 
 	vers      map[int]*verLog
 	committed map[int]float64
@@ -404,7 +404,6 @@ type Sim struct {
 	traceEvery int
 	failedTr   []*tracer
 	okTr       []*tracer
-	stride     int
 	hopCount   int
 	crawl      map[string]*crawlState
 }
@@ -432,7 +431,6 @@ func New(d Diagram, opts Options) *Sim {
 		edges:     map[string]*edge{},
 		vers:      map[int]*verLog{},
 		committed: map[int]float64{},
-		stride:    1,
 	}
 	for _, n := range d.Nodes {
 		s.addNode(n)

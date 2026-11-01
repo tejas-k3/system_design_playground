@@ -20,7 +20,6 @@ import (
 // empty unless a setting is read through a computed key or is only shown to the learner; say why.
 var settingsDeclaredButNotRead = map[string]string{
 	"variability": "read as n.p[\"variability\"] in serviceDist, not through n.s",
-	"heartbeatMs": "declared on the coordinator but nothing reads it yet: a candidate for removal (it is in the served registry, so removing it is a wire change)",
 }
 
 func literalSettingReads(t *testing.T) map[string][]string {

@@ -1,4 +1,4 @@
-## GET /api/registry sha256=478624e946424040
+## GET /api/registry sha256=086571bfc1cf18bc
 $ object
 $.latency object
 $.latency.max number

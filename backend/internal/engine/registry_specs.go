@@ -592,7 +592,6 @@ func specCoordinator() NodeSpec {
 		Params: []ParamSpec{
 			num("nodes", "Nodes", "Cluster", 3, 1, 9, 2, "", "How many nodes. A majority must be up for a leader to exist: three tolerate one failure, five tolerate two."),
 			num("electionTimeoutMs", "Election timeout", "Cluster", 1000, 50, 20000, 50, "ms", "How long a node waits without hearing from the leader before it stands for election (randomised between one and two times this). Shorter recovers sooner but risks needless elections on a slow network."),
-			num("heartbeatMs", "Heartbeat", "Cluster", 150, 10, 5000, 10, "ms", "How often the leader tells the others it is alive.").adv(),
 			num("rttMs", "Round trip between nodes", "Cluster", 2, 0.1, 500, 0.5, "ms", "Every write waits for a majority to acknowledge, so it costs about one round trip.").adv(),
 			num("stepDownSec", "Cut-off leader steps down after", "Cluster", 0, 0, 60, 0.1, "s", "When the leader is cut off from the others it does not know yet. For this long it goes on acknowledging writes that no other member has, and they are lost when the others elect a new leader. 0 = it stops answering at once.").adv(),
 			sel("faultModel", "Faults to tolerate", "Cluster", "crash", "Crash: members fail by stopping, so a majority is enough, and a member that gives a wrong answer is believed. Arbitrary: members may give wrong answers, so the group waits for all but k replies and needs k+1 matching ones; that takes at least 3k+1 members, and one more round. Only reads and writes are voted on, not lock grants.",

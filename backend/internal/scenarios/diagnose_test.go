@@ -23,7 +23,7 @@ func TestDiagnoseFixturesAreGeneratedFromARealRun(t *testing.T) {
 			continue
 		}
 		n++
-		fresh, err := GenerateSymptoms(q.source)
+		fresh, err := generateSymptoms(q.source)
 		if err != nil {
 			t.Fatalf("%s: %v", q.ID, err)
 		}

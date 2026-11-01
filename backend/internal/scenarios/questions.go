@@ -83,7 +83,7 @@ type Question struct {
 }
 
 // Symptoms are what a monitoring page and one trace would show during an incident. They are generated from a
-// seeded run of a real challenge's starting design (see GenerateSymptoms), never typed in.
+// seeded run of a real challenge's starting design (see generateSymptoms), never typed in.
 type Symptoms struct {
 	DurationSec float64              `json:"durationSec"`
 	Series      []engine.SeriesPoint `json:"series"` // one point every 2 simulated seconds
@@ -112,8 +112,8 @@ func loadSymptoms(id string) *Symptoms {
 	return &s
 }
 
-// GenerateSymptoms runs a challenge's starting design with a seed and records what an operator would see.
-func GenerateSymptoms(src diagSource) (*Symptoms, error) {
+// generateSymptoms runs a challenge's starting design with a seed and records what an operator would see.
+func generateSymptoms(src diagSource) (*Symptoms, error) {
 	sc := Get(src.ScenarioID)
 	if sc == nil {
 		return nil, fmt.Errorf("no scenario %q", src.ScenarioID)

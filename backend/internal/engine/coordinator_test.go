@@ -24,7 +24,7 @@ func coordRun(coord Params, chaos []ChaosEvent, secs float64) *Sim {
 	b := &builder{}
 	b.node("u", KClient, Params{"rps": 50.0, "readPct": 0.0, "timeoutMs": 1500.0})
 	b.node("a", KAppServer, Params{"threads": 64.0, "queueCap": 2000.0, "dbPool": 200.0})
-	p := Params{"nodes": 3.0, "electionTimeoutMs": 1000.0, "heartbeatMs": 150.0, "rttMs": 2.0}
+	p := Params{"nodes": 3.0, "electionTimeoutMs": 1000.0, "rttMs": 2.0}
 	for k, v := range coord {
 		p[k] = v
 	}
@@ -117,7 +117,7 @@ func TestTwoHundredElectionsStayInTheDocumentedRangeAroundTheirMean(t *testing.T
 		b := &builder{}
 		b.node("u", KClient, Params{"rps": 10.0, "readPct": 0.0, "timeoutMs": 1500.0})
 		b.node("a", KAppServer, Params{"threads": 64.0, "queueCap": 2000.0, "dbPool": 200.0})
-		b.node("zk", KCoordinator, Params{"nodes": 3.0, "electionTimeoutMs": timeout, "heartbeatMs": 150.0, "rttMs": rtt})
+		b.node("zk", KCoordinator, Params{"nodes": 3.0, "electionTimeoutMs": timeout, "rttMs": rtt})
 		b.edge("u", "a").edge("a", "zk")
 		d, _ := Sanitize(b.d)
 		s := New(d, Options{Seed: seed, Chaos: []ChaosEvent{{Type: "leaderDown", NodeID: "zk", AtSec: 5, DurationSec: 60}}})
