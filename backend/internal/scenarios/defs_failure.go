@@ -8,6 +8,20 @@ import (
 
 // registerFailureAndElasticity registers failover, partitions, gray failures, stampedes, fleet scaling, hot shards and scan pollution.
 func (c *catalog) registerFailureAndElasticity() {
+	c.addPrimaryDies()
+	c.addMorningRush()
+	c.addCutOff()
+	c.addFlakyNeighbour()
+	c.addCacheStampede()
+	c.addSyncOrAsync()
+	c.addWaveRider()
+	c.addPassedTheLoadTest()
+	c.addFlashCrowd()
+	c.addHotShard()
+	c.addScanPollution()
+}
+
+func (c *catalog) addPrimaryDies() {
 	// 14b ─ Hard, config only: the primary database dies ───────────────────────────────
 	failover := func(db, replica engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -37,7 +51,9 @@ func (c *catalog) registerFailureAndElasticity() {
 		Debrief: "{{failover|Failover}} has two costs. Time: while the failure is noticed and a replica takes over, nothing can write. Data: with asynchronous replication, whatever the replica had not yet copied is gone. Both are settings you choose: faster detection risks false alarms, and a smaller {{replication-lag|lag}} costs the primary more work.",
 		Deeper:  "A {{failover|failover}} costs time and data, and they are separate dials: time is detection plus promotion, data is whatever the replica had not yet received when the primary died. Detecting faster risks promoting on a blip, which creates an outage that did not need to happen, and a smaller {{replication-lag|replication lag}} costs the primary more work or, if you make replication synchronous, makes every write wait for the replica. At larger scale you promote the most caught-up replica rather than any replica and let clients find the new primary through a service name instead of a cached address. An interviewer will ask what happens to the old primary when it returns, which is a later challenge in this set, and how you would reconcile writes it accepted that were never copied. The usual failure is promoting a lagging replica and then silently discarding the unreplicated tail.",
 	})
+}
 
+func (c *catalog) addMorningRush() {
 	// 14c ─ Hard, config only: the traffic ramps and the fleet is fixed ─────────────────────
 	elastic := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -66,7 +82,9 @@ func (c *catalog) registerFailureAndElasticity() {
 		Debrief: "{{autoscaling|Autoscaling}} trades money for time. A low target busy level orders servers early and costs more; a high one is cheap and late. Boot time sets how far ahead you must look, and a wait before removing servers stops the fleet flapping. The very large fixed fleet works too, but costs all day what you only need at the peak.",
 		Deeper:  "Reactive {{autoscaling|autoscaling}} always lags demand by the measuring window plus the boot time, which here is 20 seconds, so the target busy level is really a decision about how far ahead you pay for capacity: lower means earlier and dearer, higher means cheaper and late. When the wave is predictable, scheduled or predictive scaling and a pool of servers kept ready beat any threshold, and scaling on queue depth or latency reacts to the symptom that users feel rather than to CPU. The downstream side matters too, because every new server {{connection-pool|opens its own connections}}, so a fleet that grows quickly can overload the database that was fine a minute earlier. An interviewer will ask what the maximum should be and what happens when the cloud cannot supply the servers you ordered. The failure pattern is flapping: scaling in too eagerly removes the capacity the next wave needs.",
 	})
+}
 
+func (c *catalog) addCutOff() {
 	// 14d ─ Medium, config only: the database is cut off (a partition, not a crash) ─────────
 	cutOff := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -94,7 +112,9 @@ func (c *catalog) registerFailureAndElasticity() {
 			Explain: "Each waiting request holds a thread for good. Within a second or two none are left, and cache hits queue behind them."}},
 		Debrief: "Silence is worse than an error. A crashed dependency refuses quickly, but a partitioned one makes callers wait, and waiting callers use up {{thread-pool|threads}} until the healthy parts of the system starve too. Timeouts turn silence into a fast failure, and a {{circuit-breaker|circuit breaker}} stops you spending a thread on every attempt. A distributed design must not assume {{distributed-system-pitfalls|the network is reliable}}.",
 	})
+}
 
+func (c *catalog) addFlakyNeighbour() {
 	// 14e ─ Medium, config only: one server keeps stalling (a gray failure that pulses) ────
 	flaky := func(lb engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -121,7 +141,9 @@ func (c *catalog) registerFailureAndElasticity() {
 			Explain: "A slow server is worse than a dead one: a dead one is skipped, a slow one keeps being given work it cannot finish."}},
 		Debrief: "Gray failures pass the checks that catch dead servers. Comparing each server with its peers (latency and errors) is what catches the ones that are merely sick, and least-connections balancing does it implicitly, because a sick server is the one with the most unfinished work.",
 	})
+}
 
+func (c *catalog) addCacheStampede() {
 	// 14f ─ Medium, config only: every cache entry expires at the same instant ────────────
 	stampede := func(cache engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -149,7 +171,9 @@ func (c *catalog) registerFailureAndElasticity() {
 			Explain: "A warm start gives every entry the same creation time, so they share one expiry time. Misses arrive as a wave, not a trickle."}},
 		Debrief: "A cache hides load until the moment it cannot. Synchronised {{ttl|expiry}} turns a 99% {{cache-hit-rate|hit rate}} into a 0% one for a few seconds. Jitter spreads the expiries out, and sharing concurrent misses keeps one popular item from being fetched a hundred times. Making the TTL very long also avoids the {{stampede|stampede}}, but it trades it for stale data, which is why this challenge limits staleness.",
 	})
+}
 
+func (c *catalog) addSyncOrAsync() {
 	// 14g ─ Medium, config only: how much data may a failover lose? ─────────────────────
 	replicas := func(db, rep engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -201,7 +225,9 @@ func (c *catalog) registerFailureAndElasticity() {
 		Debrief: "{{failover|Failover}} is only half the job: you also have to make sure the old primary cannot come back as one. {{fencing|Fencing}} (a token, a lease, or simply keeping the node out until it is reconciled) is what prevents {{split-brain|split brain}}. Staying down avoids the problem but costs the whole outage.",
 		Deeper:  "{{failover|Failover}} without {{fencing|fencing}} creates {{split-brain|two nodes that both believe they are the primary}}, and whichever the clients reach next wins while the other side's writes are quietly lost. Fencing has to be enforced where the data lives: a monotonically increasing term or token that the storage layer checks, a lease the old primary must renew, or simply keeping the node out until it has been reconciled, because a node cannot be trusted to know it was replaced. Staying down is the safe answer and costs the whole outage; fencing keeps both safety and availability but needs {{leader-election|a source of truth for who the current primary is}}, which leads to the coordination service in a later challenge. An interviewer will push on the harder case where the old primary never crashed and was only partitioned, so it keeps serving writes it believes are valid. That is the real split-brain failure, and it is why the check must come from the resource and not from the process.",
 	})
+}
 
+func (c *catalog) addWaveRider() {
 	// 14i ─ Medium, config only: demand swings faster than a new server boots ─────────────
 	var waves []engine.TrafficPoint
 	waves = append(waves, engine.TrafficPoint{0, 40})
@@ -238,7 +264,9 @@ func (c *catalog) registerFailureAndElasticity() {
 			Explain: "Reactive scaling always lags demand by the measuring window plus the boot time. When waves are shorter than that lag, only capacity that is already running helps."}},
 		Debrief: "{{autoscaling|Autoscaling}} is reactive, so it suits changes slower than its own reaction time. For predictable, fast waves, pre-provision a floor (or scale on a schedule); a lower target busy level buys earlier action at a higher cost. Waiting longer before scaling down avoids flapping but would not have fixed the wave start.",
 	})
+}
 
+func (c *catalog) addPassedTheLoadTest() {
 	// 14j ─ Medium, config only: the load test passed, the launch did not ─────────────────
 	loadTest := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -265,7 +293,9 @@ func (c *catalog) registerFailureAndElasticity() {
 			Explain: "A fixed crowd that waits is self-limiting: latency rises, arrivals fall. Real internet traffic keeps coming at the same rate however slow you are."}},
 		Debrief: "Closed-loop tests flatter a system: the offered load shrinks as latency grows (and they hide latency by not measuring the requests that were never sent). Real traffic is mostly open-loop, so size for the arrival rate, not for the number of testers.",
 	})
+}
 
+func (c *catalog) addFlashCrowd() {
 	// 14k ─ Medium, config only: short intense rushes at a modest average ───────────────────
 	rush := func(app engine.Params) engine.Diagram {
 		return (&bld{}).
@@ -292,7 +322,9 @@ func (c *catalog) registerFailureAndElasticity() {
 			Explain: "Utilisation is an average over time; failures happen in the moments when arrivals exceed capacity. Queues and headroom absorb those moments."}},
 		Debrief: "Provision for the burst, not the mean. A queue absorbs a burst only if it is large enough and drains fast enough; it trades errors for waiting time. {{load-shedding|Rate limiting}} protects a system from overload but does not make rejected users succeed, so it is the wrong tool when the burst is short enough to wait out.",
 	})
+}
 
+func (c *catalog) addHotShard() {
 	// 14l ─ Medium: a hot key overloads one shard; more shards do not help ────────────────
 	hotShard := func(shards int, cache bool) engine.Diagram {
 		b := (&bld{}).
@@ -326,7 +358,9 @@ func (c *catalog) registerFailureAndElasticity() {
 			Explain: "Resharding spreads the other keys thinner, but a single key cannot be split by hashing: its load stays on whichever shard owns it."}},
 		Debrief: "{{sharding|Sharding}} balances many keys, not one. A {{hot-key|hot key}} needs a different tool: a cache in front, a replica set for that key, or splitting the key (for example, a counter sharded into N sub-counters). Check the load per shard, not the average.",
 	})
+}
 
+func (c *catalog) addScanPollution() {
 	// 14m ─ Medium, config only: a scan flushes the useful part of the cache ────────────────
 	scanned := func(cache engine.Params) engine.Diagram {
 		return (&bld{}).

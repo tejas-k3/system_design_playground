@@ -3,6 +3,10 @@ package scenarios
 import "sysdesign/internal/engine"
 
 func (c *catalog) registerDNS() {
+	c.addStaleDns()
+}
+
+func (c *catalog) addStaleDns() {
 	design := func(ttl float64) engine.Diagram {
 		return (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 60.0, "readPct": 100.0, "keySpace": 200.0, "timeoutMs": 1000.0, "retries": 0.0, "dnsTtlSec": ttl}).

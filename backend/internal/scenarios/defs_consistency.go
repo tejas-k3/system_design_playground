@@ -8,6 +8,23 @@ import (
 
 // registerConsistencyAndStreams registers restores, replication and quorum consistency, leases, hot rows, and stream counting and ranking.
 func (c *catalog) registerConsistencyAndStreams() {
+	c.addRestoreDrill()
+	c.addLostCart()
+	c.addOlderWriteWins()
+	c.addLiarInTheGroup()
+	c.addOldLeadersWrites()
+	c.addSlowNews()
+	c.addQuorumOverlap()
+	c.addLeaseExpired()
+	c.addWhoIsTheLeader()
+	c.addLaunchDay()
+	c.addCountTheClicks()
+	c.addUniqueVisitors()
+	c.addTopTen()
+	c.addEffectBeforeCause()
+}
+
+func (c *catalog) addRestoreDrill() {
 	// Restore drill: a bad migration corrupts the database; how much is lost and how long until it is back
 	restoreDrill := func(fixed bool) engine.Diagram {
 		every, mbps := 0.0, 200.0
@@ -38,7 +55,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 			Explain: "How often you back up sets how much you can lose; how fast a backup streams back sets how long you wait. They are separate levers."}},
 		Debrief: "RPO and RTO are different dials: backup frequency sets the recovery point, restore bandwidth and data size set the recovery time. Pick them from what the business can bear, and then practise the restore.",
 	})
+}
 
+func (c *catalog) addLostCart() {
 	// Lost cart: two leaders accept writes for the same cart; last-writer-wins silently drops one of them
 	lostCart := func(fixed bool) engine.Diagram {
 		policy := "lastWriterWins"
@@ -69,7 +88,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "With more than one writer, concurrent writes to the same item are normal, and the conflict rule decides who loses. Last-writer-wins is easy and loses data silently; data types that merge keep every update.",
 		Deeper:  "With several writers, concurrent writes to one item are normal, and the conflict rule decides what survives; last-writer-wins is simple and drops data without any error. Merging types such as a set that adds, or a counter, keep every update, but they only work when the data model can be merged, and removals need extra care or a deleted item comes back. Shortening the {{replication-lag|replication delay}} only makes conflicts rarer, and routing all writes for a cart to one home region removes them at the cost of a slow write for far users. At larger scale you need version vectors or similar to tell concurrent writes from ordered ones, because relying on clocks lets skew pick the wrong winner. An interviewer will ask what you do with a conflict that cannot be merged, such as a stock count, and how a user would be shown it.",
 	})
+}
 
+func (c *catalog) addOlderWriteWins() {
 	// The older write wins: two leaders stamp writes with their own clocks, and one clock runs ahead
 	olderWins := func(fixed bool) engine.Diagram {
 		policy := "lastWriterWins"
@@ -100,7 +121,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "Time stamps from different machines cannot order events closer together than the error between their clocks, and last-writer-wins trusts them completely. A {{logical-clock|logical clock}} counts events instead: a write that has seen another is numbered after it. It orders what is causally related and leaves truly concurrent writes as conflicts to resolve.",
 		Deeper:  "Physical clocks drift and are corrected by a synchronisation protocol only to within some error, so a timestamp can order two events reliably only when they are further apart than that error. Last-writer-wins treats the stamp as truth, so the machine with the fastest clock wins every close contest, and a newer write is dropped without any error. Logical clocks avoid the problem: a Lamport clock gives every event a number larger than any it has seen, so causally related events are ordered correctly, while a vector clock also tells you when two writes are concurrent so both can be kept and merged by the application. Systems that do need real time, such as globally ordered transactions, pay for it with special hardware and by waiting out the uncertainty. An interviewer will ask why synchronising clocks is not enough, and what you would do for two writes that are really concurrent.",
 	})
+}
 
+func (c *catalog) addLiarInTheGroup() {
 	// The member that lies: a group of three members that believes what it hears, and one of them starts giving wrong answers
 	liarInTheGroup := func(fixed bool) engine.Diagram {
 		p := P{"nodes": 3.0}
@@ -132,7 +155,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "A member that stops is easy to survive with a {{quorum|majority}}. A member that gives wrong answers, an {{arbitrary-fault|arbitrary or Byzantine fault}}, must be outvoted, and that takes more members: to tolerate k of them the group needs 3k+1, waits for all but k replies, and needs k+1 matching ones. It also costs an extra round. A checksum catches accidental damage but not a member that sends a wrong value with a valid checksum.",
 		Deeper:  "Crash faults are masked by a majority: with 2k+1 members any two majorities overlap in at least one member, and a member that stops never says anything false. Arbitrary faults break that, because a faulty member can say different things to different members. To tolerate k of them, a group cannot wait for more than n-k replies, since k may never come, and among those n-k at most k can be wrong, so it needs n-k-k at least k+1 honest ones to be a match that cannot be forged: n at least 3k+1. Practical protocols pay for it with extra message rounds and signatures, which is why they are used where members do not trust each other, such as blockchains, and rarely inside one company, where the usual answer is checksums, replication of the data itself, and treating a member that returns bad data as crashed. An interviewer will ask why 2f+1 is not enough and what a signature changes.",
 	})
+}
 
+func (c *catalog) addOldLeadersWrites() {
 	// The old leader's write: a leader cut off from the others goes on acknowledging writes that are then lost
 	oldLeaderWrites := func(fixed bool) engine.Diagram {
 		step := 8.0
@@ -164,7 +189,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "A leader is only the leader while a majority follows it, and each election starts a higher {{leader-election|term}}. A leader that does not notice it has lost its majority acknowledges writes that no majority holds, and they vanish when the new leader's log wins. The cure is to step down on missing heartbeats, and for clients and storage to refuse a leader from an older term, which is also how fencing tokens work.",
 		Deeper:  "Consensus protocols such as Raft number every leadership with a term and let a write count as committed only when a majority has stored it, so two leaders can never both commit. A leader cut off from the majority can still receive client requests, but it cannot commit them, and a correct implementation does not acknowledge before commit. The danger in this scenario is a leader that acknowledges early, or a read served locally from a leader that has been replaced. The usual defences are a step-down rule (leave leadership when no majority has answered for an election timeout), leader leases whose length is shorter than the election timeout so a replaced leader stops serving before a new one starts, and terms or fencing tokens checked by whoever receives the writes. The cost of stepping down quickly is false step-downs during a slow network, which this simulation does not model. An interviewer will ask what happens to a write that reached only some followers, and why a read from the leader may still be stale.",
 	})
+}
 
+func (c *catalog) addSlowNews() {
 	// Who knows it is dead: a thirty-two node store where the news of a failure spreads too slowly
 	slowNews := func(fixed bool) engine.Diagram {
 		g := P{"nodes": 32.0, "replicas": 3.0, "readQuorum": 1.0, "writeQuorum": 3.0, "writeMs": 5.0, "sloppyQuorum": true, "hintedHandoff": true, "failureDetection": "gossip", "detectMs": 500.0, "gossipIntervalMs": 10000.0, "gossipFanout": 1.0, "probeTimeoutMs": 1000.0}
@@ -196,7 +223,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "{{gossip|Gossip}} spreads news the way a rumour spreads: each node that knows tells a few others every round, so the time to reach everyone grows with the logarithm of the cluster and no node sends more than its fanout per round. It is slower than telling everyone directly but scales, and it needs no central list. The interval and the fanout set the time, and until the news arrives, a node acts on an out-of-date view.",
 		Deeper:  "Epidemic dissemination reaches all N nodes in about log base (1+fanout) of N rounds with high probability, and the work per node per round is constant, so it scales to thousands of nodes and tolerates the loss of any node or message, since the news arrives by many paths. The costs are delay, which sets how long a node acts on an old view; duplicate messages, because nodes keep telling nodes that already know; and probabilistic guarantees instead of certain ones. Direct broadcast is fastest and simplest but puts N messages on one node, and fails if that node dies mid-send. Systems that gossip membership and failure suspicion, such as Cassandra and Consul, add suspicion levels and indirect probes so one lost message does not mark a healthy node dead. An interviewer will ask how long a rumour takes to reach everyone, why the number of rounds is logarithmic, and how a partition changes that: the two sides each learn their own news and merge it when they reconnect.",
 	})
+}
 
+func (c *catalog) addQuorumOverlap() {
 	// Quorum overlap: a key-value store that answers quickly but sometimes shows a client its own old data
 	quorumOverlap := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0
@@ -227,7 +256,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "{{quorum|R + W > N}} makes every read share a copy with the latest completed write, so the read sees that write. Also, W > N/2 makes any two write quorums share a copy, so two writes cannot succeed without meeting. These rules do not stop successive reads going backwards while a write is only partly applied. You buy them with latency (the kth fastest copy instead of the fastest) and availability (fewer failures tolerated). Choose R and W for the workload: read-heavy systems often use a cheap read quorum and a larger write quorum.",
 		Deeper:  "When R + W > N, every read shares a copy with the latest completed write, so it sees that write; W > N/2 also makes any two write quorums share a copy, so two writes cannot succeed without meeting. These rules do not stop successive reads going backwards while a write is only partly applied. You buy them with latency (the kth fastest copy instead of the fastest) and availability (fewer failures tolerated); for a read-heavy workload you can make reads cheap and writes expensive, but then one dead copy blocks every write. The guarantee is weaker than it looks: a write that reached only some copies before failing can still be seen by some reads, concurrent writes need a version or clock to order them, and {{quorum|sloppy quorums}} that accept stand-in nodes during an outage give up the overlap exactly when you need it. At larger scale you add read repair and background anti-entropy so copies converge. An interviewer will ask what changes across data centres, where a local quorum is cheap and a global one is slow.",
 	})
+}
 
+func (c *catalog) addLeaseExpired() {
 	// Lease expired: a frozen lock holder wakes up and books a seat someone else already took
 	leaseExpired := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -260,7 +291,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "Treat a lock as an optimisation, not a guarantee. Make the write itself safe: a conditional write (compare-and-set, unique constraint) refuses whatever arrives late, and a {{fencing|fencing token}} does the same when the resource can compare tokens.",
 		Deeper:  "A lock with an expiry only bounds how long a dead holder blocks others; it cannot stop a live holder that was paused by garbage collection, a swapped-out process or a slow network from acting after the lease has passed to someone else. The write itself must refuse stale work: a conditional write such as compare-and-set or a unique constraint does not depend on timing, while a {{fencing|fencing token}} only helps when the resource can compare tokens and sees them in order. The lock is still useful as an optimisation because it reduces contention, so treat it as that and not as the safety mechanism. An interviewer will ask what you do when the final resource, such as an external API, cannot do a conditional write; the usual answer is to make the operation {{idempotency|idempotent}} or to give each key a single consumer. The failure pattern is any pause longer than the lease, and clock jumps produce the same result.",
 	})
+}
 
+func (c *catalog) addWhoIsTheLeader() {
 	// Who is the leader: failover is decided by a coordination service that has itself lost its majority
 	whoLeads := func(fixed bool) engine.Diagram {
 		nodes := 3.0
@@ -294,7 +327,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "{{quorum|Quorums}} trade availability for safety. N machines tolerate (N-1)/2 failures: 3 tolerate one, 5 tolerate two. Size the cluster for the failures you expect together, and spread it across failure domains so they do not happen together.",
 		Deeper:  "A coordination service stays safe by refusing to act without {{quorum|a majority}}, so {{cap-trade-off|it trades availability for the guarantee that two leaders can never exist}}; with N machines it tolerates (N-1)/2 failures, which is why three survive one loss and five survive two. An even number adds cost without adding tolerance. Machines that share a zone, rack or power feed fail together, so the count only protects you if the members sit in different failure domains. Keep the data path out of the coordinator and use it only for {{leader-election|election}} and small configuration, since every request through it needs a majority round trip. An interviewer will ask what the database does while there is no leader, which here is failing writes rather than risking {{split-brain|two primaries}}, and how clients find the new leader. The classic failure is a cluster that lost its majority during a rolling upgrade because one member was already down.",
 	})
+}
 
+func (c *catalog) addLaunchDay() {
 	// Launch day: nearly every write is to one row, and row locks make those writes queue one behind the other
 	launchDay := func(fixed bool) engine.Diagram {
 		app := P{"threads": 64.0, "queueCap": 2000.0, "dbPool": 100.0}
@@ -326,7 +361,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "A {{hot-key|hot row}} is a {{throughput|throughput}} ceiling of one over the write time, however big the database. Split the counter (several sub-rows added up on read), batch the updates, or queue them so they are applied in order without making buyers wait.",
 		Deeper:  "A row lock makes writes to one row sequential, so the ceiling is one over the write time however large the database is; here that is 50 a second against 180 arriving. Splitting the counter over several rows lets the writes proceed in parallel but turns every read of the total into a sum, and it makes the question whether stock is zero inexact, so overselling needs care: hand each sub-row a share of the stock and rebalance when one runs dry. Batching or queueing the updates also works and keeps them ordered, at the cost of buyers waiting or learning of a failure later. The same shape appears in like counters and view counts. An interviewer will ask how you guarantee you never sell more than you have and whether a virtual waiting room would be fairer. The failure pattern is timeouts on the hot row {{retry-storm|triggering retries}}, which lengthens the very queue that caused them.",
 	})
+}
 
+func (c *catalog) addCountTheClicks() {
 	// Count the clicks: a stream job counts clicks per window, but some arrive long after they happened
 	countClicks := func(fixed bool) engine.Diagram {
 		st := P{"windowSec": 10.0, "watermarkDelaySec": 2.0, "lateEventPct": 15.0, "lateBySec": 20.0}
@@ -356,7 +393,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 			Explain: "A longer watermark delay trades freshness for completeness. Allowed lateness gives both, at the price of results that change after they were shown."}},
 		Debrief: "Event time is when something happened, not when you heard about it. The watermark is a guess about how late data can be: too tight and you drop data, too loose and you answer slowly. Allowed lateness, with updates to published windows, lets you answer early and still end up correct.",
 	})
+}
 
+func (c *catalog) addUniqueVisitors() {
 	// Unique visitors: counting different people exactly needs memory that grows with the audience
 	uniqueVisitors := func(fixed bool) engine.Diagram {
 		st := P{"counting": "exact"}
@@ -386,7 +425,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 			Explain: "The error falls with the square root of the registers: doubling them divides it by about 1.4, while memory doubles. Accuracy gets expensive quickly."}},
 		Debrief: "Approximate structures trade a bounded, known error for memory that does not grow with the data: HyperLogLog counts distinct items, a Bloom filter answers 'seen before?', a count-min sketch counts how often. They are the answer whenever the exact version will not fit.",
 	})
+}
 
+func (c *catalog) addTopTen() {
 	// Top ten: the ten most popular items out of a huge catalogue, in a small amount of memory
 	topTen := func(fixed bool) engine.Diagram {
 		st := P{"topK": "exact"}
@@ -417,6 +458,9 @@ func (c *catalog) registerConsistencyAndStreams() {
 		Debrief: "{{hot-key|Heavy hitters}} are few, and a structure that only needs to be right about them can be tiny. A count-min sketch plus a short candidate list finds the top items in a fixed table; the width bounds the overcount and the depth bounds the chance of it. Exactness costs memory in proportion to the number of different items.",
 		Deeper:  "Exact counting needs memory in proportion to the number of different items, while a count-min sketch uses a fixed table: each occurrence increments one counter per row, so an estimate can be too high because of collisions but never too low, and taking the smallest counter keeps the overcount small. The table here holds width times depth counters of 4 bytes each, so the budget fixes how wide it can be; the sketch gives counts but not names, so you also keep a short candidate list of the current leaders. Sketches from different workers merge by adding the tables, which is what makes them practical when the stream is spread over many machines. An interviewer will ask how you would get the top ten for the last hour, which needs a sketch per time slice, and when an exact structure with a bounded number of counters is a better fit. The failure is a table too narrow for a long tail: the noise floor rises until items near the bottom of the top ten swap places.",
 	})
+}
+
+func (c *catalog) addEffectBeforeCause() {
 	// Effect before cause: replies are seen before the post they answer, because a read can land on a copy that has not caught up
 	effectBeforeCause := func(fixed bool) engine.Diagram {
 		r, w := 1.0, 1.0

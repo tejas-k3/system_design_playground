@@ -4,6 +4,10 @@ import "sysdesign/internal/engine"
 
 // registerStorage registers the challenges about where bytes are kept and how fast they move back.
 func (c *catalog) registerStorage() {
+	c.addRestoreWindow()
+}
+
+func (c *catalog) addRestoreWindow() {
 	// A 12 GB database is restored from backups in an object store. The restore streams through the slowest of: the
 	// link to the bucket, the bucket's streams (one stream is 50 MB/s; multipart runs several at once) and the
 	// database's own restore speed. The link is narrow AND the bucket is read as a single stream, so fixing either

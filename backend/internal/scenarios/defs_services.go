@@ -6,6 +6,18 @@ import (
 
 // registerServicePatterns registers crawlers, LLM serving, load shedding, URL shortener and rate limiting.
 func (c *catalog) registerServicePatterns() {
+	c.addPoliteCrawler()
+	c.addSlowFirstToken()
+	c.addRagUnderLoad()
+	c.addTheGpuBudget()
+	c.addShedTheCheapTraffic()
+	c.addUrlShortener()
+	c.addRateLimiterShowdown()
+	c.addTypeaheadIndex()
+	c.addCrawlDedup()
+}
+
+func (c *catalog) addPoliteCrawler() {
 	// Polite crawler: the sites it fetches from refuse a crawler that comes in rushes
 	politeCrawler := func(fixed bool) engine.Diagram {
 		app := P{"threads": 16.0, "queueCap": 500.0, "hostChoice": "byKey"}
@@ -39,7 +51,9 @@ func (c *catalog) registerServicePatterns() {
 			Explain: "A limit is a ceiling: a rush that used to be refused now queues. Nothing is lost, but pages wait their turn, and a limit below the average load would make the queue grow without end."}},
 		Debrief: "Politeness is a per-host rate limit on the crawler itself, usually with {{bulkhead|a queue per host}} so that waiting for one slow or strict site does not block the others. The average rate is what you plan capacity with, but the peak rate decides whether you get blocked.",
 	})
+}
 
+func (c *catalog) addSlowFirstToken() {
 	// Slow first token: a chat service on one GPU whose batch is far too small for the traffic
 	slowFirstToken := func(fixed bool) engine.Diagram {
 		llm := P{"gpus": 1.0, "batchSize": 4.0, "kvCacheTokens": 32000.0, "promptTokens": 500.0, "outputTokens": 150.0, "queueCap": 400.0}
@@ -70,7 +84,9 @@ func (c *catalog) registerServicePatterns() {
 			Explain: "Each decode step is a little longer with more answers sharing it, but a step produces a token for every answer in the batch. Batching trades a little speed per answer for a lot more answers per second."}},
 		Debrief: "A GPU's {{throughput|throughput}} comes from batching: decoding is limited by reading the model, which is shared by every answer in the batch. The limits are the KV cache (memory for every answer in progress) and the per-answer slowdown. Time to first token is mostly queueing, so fix the throughput, not the prompt reading.",
 	})
+}
 
+func (c *catalog) addRagUnderLoad() {
 	// RAG under load: document search that finds everything but cannot keep up
 	ragSearch := func(fixed bool) engine.Diagram {
 		ef := 512.0
@@ -100,7 +116,9 @@ func (c *catalog) registerServicePatterns() {
 			Explain: "Recall climbs steeply at first and then flattens: the last candidates add little. Time grows steadily with every candidate, so the extra recall at the top is the most expensive part."}},
 		Debrief: "Approximate nearest-neighbour search is a dial between recall and latency, and the top of the dial is steep: 99% recall costs far more than 94%. Pick the recall the application needs, not the maximum, and spend the saved time on capacity.",
 	})
+}
 
+func (c *catalog) addTheGpuBudget() {
 	// The GPU budget: a few huge prompts stall the one GPU the budget pays for
 	gpuBudget := func(fixed bool) engine.Diagram {
 		lim := P{"limitRps": 1000.0, "burst": 1000.0}
@@ -132,7 +150,9 @@ func (c *catalog) registerServicePatterns() {
 		Debrief: "Capacity in an LLM service is measured in tokens, not requests: a request's cost is its prompt and its answer. {{load-shedding|Limiting by tokens}} (and, in practice, capping the prompt length and billing by token) keeps a few heavy requests from consuming what everyone shares.",
 		Deeper:  "In an LLM service the cost of a request is its tokens, not its count: reading a long prompt keeps the GPU busy while it writes nothing for anyone, so one pasted document delays everyone's first word. A limiter that counts tokens charges the prompt up front, since the answer length is not yet known, and can settle the difference when the answer is finished; capping the prompt length and billing per token pushes the same pressure back onto users. In practice you also {{bulkhead|separate long prompts onto their own pool}} or priority, and split a long read into chunks so the decode work for other users is not blocked behind it. An interviewer will ask how to be fair per tenant rather than globally, and what the memory for the attention cache does to your batch size. The failure pattern is head-of-line blocking: a few expensive requests that look identical to cheap ones at the door.",
 	})
+}
 
+func (c *catalog) addShedTheCheapTraffic() {
 	// Shed the cheap traffic: more arrives than the server can do, and a deep queue makes every request wait out its timeout
 	shedCheap := func(fixed bool) engine.Diagram {
 		app := P{"threads": 8.0, "queueCap": 2000.0}
@@ -162,7 +182,9 @@ func (c *catalog) registerServicePatterns() {
 			Explain: "An overloaded server with a deep queue serves requests so late that their users have left: very little of its work counts. Shedding spends the same capacity on requests that are still wanted."}},
 		Debrief: "Overload is not fixed by queueing more. Bound the wait, {{load-shedding|shed the requests that can be retried}}, and keep the ones that matter (urgent, paid, already half done) flowing; the cap on the queue's age matters more than its length.",
 	})
+}
 
+func (c *catalog) addUrlShortener() {
 	// URL shortener: millions of reads of short links, and every new link takes its number from one counter row
 	urlShortener := func(fixed bool) engine.Diagram {
 		app := P{"threads": 64.0, "queueCap": 1000.0, "dbPool": 60.0}
@@ -200,7 +222,9 @@ func (c *catalog) registerServicePatterns() {
 			Explain: "A cache absorbs repeated reads. Creating a link is a write, and every write to the counter row still has to take its turn at the database."}},
 		Debrief: "A URL shortener is read-heavy with a skewed popularity: cache the popular links and {{cache-hit-rate|the database is left with the misses}}. The write path has its own trap, a single sequential ID: hand out blocks of numbers to each server, or split the counter, so creating links does not queue on one row.",
 	})
+}
 
+func (c *catalog) addRateLimiterShowdown() {
 	// Rate limiter showdown: a partner's job fires a burst on the second, across the edge of the limiter's window
 	var edgeSpikes []engine.TrafficPoint
 	edgeSpikes = append(edgeSpikes, engine.TrafficPoint{0, 100})
@@ -234,7 +258,9 @@ func (c *catalog) registerServicePatterns() {
 			Explain: "Each window has its own count: the last moments of one window and the first moments of the next can each admit the whole allowance."}},
 		Debrief: "Every rate-limiting algorithm makes a different promise at the boundary. A fixed window is cheap but allows up to twice the limit across its edge; a sliding log is exact and costs memory per request; a sliding counter is cheap and close; a token bucket allows a burst up to its size and then a steady rate. Pick the one whose worst case your backend can survive.",
 	})
+}
 
+func (c *catalog) addTypeaheadIndex() {
 	typeahead := func(indexes float64) engine.Diagram {
 		return (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 100.0, "readPct": 70.0, "secondaryPct": 80.0, "timeoutMs": 1500.0, "retries": 0.0}).
@@ -259,7 +285,9 @@ func (c *catalog) registerServicePatterns() {
 			Explain: "An index saves read work for lookups by that field, and adds work whenever the field is written."}},
 		Debrief: "A {{secondary-index|secondary index}} trades extra work on writes for faster lookups by another field. Keep only indexes that serve a real access path. This model treats a prefix query as one alternate-field lookup; it does not measure autocomplete ranking or results for each prefix length.",
 	})
+}
 
+func (c *catalog) addCrawlDedup() {
 	crawler := func(dedup string, bits float64) engine.Diagram {
 		return (&bld{}).
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 25.0, "readPct": 100.0, "workload": "crawl", "crawlHosts": 40.0, "crawlHostSkew": 1.2, "crawlLinks": 6.0, "crawlDupPct": 80.0, "crawlDedup": dedup, "crawlUrls": 30000.0, "crawlBitsPerUrl": bits, "crawlHashes": 7.0, "timeoutMs": 2000.0, "retries": 0.0}).

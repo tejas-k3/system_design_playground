@@ -8,6 +8,23 @@ import (
 
 // registerResourceLimits registers search tails, egress, bandwidth, GC, disks, heavy queries, write skew, indexes, store choice and queues.
 func (c *catalog) registerResourceLimits() {
+	c.addSearchTail()
+	c.addCelebrityPost()
+	c.addImageEgress()
+	c.addVideoUpload()
+	c.addGcStorm()
+	c.addDiskWrites()
+	c.addOneHeavyQuery()
+	c.addNobodyOnCall()
+	c.addSlowQuery()
+	c.addPickTheStore()
+	c.addLastHour()
+	c.addPoisonPill()
+	c.addConsumerLag()
+	c.addHotCell()
+}
+
+func (c *catalog) addSearchTail() {
 	// Search over 16 shards: the slowest shard sets the latency. Config only: ask for fewer answers, or ask again.
 	searchTail := func(fixed bool) engine.Diagram {
 		app := P{"threads": 32.0, "gather": "all"}
@@ -40,7 +57,9 @@ func (c *catalog) registerResourceLimits() {
 		Debrief: "{{tail-latency-amplification|Waiting for all N answers makes latency the maximum of N draws}}, so tail latency grows with fan-out. Answering on the first K, hedging slow calls, or allowing partial results trade completeness or extra load for a much shorter tail.",
 		Deeper:  "{{tail-latency-amplification|When a request waits for all N shards its latency is the maximum of N draws}}, and the chance that at least one shard is slow grows quickly with N, so the tail gets worse as you add shards even if every shard is healthy. Answering on the first K trades completeness for latency, so the response must say it is partial and you must know how much relevance you give up; hedging a slow shard to a replica trades extra load for a shorter tail but only works when the slowness is independent between copies. At larger scale you limit fan-out with routing or tiered indexes and keep replicas per shard so a hedge has somewhere to go. An interviewer will ask how you choose K and how you spot a shard that is slow every time, which calls for ejecting it rather than hedging around it. The failure pattern is hedging during overload: the extra requests make every shard slower and the tail gets worse.",
 	})
+}
 
+func (c *catalog) addCelebrityPost() {
 	// A celebrity's post is pushed into millions of timelines. Config only: stop pushing for the few huge accounts.
 	celebrity := func(fixed bool) engine.Diagram {
 		app := P{"threads": 32.0, "queueCap": 500.0}
@@ -71,7 +90,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Fan-out on write spends effort once per follower; fan-out on read spends it once per reader. A hybrid pays the cheap side for each kind of account."}},
 		Debrief: "Push makes reads cheap and writes proportional to the audience; pull makes writes cheap and reads proportional to who you follow. With heavy skew a hybrid wins: push for the many small accounts and pull {{hot-key|the few giants}}.",
 	})
+}
 
+func (c *catalog) addImageEgress() {
 	// Image downloads billed per GB: every view pays egress unless a CDN answers it
 	imageFeed := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -104,7 +125,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Views are skewed, so a small cache catches the popular ones, but every miss still downloads from the store and pays for it."}},
 		Debrief: "Egress is billed per byte, so the cheapest download is the one that never reaches the origin. A CDN {{cache-hit-rate|sized to the popular set}} turns a dominant cost into a rounding error; one that is too small saves some and still pays for the rest. Data transfer has a cost, so {{distributed-system-pitfalls|transport is not free}}.",
 	})
+}
 
+func (c *catalog) addVideoUpload() {
 	// Video uploads of 10 MB at 6 a second need 480 Mbit/s on every hop: the link to the store is sized for far less
 	videoUpload := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
@@ -140,7 +163,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Parallel uploads still squeeze through one link. When a link is the limit, adding workers only adds more bytes waiting for it."}},
 		Debrief: "Bandwidth is a capacity like any other: {{throughput|bytes per second in must be less than the link can carry}}. Estimate peak QPS x object size x 8 before choosing the pipe, and keep big bodies off paths that are sized for small ones. {{distributed-system-pitfalls|Bandwidth is finite}}.",
 	})
+}
 
+func (c *catalog) addGcStorm() {
 	// GC storm: long stop-the-world pauses on every app server. Config only: tune the pauses, do not paper over them.
 	gcStorm := func(fixed bool) engine.Diagram {
 		pause := 1500.0
@@ -175,7 +200,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "A retry reaches a healthy server, so more requests succeed, but each rescued request has already waited out its timeout: the tail gets worse."}},
 		Debrief: "A stop-the-world pause is invisible in averages and brutal at the tail. Retries and extra servers mask it at a cost; the real fix is a shorter pause. Watch {{p99}} and the timeouts, not the mean.",
 	})
+}
 
+func (c *catalog) addDiskWrites() {
 	// Disk full of writes: every secondary index is another disk write per row, against a disk with a fixed IOPS budget
 	diskWrites := func(fixed bool) engine.Diagram {
 		idx := 3.0
@@ -205,7 +232,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Each write must update every index as well as the table. With no reads using them, they only cost disk writes."}},
 		Debrief: "Every index is paid for on every write. Check that an index is used before keeping it, and compare the write rate times the operations per write with the disk's budget.",
 	})
+}
 
+func (c *catalog) addOneHeavyQuery() {
 	// A few expensive requests hold every thread: head-of-line blocking. Config only: give the server more threads.
 	oneHeavy := func(fixed bool) engine.Diagram {
 		threads := 16.0
@@ -235,7 +264,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Every request shares the same threads. A few long requests occupy a large share of thread-time, so the quick ones wait behind them."}},
 		Debrief: "{{throughput|Throughput}} is not the only budget: a small share of expensive requests can take most of the worker time and make the cheap majority slow. Look at latency by request type, and {{bulkhead|keep heavy work from sharing the pool the light work needs}}.",
 	})
+}
 
+func (c *catalog) addNobodyOnCall() {
 	// Write skew: each doctor leaves after checking the other is still on call. Config only: raise the isolation level.
 	onCall := func(fixed bool) engine.Diagram {
 		iso := "readCommitted"
@@ -266,7 +297,9 @@ func (c *catalog) registerResourceLimits() {
 		Debrief: "Write skew is the anomaly snapshot isolation misses: a rule that spans several rows, checked by reading and enforced by writing one of them. Either serialize those transactions, lock the rows the rule reads, or make the rule a constraint the database enforces.",
 		Deeper:  "Write skew happens when two transactions read an overlapping set of rows, each decides it is safe, and each writes a different row, so snapshot isolation sees no conflict even though the rule across the rows is broken. You have three fixes: run the transactions serializably and accept aborts that the client must retry, lock the rows the rule reads, or turn the rule into something the database enforces, for example by making both writers touch one row that represents the pair. At larger scale the rule gets harder when the rows live on {{sharding|different shards}}, which is a reason to keep an invariant inside one partition. An interviewer will ask for other examples such as booking the same room or spending from two accounts, and what your database really means by repeatable read, because the name does not guarantee the same behaviour everywhere. The failure is silent: nothing errors and the broken invariant is noticed by a person, as in this story.",
 	})
+}
 
+func (c *catalog) addSlowQuery() {
 	// The slow query: most reads look an item up by a field other than its key, and there is no index for it
 	slowQuery := func(fixed bool) engine.Diagram {
 		idx := 0.0
@@ -296,7 +329,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Every write also updates each index, so a read speed-up is paid for with a small write cost. Worth it when reads dominate."}},
 		Debrief: "A lookup on an unindexed field is a full scan. An index trades a little write cost and storage for turning that scan into a seek. Check the access paths your queries really use.",
 	})
+}
 
+func (c *catalog) addPickTheStore() {
 	// Pick the store: a sensor firehose. The write path of the relational baseline is the bottleneck
 	pickStore := func(fixed bool) engine.Diagram {
 		model := "relational"
@@ -326,7 +361,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Appending to the end of a log-structured layout avoids random in-place updates, so each write costs a fraction of a general-purpose engine's."}},
 		Debrief: "Match the store to the access pattern. Append-heavy, rarely-read data fits an append-optimised layout; paying a general-purpose engine's cost per row for a firehose is how a database becomes the bottleneck.",
 	})
+}
 
+func (c *catalog) addLastHour() {
 	// The last hour of readings: an index makes the range cheap but slows every write; the right layout does neither
 	lastHour := func(fixed bool) engine.Diagram {
 		model := "relational"
@@ -356,7 +393,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "An index is a second structure that every write must update, so reads gain what writes pay."}},
 		Debrief: "How cheap a range read is depends on how the store lays out its data. A relational or document store answers it from an index, which every write must then keep up to date. A wide-column store reads efficiently by its partition key and has no other access path, so a range over another field touches every partition. A time-series store keeps rows in time order, so a time range is one sequential read and writes are appends. Choose the store for the shape of the questions, not the other way round.",
 	})
+}
 
+func (c *catalog) addPoisonPill() {
 	// Poison pill: a malformed job is retried ten times, burning worker time, and then vanishes
 	poisonPill := func(fixed bool) engine.Diagram {
 		attempts, dlq := 10.0, false
@@ -388,7 +427,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Fewer retries stop the waste, but a job that used up its attempts is gone. A dead-letter queue keeps it where someone can look at it."}},
 		Debrief: "Retries help against transient failures and hurt against permanent ones. Bound the attempts, back off, and route what still fails to a {{dead-letter-queue|dead-letter queue}} so it is visible and recoverable instead of lost.",
 	})
+}
 
+func (c *catalog) addConsumerLag() {
 	// Consumer lag: eight consumers, four partitions
 	consumerLag := func(fixed bool) engine.Diagram {
 		parts := 4.0
@@ -424,7 +465,9 @@ func (c *catalog) registerResourceLimits() {
 			Explain: "Within a consumer group each partition is assigned to exactly one member, so parallelism is capped by the partition count."}},
 		Debrief: "In a partitioned log the number of partitions is the ceiling on consumer parallelism. Choose it for the {{throughput|throughput}} you will need, since changing it later also changes how keys map to partitions.",
 	})
+}
 
+func (c *catalog) addHotCell() {
 	// Hot cell: location pings from one busy city all land on the shard that owns that map cell
 	hotCell := func(fixed bool) engine.Diagram {
 		by := "key"

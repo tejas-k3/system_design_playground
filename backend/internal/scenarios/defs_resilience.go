@@ -8,6 +8,19 @@ import (
 
 // registerResilienceAndCapstones registers reconnect storms, bad deploys, zone outages, retry storms, bots, uploads and the capstones.
 func (c *catalog) registerResilienceAndCapstones() {
+	c.addReconnectStorm()
+	c.addBadDeploy()
+	c.addZoneOutage()
+	c.addRetryStorm()
+	c.addBotFlood()
+	c.addUpload500kb()
+	c.addEdgeCache()
+	c.addOneSlowServer()
+	c.addSplitTheDatabase()
+	c.addLaunchDayCapstone()
+}
+
+func (c *catalog) addReconnectStorm() {
 	// Reconnect storm: a server restarts and every user it held comes back in the same instant
 	reconnect := func(fixed bool) engine.Diagram {
 		jitter := 0.0
@@ -38,7 +51,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 			Explain: "The same number of connections are set up, but the peak rate falls from the whole population at once to about fifty a second."}},
 		Debrief: "A restart is not the end of the incident: {{retry-storm|every client retrying in lockstep}} can keep the server down. Add random jitter (and backoff) to reconnects so the {{thundering-herd|herd}} arrives as a stream.",
 	})
+}
 
+func (c *catalog) addBadDeploy() {
 	// The bad deploy: version 2 is rolled out to half the fleet at once and it serves errors
 	badDeploy := func(fixed bool) engine.Diagram {
 		canary := 0.0
@@ -78,7 +93,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 			Explain: "A canary sends the new version only its small share, so a broken release hurts only that share until it is rolled back."}},
 		Debrief: "Release safety is about blast radius. Rolling to half the fleet at once exposes half your users to every bug; a canary exposes a few, lets you watch the numbers, and only then widens the rollout.",
 	})
+}
 
+func (c *catalog) addZoneOutage() {
 	// Zone outage: every component sits in the default zone, so one zone failing is a total outage
 	zoneOutage := func(fixed bool) engine.Diagram {
 		zl, za, zb, zc, zd := "az-a", "az-a", "az-a", "az-a", "az-a"
@@ -112,7 +129,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 			Explain: "A balancer in a healthy zone has nothing to send traffic to if every server it knows is in the failed zone. All the pieces a request needs must survive."}},
 		Debrief: "Failure domains are only useful if you actually use them: spread replicas across zones, and put the single points (balancer entry, primary database) where a zone failure will not take them with it. Cross-zone calls cost about a millisecond or two, which is cheap insurance. A design must account for {{distributed-system-pitfalls|topology changes}}.",
 	})
+}
 
+func (c *catalog) addRetryStorm() {
 	// Retry storm: a five-second slowdown that never ends, because the clients' retries keep the database saturated
 	retryStorm := func(fixed bool) engine.Diagram {
 		budget := 0.0
@@ -144,7 +163,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 		Debrief: "{{retry-storm|Retries multiply load exactly when a dependency is weakest}}. Keep them bounded: a retry budget as a share of normal traffic, backoff with jitter, and a limit on attempts. Without that, a short blip turns into a long outage.",
 		Deeper:  "{{retry-storm|Retries multiply load exactly when the dependency is weakest}}, and the multiplication compounds across layers: if three layers each try an operation four times, one user action can become sixty-four calls at the bottom. The state is {{metastable-failure|metastable}}, meaning the system stays broken after the original trigger is gone, as in this story where it is still down fifty seconds after a five-second slowdown. The remedies work together: a retry budget as a share of normal traffic, backoff with jitter so retries do not arrive in step, retries at one layer only, deadlines that travel with the request, and {{load-shedding|shedding load}} so the queue does not hold dead requests. The cost is that a budget gives up on some requests that would have succeeded. An interviewer will ask which layer should retry and why the operation must be {{idempotency|idempotent}}.",
 	})
+}
 
+func (c *catalog) addBotFlood() {
 	// Bot flood: a scraper on three accounts, and a limiter that cannot tell it from a customer
 	botFlood := func(fixed bool) engine.Diagram {
 		keyBy, limit, burst := "none", 150.0, 50.0
@@ -177,7 +198,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 			Explain: "A shared limit that is high enough for the customers lets most of the bot through too. The two have to be told apart by who they are."}},
 		Debrief: "{{load-shedding|A global limit}} protects the system but not the people. Limit per identity so a heavy or abusive account runs out of allowance on its own, and size the per-user rate to legitimate use rather than to total capacity.",
 	})
+}
 
+func (c *catalog) addUpload500kb() {
 	// 500 KB uploads into a queue that refuses bodies that big: the claim-check pattern
 	uploads := func(fixed bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "reqKB": 500.0, "timeoutMs": 3000.0}).
@@ -208,7 +231,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 			Explain: "Queues and databases are built for small records. Large bodies go to an object store; what travels through the queue is a reference to it."}},
 		Debrief: "The claim-check pattern keeps large payloads out of the messaging path: the body is uploaded once to cheap, durable object storage and everyone downstream handles a small pointer. It also makes retries cheap, because a retry re-sends a pointer, not 500 KB.",
 	})
+}
 
+func (c *catalog) addEdgeCache() {
 	// 15 ─ Easy ────────────────────────────────────────────────────────────────────────
 	edge := func(cdn bool) engine.Diagram {
 		b := (&bld{}).
@@ -239,7 +264,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 			Explain: "Cached copies are served until they expire, so freshness is traded for speed unless writes invalidate them."}},
 		Debrief: "The cheapest request is one your servers never see. A CDN absorbs repeated reads at the edge; the price is freshness, which is why caching suits content that changes slowly.",
 	})
+}
 
+func (c *catalog) addOneSlowServer() {
 	// 16 ─ Medium, config only ─────────────────────────────────────────────────────────
 	lopsided := func(algorithm string) engine.Diagram {
 		return (&bld{}).
@@ -266,7 +293,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 			Explain: "Requests pile up on the slow server, so its in-flight count is high and new requests go elsewhere."}},
 		Debrief: "Balancing is not about equal shares, it is about equal outcomes. Least connections adapts to slowness automatically; {{circuit-breaker|ejecting outliers}} goes further and rests a sick server entirely.",
 	})
+}
 
+func (c *catalog) addSplitTheDatabase() {
 	// 17 ─ Hard ────────────────────────────────────────────────────────────────────────
 	sharded := func(shards int) engine.Diagram {
 		b := (&bld{}).
@@ -303,7 +332,9 @@ func (c *catalog) registerResilienceAndCapstones() {
 		Debrief: "{{sharding|Sharding}} multiplies write capacity by splitting the data, at the price of complexity: queries across shards get hard and skew can recreate the {{hot-key|hotspot}} you were escaping.",
 		Deeper:  "{{sharding|Sharding}} multiplies write capacity by splitting the data, but you pay in operations: the shard key decides which queries stay on one shard and which fan out, cross-shard transactions and joins become difficult, and {{hot-key|a key that is hot}} or a tenant that is large recreates the hot spot you were escaping. Hashing spreads keys evenly and loses range scans, ranges keep scans and make monotonic keys hot, and a {{consistent-hashing|consistent-hashing ring}} or fixed virtual shards makes adding capacity move only a fraction of the data. Resharding a live system needs copying, double writes and a cut-over, so choose more logical shards than machines at the start. An interviewer will ask why you did not first try read replicas, a bigger machine or a different data model, and how you generate unique ids across shards. The failure pattern is a shard key that looks even in testing and skews in production.",
 	})
+}
 
+func (c *catalog) addLaunchDayCapstone() {
 	// 18 ─ Hard capstone ───────────────────────────────────────────────────────────────
 	capstone := func(hardened bool) engine.Diagram {
 		clients := P{"readPct": 85.0, "keySpace": 8000.0, "timeoutMs": 1500.0, "retries": 2.0, "backoff": "exponential"}

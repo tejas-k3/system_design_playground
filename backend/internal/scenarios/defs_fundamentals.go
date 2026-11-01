@@ -7,6 +7,19 @@ import (
 
 // registerFundamentals registers the first challenges: a database, a front door, caching, connection limits, retries, stale reads and double writes.
 func (c *catalog) registerFundamentals() {
+	c.addHelloWorld()
+	c.addOpeningNight()
+	c.addSlowReads()
+	c.addConnectionCrunch()
+	c.addRetryPileup()
+	c.addStalePrices()
+	c.addDoubleBooked()
+	c.addChargedTwice()
+	c.addDisappearingMoney()
+	c.addWhoNeedsTelling()
+}
+
+func (c *catalog) addHelloWorld() {
 	// 1 ─ Tutorial ───────────────────────────────────────────────────────────────────
 	c.register(&Scenario{
 		ID: "hello-world", Title: "Hello, database", Difficulty: "Tutorial",
@@ -34,7 +47,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "Each request holds a thread for CPU plus the database wait; 8 threads at ~40 ms each serve about 200 requests per second."}},
 		Debrief: "Every request travels users → app → database and back. Latency is the sum of the hops plus the time spent waiting for a free {{thread-pool|thread}}. Keep that picture in mind: every later challenge is about where the waiting happens.",
 	})
+}
 
+func (c *catalog) addOpeningNight() {
 	// 2 ─ Easy ────────────────────────────────────────────────────────────────────────
 	opening := func(servers int, lb bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 80.0, "readPct": 85.0}).
@@ -64,7 +79,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "4 threads ÷ 0.04 s ≈ 100 requests per second. Beyond that the queue fills and requests are rejected."}},
 		Debrief: "Horizontal scaling is a load balancer plus enough identical servers. Notice the cost: {{thread-pool|threads}} are not free, so you want just enough {{queueing-knee|headroom}}, not ten times too much.",
 	})
+}
 
+func (c *catalog) addSlowReads() {
 	// 3 ─ Easy ────────────────────────────────────────────────────────────────────────
 	slow := func(cache bool) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 500.0, "readPct": 95.0, "keySpace": 5000.0, "zipfS": 1.1}).
@@ -101,7 +118,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "Popularity is skewed, so a small fraction of items accounts for most requests. A modest cache absorbs most reads."}},
 		Debrief: "Caches work because access is skewed. The {{cache-hit-rate|hit rate}} is not the cache size over the data size, it is the share of requests that land on the items you kept.",
 	})
+}
 
+func (c *catalog) addConnectionCrunch() {
 	// 4 ─ Medium, config only ─────────────────────────────────────────────────────────
 	crunch := func(pool float64) engine.Diagram {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"rps": 800.0, "readPct": 100.0}).
@@ -127,7 +146,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "A pool makes callers wait for a free connection instead of opening a new one, which keeps the database healthy."}},
 		Debrief: "{{connection-pool|Connection pools}} protect the database from the fleet in front of it. Pool size is a budget shared by every server: per-server pool × number of servers must stay under the database's limit.",
 	})
+}
 
+func (c *catalog) addRetryPileup() {
 	// 5 ─ Medium, config only ─────────────────────────────────────────────────────────
 	storm := func(fixed bool) engine.Diagram {
 		app := P{"threads": 8.0, "queueCap": 400.0}
@@ -160,7 +181,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "The oldest requests are the ones whose callers have likely timed out. Serving them wastes capacity; newest-first or a queue timeout avoids it."}},
 		Debrief: "A {{retry-storm|retry storm}} is a {{metastable-failure|feedback loop}}: slowness causes timeouts, timeouts cause retries, retries cause slowness. Break it with backoff and jitter, bounded retries, {{load-shedding|load shedding}} and {{circuit-breaker|circuit breakers}}.",
 	})
+}
 
+func (c *catalog) addStalePrices() {
 	// 6 ─ Medium ──────────────────────────────────────────────────────────────────────
 	stale := func(fixed bool) engine.Diagram {
 		app := P{"readRouting": "nearest", "threads": 16.0}
@@ -194,7 +217,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "A replica applies writes after a delay, so a read right after a write can miss it."}},
 		Debrief: "Caches and replicas trade freshness for speed. Decide per read {{consistency-levels|how stale is acceptable}}, route accordingly, and invalidate on writes so the cache does not outlive the truth.",
 	})
+}
 
+func (c *catalog) addDoubleBooked() {
 	// 7 ─ Medium ──────────────────────────────────────────────────────────────────────
 	booking := func(fixed bool) engine.Diagram {
 		dbp := P{"connections": 32.0}
@@ -225,7 +250,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "Failing fast avoids double bookings but turns every collision into an error unless you wait a little for the lock."}},
 		Debrief: "Correctness under concurrency needs an explicit mechanism: row locks, optimistic version checks, or a distributed lock with a lease. Locks have costs: contention, waiting, and expiry races.",
 	})
+}
 
+func (c *catalog) addChargedTwice() {
 	// 8 ─ Medium ──────────────────────────────────────────────────────────────────────
 	charge := func(fixed bool) engine.Diagram {
 		return (&bld{}).
@@ -252,7 +279,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "The server remembers the key and returns the earlier outcome instead of applying the write again."}},
 		Debrief: "Retries are only safe for {{idempotency|idempotent}} operations. Make writes idempotent with a client-supplied key, then retry freely.",
 	})
+}
 
+func (c *catalog) addDisappearingMoney() {
 	// 8b ─ Medium, config only: concurrent transfers silently overwrite each other ───────
 	transfers := func(fixed bool) engine.Diagram {
 		iso := "readCommitted"
@@ -282,6 +311,9 @@ func (c *catalog) registerFundamentals() {
 			Explain: "Stronger isolation turns silent overwrites into waiting (locks) or errors (aborts and deadlocks): correctness is paid for with latency under contention."}},
 		Debrief: "Weak isolation is fast and silently wrong. Stronger isolation is right but makes contending transactions wait, abort or deadlock, and the cost grows with how hot the shared rows are.",
 	})
+}
+
+func (c *catalog) addWhoNeedsTelling() {
 	// Who needs telling: four caches in front of one database; leaving them alone serves stale items, telling all of them costs messages
 	tellWho := func(fixed bool) engine.Diagram {
 		policy := "none"
