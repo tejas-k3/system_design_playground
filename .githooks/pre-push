@@ -1,0 +1,9 @@
+#!/bin/sh
+# No direct pushes to main: changes go through a pull request. Enable with `make hooks`.
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ] && [ -z "$ALLOW_MAIN_PUSH" ]; then
+    echo "pre-push: refusing to push to main; open a pull request (set ALLOW_MAIN_PUSH=1 only if the owner said so)" >&2
+    exit 1
+  fi
+done
+exit 0

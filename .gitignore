@@ -15,3 +15,7 @@ docs/**/*.md
 # screenshots and other review evidence stay on the local disk only, never in commits
 docs/review/evidence/
 graphify-out/
+
+# Claude Code: per-machine settings and worktrees are local; skills, hooks and settings.json are shared
+.claude/worktrees/
+.claude/settings.local.json

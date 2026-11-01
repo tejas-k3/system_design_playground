@@ -1,11 +1,28 @@
 #!/bin/sh
 # Working notes (review reports, plans, findings) must never reach the repository or its history.
-# Published markdown is an allow-list: README.md, AGENTS.md, CLAUDE.md, docs/DEPLOYMENT.md, docs/ACCESSIBILITY_TESTING.md, docs/COMPONENTS.md.
+# Published markdown is an allow-list: README.md, AGENTS.md, CLAUDE.md, .claude/skills/*/SKILL.md, docs/DEPLOYMENT.md, docs/ACCESSIBILITY_TESTING.md, docs/COMPONENTS.md.
 # Enable with `make hooks` (git config core.hooksPath .githooks). CI enforces the same rule.
-bad=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.md$' | grep -vE '^(README\.md|AGENTS\.md|CLAUDE\.md|docs/DEPLOYMENT\.md|docs/ACCESSIBILITY_TESTING\.md|docs/COMPONENTS\.md)$')
+bad=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.md$' | grep -vE '^(README\.md|AGENTS\.md|CLAUDE\.md|\.claude/skills/[a-z-]+/SKILL\.md|docs/DEPLOYMENT\.md|docs/ACCESSIBILITY_TESTING\.md|docs/COMPONENTS\.md)$')
 if [ -n "$bad" ]; then
   echo "pre-commit: refusing to commit working-note markdown:" >&2
   echo "$bad" | sed 's/^/  /' >&2
   echo "Keep these files local (docs/**/*.md is git-ignored); only README.md and docs/DEPLOYMENT.md are published." >&2
+  exit 1
+fi
+
+# the worktree symlink to node_modules must never be committed
+if git diff --cached --name-only | grep -q '^frontend/node_modules'; then
+  echo "pre-commit: frontend/node_modules is staged (a worktree symlink?); unstage it" >&2
+  exit 1
+fi
+# Go files must be formatted and parse, or `make lint` fails in CI (the staged contents are checked, not the working copy)
+bad_go=""
+for f in $(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.go$'); do
+  out=$(git show ":$f" | gofmt -l 2>&1) || { echo "pre-commit: $f does not parse: $out" >&2; exit 1; }
+  [ -n "$out" ] && bad_go="$bad_go $f"
+done
+if [ -n "$bad_go" ]; then
+  echo "pre-commit: gofmt -w these files first:" >&2
+  for f in $bad_go; do echo "  $f" >&2; done
   exit 1
 fi
