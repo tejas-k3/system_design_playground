@@ -10,6 +10,7 @@ type Window struct {
 	head int
 }
 
+// Push records one finished request: when it ended, whether it succeeded and its latency.
 func (w *Window) Push(t float64, ok bool, lat float64) {
 	w.t = append(w.t, t)
 	w.ok = append(w.ok, ok)
@@ -49,6 +50,7 @@ type WindowStats struct {
 	Mean          float64
 }
 
+// Stats summarises the requests that ended after the given time.
 func (w *Window) Stats(after float64) WindowStats {
 	var s WindowStats
 	var lats []float64

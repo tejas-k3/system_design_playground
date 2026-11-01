@@ -31,12 +31,16 @@ type Emission struct {
 	Update     bool
 }
 
+// NewWindowAgg returns an aggregator of event-time windows of the given size and slide, a watermark that trails the
+// newest event by delay, and an allowed lateness (all in milliseconds).
 func NewWindowAgg(size, slide, delay, lateness float64) *WindowAgg {
 	return &WindowAgg{Size: size, Slide: slide, Delay: delay, Lateness: lateness, maxEvent: math.Inf(-1), open: map[int64]*winState{}}
 }
 
 func (w *WindowAgg) watermark() float64 { return w.maxEvent - w.Delay }
 
+// Add places an event with the given event time into every window it belongs to, and drops it when all of them are
+// already closed.
 func (w *WindowAgg) Add(at float64) {
 	if at > w.maxEvent {
 		w.maxEvent = at

@@ -50,6 +50,7 @@ type Goals struct {
 	StarP95Ms               *float64 `json:"starP95Ms,omitempty"`
 }
 
+// Check is one line of a verdict: a goal, its target, what the run achieved and whether it passed.
 type Check struct {
 	Label  string `json:"label"`
 	Target string `json:"target"`

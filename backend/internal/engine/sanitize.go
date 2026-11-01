@@ -7,6 +7,7 @@ import (
 	"unicode"
 )
 
+// The limits Sanitize clamps a connection to.
 const (
 	MinLatencyMs     = 1
 	MaxLatencyMs     = 200

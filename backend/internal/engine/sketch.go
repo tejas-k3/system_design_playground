@@ -19,6 +19,7 @@ type Bloom struct {
 	m, k int
 }
 
+// NewBloom returns a Bloom filter of m bits and k hash functions.
 func NewBloom(m, k int) *Bloom { return &Bloom{bits: make([]uint64, (m+63)/64), m: m, k: k} }
 
 func (b *Bloom) positions(x uint32, f func(pos int) bool) bool {
@@ -32,10 +33,12 @@ func (b *Bloom) positions(x uint32, f func(pos int) bool) bool {
 	return true
 }
 
+// Add inserts x.
 func (b *Bloom) Add(x uint32) {
 	b.positions(x, func(p int) bool { b.bits[p/64] |= 1 << (p % 64); return true })
 }
 
+// Has reports whether x may have been added; false means it was not.
 func (b *Bloom) Has(x uint32) bool {
 	return b.positions(x, func(p int) bool { return b.bits[p/64]&(1<<(p%64)) != 0 })
 }
@@ -48,6 +51,7 @@ type CountMin struct {
 	seed uint32
 }
 
+// NewCountMin returns a count-min sketch of the given width and depth.
 func NewCountMin(width, depth int, seed uint32) *CountMin {
 	t := make([][]uint32, depth)
 	for i := range t {
@@ -60,12 +64,14 @@ func (c *CountMin) slot(row int, x uint32) int {
 	return int(Hash32(x*0x9e3779b1+c.seed+uint32(row)*0x85ebca6b+uint32(row)) % uint32(c.w))
 }
 
+// Add counts n more occurrences of x.
 func (c *CountMin) Add(x uint32, n int) {
 	for r := range c.t {
 		c.t[r][c.slot(r, x)] += uint32(n)
 	}
 }
 
+// Estimate returns an upper bound of how often x was added.
 func (c *CountMin) Estimate(x uint32) int {
 	best := uint32(math.MaxUint32)
 	for r := range c.t {
@@ -82,8 +88,10 @@ type HLL struct {
 	p   uint
 }
 
+// NewHLL returns a HyperLogLog counter with 2^p registers.
 func NewHLL(p uint) *HLL { return &HLL{reg: make([]uint8, 1<<p), p: p} }
 
+// Add observes x.
 func (h *HLL) Add(x uint32) {
 	v := hash64(x, 7)
 	idx := v >> (64 - h.p)
@@ -94,6 +102,7 @@ func (h *HLL) Add(x uint32) {
 	}
 }
 
+// Count estimates the number of distinct items observed.
 func (h *HLL) Count() float64 {
 	m := float64(len(h.reg))
 	alpha := 0.7213 / (1 + 1.079/m)
@@ -115,9 +124,16 @@ func (h *HLL) Count() float64 {
 // ExactTopK counts every item exactly: perfect, and one counter for each distinct item seen.
 type ExactTopK struct{ n map[uint32]int }
 
-func NewExactTopK() *ExactTopK     { return &ExactTopK{n: map[uint32]int{}} }
-func (e *ExactTopK) Add(x uint32)  { e.n[x]++ }
+// NewExactTopK returns an empty exact counter.
+func NewExactTopK() *ExactTopK { return &ExactTopK{n: map[uint32]int{}} }
+
+// Add counts one occurrence of x.
+func (e *ExactTopK) Add(x uint32) { e.n[x]++ }
+
+// Counters is the number of counters held, one per distinct item.
 func (e *ExactTopK) Counters() int { return len(e.n) }
+
+// Top returns the k most frequent items.
 func (e *ExactTopK) Top(k int) []uint32 {
 	return topOf(e.n, k)
 }
@@ -130,13 +146,19 @@ type SketchTopK struct {
 	cap  int
 }
 
+// NewSketchTopK returns a heavy-hitter finder for the top k items, backed by a count-min sketch of the given width
+// and depth.
 func NewSketchTopK(k, width, depth int, seed uint32) *SketchTopK {
 	return &SketchTopK{cm: NewCountMin(width, depth, seed), cand: map[uint32]int{}, cap: 3 * k}
 }
 
-func (s *SketchTopK) Counters() int   { return len(s.cm.t) * s.cm.w }
+// Counters is the number of counters held, which stays fixed.
+func (s *SketchTopK) Counters() int { return len(s.cm.t) * s.cm.w }
+
+// Candidates is the number of items currently tracked as possible heavy hitters.
 func (s *SketchTopK) Candidates() int { return len(s.cand) }
 
+// Add counts one occurrence of x and keeps it as a candidate while its estimate is among the highest.
 func (s *SketchTopK) Add(x uint32) {
 	s.cm.Add(x, 1)
 	est := s.cm.Estimate(x)
@@ -156,6 +178,7 @@ func (s *SketchTopK) Add(x uint32) {
 	}
 }
 
+// Top returns the k candidates with the highest estimates.
 func (s *SketchTopK) Top(k int) []uint32 { return topOf(s.cand, k) }
 
 func topOf(m map[uint32]int, k int) []uint32 {

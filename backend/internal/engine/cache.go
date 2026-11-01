@@ -26,6 +26,8 @@ type Store struct {
 	keys              []int // random policy
 }
 
+// NewStore returns a cache of the given eviction policy (lru, lfu, fifo or random; anything else means lru), capacity
+// and time to live.
 func NewStore(policy string, capacity int, ttlMs float64, rng *RNG) *Store {
 	switch policy {
 	case "lru", "lfu", "fifo", "random":
@@ -38,9 +40,16 @@ func NewStore(policy string, capacity int, ttlMs float64, rng *RNG) *Store {
 	return &Store{policy: policy, cap: capacity, ttlMs: ttlMs, rng: rng, m: map[int]*entry{}, ll: list.New(), freq: map[int]*list.List{}, minF: 1}
 }
 
-func (s *Store) Size() int           { return len(s.m) }
-func (s *Store) Capacity() int       { return s.cap }
-func (s *Store) SetTTL(ms float64)   { s.ttlMs = ms }
+// Size is the number of entries held.
+func (s *Store) Size() int { return len(s.m) }
+
+// Capacity is the number of entries the store may hold.
+func (s *Store) Capacity() int { return s.cap }
+
+// SetTTL changes the time to live of entries stored from now on.
+func (s *Store) SetTTL(ms float64) { s.ttlMs = ms }
+
+// SetJitter spreads each time to live by up to this fraction, so entries do not all expire together.
 func (s *Store) SetJitter(f float64) { s.jitter = f }
 
 // SetShortTTL gives a share of the items (chosen by key, so the same items every time) a shorter time to live.
@@ -141,6 +150,7 @@ func (s *Store) Set(now float64, key, ver int) int {
 	return ev
 }
 
+// Delete removes the entry for key, if any.
 func (s *Store) Delete(key int) {
 	if e, ok := s.m[key]; ok {
 		s.remove(e)

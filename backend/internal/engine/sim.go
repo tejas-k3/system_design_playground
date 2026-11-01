@@ -1,7 +1,5 @@
 package engine
 
-import ()
-
 // Options configures a run.
 type Options struct {
 	Seed            uint32

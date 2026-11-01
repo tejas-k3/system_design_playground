@@ -126,6 +126,7 @@ func New(cfg Config) *Server {
 	return s
 }
 
+// Handler is the whole HTTP handler: routes, request logging and security headers.
 func (s *Server) Handler() http.Handler { return secureHeaders(s.logRequests(s.mux)) }
 
 type statusWriter struct {
@@ -133,6 +134,7 @@ type statusWriter struct {
 	code int
 }
 
+// WriteHeader remembers the status code for the request log.
 func (w *statusWriter) WriteHeader(c int) { w.code = c; w.ResponseWriter.WriteHeader(c) }
 
 // Hijack/Flush pass through so WebSocket upgrades keep working.

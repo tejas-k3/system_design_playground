@@ -16,6 +16,7 @@ type Hist struct {
 	n, sum float64
 }
 
+// Add records one latency in milliseconds.
 func (h *Hist) Add(v float64) {
 	b := int(math.Floor(math.Log(max(v, 0.001))/histLog)) + histOffset
 	if b < 0 {
@@ -28,8 +29,10 @@ func (h *Hist) Add(v float64) {
 	h.sum += v
 }
 
+// Count is the number of latencies recorded.
 func (h *Hist) Count() int { return int(h.n) }
 
+// Quantile returns the latency at quantile q (0..1), or 0 when the histogram is empty.
 func (h *Hist) Quantile(q float64) float64 {
 	if h.n == 0 {
 		return 0
@@ -45,6 +48,7 @@ func (h *Hist) Quantile(q float64) float64 {
 	return math.Pow(histGrowth, 1000)
 }
 
+// Mean is the average latency recorded, or 0 when the histogram is empty.
 func (h *Hist) Mean() float64 {
 	if h.n == 0 {
 		return 0

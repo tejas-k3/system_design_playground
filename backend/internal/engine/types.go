@@ -30,6 +30,7 @@ const (
 // Params holds user-editable settings: numbers, strings (select) and booleans.
 type Params map[string]any
 
+// Node is one component on the canvas: its kind, position, label and settings.
 type Node struct {
 	ID     string  `json:"id"`
 	Kind   string  `json:"kind"`
@@ -40,6 +41,7 @@ type Node struct {
 	Locked bool    `json:"locked,omitempty"`
 }
 
+// Edge is a directed connection between two nodes, with its network properties.
 type Edge struct {
 	ID        string  `json:"id"`
 	From      string  `json:"from"`
@@ -58,6 +60,7 @@ type Edge struct {
 	Async    bool   `json:"async,omitempty"`
 }
 
+// Note is a free text annotation on the canvas; it does not take part in the simulation.
 type Note struct {
 	ID       string  `json:"id"`
 	X        float64 `json:"x"`
@@ -92,6 +95,7 @@ type Shape struct {
 	H     float64 `json:"h"`
 }
 
+// Diagram is a whole design: components, connections and annotations.
 type Diagram struct {
 	Name   string  `json:"name,omitempty"` // the design's title; absent in older designs
 	Nodes  []Node  `json:"nodes"`
@@ -104,6 +108,8 @@ type Diagram struct {
 // Reason is why a request failed at some node.
 type Reason int
 
+// The reasons a request can fail at a node. Their order is the wire order of ReasonInfos and of the failure
+// counters, so add new reasons at the end, before NumReasons.
 const (
 	RTimeout Reason = iota
 	RQueueFull
@@ -162,6 +168,7 @@ func ReasonInfos() []ReasonInfo {
 	return out
 }
 
+// String is the stable id of the failure reason ("unknown" when out of range).
 func (r Reason) String() string {
 	if r < 0 || r >= NumReasons {
 		return "unknown"

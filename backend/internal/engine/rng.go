@@ -5,6 +5,7 @@ import "math"
 // RNG is a small deterministic PRNG (mulberry32) so a run is reproducible from its seed.
 type RNG struct{ s uint32 }
 
+// NewRNG returns a deterministic generator for the seed.
 func NewRNG(seed uint32) *RNG { return &RNG{s: seed} }
 
 // Next returns a uniform float in [0,1).

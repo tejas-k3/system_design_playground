@@ -11,8 +11,10 @@ type eventHeap struct{ a []event }
 
 func less(x, y event) bool { return x.t < y.t || (x.t == y.t && x.seq < y.seq) }
 
+// Len is the number of queued events.
 func (h *eventHeap) Len() int { return len(h.a) }
 
+// Push queues an event.
 func (h *eventHeap) Push(e event) {
 	h.a = append(h.a, e)
 	i := len(h.a) - 1
@@ -34,6 +36,7 @@ func (h *eventHeap) PeekTime() float64 {
 	return h.a[0].t
 }
 
+// Pop removes and returns the earliest event; ties go to the one queued first.
 func (h *eventHeap) Pop() event {
 	top := h.a[0]
 	n := len(h.a) - 1

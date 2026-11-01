@@ -2,11 +2,13 @@ package engine
 
 import "math"
 
+// Option is one choice of a select setting: the stored value and the label shown to the learner.
 type Option struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
 }
 
+// ShowIf makes a setting visible only while another setting holds one of the listed values.
 type ShowIf struct {
 	Key string   `json:"key"`
 	In  []string `json:"in"`

@@ -26,6 +26,7 @@ type NodeStats struct {
 	Extra     map[string]float64 `json:"extra,omitempty"`
 }
 
+// EdgeStats is what the last stats window measured on one connection.
 type EdgeStats struct {
 	ID      string  `json:"id"`
 	Rps     float64 `json:"rps"`
@@ -35,6 +36,7 @@ type EdgeStats struct {
 	Util    float64 `json:"util,omitempty"` // Mbps as a share of the link's bandwidth, if it has a limit
 }
 
+// JobStats counts the work of a queue or stream consumer: jobs enqueued, done, retried and given up.
 type JobStats struct {
 	Enqueued        int     `json:"enqueued"`
 	Completed       int     `json:"completed"`
@@ -56,6 +58,8 @@ type LatencyBucket struct {
 	Count int     `json:"count"`
 }
 
+// RunStats is the outcome of a run so far: request counts by result and reason, latency quantiles, cost and the
+// feature counters that goals are checked against.
 type RunStats struct {
 	Resolved             int             `json:"resolved"`
 	Pending              int             `json:"pending"`
@@ -143,6 +147,8 @@ type Event struct {
 
 const maxEvents = 200
 
+// GlobalStats is the snapshot sent to the browser each frame: time, the current window, the whole run and the time
+// series.
 type GlobalStats struct {
 	Now      float64  `json:"now"` // seconds
 	InFlight int      `json:"inFlight"`

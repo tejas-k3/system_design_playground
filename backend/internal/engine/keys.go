@@ -11,6 +11,8 @@ type KeySampler struct {
 	scanNext int
 }
 
+// Sample draws a key in [0, keySpace) from the named distribution, optionally sending hotPct percent of the draws to
+// key 0.
 func (k *KeySampler) Sample(dist string, keySpace int, zipfS, hotPct float64, rng *RNG) int {
 	if hotPct > 0 && rng.Next() < hotPct/100 {
 		return 0

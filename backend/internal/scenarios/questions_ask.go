@@ -29,6 +29,7 @@ type AskOption struct {
 	flip     *askFlip
 }
 
+// AskItemResult is the verdict on one candidate question of a clarifying-questions exercise.
 type AskItemResult struct {
 	Chosen   bool   `json:"chosen"`
 	Decisive bool   `json:"decisive"`
@@ -36,6 +37,7 @@ type AskItemResult struct {
 	Flip     string `json:"flip,omitempty"`
 }
 
+// AskResult is the verdict on a whole clarifying-questions exercise.
 type AskResult struct {
 	Items  []AskItemResult `json:"items"`
 	Found  int             `json:"found"`  // decisive questions asked

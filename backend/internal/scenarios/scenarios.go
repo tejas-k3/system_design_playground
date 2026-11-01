@@ -9,6 +9,7 @@ import (
 	"sysdesign/internal/engine"
 )
 
+// Prediction is a multiple-choice "what will happen" question asked before a challenge is run.
 type Prediction struct {
 	ID       string   `json:"id"`
 	Question string   `json:"question"`
@@ -93,6 +94,7 @@ func (s *Scenario) Prediction(id string) *Prediction {
 	return nil
 }
 
+// Scenario is one challenge: the broken design, its goals, traffic and failures, and the teaching text around it.
 type Scenario struct {
 	ID          string                           `json:"id"`
 	Title       string                           `json:"title"`
@@ -152,6 +154,7 @@ func All() []*Scenario {
 	return out
 }
 
+// Get returns the scenario with the id, or nil.
 func Get(id string) *Scenario { return byID[id] }
 
 // ---- tiny diagram builder ------------------------------------------------------------
@@ -214,4 +217,5 @@ const (
 	rowTop, rowMid, rowBot = 40.0, 164.0, 288.0
 )
 
+// P is shorthand for component settings in the challenge definitions.
 type P = engine.Params
