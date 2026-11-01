@@ -220,7 +220,7 @@ A 30 s run of a 1,000 rps, 20-node design takes about 90 ms (`make bench`).
 | `GET /api/scenarios`, `GET /api/scenarios/{id}` | Challenge list / one challenge (without its solution) |
 | `GET /api/scenarios/{id}/solution` | Reference solution diagram |
 | `POST /api/scenarios/{id}/defend` | Run a stored counterfactual on the learner's design and compare the measured results |
-| `GET /api/study-deck?level=sde1|sde2|sde3` | The study deck for one level as Markdown (400 for any other level) |
+| `GET /api/study-deck?level=sde2` | The study deck for one level (sde1, sde2 or sde3) as Markdown (400 for any other level) |
 | `POST /api/validate` | Sanitize a diagram, returns `{diagram, adjusted, costPerHour}` |
 | `POST /api/run` | Headless run `{diagram, scenarioId?, seed?, durationSec?}` → stats (+ score for a scenario) |
 | `POST /api/bottleneck` | Which component runs out first at up to twice today's traffic: send a design and a guess (a component id, or empty for none); the answer and the five-load ladder come back with the result. A component that only waits on a saturated callee is not named |
