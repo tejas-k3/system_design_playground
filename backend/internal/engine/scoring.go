@@ -43,6 +43,7 @@ type Goals struct {
 	MaxLateDropped          *int     `json:"maxLateDropped,omitempty"`          // events a stream job dropped for arriving too late
 	MaxResultDelaySec       *float64 `json:"maxResultDelaySec,omitempty"`       // how long after a window ends a stream job first emits it
 	MaxLostEvents           *int     `json:"maxLostEvents,omitempty"`           // saved writes whose event never reached the queue
+	MaxUnbalanced           *int     `json:"maxUnbalanced,omitempty"`           // ledger entries that do not balance: left half done, or saved and never announced
 	MaxSessionViolations    *int     `json:"maxSessionViolations,omitempty"`    // violations of the client's selected session guarantee
 	MaxCacheMessages        *int     `json:"maxCacheMessages,omitempty"`        // messages the origin sent to caches about writes
 	StarCostPerHour         *float64 `json:"starCostPerHour,omitempty"`
@@ -303,6 +304,9 @@ func Evaluate(g Goals, d Diagram, run RunStats, cost float64) Score {
 	}
 	if g.MaxLostEvents != nil {
 		checks = append(checks, Check{"Events lost", fmt.Sprintf("≤ %d", *g.MaxLostEvents), fmt.Sprint(run.EventsLost), run.EventsLost <= *g.MaxLostEvents})
+	}
+	if g.MaxUnbalanced != nil {
+		checks = append(checks, Check{"Entries that do not balance", fmt.Sprintf("≤ %d", *g.MaxUnbalanced), fmt.Sprint(run.Inconsistent + run.EventsLost), run.Inconsistent+run.EventsLost <= *g.MaxUnbalanced})
 	}
 	if g.MaxRpoSec != nil {
 		checks = append(checks, Check{"Data lost (RPO)", fmt.Sprintf("≤ %.0f s", *g.MaxRpoSec), fmt.Sprintf("%.1f s", run.RpoSec), run.RpoSec <= *g.MaxRpoSec+eps})

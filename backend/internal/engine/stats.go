@@ -73,6 +73,7 @@ type RunStats struct {
 	Fresh                int             `json:"freshReads"`
 	Stale                int             `json:"staleReads"`
 	EventsLost           int             `json:"eventsLost,omitempty"`              // writes saved whose event never reached the queue
+	Unbalanced           int             `json:"unbalanced,omitempty"`              // ledger entries that do not balance: left half done, or saved with no event (the sum of those two)
 	Tenants              int             `json:"tenants,omitempty"`                 // tenants tracked
 	WorstTenantSuccess   float64         `json:"worstTenantSuccess,omitempty"`      // the success rate of the worst-served tenant
 	Inconsistent         int             `json:"inconsistent,omitempty"`            // multi-step writes left half done
@@ -414,6 +415,7 @@ func (s *Sim) Snapshot() Stats {
 			run.Errors[r.String()] = s.runErrors[r]
 		}
 	}
+	run.Unbalanced = run.Inconsistent + run.EventsLost
 	run.Crawl = s.crawlTotals()
 	if s.hasQueue {
 		run.Jobs = &JobStats{

@@ -624,6 +624,39 @@ func registerScaleOut() {
 		Deeper:  "In a saga every step has a compensation, and a compensation is a call to another service, so it can fail, time out or succeed without the caller knowing. The ways to make that safe are to make compensations idempotent (an idempotency key per order) so a retry never refunds twice, to retry with a limit and backoff, to persist the saga's state so a crash does not forget which undos remain, and to route the ones that still fail to a dead-letter queue or a manual queue with an alert. Compensations that cannot be undone, such as an email sent, belong at the end of the saga. The cost of retrying is a longer failed order and more load on a processor that is already struggling, so a circuit breaker belongs here too. An interviewer will ask what happens when the compensation itself fails and how you know an order is stuck.",
 	})
 
+	// The books: every charge needs its order and every order its charge
+	books := func(fixed bool) engine.Diagram {
+		retries := 0.0
+		if fixed {
+			retries = 4
+		}
+		return (&bld{}).
+			n("users", engine.KClient, cols[0], rowMid, P{"rps": 40.0, "readPct": 0.0, "keySpace": 100000.0, "keyDist": "uniform", "timeoutMs": 4000.0, "retries": 0.0}).
+			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 1000.0, "dbPool": 50.0, "workflow": "saga", "compensationRetries": retries}).
+			n("orders", engine.KDatabase, cols[2], 40, P{"connections": 16.0, "writeMs": 10.0}).label("orders", "Orders").
+			n("card", engine.KExternalAPI, cols[2], 160, P{"latencyMs": 40.0, "errorPct": 15.0}).label("card", "Card processor").
+			n("ledger", engine.KExternalAPI, cols[2], 280, P{"latencyMs": 25.0, "errorPct": 20.0}).label("ledger", "Ledger service").
+			e("users", "app").e("app", "orders").e("app", "card").e("app", "ledger").done()
+	}
+	register(&Scenario{
+		ID: "books-balance", Title: "The books must balance", Difficulty: "Hard", ConfigOnly: true,
+		Summary: "At midnight finance finds charges with no order behind them.",
+		Story:   "Checkout reserves the order, charges the card and posts the entry to the ledger service, and undoes the steps already done when one fails. The ledger service declines one call in five, and so does the undo of a charge on the card processor sometimes. Every night finance checks that each charge has its order and each order its charge. Entries that do not balance have to be fixed by hand. Keep them at none while at least 55% of orders succeed.",
+		Diagram: books(false), Solution: books(true),
+		Goals:       engine.Goals{MinSuccessRate: 0.55, MaxUnbalanced: i(0), MaxP95Ms: f(500), MaxCostPerHour: f(1.6), StarCostPerHour: f(1.4)},
+		DurationSec: 40, WarmupSec: 5, Speed: 1,
+		Hints: [3]string{
+			"Open the goals: how many entries do not balance, and which step was running when each was left?",
+			"An undo can fail like any other call. What does the checkout do when the undo of a charge is declined?",
+			"The checkout's saga has a setting for repeating an undo that fails. How many tries does it need before none is left over?",
+		},
+		Answer: "The answer: let the saga retry a failed undo (the compensation retries setting). Charges that are undone cleanly leave no entry without its partner; without retries each declined refund strands one for finance to fix by hand.",
+		Predictions: []Prediction{{ID: "p1", Question: "Checkout is switched from a saga to two-phase commit, with no other change. Will the books balance?", Options: []string{"Yes, since a commit is all or nothing", "No, the release that undoes a step can still be declined", "Yes, since it never undoes anything"}, Answer: 1,
+			Explain: "Two-phase commit still has to release or undo what the services prepared, and a call that fails there leaves its entry behind. It does not retry them either."}},
+		Debrief: "A ledger balances when every entry has its counterpart, and the nightly reconciliation is the check that finds the ones that do not. In a distributed workflow the usual leaks are a step done with no partner, a write that was saved but never announced, and an undo that failed. Undo calls have to be as reliable as the steps they undo: repeat them, make them {{idempotency|safe to repeat}}, and keep a list of the entries still open so that a person or a job can finish them.",
+		Deeper:  "Reconciliation compares two records of the same facts, here the orders and the charges, and reports the entries that exist on one side only. Whatever the cause, the cure has the same shape: a durable record of what was started, a repeat that can do no harm when it runs twice, and a sweeper that finishes what the first attempt left open. An undo with retries is that shape inside one request. Money systems add a second line, a periodic job that matches the two sides and raises the differences, because no protocol removes every leak. Counting what the sweep finds, as this goal does, shows whether the design leaks at all.",
+	})
+
 	// Presence: a heartbeat from every user is a write, and it does not need to survive a restart
 	presence := func(fixed bool) engine.Diagram {
 		b := (&bld{}).
