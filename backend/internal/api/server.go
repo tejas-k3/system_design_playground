@@ -93,6 +93,7 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/scenarios/{id}", s.getScenario)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/solution", s.getSolution)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/alternatives", s.getAlternatives)
+	s.mux.HandleFunc("GET /api/study-deck", s.getStudyDeck)
 	s.mux.HandleFunc("POST /api/scenarios/{id}/defend", s.defend)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/hints/{n}", s.getHint)
 	s.mux.HandleFunc("GET /api/scenarios/{id}/answer-hint", s.getAnswerHint)
@@ -303,6 +304,18 @@ func (s *Server) getAlternatives(w http.ResponseWriter, r *http.Request) {
 		alts = []scenarios.Alternative{}
 	}
 	writeJSON(w, 200, alts)
+}
+
+// getStudyDeck serves a printable deck of counter-questions for one level, as Markdown.
+func (s *Server) getStudyDeck(w http.ResponseWriter, r *http.Request) {
+	deck, ok := scenarios.StudyDeck(r.URL.Query().Get("level"))
+	if !ok {
+		writeErr(w, 400, "level must be sde1, sde2 or sde3 and have counter-questions")
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8") // shown in the browser, and it is Markdown to read
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write([]byte(deck))
 }
 
 func (s *Server) getSolution(w http.ResponseWriter, r *http.Request) {

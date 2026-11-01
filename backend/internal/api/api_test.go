@@ -832,3 +832,27 @@ func TestHintsPredictionsAndDebriefAreFetchedOnRequest(t *testing.T) {
 		t.Errorf("unknown challenge: %d", code)
 	}
 }
+
+func TestStudyDeckEndpoint(t *testing.T) {
+	ts := newTestServer(t)
+	get := func(q string) (int, string, string) {
+		resp, err := http.Get(ts.URL + "/api/study-deck" + q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, resp.Header.Get("Content-Type"), string(body)
+	}
+	for _, level := range []string{"sde1", "sde2", "sde3"} {
+		code, typ, body := get("?level=" + level)
+		if code != 200 || !strings.HasPrefix(typ, "text/plain") || !strings.HasPrefix(body, "# Study deck: "+strings.ToUpper(level)) || !strings.Contains(body, "Why not ") {
+			t.Errorf("%s: status %d, type %q, body starts %.40q", level, code, typ, body)
+		}
+	}
+	for _, q := range []string{"", "?level=sde9"} {
+		if code, _, _ := get(q); code != 400 {
+			t.Errorf("%q: status %d", q, code)
+		}
+	}
+}
