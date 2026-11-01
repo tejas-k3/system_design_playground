@@ -44,6 +44,12 @@ func wirePaths(prefix string, v any, out map[string]bool) {
 }
 
 func wireSection(t *testing.T, name string, body []byte) string {
+	return wireSectionHash(t, name, body, true)
+}
+
+// wireSectionHash lists the key paths of body and, when hash is set, a hash of the whole body. A body of computed
+// floats must not be hashed: their last bits differ between CPU architectures.
+func wireSectionHash(t *testing.T, name string, body []byte, hash bool) string {
 	t.Helper()
 	var v any
 	if err := json.Unmarshal(body, &v); err != nil {
@@ -56,6 +62,9 @@ func wireSection(t *testing.T, name string, body []byte) string {
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
+	if !hash {
+		return fmt.Sprintf("## %s\n%s\n", name, strings.Join(keys, "\n"))
+	}
 	sum := sha256.Sum256(body)
 	return fmt.Sprintf("## %s sha256=%s\n%s\n", name, hex.EncodeToString(sum[:8]), strings.Join(keys, "\n"))
 }
@@ -88,7 +97,7 @@ func TestWireSnapshot(t *testing.T) {
 		wireSection(t, "GET /api/scenarios", get("/api/scenarios")),
 		wireSection(t, "GET /api/scenarios/hello-world", get("/api/scenarios/hello-world")),
 		wireSection(t, "GET /api/scenarios/hello-world/solution", get("/api/scenarios/hello-world/solution")),
-		wireSection(t, "POST /api/run hello-world", run),
+		wireSectionHash(t, "POST /api/run hello-world", run, false),
 	}, "")
 	const path = "testdata/wire.golden"
 	if os.Getenv("UPDATE_GOLDEN") != "" {

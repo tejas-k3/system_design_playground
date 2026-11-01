@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -80,7 +81,7 @@ func characterisationLines(t *testing.T) []string {
 				if j.chaos != nil {
 					opts.Chaos = append(append([]engine.ChaosEvent(nil), opts.Chaos...), j.chaos...)
 				}
-				b, err := json.Marshal(engine.RunToEnd(j.d, opts, j.sc.Goals))
+				b, err := roundedJSON(engine.RunToEnd(j.d, opts, j.sc.Goals))
 				if err != nil {
 					lines[i] = j.label + " marshal error: " + err.Error()
 					continue
@@ -92,6 +93,37 @@ func characterisationLines(t *testing.T) []string {
 	}
 	wg.Wait()
 	return lines
+}
+
+// roundedJSON marshals v with every float rounded to 5 significant digits, so the hash does not depend on the CPU
+// architecture (arm64 fuses multiply-add, amd64 does not, which changes the last bits of a float).
+func roundedJSON(v any) ([]byte, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var tree any
+	if err := json.Unmarshal(raw, &tree); err != nil {
+		return nil, err
+	}
+	return json.Marshal(roundFloats(tree))
+}
+
+func roundFloats(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		for k, c := range x {
+			x[k] = roundFloats(c)
+		}
+	case []any:
+		for i, c := range x {
+			x[i] = roundFloats(c)
+		}
+	case float64:
+		r, _ := strconv.ParseFloat(strconv.FormatFloat(x, 'g', 5, 64), 64)
+		return r
+	}
+	return v
 }
 
 func sortedKeys(m map[string][]engine.ChaosEvent) []string {

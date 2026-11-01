@@ -127,7 +127,7 @@ $.nodes[].params.rps number
 $.nodes[].x number
 $.nodes[].y number
 $.notes array
-## POST /api/run hello-world sha256=f8177aedd999ffce
+## POST /api/run hello-world
 $ object
 $.costPerHour number
 $.score object
