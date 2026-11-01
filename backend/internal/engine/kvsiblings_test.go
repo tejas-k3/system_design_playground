@@ -157,7 +157,7 @@ func TestSiblingsConvergeAfterAnOutage(t *testing.T) {
 		t.Fatalf("two writers leave two siblings and lose nothing: %d, lost %d", len(truth), n.kx.lost)
 	}
 	first := kvModFirst(key, 5)
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		set := n.kx.sib[(first+j)%5][key]
 		if len(set) != 2 {
 			t.Errorf("copy %d holds %d siblings, want 2", j, len(set))

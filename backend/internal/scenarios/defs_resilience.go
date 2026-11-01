@@ -50,7 +50,7 @@ func registerResilienceAndCapstones() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, P{"healthCheckSec": 1.0, "canaryPct": canary}).
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0}).
 			e("users", "lb")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("app%d", k+1)
 			v := "v1"
 			if k >= 2 {
@@ -278,7 +278,7 @@ func registerResilienceAndCapstones() {
 			return b.servers(4, cols[2], 0, 80, P{"threads": 16.0}).done()
 		}
 		b.n("router", engine.KShardRouter, cols[3], rowMid, nil)
-		for k := 0; k < shards; k++ {
+		for k := range shards {
 			id := fmt.Sprintf("shard%d", k+1)
 			b.n(id, engine.KDatabase, cols[4], rowTop+float64(k)*140, db).e("router", id)
 		}

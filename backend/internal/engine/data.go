@@ -703,7 +703,7 @@ const (
 // everything; a wide-column store has no access path but its partition key, so it scans every partition.
 func (s *Sim) rangeMult(n *node, c *call) float64 {
 	rows := c.lg.client.f("rangeRows")
-	readMs := math.Max(n.f("readMs"), 0.001)
+	readMs := max(n.f("readMs"), 0.001)
 	switch n.s("model") {
 	case "timeSeries":
 		return 1 + rows*seriesRangeRowMs/readMs
@@ -715,7 +715,7 @@ func (s *Sim) rangeMult(n *node, c *call) float64 {
 		m *= 0.8 // single-document reads are cheaper in a document store
 	}
 	if n.f("indexes") < 1 { // a scan reads at least the rows an index would have found
-		return math.Max(n.f("scanMult"), m)
+		return max(n.f("scanMult"), m)
 	}
 	return m
 }
@@ -809,7 +809,7 @@ func (s *Sim) procDB(n *node, c *call, cb func(Result), release func()) {
 		}
 		if write && n.kind == KDatabase && n.f("diskIops") > 0 {
 			per := 1000 / n.f("diskIops")
-			start := math.Max(s.now, n.diskFree)
+			start := max(s.now, n.diskFree)
 			n.diskFree = start + per*(1+n.f("indexes"))
 			took += n.diskFree - s.now
 		}

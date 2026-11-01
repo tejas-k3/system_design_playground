@@ -205,7 +205,7 @@ func registerFailureAndElasticity() {
 	// 14i ─ Medium, config only: demand swings faster than a new server boots ─────────────
 	var waves []engine.TrafficPoint
 	waves = append(waves, engine.TrafficPoint{0, 40})
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		at := float64(20 + 40*k)
 		waves = append(waves, engine.TrafficPoint{at, 40}, engine.TrafficPoint{at + 2, 180}, engine.TrafficPoint{at + 22, 180}, engine.TrafficPoint{at + 24, 40})
 	}
@@ -299,7 +299,7 @@ func registerFailureAndElasticity() {
 			n("users", engine.KClient, cols[0], rowMid, P{"rps": 700.0, "readPct": 90.0, "keySpace": 100000.0, "hotKeyPct": 35.0, "timeoutMs": 2000.0}).
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
 			n("router", engine.KShardRouter, cols[3], rowMid, nil)
-		for k := 0; k < shards; k++ {
+		for k := range shards {
 			b.n(fmt.Sprintf("db%d", k+1), engine.KDatabase, cols[4], rowTop+float64(k)*60, P{"connections": 8.0, "readMs": 30.0, "writeMs": 40.0}).e("router", fmt.Sprintf("db%d", k+1))
 		}
 		b.e("users", "lb")

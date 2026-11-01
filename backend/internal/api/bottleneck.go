@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -78,7 +78,7 @@ func deepest(u map[string]float64, calls map[string][]string) []string {
 			who = append(who, id)
 		}
 	}
-	sort.Strings(who)
+	slices.Sort(who)
 	return who
 }
 
@@ -103,7 +103,7 @@ func hottest(u map[string]float64, calls map[string][]string) (string, float64) 
 		for id := range u {
 			pool = append(pool, id)
 		}
-		sort.Strings(pool)
+		slices.Sort(pool)
 	}
 	best := ""
 	for _, id := range pool {

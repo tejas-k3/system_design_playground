@@ -68,7 +68,7 @@ func (s *Sim) dnsCostPerHour() float64 {
 
 func (s *Sim) averageInstances(n *node) float64 {
 	if s.autoscaled(n) && n.as.instArea > 0 && s.now > 0 {
-		return math.Max(1, n.as.instArea/s.now)
+		return max(1, n.as.instArea/s.now)
 	}
 	return 1
 }
@@ -80,8 +80,8 @@ func (s *Sim) autoscale(n *node) {
 		return
 	}
 	a := &n.as
-	lo := int(math.Max(1, n.f("minInstances")))
-	hi := int(math.Max(float64(lo), n.f("maxInstances")))
+	lo := int(max(1, n.f("minInstances")))
+	hi := int(max(float64(lo), n.f("maxInstances")))
 	if a.instances < lo {
 		a.instances = lo
 		s.startNext(n)
@@ -114,13 +114,13 @@ func (s *Sim) autoscale(n *node) {
 	if capa > 0 {
 		util = busy / capa
 	}
-	target := math.Min(0.95, math.Max(0.2, n.f("targetUtilPct")/100))
-	desired := int(math.Min(float64(hi), math.Max(float64(lo), math.Ceil(float64(a.instances)*util/target))))
+	target := min(0.95, max(0.2, n.f("targetUtilPct")/100))
+	desired := int(min(float64(hi), max(float64(lo), math.Ceil(float64(a.instances)*util/target))))
 	if total := a.instances + a.pending; desired > total {
 		a.below = false
 		add := desired - total
 		a.pending += add
-		for k := 0; k < add; k++ {
+		for range add {
 			s.logEvent("scaleUp", n, 0)
 			boot := n.f("scaleUpDelaySec")
 			if n.s("runtime") == "container" {

@@ -104,7 +104,7 @@ func TestGradeChoice(t *testing.T) {
 
 // within reports whether two measurements agree within a relative and an absolute allowance.
 func close(a, b, rel, abs float64) bool {
-	return math.Abs(a-b) <= rel*math.Max(math.Abs(a), math.Abs(b))+abs
+	return math.Abs(a-b) <= rel*max(math.Abs(a), math.Abs(b))+abs
 }
 
 // symptomsDiffer compares a stored fixture with a fresh run. The engine is deterministic on one machine, but
@@ -164,10 +164,10 @@ func TestWatchQuestionsQuoteWhatTheirFixturesShow(t *testing.T) {
 	var okDuring, arrivals float64
 	for _, p := range down.Series {
 		if p.T > 24 && p.T < 44 {
-			okDuring = math.Max(okDuring, p.OkRps)
+			okDuring = max(okDuring, p.OkRps)
 		}
 		if p.T > 6 && p.T < 18 {
-			arrivals = math.Max(arrivals, p.OkRps)
+			arrivals = max(arrivals, p.OkRps)
 		}
 	}
 	if okDuring < 150 || okDuring > 230 || arrivals < 300 || arrivals > 400 {

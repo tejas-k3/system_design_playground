@@ -57,7 +57,7 @@ func registerScaleOut() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 48.0, "queueCap": 2000.0, "dbPool": 200.0}).
 			n("shards", engine.KShardRouter, cols[2], rowMid, P{"hashing": hashing, "vnodes": 128.0, "rebalanceSec": 10.0, "rebalanceMs": 400.0}).
 			e("users", "app").e("app", "shards")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("db%d", k+1)
 			b.n(id, engine.KDatabase, cols[3], float64(k)*100+30, P{"connections": 32.0, "readMs": 5.0}).e("shards", id)
 		}
@@ -93,7 +93,7 @@ func registerScaleOut() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 48.0, "queueCap": 2000.0, "dbPool": 100.0, "readSpread": "roundRobin", "hedgeReadsMs": hedge}).
 			n("db", engine.KDatabase, cols[3], 20, P{"connections": 16.0}).
 			e("users", "app").e("app", "db")
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			id := fmt.Sprintf("replica%d", k+1)
 			b.n(id, engine.KReplica, cols[2], float64(k)*100+60, P{"connections": 16.0, "readMs": 40.0, "variability": "heavy", "replicationLagMs": 50.0}).e("app", id)
 		}
@@ -567,7 +567,7 @@ func registerScaleOut() {
 			n("log", engine.KLog, cols[2], rowMid, P{"partitions": 4.0, "partitionBy": by, "capacity": 50000.0}).label("log", "Message log").
 			n("db", engine.KDatabase, cols[4], rowMid, nil).label("db", "Message store").
 			e("users", "app").e("app", "log")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("c%d", k+1)
 			b.n(id, engine.KWorker, cols[3], float64(k)*70, P{"concurrency": 1.0, "processMs": 40.0}).label(id, fmt.Sprintf("Delivery %d", k+1)).e("log", id).e(id, "db")
 		}

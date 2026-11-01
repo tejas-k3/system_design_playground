@@ -809,7 +809,7 @@ func NodeCost(n Node) float64 {
 	p := Resolve(n.Kind, n.Params)
 	c := s.cost(p)
 	if n.Kind == KAppServer && pb(p, "autoscale") { // a fleet costs at least its minimum number of servers
-		c *= math.Max(1, pf(p, "minInstances", 1))
+		c *= max(1, pf(p, "minInstances", 1))
 	}
 	return c
 }

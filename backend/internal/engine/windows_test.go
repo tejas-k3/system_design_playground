@@ -30,7 +30,7 @@ func finalCounts(w *WindowAgg) map[float64]int {
 func TestTumblingWindowsCountEveryEventOnce(t *testing.T) {
 	rng := NewRNG(5)
 	var evs []evt
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		at := float64(i) * 0.01                       // 100 events a second for 50 s
 		evs = append(evs, evt{at, at + rng.Next()*2}) // up to 2 s late
 	}
@@ -56,7 +56,7 @@ func TestEventsBeyondTheLatenessAreDropped(t *testing.T) {
 	// dropped once the watermark has passed its window.
 	rng := NewRNG(6)
 	var evs []evt
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		at := float64(i) * 0.01
 		d := 0.0
 		if rng.Next() < 0.1 {
@@ -89,7 +89,7 @@ func TestEventsBeyondTheLatenessAreDropped(t *testing.T) {
 
 func TestSlidingWindowsPutAnEventInSizeOverSlideWindows(t *testing.T) {
 	w := NewWindowAgg(10, 2, 0, 0) // 10 s windows every 2 s: 5 windows hold each event
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		w.Add(20 + float64(i)*0.01)
 	}
 	w.Flush()

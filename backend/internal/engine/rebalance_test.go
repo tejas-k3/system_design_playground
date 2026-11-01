@@ -12,7 +12,7 @@ func rebalanceRun(hashing string, window float64) *Sim {
 		rp := Params{"hashing": hashing, "vnodes": 128.0, "rebalanceSec": window, "rebalanceMs": 400.0}
 		b.node("sr", KShardRouter, rp)
 		b.edge("u", "a").edge("a", "sr")
-		for i := 0; i < count; i++ {
+		for i := range count {
 			id := "db" + string(rune('a'+i))
 			b.node(id, KDatabase, Params{"connections": 32.0, "readMs": 5.0})
 			b.edge("sr", id)

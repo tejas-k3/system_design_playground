@@ -35,7 +35,7 @@ func TestPutThenGetRoundTrips(t *testing.T) {
 func TestIDsAreUniqueAndUnguessableLooking(t *testing.T) {
 	s, _ := New("", 0)
 	seen := map[string]bool{}
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		id, _ := s.Put(diagram("x"))
 		if seen[id] {
 			t.Fatalf("duplicate id %q", id)
@@ -80,7 +80,7 @@ func TestOldestDesignsAreDroppedBeyondTheLimit(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := New(dir, 3)
 	var ids []string
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		id, _ := s.Put(diagram(fmt.Sprint(i)))
 		ids = append(ids, id)
 	}
@@ -115,11 +115,11 @@ func TestIgnoresStrayFilesAndCorruptDesigns(t *testing.T) {
 func TestConcurrentUse(t *testing.T) {
 	s, _ := New(t.TempDir(), 50)
 	var wg sync.WaitGroup
-	for g := 0; g < 8; g++ {
+	for range 8 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 40; i++ {
+			for range 40 {
 				id, err := s.Put(diagram("c"))
 				if err != nil {
 					t.Error(err)

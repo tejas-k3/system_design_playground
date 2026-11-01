@@ -36,7 +36,7 @@ func (s *Sim) ringFor(t *node, cand []*edge) *ring {
 	}
 	r := &ring{sig: sig}
 	for _, e := range cand {
-		for i := 0; i < v; i++ {
+		for i := range v {
 			r.points = append(r.points, ringPoint{Hash32(strHash(e.to.id) + uint32(i)*0x9e3779b1), e.to.id})
 		}
 	}
@@ -128,7 +128,7 @@ func (s *Sim) noteReshard() {
 func (s *Sim) ringImbalance(t *node, n int) float64 {
 	cand := shardChildren(t)
 	count := map[string]int{}
-	for k := 0; k < n; k++ {
+	for k := range n {
 		count[s.pickShard(t, cand, uint32(k)*2654435761+7).to.id]++
 	}
 	max := 0

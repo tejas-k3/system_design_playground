@@ -107,7 +107,7 @@ func (s *Sim) procKV(n *node, c *call, cb func(Result), release func()) {
 			coord = (coord + 1) % nodes // a dead node receives nothing: the request lands on the next one
 		}
 	}
-	for j := 0; j < copies; j++ {
+	for j := range copies {
 		i := at(j)
 		if n.kvDownUntil[i] <= s.now {
 			replies = append(replies, reply{i, -1, slot(i, ms), true})
@@ -309,7 +309,7 @@ func (s *Sim) kvAntiEntropy(n *node) {
 			}
 			newest := 0
 			var all []kvSib
-			for j := 0; j < copies; j++ {
+			for j := range copies {
 				if v := n.kvVer[at(j)][k]; v > newest {
 					newest = v
 				}
@@ -317,7 +317,7 @@ func (s *Sim) kvAntiEntropy(n *node) {
 					all = kvUnion(all, kx.copies(nodes)[at(j)][k])
 				}
 			}
-			for j := 0; j < copies; j++ {
+			for j := range copies {
 				i := at(j)
 				if n.kvDownUntil[i] <= s.now && n.kvVer[i][k] < newest { // a node that is down cannot be repaired yet
 					n.kvVer[i][k] = newest
@@ -346,7 +346,7 @@ func kvCoordinator(c *call, nodes int) int {
 func gossipInformed(n int, fanout float64, r int) float64 {
 	know := 1.0
 	for ; r > 0 && know < float64(n); r-- {
-		know = math.Min(float64(n), math.Ceil(know+fanout*know*(1-know/float64(n)))) // whole nodes
+		know = min(float64(n), math.Ceil(know+fanout*know*(1-know/float64(n)))) // whole nodes
 	}
 	return know
 }
@@ -376,7 +376,7 @@ func (s *Sim) kvSpreadNews(n *node, nodes int) {
 	f := n.f("gossipFanout")
 	rounds := gossipRounds(nodes, f, nodes)
 	n.kvTimeToAll = detect + float64(rounds)*n.f("gossipIntervalMs")
-	for r := 0; r < rounds; r++ {
+	for r := range rounds {
 		n.kvMemberMsgs += gossipInformed(nodes, f, r) * f
 	}
 }

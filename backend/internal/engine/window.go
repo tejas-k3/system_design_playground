@@ -1,6 +1,6 @@
 package engine
 
-import "sort"
+import "slices"
 
 // Window is an append-only sliding window of (time, ok, latency) samples.
 type Window struct {
@@ -62,7 +62,7 @@ func (w *Window) Stats(after float64) WindowStats {
 			s.Failed++
 		}
 	}
-	sort.Float64s(lats)
+	slices.Sort(lats)
 	q := func(p float64) float64 {
 		if len(lats) == 0 {
 			return 0

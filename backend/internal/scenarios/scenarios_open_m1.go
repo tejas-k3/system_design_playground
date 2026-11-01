@@ -16,7 +16,7 @@ func init() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb")
 		b.n("cache", engine.KCache, cols[3], rowTop, P{"ttlSec": 60.0, "ttlJitterPct": 20.0, "capacityItems": 4000.0})
 		b.n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 24.0})
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			id := fmt.Sprintf("app%d", i+1)
 			b.n(id, engine.KAppServer, cols[2], rowTop+float64(i)*70, P{"threads": 16.0, "callTimeoutMs": 400.0, "circuitBreaker": true}).e("lb", id).e(id, "cache").e(id, "db")
 		}
@@ -46,13 +46,13 @@ func init() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 16.0, "queueCap": 200.0}).
 			n("events", engine.KQueue, cols[2], rowMid, P{"capacity": 3000.0, "maxAttempts": 4.0, "deadLetter": deadLetter})
 		b.e("users", "app").e("app", "events")
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			id := fmt.Sprintf("sender%d", i+1)
 			b.n(id, engine.KWorker, cols[3], rowTop+float64(i)*70, P{"concurrency": 8.0, "processMs": 80.0, "poisonPct": 4.0}).e("events", id)
 		}
 		b.n("provider", engine.KExternalAPI, cols[4], rowMid, P{"latencyMs": 50.0, "errorPct": 0.0})
 		b.n("db", engine.KDatabase, cols[5], rowMid, P{"connections": 16.0})
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			b.e(fmt.Sprintf("sender%d", i+1), "provider").e(fmt.Sprintf("sender%d", i+1), "db")
 		}
 		return b.done()
@@ -133,7 +133,7 @@ func init() {
 		b := (&bld{}).n("users", engine.KClient, cols[0], rowMid, P{"arrival": "sessions", "connections": 900.0, "sessionSec": 900.0, "msgsPerMin": 6.0, "reconnectJitterSec": jitter, "readPct": 50.0, "timeoutMs": 2000.0, "retries": 0.0}).
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).e("users", "lb")
 		b.n("db", engine.KDatabase, cols[4], rowMid, P{"connections": 24.0})
-		for i := 0; i < apps; i++ {
+		for i := range apps {
 			id := fmt.Sprintf("app%d", i+1)
 			b.n(id, engine.KAppServer, cols[2], rowTop+float64(i)*70, P{"threads": 16.0, "maxConns": 350.0, "handshakeMs": 20.0}).e("lb", id).e(id, "db")
 		}

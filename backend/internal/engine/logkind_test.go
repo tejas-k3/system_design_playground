@@ -12,7 +12,7 @@ func logDesign(workers int, partitionBy string, groups []float64) Diagram {
 		node("a", KAppServer, Params{"threads": 32.0}).
 		node("l", KLog, Params{"partitions": 4.0, "partitionBy": partitionBy, "capacity": 20000.0})
 	b.edge("u", "a").edge("a", "l")
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		g := 1.0
 		if i < len(groups) {
 			g = groups[i]

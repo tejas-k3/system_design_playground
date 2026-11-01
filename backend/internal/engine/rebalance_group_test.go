@@ -17,7 +17,7 @@ func groupRebalanceRun(pauseSec float64, crash bool) (peakBacklog int, s *Sim) {
 	}
 	d, _ = Sanitize(d)
 	s = New(d, opts)
-	for sec := 0; sec < 45; sec++ {
+	for range 45 {
 		s.Advance(1000)
 		if b := s.RunSnapshot().Jobs; b != nil && b.Backlog > peakBacklog {
 			peakBacklog = b.Backlog
@@ -52,7 +52,7 @@ func TestRebalanceSecZeroIsTheOldInstantHandover(t *testing.T) {
 	d, _ = Sanitize(d)
 	s := New(d, Options{Seed: 8, Chaos: []ChaosEvent{{Type: "crash", NodeID: "w1", AtSec: 10, DownSec: 20}}})
 	peak := 0
-	for sec := 0; sec < 45; sec++ {
+	for range 45 {
 		s.Advance(1000)
 		if b := s.RunSnapshot().Jobs; b != nil && b.Backlog > peak {
 			peak = b.Backlog

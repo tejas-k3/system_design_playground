@@ -87,7 +87,7 @@ func TestAutoscaleScalesBackDownAfterTheDownDelay(t *testing.T) {
 
 func TestShortScaleDownDelayCausesThrash(t *testing.T) {
 	wave := []TrafficPoint{{0, 40}}
-	for k := 0; k < 30; k++ { // 20 s high, 20 s low, repeatedly
+	for k := range 30 { // 20 s high, 20 s low, repeatedly
 		at := float64(20 + 40*k)
 		wave = append(wave, TrafficPoint{at, 40}, TrafficPoint{at + 2, 160}, TrafficPoint{at + 20, 160}, TrafficPoint{at + 22, 30})
 	}

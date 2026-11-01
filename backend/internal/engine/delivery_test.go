@@ -8,7 +8,7 @@ import "testing"
 // exactly-once the sink only accepts an output together with its checkpoint, so the repeat replaces it.
 func deliveryEvents() []float64 {
 	var ev []float64
-	for i := 0; i < 6000; i++ { // 100 events a second for 60 s, in order
+	for i := range 6000 { // 100 events a second for 60 s, in order
 		ev = append(ev, float64(i)*0.01)
 	}
 	return ev

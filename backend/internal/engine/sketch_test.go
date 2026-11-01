@@ -19,7 +19,7 @@ func TestBloomFalsePositiveRateMatchesTheFormula(t *testing.T) {
 			}
 		}
 		fp, trials := 0, 200000
-		for i := 0; i < trials; i++ {
+		for i := range trials {
 			if b.Has(uint32(1000000 + i)) {
 				fp++
 			}
@@ -39,12 +39,12 @@ func TestCountMinOvercountIsBoundedByEpsilonN(t *testing.T) {
 	const w, d = 272, 5 // epsilon = e / 272 = 0.01, delta = e^-5 = 0.0067
 	eps, delta := math.E/float64(w), math.Exp(-float64(d))
 	over, total := 0, 0
-	for trial := 0; trial < 1000; trial++ {
+	for trial := range 1000 {
 		c := NewCountMin(w, d, uint32(trial))
 		rng := NewRNG(uint32(trial) + 1)
 		counts := map[uint32]int{}
 		n := 0
-		for i := 0; i < 2000; i++ {
+		for range 2000 {
 			x := uint32(rng.Next() * 500)
 			c.Add(x, 1)
 			counts[x]++
@@ -74,11 +74,11 @@ func TestHyperLogLogErrorIsWithinThreeStandardErrors(t *testing.T) {
 	se := 1.04 / math.Sqrt(float64(int(1)<<p))
 	rng := NewRNG(99)
 	var sumSq float64
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		n := 100 + int(rng.Next()*200000)
 		h := NewHLL(p)
 		base := uint32(i) * 1000003
-		for j := 0; j < n; j++ {
+		for j := range n {
 			h.Add(base + uint32(j))
 			h.Add(base + uint32(j)) // repeats do not count
 		}
@@ -98,10 +98,10 @@ func TestHyperLogLogErrorMatchesTheoryAtSmallPrecisions(t *testing.T) {
 	for _, p := range []uint{4, 6, 8} {
 		se := 1.04 / math.Sqrt(float64(int(1)<<p))
 		var sq, sum float64
-		for i := 0; i < trials; i++ {
+		for i := range trials {
 			h := NewHLL(p)
 			base := uint32(i) * 7919
-			for j := 0; j < n; j++ {
+			for j := range n {
 				h.Add(base + uint32(j)*3)
 			}
 			r := (h.Count() - n) / n

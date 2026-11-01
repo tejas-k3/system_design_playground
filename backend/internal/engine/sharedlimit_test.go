@@ -11,7 +11,7 @@ func limiterFleet(n int, shared bool) Diagram {
 	b := &builder{}
 	b.node("u", KClient, Params{"rps": 600.0, "readPct": 100.0, "keySpace": 200.0, "keyDist": "zipf", "timeoutMs": 3000.0}).
 		node("a", KAppServer, Params{"threads": 128.0, "queueCap": 1000.0}).node("db", KDatabase, Params{"connections": 64.0})
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := fmt.Sprintf("rl%d", i+1)
 		b.node(id, KRateLimiter, Params{"limitRps": 100.0, "burst": 10.0, "shared": shared})
 		b.edge("u", id).edge(id, "a")
@@ -25,7 +25,7 @@ func admitted(d Diagram) float64 {
 	s := New(d, Options{Seed: 5})
 	s.Advance(10000)
 	var sum float64
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		s.Advance(1000)
 		sum += s.Snapshot().Nodes["a"].Arr
 	}
@@ -58,7 +58,7 @@ func limiterFleetWithoutKey() Diagram {
 	b := &builder{}
 	b.node("u", KClient, Params{"rps": 600.0, "readPct": 100.0, "keySpace": 200.0, "keyDist": "zipf", "timeoutMs": 3000.0}).
 		node("a", KAppServer, Params{"threads": 128.0, "queueCap": 1000.0}).node("db", KDatabase, Params{"connections": 64.0})
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := fmt.Sprintf("rl%d", i+1)
 		b.node(id, KRateLimiter, Params{"limitRps": 100.0, "burst": 10.0})
 		b.edge("u", id).edge(id, "a")

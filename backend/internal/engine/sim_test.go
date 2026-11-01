@@ -44,7 +44,7 @@ func stack(apps int, client, app, cache, db Params) *builder {
 		b.node("c", KCache, cache)
 		b.edge("c", "db")
 	}
-	for i := 0; i < apps; i++ {
+	for i := range apps {
 		id := fmt.Sprintf("a%d", i)
 		b.node(id, KAppServer, app)
 		b.edge("lb", id)
@@ -206,7 +206,7 @@ func TestEvictionPoliciesUnderScan(t *testing.T) {
 	r := NewRNG(1)
 	for _, pol := range []string{"lru", "lfu", "fifo", "random"} {
 		s := NewStore(pol, 10, 0, r)
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			s.Set(0, i%37, i)
 			if s.Size() > 10 {
 				t.Fatalf("%s: size %d > cap", pol, s.Size())
@@ -365,7 +365,7 @@ func BenchmarkLargeDesign(b *testing.B) {
 	bd.node("u", KClient, Params{"rps": 1000.0, "readPct": 90.0}).node("lb", KLoadBalancer, nil).edge("u", "lb")
 	bd.node("db", KDatabase, Params{"connections": 64.0}).node("rep", KReplica, nil).node("c", KCache, nil).node("q", KQueue, nil).node("w", KWorker, nil)
 	bd.edge("c", "db").edge("q", "w").edge("w", "db")
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		id := fmt.Sprintf("a%d", i)
 		bd.node(id, KAppServer, Params{"threads": 16.0}).edge("lb", id).edge(id, "c").edge(id, "rep").edge(id, "db").edge(id, "q")
 	}

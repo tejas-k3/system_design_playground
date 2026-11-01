@@ -160,7 +160,7 @@ func TestWebSocketStepsToScoredResult(t *testing.T) {
 	readType(t, c, ctx, "frame")
 	sendMsg(t, c, ctx, clientMsg{Type: "init", ScenarioID: sc.ID, Diagram: &sc.Solution})
 	readType(t, c, ctx, "frame")
-	for i := 0; i < 400; i++ {
+	for range 400 {
 		sendMsg(t, c, ctx, clientMsg{Type: "step"})
 	}
 	var res resultMsg
@@ -230,7 +230,7 @@ func TestFramesNeverCarryNullArrays(t *testing.T) {
 	sc := scenarios.Get("hello-world")
 	sendMsg(t, c, ctx, clientMsg{Type: "init", Diagram: &sc.Solution})
 	sendMsg(t, c, ctx, clientMsg{Type: "play"})
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		_, data, err := c.Read(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -307,7 +307,7 @@ func TestWebSocketReturnsRequestTraces(t *testing.T) {
 	}
 
 	sendMsg(t, c, ctx, clientMsg{Type: "init", Diagram: &sc.Solution})
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		sendMsg(t, c, ctx, clientMsg{Type: "step"})
 	}
 	sendMsg(t, c, ctx, clientMsg{Type: "traces"})
@@ -333,7 +333,7 @@ func TestNodeSeriesAnswersWithOneSecondPointsAndNeverNull(t *testing.T) {
 	}
 
 	sendMsg(t, c, ctx, clientMsg{Type: "init", Diagram: &sc.Solution})
-	for i := 0; i < 50; i++ { // 5 simulated seconds
+	for range 50 { // 5 simulated seconds
 		sendMsg(t, c, ctx, clientMsg{Type: "step"})
 	}
 	var id string
@@ -388,7 +388,7 @@ func TestSharedDesignsRoundTripAreSanitizedAndGuarded(t *testing.T) {
 		t.Fatalf("an empty design should be refused, got %d", code)
 	}
 	huge := engine.Diagram{}
-	for i := 0; i < 130; i++ {
+	for i := range 130 {
 		huge.Nodes = append(huge.Nodes, engine.Node{ID: fmt.Sprint("n", i), Kind: engine.KCache})
 	}
 	if code := post(t, ts.URL+"/api/designs", map[string]any{"diagram": huge}, nil); code != http.StatusRequestEntityTooLarge {
@@ -399,7 +399,7 @@ func TestSharedDesignsRoundTripAreSanitizedAndGuarded(t *testing.T) {
 func TestSavingDesignsIsRateLimitedPerClient(t *testing.T) {
 	ts := newTestServerWith(t, Config{OriginPatterns: []string{"*"}, SaveLimit: 3})
 	d := scenarios.Get("hello-world").Solution
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if code := post(t, ts.URL+"/api/designs", map[string]any{"diagram": d}, nil); code != http.StatusCreated {
 			t.Fatalf("save %d: %d", i, code)
 		}

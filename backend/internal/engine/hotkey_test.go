@@ -19,7 +19,7 @@ func hotKeyCacheLoad(params Params) (cacheArr, dbArr float64) {
 	s := New(d, Options{Seed: 2})
 	s.Advance(5000)
 	n := 0.0
-	for sec := 0; sec < 10; sec++ {
+	for range 10 {
 		s.Advance(1000)
 		snap := s.Snapshot()
 		cacheArr += snap.Nodes["c"].Arr

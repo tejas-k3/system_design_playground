@@ -43,7 +43,7 @@ func followerCount(k, K int, mean, skew float64) float64 {
 	if K < 1 || k < 1 {
 		return 1
 	}
-	return math.Max(1, math.Floor(mean*float64(K)*math.Pow(float64(k), -skew)/harmonic(K, skew)))
+	return max(1, math.Floor(mean*float64(K)*math.Pow(float64(k), -skew)/harmonic(K, skew)))
 }
 
 // feedFan works out how much extra database work a feed request carries and counts it; the answer is the number of

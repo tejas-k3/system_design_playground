@@ -140,7 +140,7 @@ const noEffect = "Good to know, but it does not change how big the system has to
 func askPrompt(id, title, summary, prompt string, at [2]int, decisive [2]AskOption, others []AskOption) {
 	asks := make([]AskOption, 0, 8)
 	next := 0
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		switch i {
 		case at[0]:
 			asks = append(asks, decisive[0])

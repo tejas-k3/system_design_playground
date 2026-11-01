@@ -21,7 +21,7 @@ func vendorLoad(d Diagram) (offered, arrivals float64) {
 	s := New(d, Options{Seed: 4})
 	s.Advance(20000)
 	var sum float64
-	for sec := 0; sec < 40; sec++ {
+	for range 40 {
 		s.Advance(1000)
 		sum += s.Snapshot().Nodes["v"].Arr
 	}

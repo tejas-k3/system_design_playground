@@ -79,7 +79,7 @@ func TestASplitCounterSpreadsItsWritesEvenly(t *testing.T) {
 	const rows, writes = 8, 20000
 	n := &node{p: Params{"hotKeyMode": "split", "splitShards": float64(rows)}}
 	count := map[int]int{}
-	for i := 0; i < writes; i++ {
+	for i := range writes {
 		c := splitHotKey(n, &call{key: 0, hash: Hash32(uint32(i))}, false)
 		count[c.key]++
 	}

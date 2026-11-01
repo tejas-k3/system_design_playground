@@ -1,8 +1,6 @@
 package engine
 
-import (
-	"math"
-)
+import ()
 
 // Options configures a run.
 type Options struct {
@@ -444,7 +442,7 @@ func New(d Diagram, opts Options) *Sim {
 	keySpace := 0
 	for _, n := range s.order {
 		if n.kind == KClient {
-			keySpace = int(math.Max(float64(keySpace), n.f("keySpace")))
+			keySpace = int(max(float64(keySpace), n.f("keySpace")))
 		}
 	}
 	for _, n := range s.order {
@@ -504,7 +502,7 @@ func (s *Sim) after(d float64, fn func()) { s.at(s.now+d, fn) }
 
 // Advance runs all events up to now+dt.
 func (s *Sim) Advance(dt float64) {
-	target := s.now + math.Max(0, dt)
+	target := s.now + max(0, dt)
 	for s.heap.PeekTime() <= target {
 		e := s.heap.Pop()
 		s.now = e.t
@@ -556,15 +554,15 @@ func (s *Sim) tick() {
 		capN := float64(s.capacity(n))
 		switch {
 		case n.kind == KQueue || n.kind == KTopic || n.kind == KLog:
-			n.util[i] = float64(s.queued(n)) / math.Max(1, n.f("capacity"))
+			n.util[i] = float64(s.queued(n)) / max(1, n.f("capacity"))
 		case n.kind == KRateLimiter:
-			n.util[i] = math.Min(1, float64(n.c.adm)/math.Max(1e-9, n.f("limitRps")*tickMs/1000))
+			n.util[i] = min(1, float64(n.c.adm)/max(1e-9, n.f("limitRps")*tickMs/1000))
 		case n.kind == KLoadBalancer && n.f("maxRps") > 0:
-			n.util[i] = math.Min(1, float64(n.c.arr)*lbServiceMs(n)/tickMs)
+			n.util[i] = min(1, float64(n.c.arr)*lbServiceMs(n)/tickMs)
 		case n.kind == KClient || n.kind == KLoadBalancer || capN > 1e6:
 			n.util[i] = 0
 		default:
-			n.util[i] = math.Min(1, (n.busyArea-n.areaMark)/(capN*tickMs))
+			n.util[i] = min(1, (n.busyArea-n.areaMark)/(capN*tickMs))
 		}
 		n.areaMark = n.busyArea
 		n.ring[i] = n.c

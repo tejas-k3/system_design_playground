@@ -83,11 +83,11 @@ func TestAShareOfItemsCanHaveAShorterTTL(t *testing.T) {
 	live := func(shortPct float64) int {
 		s := NewStore("lru", 1000, 100000, NewRNG(1))
 		s.SetShortTTL(shortPct, 1000)
-		for k := 0; k < 400; k++ {
+		for k := range 400 {
 			s.Set(0, k, 1)
 		}
 		n := 0
-		for k := 0; k < 400; k++ {
+		for k := range 400 {
 			if s.Live(5000, k) {
 				n++
 			}

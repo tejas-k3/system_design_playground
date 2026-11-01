@@ -24,7 +24,7 @@ func TestASaturatedLinkCarriesExactlyItsBandwidth(t *testing.T) {
 	// 100 KB requests on an 80 Mbit/s link: 80e6 / (100,000 x 8) = 100 requests a second at most, offered 300
 	s := run(linkDesign(80, 100, 0, 300), Options{Seed: 3}, 20)
 	var st EdgeStats
-	for i := 0; i < 220; i++ { // let the window fill
+	for range 220 { // let the window fill
 		s.Advance(100)
 	}
 	st = s.Snapshot().Edges["u>a"]

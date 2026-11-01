@@ -15,7 +15,7 @@ func hedgeRun(app Params, seed uint32) *Sim {
 	b.node("a", KAppServer, ap)
 	b.node("db", KDatabase, Params{"connections": 16.0})
 	b.edge("u", "a").edge("a", "db")
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id := "r" + string(rune('1'+i))
 		b.node(id, KReplica, Params{"connections": 16.0, "readMs": 20.0, "variability": "heavy", "replicationLagMs": 50.0})
 		b.edge("a", id)

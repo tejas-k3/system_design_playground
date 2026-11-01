@@ -13,7 +13,7 @@ func TestServiceVariabilityModes(t *testing.T) {
 		r := NewRNG(11)
 		const n = 2000000
 		var sum, sumSq float64
-		for i := 0; i < n; i++ {
+		for range n {
 			v := r.ServiceDist(10, mode)
 			sum += v
 			sumSq += v * v
@@ -31,7 +31,7 @@ func TestServiceVariabilityModes(t *testing.T) {
 
 func TestDefaultVariabilityIsTheOriginalModel(t *testing.T) {
 	r1, r2 := NewRNG(5), NewRNG(5)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		if a, b := r1.Service(7), r2.ServiceDist(7, ""); a != b {
 			t.Fatalf("draw %d: Service %v vs ServiceDist(\"\") %v", i, a, b)
 		}

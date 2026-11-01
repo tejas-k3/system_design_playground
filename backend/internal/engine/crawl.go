@@ -178,7 +178,7 @@ func (st *crawlState) expand(c *node, pg crawlPage, trapOn bool, trapHost int32)
 	}
 	dupPct := c.f("crawlDupPct")
 	dedup := c.s("crawlDedup")
-	for i := 0; i < links; i++ {
+	for i := range links {
 		h := Hash32(pg.id*2654435761 ^ uint32(i+1)*40503 + 0x51ed27)
 		st.found++
 		if !pg.trap && len(st.known) > 0 && float64(h%1000) < dupPct*10 {

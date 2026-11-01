@@ -13,7 +13,7 @@ func canaryFleet(canaryPct float64) Diagram {
 		node("lb", KLoadBalancer, Params{"healthCheckSec": 1.0, "canaryPct": canaryPct})
 	b.edge("u", "lb")
 	b.node("db", KDatabase, Params{"connections": 64.0})
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		v := "v1"
 		if i >= 2 {
 			v = "v2"

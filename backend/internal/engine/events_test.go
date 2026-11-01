@@ -77,7 +77,7 @@ func TestEventLogRecordsAutoscalingSteps(t *testing.T) {
 
 func TestEventLogIsDeterministicAndBounded(t *testing.T) {
 	var many []ChaosEvent
-	for k := 0; k < 250; k++ {
+	for k := range 250 {
 		many = append(many, ChaosEvent{Type: "slow", NodeID: "a0", AtSec: float64(1 + k), Factor: 2, DurationSec: 0.5})
 	}
 	run := func() []Event {

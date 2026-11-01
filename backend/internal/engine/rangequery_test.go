@@ -37,7 +37,7 @@ func TestRangeReadsCostWhatTheStoreMakesThem(t *testing.T) {
 		name      string
 		got, want float64
 	}{{"indexed", indexed, 1}, {"unindexed", unindexed, 190}, {"wide-column", wide, 590}, {"time-series", series, 0.3}} {
-		if math.Abs(c.got-c.want) > math.Max(2, 0.02*c.want) { // service times are sampled, so a long scan wanders a little
+		if math.Abs(c.got-c.want) > max(2, 0.02*c.want) { // service times are sampled, so a long scan wanders a little
 			t.Errorf("%s: want about %.0f ms more than a point read, got %.1f", c.name, c.want, c.got)
 		}
 	}

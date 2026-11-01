@@ -6,12 +6,12 @@ import "testing"
 func tierDesign(edges int, coalesce bool) Diagram {
 	b := &builder{}
 	b.node("u", KClient, Params{"rps": 300.0, "readPct": 100.0, "keySpace": 20.0, "keyDist": "zipf", "timeoutMs": 8000.0})
-	for i := 0; i < edges; i++ {
+	for i := range edges {
 		b.node(edgeID(i), KCDN, Params{"capacityItems": 100.0, "ttlSec": 30.0, "startWarm": false})
 	}
 	b.node("shield", KCDN, Params{"capacityItems": 100.0, "ttlSec": 30.0, "startWarm": false, "coalesce": coalesce})
 	b.node("a", KAppServer, Params{"threads": 64.0, "queueCap": 1000.0}).node("db", KDatabase, Params{"connections": 16.0, "readMs": 200.0})
-	for i := 0; i < edges; i++ {
+	for i := range edges {
 		b.edge("u", edgeID(i)).edge(edgeID(i), "shield")
 	}
 	b.edge("shield", "a").edge("a", "db")

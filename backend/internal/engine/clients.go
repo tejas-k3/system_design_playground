@@ -26,7 +26,7 @@ func (s *Sim) rate(n *node, tMs float64) float64 {
 		return pts[len(pts)-1][1]
 	}
 	base, peak := n.f("rps"), n.f("peakRps")
-	period := math.Max(0.001, n.f("periodSec"))
+	period := max(0.001, n.f("periodSec"))
 	switch n.s("pattern") {
 	case "ramp":
 		if t >= period {
@@ -81,8 +81,8 @@ func (s *Sim) startCrowd(n *node, gen int) {
 // burstMultiplier scales a bursty client's rate: rushes take a fifth of the time at burstFactor times the average, and the
 // quiet phases run slower so that the long-run average is unchanged.
 func (s *Sim) burstMultiplier(n *node) float64 {
-	factor := math.Min(5, math.Max(1.5, n.f("burstFactor")))
-	mean := math.Max(0.5, n.f("burstSec")) * 1000
+	factor := min(5, max(1.5, n.f("burstFactor")))
+	mean := max(0.5, n.f("burstSec")) * 1000
 	for s.now >= n.burstUntil {
 		n.burstOn = !n.burstOn
 		phase := mean
@@ -90,12 +90,12 @@ func (s *Sim) burstMultiplier(n *node) float64 {
 			phase = mean * 4
 		}
 		// Erlang-4 phase lengths: random, but regular enough that the long-run average does not wander
-		n.burstUntil = math.Max(n.burstUntil, s.now) + (s.rng.Exp()+s.rng.Exp()+s.rng.Exp()+s.rng.Exp())/4*phase
+		n.burstUntil = max(n.burstUntil, s.now) + (s.rng.Exp()+s.rng.Exp()+s.rng.Exp()+s.rng.Exp())/4*phase
 	}
 	if n.burstOn {
 		return factor
 	}
-	return math.Max(0.05, (1-0.2*factor)/0.8)
+	return max(0.05, (1-0.2*factor)/0.8)
 }
 
 func (s *Sim) nextArrival(n *node, gen int) {
@@ -114,7 +114,7 @@ func (s *Sim) nextArrival(n *node, gen int) {
 	if n.s("arrival") == "bursty" && s.now+gap > n.burstUntil {
 		// the rate changes before this arrival would happen: redraw at the change (exponential gaps are memoryless),
 		// otherwise a long quiet-phase gap would swallow the start of the next rush and the average would sag
-		s.after(math.Max(1, n.burstUntil-s.now), func() { s.nextArrival(n, gen) })
+		s.after(max(1, n.burstUntil-s.now), func() { s.nextArrival(n, gen) })
 		return
 	}
 	s.after(gap, func() {

@@ -222,7 +222,7 @@ func (s *Sim) nic(n *node, bytes float64) float64 {
 		return 0
 	}
 	dur := bytes * 8 / (mbps * 1000)
-	start := math.Max(s.now, n.nicFree)
+	start := max(s.now, n.nicFree)
 	n.nicFree = start + dur
 	return start + dur - s.now
 }
@@ -234,7 +234,7 @@ func (s *Sim) transmit(e *edge, dir int, bytes float64) float64 {
 		return 0
 	}
 	dur := bytes * 8 / (e.bw * 1000) // bits / (Mbit/s x 1e3 bits per ms)
-	start := math.Max(s.now, e.txFree[dir])
+	start := max(s.now, e.txFree[dir])
 	e.txFree[dir] = start + dur
 	// the bits count as carried when they start crossing, so a backlog waiting behind a saturated link is not counted early
 	if wait := start - s.now; wait > 0 {
@@ -435,11 +435,11 @@ type pool struct {
 func (s *Sim) poolSize(owner *node) int {
 	switch owner.kind {
 	case KWorker:
-		return int(math.Max(1, owner.f("concurrency")))
+		return int(max(1, owner.f("concurrency")))
 	case KCache:
 		return 64 // a read-through cache keeps its own generous pool
 	}
-	return int(math.Max(1, owner.f("dbPool")))
+	return int(max(1, owner.f("dbPool")))
 }
 
 func (s *Sim) poolOf(owner, db *node) *pool {
@@ -906,7 +906,7 @@ func (s *Sim) admit(n *node, c *call) bool {
 		b = &bucket{tokens: n.f("burst"), at: s.now}
 		n.buckets[key] = b
 	}
-	b.tokens = math.Min(n.f("burst"), b.tokens+(s.now-b.at)*n.f("limitRps")/1000)
+	b.tokens = min(n.f("burst"), b.tokens+(s.now-b.at)*n.f("limitRps")/1000)
 	b.at = s.now
 	if b.tokens < 1 {
 		return false
@@ -974,7 +974,7 @@ func (s *Sim) admitWindow(n *node, c *call, algo string) bool {
 }
 
 func (s *Sim) takeToken(n *node) bool {
-	n.tokens = math.Min(n.f("burst"), n.tokens+(s.now-n.tokensAt)*n.f("limitRps")/1000)
+	n.tokens = min(n.f("burst"), n.tokens+(s.now-n.tokensAt)*n.f("limitRps")/1000)
 	n.tokensAt = s.now
 	if n.tokens < 1 {
 		return false
@@ -1050,7 +1050,7 @@ func (s *Sim) process(n *node, c *call, cb func(Result), release func()) {
 			per := n.f("throughputMBps") * 1000 // bytes per ms for one stream
 			if chunk := n.f("multipartKB") * 1000; chunk > 0 && c.cmd == cmdPut && body > chunk {
 				// multipart upload: parts of `chunk` bytes, `parallel` of them at once, each at the per-stream rate
-				rounds := math.Ceil(math.Ceil(body/chunk) / math.Max(1, n.f("multipartParallel")))
+				rounds := math.Ceil(math.Ceil(body/chunk) / max(1, n.f("multipartParallel")))
 				ms += rounds * chunk / per
 			} else {
 				ms += body / per // bytes / (MB/s x 1000 bytes per ms)
@@ -1193,7 +1193,7 @@ func (s *Sim) procRoute(n *node, c *call, cb func(Result), release func()) {
 			base = 0.05 // it forwards connections without reading the request
 		}
 		if per := lbServiceMs(n); per > 0 {
-			start := math.Max(s.now, n.lbFree)
+			start := max(s.now, n.lbFree)
 			if start-s.now > n.f("lbQueueMs") {
 				release()
 				s.failAt(n, RQueueFull, cb)
@@ -1428,7 +1428,7 @@ func (s *Sim) admitTokens(n *node, c *call) bool {
 	if n.tokAt == 0 {
 		n.tokTokens = rate
 	}
-	n.tokTokens = math.Min(rate, n.tokTokens+(s.now-n.tokAt)*rate/60000)
+	n.tokTokens = min(rate, n.tokTokens+(s.now-n.tokAt)*rate/60000)
 	n.tokAt = s.now
 	w := float64(max(1, int(c.tok)))
 	if n.tokTokens < w {

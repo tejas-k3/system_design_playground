@@ -29,7 +29,7 @@ func TestEveryPublishIsDeliveredToEverySubscriber(t *testing.T) {
 	if r.Jobs.Enqueued < published*3-9 || r.Jobs.Enqueued > published*3+30 {
 		t.Fatalf("one delivery per subscriber: %d deliveries for %d publishes", r.Jobs.Enqueued, published)
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		got := s.Snapshot().Nodes[fmt.Sprintf("w%d", i)]
 		if got.Ok < 25 { // 30 messages a second
 			t.Fatalf("subscriber %d should handle about 30/s, handles %.1f", i, got.Ok)

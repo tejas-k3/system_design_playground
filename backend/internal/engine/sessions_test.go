@@ -46,7 +46,7 @@ func TestConnectionsAreLimitedByMemoryNotThreads(t *testing.T) {
 		t.Errorf("the published capacity should be 1024, got %v", refused)
 	}
 	var refusals float64
-	for i := 0; i < 5; i++ { // the rest keep being refused, with a reason of their own
+	for range 5 { // the rest keep being refused, with a reason of their own
 		s.Advance(1000)
 		refusals += s.Snapshot().Nodes["a"].Reasons["connRefused"]
 	}
@@ -62,7 +62,7 @@ func TestReconnectStormNeedsJitter(t *testing.T) {
 		s.Advance(30000)
 		s.CrashNode("a", 1)
 		p := 0.0
-		for i := 0; i < 40; i++ {
+		for range 40 {
 			s.Advance(500)
 			if r := s.Snapshot().Nodes["a"].Extra["connectRps"]; r > p {
 				p = r

@@ -111,7 +111,7 @@ func runDefendDesign(d engine.Diagram, sc *scenarios.Scenario, seed uint32, dead
 		}
 	}
 	run := sim.RunSnapshot()
-	success := math.Floor(100*float64(run.OK)/math.Max(1, float64(run.Resolved+run.Pending))*10) / 10
+	success := math.Floor(100*float64(run.OK)/max(1, float64(run.Resolved+run.Pending))*10) / 10
 	return defendScore{
 		Pass:        engine.Evaluate(sc.Goals, d, run, sim.CostPerHour()).Pass,
 		SuccessPct:  success,

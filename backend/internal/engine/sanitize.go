@@ -16,7 +16,7 @@ const (
 
 func finite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
 
-func clamp(v, lo, hi float64) float64 { return math.Min(hi, math.Max(lo, v)) }
+func clamp(v, lo, hi float64) float64 { return min(hi, max(lo, v)) }
 
 // SanitizeParams keeps only known keys with valid values, clamping numbers into range.
 // It reports whether anything had to be changed.

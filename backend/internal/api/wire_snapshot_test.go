@@ -9,7 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -55,7 +55,7 @@ func wireSection(t *testing.T, name string, body []byte) string {
 	for k := range paths {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	sum := sha256.Sum256(body)
 	return fmt.Sprintf("## %s sha256=%s\n%s\n", name, hex.EncodeToString(sum[:8]), strings.Join(keys, "\n"))
 }

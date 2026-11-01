@@ -182,7 +182,7 @@ func (s *Sim) Snapshot() Stats {
 		sum, u := s.nodeWindow(n)
 		ns := NodeStats{
 			ID: n.id, Arr: float64(sum.arr) / span, Ok: float64(sum.ok) / span, Err: float64(sum.err) / span,
-			Util: math.Min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted, Instances: s.scaledInstances(n),
+			Util: min(1, u), Busy: n.busy, QLen: len(n.q) - n.qh, HitRate: -1, Down: n.down, Cut: n.cut, Primary: n.promoted, Instances: s.scaledInstances(n),
 		}
 		ns.Phase, ns.PhaseLeft = s.failoverPhase(n)
 		if s.autoscaled(n) {
@@ -388,7 +388,7 @@ func (s *Sim) Snapshot() Stats {
 		if bits > 0 {
 			es.Mbps = bits / span / 1e6
 			if e.bw > 0 {
-				es.Util = math.Min(1, es.Mbps/e.bw)
+				es.Util = min(1, es.Mbps/e.bw)
 			}
 		}
 		if e.from.kind == KAppServer && e.from.b("circuitBreaker") {
@@ -477,7 +477,7 @@ func (s *Sim) recordNodePoints() {
 		if n.kind == KQueue {
 			q = len(n.jobs) - n.jh + len(n.hjobs) - n.hh
 		}
-		n.hist = append(n.hist, NodePoint{T: s.now / 1000, Util: math.Min(1, u), QLen: q, Arr: float64(sum.arr) / span, Err: float64(sum.err) / span, Instances: s.scaledInstances(n)})
+		n.hist = append(n.hist, NodePoint{T: s.now / 1000, Util: min(1, u), QLen: q, Arr: float64(sum.arr) / span, Err: float64(sum.err) / span, Instances: s.scaledInstances(n)})
 		if len(n.hist) > nodeHistory {
 			n.hist = append([]NodePoint(nil), n.hist[len(n.hist)-nodeHistory:]...)
 		}

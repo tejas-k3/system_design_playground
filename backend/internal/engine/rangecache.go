@@ -42,7 +42,7 @@ func pieceKey(key, i int) int { return -(key*1024 + i + 1) }
 // rangeLookup reads every piece of the object. It returns the pieces that are missing, the version of the first piece
 // present, and whether any piece had expired.
 func (s *Sim) rangeLookup(n *node, c *call, pieces int) (missing []int, ver int, expired bool) {
-	for i := 0; i < pieces; i++ {
+	for i := range pieces {
 		v, hit, exp := n.store.Get(s.now, pieceKey(c.key, i))
 		expired = expired || exp
 		if !hit {
@@ -55,13 +55,13 @@ func (s *Sim) rangeLookup(n *node, c *call, pieces int) (missing []int, ver int,
 }
 
 func (s *Sim) rangeSetAll(n *node, c *call, pieces, ver int) {
-	for i := 0; i < pieces; i++ {
+	for i := range pieces {
 		n.c.evict += n.store.Set(s.now, pieceKey(c.key, i), ver)
 	}
 }
 
 func (s *Sim) rangeDeleteAll(n *node, c *call, pieces int) {
-	for i := 0; i < pieces; i++ {
+	for i := range pieces {
 		n.store.Delete(pieceKey(c.key, i))
 	}
 }
@@ -146,7 +146,7 @@ func (s *Sim) rangeMiss(n *node, c *call, missing []int, pieces int, size, piece
 // preloadRanged fills a ranged store with the pieces of objects 1..n, as if warmed up.
 func (s *Sim) preloadRanged(n *node, objects, pieces int) {
 	for k := 1; k <= objects; k++ {
-		for i := 0; i < pieces; i++ {
+		for i := range pieces {
 			if n.store.Size() >= n.store.Capacity() {
 				return
 			}

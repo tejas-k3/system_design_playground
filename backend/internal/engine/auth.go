@@ -1,7 +1,5 @@
 package engine
 
-import "math"
-
 // Who is calling. Every request carries a token. The app server either asks the auth service whether it is valid (and may
 // remember a yes for a while, per user), or verifies the signature itself. When the auth service fails, the server
 // refuses the request (closed) or lets it through unchecked (open). Encryption is a time cost only; nothing is encrypted.
@@ -73,5 +71,5 @@ func (s *Sim) coldStartWait(n *node) float64 {
 		n.coldWarmAt = s.now + cs
 	}
 	n.coldUp, n.coldLast = true, s.now
-	return math.Max(0, n.coldWarmAt-s.now)
+	return max(0, n.coldWarmAt-s.now)
 }

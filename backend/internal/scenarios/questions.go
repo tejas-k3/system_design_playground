@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 
 	"sysdesign/internal/engine"
 )
@@ -265,7 +265,7 @@ func (q *Question) GradeEstimate(answers map[string]float64) (EstimateResult, er
 		}
 	}
 	if len(extra) > 0 {
-		sort.Strings(extra)
+		slices.Sort(extra)
 		return EstimateResult{}, fmt.Errorf("unknown field %q", extra[0])
 	}
 	res := EstimateResult{}

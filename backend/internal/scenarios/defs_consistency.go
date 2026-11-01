@@ -236,7 +236,7 @@ func registerConsistencyAndStreams() {
 			n("db", engine.KDatabase, cols[3], rowMid, P{"connections": 64.0, "writeMs": 40.0, "conditionalWrite": fixed}).
 			n("redis", engine.KRedis, cols[2], 320, nil).
 			e("users", "lb")
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			id := fmt.Sprintf("app%d", k+1)
 			b.n(id, engine.KAppServer, cols[2], float64(k)*100+30, P{"threads": 24.0, "queueCap": 2000.0, "lockTtlMs": 150.0, "lockWaitMs": 300.0, "dbPool": 100.0, "gcPauseMs": 600.0, "gcEverySec": 0.5}).e("lb", id).e(id, "db").e(id, "redis")
 		}

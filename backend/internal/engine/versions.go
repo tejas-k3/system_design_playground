@@ -1,7 +1,5 @@
 package engine
 
-import "math"
-
 // Versions: per-item version history, staleness accounting and idempotent commits.
 
 // verLog is the recent version history of one item.
@@ -34,7 +32,7 @@ func (s *Sim) verAt(key int, t float64) int {
 			return v.v[i]
 		}
 	}
-	return int(math.Max(0, float64(v.v[0]-1)))
+	return int(max(0, float64(v.v[0]-1)))
 }
 
 func (s *Sim) bumpVer(key int) int {
@@ -60,7 +58,7 @@ func maxStale(cl *node) float64 {
 	case "strong":
 		return 0
 	case "bounded":
-		return math.Max(0, cl.f("maxStaleMs"))
+		return max(0, cl.f("maxStaleMs"))
 	}
 	return -1
 }

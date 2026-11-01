@@ -40,7 +40,7 @@ func (s *Sim) txAcquire(n *node, id, key int, granted, deadlock func()) {
 	}
 	// would waiting here close a cycle? follow who holds what each holder waits for
 	cur := l.holder
-	for i := 0; i < 64; i++ {
+	for range 64 {
 		if cur == id {
 			deadlock()
 			return

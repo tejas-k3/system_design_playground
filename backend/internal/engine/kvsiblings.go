@@ -270,9 +270,9 @@ func kvModFirst(key, n int) int { return int(kvKeyHash(key) % uint32(n)) }
 
 func newKVRing(nodes, vnodes int) *kvRing {
 	r := &kvRing{nodes: nodes, cache: map[int][]int{}}
-	for i := 0; i < nodes; i++ {
+	for i := range nodes {
 		base := Hash32(uint32(i) + 0x5bd1e995)
-		for v := 0; v < vnodes; v++ {
+		for v := range vnodes {
 			r.pts = append(r.pts, kvPoint{Hash32(base + uint32(v)*0x9e3779b1), i})
 		}
 	}

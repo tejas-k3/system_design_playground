@@ -269,7 +269,7 @@ func (s *Sim) coordVote(n *node, c *call) (answered, wrong bool) {
 	members := len(n.coordDown)
 	f.fit(members)
 	honest, liars := 0, 0
-	for j := 0; j < members; j++ {
+	for j := range members {
 		if !s.coordUp(n, j) || s.memberHit(c, j, f.muteUntil[j], f.mutePct[j], 11) {
 			continue // down, or it drops this request
 		}

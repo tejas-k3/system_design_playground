@@ -16,7 +16,7 @@ func registerResourceLimits() {
 		}
 		b := (&bld{}).n("users", engine.KClient, cols[0], 200, P{"rps": 60.0, "readPct": 100.0, "timeoutMs": 2000.0}).
 			n("app", engine.KAppServer, cols[1], 200, app).e("users", "app")
-		for k := 0; k < 16; k++ {
+		for k := range 16 {
 			id := fmt.Sprintf("shard%d", k+1)
 			b.n(id, engine.KIndex, cols[2], float64(k)*80, P{"queryMs": 30.0, "variability": "heavy", "connections": 16.0}).label(id, fmt.Sprintf("Search Shard %d", k+1)).e("app", id)
 		}
@@ -152,7 +152,7 @@ func registerResourceLimits() {
 			n("lb", engine.KLoadBalancer, cols[1], rowMid, nil).
 			n("db", engine.KDatabase, cols[3], rowMid, nil).
 			e("users", "lb")
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			id := fmt.Sprintf("app%d", k+1)
 			b.n(id, engine.KAppServer, cols[2], float64(k)*110+60, P{"threads": 16.0, "gcPauseMs": pause, "gcEverySec": 8.0}).e("lb", id).e(id, "db")
 		}
@@ -401,7 +401,7 @@ func registerResourceLimits() {
 			n("log", engine.KLog, cols[2], rowMid, P{"partitions": parts, "capacity": 50000.0}).
 			n("db", engine.KDatabase, cols[4], rowMid, nil).
 			e("users", "app").e("app", "log")
-		for k := 0; k < 8; k++ {
+		for k := range 8 {
 			id := fmt.Sprintf("c%d", k+1)
 			b.n(id, engine.KWorker, cols[3], float64(k)*60, P{"concurrency": 2.0, "processMs": 100.0}).label(id, fmt.Sprintf("Consumer %d", k+1)).e("log", id).e(id, "db")
 		}
@@ -436,7 +436,7 @@ func registerResourceLimits() {
 			n("app", engine.KAppServer, cols[1], rowMid, P{"threads": 32.0, "queueCap": 2000.0, "dbPool": 200.0}).
 			n("shards", engine.KShardRouter, cols[2], rowMid, P{"shardBy": by}).
 			e("users", "app").e("app", "shards")
-		for k := 0; k < 4; k++ {
+		for k := range 4 {
 			id := fmt.Sprintf("r%d", k+1)
 			b.n(id, engine.KRedis, cols[3], float64(k)*100+30, P{"scoreMs": 4.0}).e("shards", id)
 		}

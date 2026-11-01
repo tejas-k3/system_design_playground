@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"math"
 )
 
 // Finding is one piece of advice about a design. Lint is advisory: it never changes a simulation.
@@ -69,7 +68,7 @@ func Lint(d Diagram) []Finding {
 	}
 	var smallVote []string
 	for _, n := range d.Nodes {
-		if n.Kind == KCoordinator && ps(res[n.ID], "faultModel") == "arbitrary" && math.Min(9, pf(res[n.ID], "nodes", 3)) < 3*pf(res[n.ID], "faultsTolerated", 1)+1 {
+		if n.Kind == KCoordinator && ps(res[n.ID], "faultModel") == "arbitrary" && min(9, pf(res[n.ID], "nodes", 3)) < 3*pf(res[n.ID], "faultsTolerated", 1)+1 {
 			smallVote = append(smallVote, n.ID)
 		}
 	}
